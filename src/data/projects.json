@@ -1,0 +1,28 @@
+[
+  {
+    "id": "number-slayers",
+    "title": "Number Slayers",
+    "description": "An educational math game built with Three.js featuring immersive 3D graphics and engaging gameplay mechanics designed to make learning math fun and interactive.",
+    "techStack": ["Three.js", "JavaScript", "WebGL", "Game Design"],
+    "imageUrl": "/images/projects/number-slayers.png",
+    "liveUrl": "#",
+    "repoUrl": "#"
+  },
+  {
+    "id": "2d-pong",
+    "title": "2D Pong Game",
+    "description": "A classic Pong game reimagined with modern web technologies, featuring smooth animations, responsive controls, and customizable gameplay settings.",
+    "techStack": ["JavaScript", "HTML Canvas", "CSS", "Game Development"],
+    "imageUrl": "/images/projects/pong-game.png",
+    "liveUrl": "#",
+    "repoUrl": "#"
+  },
+  {
+    "id": "timelycare-platform",
+    "title": "TimelyCare",
+    "description": "A comprehensive telehealth platform providing mental health and medical services to university students across the nation, built with accessibility as a core priority.",
+    "techStack": ["React", "React Native", "TypeScript", "Node.js", "AWS"],
+    "imageUrl": "/images/projects/timelycare.png",
+    "liveUrl": "https://timelycare.com"
+  }
+]

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "timelycare",
+    "title": "Senior Software Engineer II",
+    "company": "TimelyCare",
+    "dateRange": "Feb 2023 - Present",
+    "description": "Leading full-stack development initiatives for a telehealth platform serving universities nationwide.",
+    "bulletPoints": [
+      "Architected and engineered full-stack solutions with ReactJS, React Native, Typescript, NodeJS, AWS, Microservices/APIs.",
+      "Built a filterable, event driven live data report dashboard w/ SNS/SQS, SQL, NodeJS, React, Typescript enabling sales team to land multiple large clients.",
+      "Implemented unit and integration tests, reducing post-release bugs by 50% using Vitest, Playwright, Detox.",
+      "Achieved perfect VPAT accessibility score, setting benchmark for the most accessible telehealth software in the industry.",
+      "Highly effective cross-functional collaboration with design and product resulting in company goals being met ahead of schedule.",
+      "Mentored new engineers, helped with onboarding, ensured people felt welcome and supported resulting in a stronger and more effective team."
+    ],
+    "techStack": ["React", "React Native", "TypeScript", "Node.js", "AWS", "SQL", "Vitest", "Playwright"],
+    "type": "tech"
+  },
+  {
+    "id": "sessions",
+    "title": "Software Engineer",
+    "company": "Sessions",
+    "dateRange": "Jul 2022 - Dec 2022",
+    "description": "Built features for a music platform connecting artists with fans globally.",
+    "bulletPoints": [
+      "Built/maintained component library with React, React Native, Typescript, MobX State Tree, Tailwind.",
+      "Wrote unit and integration tests with Jest and React Testing Library to ensure software reliability and stability.",
+      "Collaborated with backend engineers to architect/build solutions with NodeJS, APIs, Microservices, AWS.",
+      "Developed and launched key platform features, connecting 130K musicians with 1.7M fans and driving user acquisition."
+    ],
+    "techStack": ["React", "React Native", "TypeScript", "MobX", "Tailwind", "Jest", "Node.js", "AWS"],
+    "type": "tech"
+  },
+  {
+    "id": "designit-microsoft",
+    "title": "Front End Developer",
+    "company": "Designit/Microsoft",
+    "dateRange": "Mar 2021 - Jul 2022",
+    "description": "Developed and maintained critical Azure product pages for Microsoft's cloud platform.",
+    "bulletPoints": [
+      "Built and maintained critical Azure product pages during 50% YoY growth, contributing to $60B+ annual intelligent cloud revenue.",
+      "Rapidly gained proficiency in C#, ASP.NET MVC, and CSHTML, expediting delivery of crucial backend-integrated features.",
+      "Converted complex Figma designs into responsive, accessible web components, ensuring pixel-perfect implementation.",
+      "Mentored new team members, conducted code reviews, and optimized processes, boosting team velocity by 25% in 3 months."
+    ],
+    "techStack": ["React", "TypeScript", "C#", "ASP.NET MVC", "Azure", "Figma", "Accessibility"],
+    "type": "tech"
+  },
+  {
+    "id": "freelance",
+    "title": "Freelance Developer",
+    "company": "phillcodes.com",
+    "dateRange": "Dec 2018 - Dec 2020",
+    "description": "Built diverse web applications for clients while establishing expertise in modern frontend technologies.",
+    "bulletPoints": [
+      "Developed diverse web applications, focusing on modern technologies like TypeScript, React, Redux, Tailwind, and Next.js.",
+      "Implemented CI/CD pipelines on AWS, improving deployment speed/reliability while ensuring scalability and performance.",
+      "Designed and engineered interactive features including a Twilio-integrated chatbot, enhancing user engagement across projects.",
+      "Built custom particle effects engine using HTML Canvas and JavaScript, elevating website aesthetics and increasing engagement."
+    ],
+    "techStack": ["React", "TypeScript", "Redux", "Tailwind", "Next.js", "AWS", "Node.js", "Canvas"],
+    "type": "tech"
+  },
+  {
+    "id": "music-career",
+    "title": "Guitarist/Composer",
+    "company": "The Funky Knuckles/Strange Loop Games",
+    "dateRange": "Apr 1998 - Present",
+    "description": "Professional musician with achievements spanning live performance, studio recording, and game audio composition.",
+    "bulletPoints": [
+      "Composed adaptive music for award-winning game ECO, contributing to acclaim and success ($7.1M revenue, 314K units sold).",
+      "Collaborated with audio and software engineers to integrate adaptive music into complex 3D game environments.",
+      "Produced/performed on Meta-Musica – an album that reached #1 on the iTunes jazz charts, increasing fanbase by 10x globally."
+    ],
+    "techStack": ["Music Composition", "Game Audio", "DAW", "Adaptive Music", "Studio Recording"],
+    "type": "music"
+  },
+  {
+    "id": "education",
+    "title": "Education",
+    "company": "",
+    "dateRange": "",
+    "description": "",
+    "bulletPoints": [
+      "BA Jazz Studies — University of North Texas",
+      "MongoDB/Full-stack Certificate — Udemy",
+      "Ultimate Redux Course — Code with Mosh"
+    ],
+    "techStack": [],
+    "type": "education"
+  }
+]

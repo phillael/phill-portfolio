@@ -1,0 +1,55 @@
+[
+  {
+    "category": "Technical Skills",
+    "skills": [
+      "JavaScript",
+      "TypeScript",
+      "HTML",
+      "CSS",
+      "React",
+      "React Native",
+      "Redux",
+      "ThreeJS",
+      "Tailwind",
+      "Node.js",
+      "SQL",
+      "NoSQL",
+      "RESTful APIs",
+      "Git",
+      "Figma",
+      "Cursor",
+      "Claude Code",
+      "Postman",
+      "Docker",
+      "Accessibility"
+    ]
+  },
+  {
+    "category": "Professional Skills",
+    "skills": [
+      "Software Engineering",
+      "SDLC",
+      "Systems Architecture",
+      "Full-Stack",
+      "SOA",
+      "Game Development",
+      "Testing",
+      "Responsive Design",
+      "Data Structures",
+      "Cloud Computing",
+      "Prompt Engineering",
+      "Agile",
+      "Cross-functional Collaboration"
+    ]
+  },
+  {
+    "category": "Other Skills",
+    "skills": [
+      "Guitar",
+      "Music Composition & Production",
+      "Cooking",
+      "Fitness/Nutrition",
+      "Spanish"
+    ]
+  }
+]

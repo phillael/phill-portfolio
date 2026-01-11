@@ -1,0 +1,331 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Background - Dark gradient base */
+  --background: 220 20% 3%;
+  --background-end: 180 45% 10%;
+  --foreground: 180 100% 95%;
+
+  /* Cards/Surfaces */
+  --card: 220 20% 8%;
+  --card-foreground: 180 100% 95%;
+
+  /* Popover */
+  --popover: 220 20% 8%;
+  --popover-foreground: 180 100% 95%;
+
+  /* Primary - Cyan/Electric Blue */
+  --primary: 190 100% 75%;
+  --primary-foreground: 0 100% 100%;
+
+  /* Secondary - Purple/Magenta */
+  --secondary: 280 225% 85%;
+  --secondary-foreground: 220 20% 5%;
+
+  /* Muted - Deep blue */
+  --muted: 230 60% 20%;
+  --muted-foreground: 180 30% 80%;
+
+  /* Accent - Green/Lime */
+  --accent: 130 200% 50%;
+  --accent-foreground: 180 100% 95%;
+
+  /* Destructive */
+  --destructive: 0 100% 60%;
+  --destructive-foreground: 180 100% 95%;
+
+  /* Borders/Inputs - Cyan */
+  --border: 180 100% 50%;
+  --input: 180 100% 50%;
+  --ring: 180 100% 50%;
+
+  /* Border radius */
+  --radius: 0.5rem;
+
+  /* Typography */
+  --font-heading: var(--font-audiowide);
+  --font-body: var(--font-nunito);
+}
+
+body {
+  background: linear-gradient(
+    to bottom right,
+    hsl(var(--background)),
+    hsl(var(--background-end))
+  );
+  color: hsl(var(--foreground));
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) hsl(var(--card));
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--card));
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--primary));
+  border-radius: 4px;
+  border: 2px solid hsl(var(--card));
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--primary) / 0.8);
+}
+
+/* Neon text effects */
+.neon-text-green {
+  text-shadow:
+    0 0 7px hsl(var(--accent)),
+    0 0 10px hsl(var(--muted)),
+    0 0 20px hsl(var(--primary)),
+    0 0 30px hsl(var(--muted)),
+    0 0 50px hsl(var(--accent));
+}
+
+.neon-text-purple {
+  text-shadow:
+    0 0 7px hsl(var(--secondary)),
+    0 0 10px hsl(var(--secondary)),
+    0 0 20px hsl(var(--secondary)),
+    0 0 30px hsl(var(--muted)),
+    0 0 40px hsl(var(--secondary));
+}
+
+.neon-text-blue {
+  text-shadow:
+    0 0 3px hsl(var(--primary)),
+    0 0 10px hsl(var(--primary)),
+    0 0 15px hsl(var(--muted));
+}
+
+/* Neon border effect */
+.neon-border {
+  box-shadow:
+    0 0 5px hsl(var(--secondary)),
+    0 0 10px hsl(var(--muted)),
+    0 0 15px hsl(var(--accent)),
+    0 0 20px hsl(var(--primary)),
+    0 0 40px hsl(var(--secondary));
+}
+
+/* Subtle neon border effect for navigation header */
+.neon-border-subtle {
+  box-shadow:
+    0 1px 3px hsl(var(--primary) / 0.3),
+    0 2px 8px hsl(var(--primary) / 0.2),
+    0 4px 15px hsl(var(--primary) / 0.1);
+}
+
+/* Gradient card */
+.gradient-card {
+  --gradient-start: hsl(var(--card));
+  --gradient-end: hsl(var(--primary) / 0.05);
+  background: linear-gradient(
+    to right,
+    var(--gradient-start),
+    var(--gradient-end)
+  );
+  transition: all 0.8s ease-in-out;
+}
+
+.gradient-card:hover {
+  filter: hue-rotate(-65deg) saturate(1.1);
+}
+
+/* HUD Card - Cyberpunk HUD aesthetic with angled corners and scanline effect */
+.hud-card {
+  position: relative;
+  clip-path: polygon(
+    0 8px,
+    8px 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    8px 100%,
+    0 calc(100% - 8px)
+  );
+  box-shadow:
+    0 0 8px hsl(var(--primary) / 0.4),
+    0 0 16px hsl(var(--primary) / 0.2),
+    inset 0 0 20px hsl(var(--primary) / 0.05);
+  border: 1px solid hsl(var(--primary) / 0.3);
+}
+
+/* Scanline overlay effect for HUD card */
+.hud-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    hsl(var(--primary) / 0.03) 2px,
+    hsl(var(--primary) / 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* HUD card content should be above scanlines */
+.hud-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Timeline connector glow effect */
+.timeline-line {
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--primary) / 0.8),
+    hsl(var(--primary) / 0.4),
+    hsl(var(--primary) / 0.8)
+  );
+  box-shadow:
+    0 0 8px hsl(var(--primary) / 0.6),
+    0 0 16px hsl(var(--primary) / 0.4),
+    0 0 24px hsl(var(--primary) / 0.2);
+}
+
+/* Timeline dot with neon glow */
+.timeline-dot {
+  background: hsl(var(--primary));
+  box-shadow:
+    0 0 6px hsl(var(--primary)),
+    0 0 12px hsl(var(--primary) / 0.8),
+    0 0 20px hsl(var(--primary) / 0.5);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 6px hsl(var(--primary)),
+      0 0 12px hsl(var(--primary) / 0.8),
+      0 0 20px hsl(var(--primary) / 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 10px hsl(var(--primary)),
+      0 0 20px hsl(var(--primary) / 0.8),
+      0 0 30px hsl(var(--primary) / 0.6);
+  }
+}
+
+/* Link styles */
+a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  transition: all 0.2s ease-in-out;
+  font-weight: 500;
+  text-shadow: 0 0 10px hsl(var(--primary) / 0.3);
+}
+
+a:hover {
+  color: hsl(var(--accent));
+  text-decoration-thickness: 2px;
+  text-shadow: 0 0 15px hsl(var(--accent) / 0.4);
+}
+
+a:focus {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
+a:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+a:active {
+  color: hsl(var(--secondary));
+  text-shadow: 0 0 20px hsl(var(--secondary) / 0.5);
+}
+
+/* Hero image animated glow effect */
+.hero-image-glow {
+  animation: hero-glow 4s ease-in-out infinite;
+  filter: blur(40px);
+  opacity: 0.6;
+}
+
+@keyframes hero-glow {
+  0%,
+  100% {
+    background: radial-gradient(
+      circle,
+      hsl(var(--primary) / 0.8) 0%,
+      transparent 70%
+    );
+  }
+  33% {
+    background: radial-gradient(
+      circle,
+      hsl(var(--secondary) / 0.8) 0%,
+      transparent 70%
+    );
+  }
+  66% {
+    background: radial-gradient(
+      circle,
+      hsl(280 80% 60% / 0.8) 0%,
+      transparent 70%
+    );
+  }
+}
+
+/* Scroll indicator glow effect */
+.scroll-indicator-chevron {
+  filter: drop-shadow(0 0 4px hsl(var(--primary)));
+}
+
+.scroll-indicator:hover .scroll-indicator-chevron {
+  filter: drop-shadow(0 0 8px hsl(var(--primary)));
+}
+
+/* Project placeholder gradient - cyberpunk-themed gradient for missing images */
+.project-placeholder-gradient {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--card)) 25%,
+    hsl(var(--primary) / 0.15) 50%,
+    hsl(var(--secondary) / 0.1) 75%,
+    hsl(var(--muted)) 100%
+  );
+}

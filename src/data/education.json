@@ -1,0 +1,22 @@
+[
+  {
+    "id": "mongodb-fullstack",
+    "credential": "MongoDB/Full-stack Certificate",
+    "institution": "Udemy",
+    "platform": "Online Course",
+    "year": "2019"
+  },
+  {
+    "id": "redux-course",
+    "credential": "Ultimate Redux Course",
+    "institution": "Code with Mosh",
+    "platform": "Online Course",
+    "year": "2020"
+  },
+  {
+    "id": "unt-jazz",
+    "credential": "BA Jazz Studies",
+    "institution": "University of North Texas",
+    "year": "2008"
+  }
+]

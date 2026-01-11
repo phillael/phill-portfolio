@@ -19,7 +19,7 @@ describe('Data Architecture', () => {
     })
 
     it('contains the expected number of experience entries', () => {
-      expect(experienceData.length).toBe(5)
+      expect(experienceData.length).toBe(6)
     })
 
     it('each experience entry has required fields', () => {
@@ -32,7 +32,7 @@ describe('Data Architecture', () => {
         expect(experience.description).toBeDefined()
         expect(Array.isArray(experience.bulletPoints)).toBe(true)
         expect(Array.isArray(experience.techStack)).toBe(true)
-        expect(['tech', 'music']).toContain(experience.type)
+        expect(['tech', 'music', 'education']).toContain(experience.type)
       })
     })
 

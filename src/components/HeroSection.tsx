@@ -2,7 +2,6 @@
 
 import HeroImage from '@/components/HeroImage'
 import { AnimatedTagline } from '@/components/AnimatedHeadline'
-import ScrollIndicator from '@/components/ScrollIndicator'
 
 const HeroSection = () => {
   return (
@@ -16,7 +15,6 @@ const HeroSection = () => {
         <HeroImage />
         <AnimatedTagline />
       </div>
-      <ScrollIndicator />
     </section>
   )
 }

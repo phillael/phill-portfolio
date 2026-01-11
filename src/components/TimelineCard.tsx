@@ -48,6 +48,8 @@ const TechBadge = ({ tech }: { tech: string }) => (
  * - Smooth height transition animation with Framer Motion
  * - HUD aesthetic with angled corners and scanline effect
  * - Full keyboard accessibility (Enter/Space to toggle)
+ * - Standardized hover effects: scale 1.02, glow enhancement
+ * - whileTap feedback: scale 0.98
  */
 const TimelineCard = ({ experience }: TimelineCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -72,7 +74,7 @@ const TimelineCard = ({ experience }: TimelineCardProps) => {
   return (
     <motion.div
       layout
-      className={`gradient-card hud-card p-4 md:p-6 cursor-pointer ${
+      className={`gradient-card hud-card p-4 md:p-6 cursor-pointer transition-all duration-150 ease-out ${
         isMusicCareer ? 'border-l-4 border-l-[hsl(var(--secondary))]' : ''
       } ${isEducation ? 'border-l-4 border-l-[hsl(var(--accent))]' : ''}`}
       role="button"
@@ -81,6 +83,12 @@ const TimelineCard = ({ experience }: TimelineCardProps) => {
       aria-label={`${experience.title}${experience.company ? ` at ${experience.company}` : ''}. ${isExpanded ? 'Click to collapse' : 'Click to expand'}`}
       onClick={toggleExpand}
       onKeyDown={handleKeyDown}
+      whileHover={{
+        scale: 1.02,
+        boxShadow: '0 0 16px hsl(var(--primary) / 0.4), 0 0 32px hsl(var(--primary) / 0.2)',
+      }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
     >
       {/* Collapsed State Header - Always Visible */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
@@ -111,7 +119,7 @@ const TimelineCard = ({ experience }: TimelineCardProps) => {
 
         {/* Expand Indicator */}
         <div
-          className={`flex items-center gap-2 text-[hsl(var(--primary))] ${
+          className={`flex items-center gap-2 text-[hsl(var(--primary))] transition-colors duration-150 ${
             isExpanded ? 'text-[hsl(var(--accent))]' : ''
           }`}
         >

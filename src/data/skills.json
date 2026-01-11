@@ -2,12 +2,17 @@
   {
     "category": "Technical Skills",
     "skills": [
+      "Claude Code",
+      "Cursor",
+      "AWS",
+      "CI/CD",
       "JavaScript",
       "TypeScript",
       "HTML",
       "CSS",
       "React",
       "React Native",
+      "Next.js",
       "Redux",
       "ThreeJS",
       "Tailwind",
@@ -15,10 +20,9 @@
       "SQL",
       "NoSQL",
       "RESTful APIs",
+      "Microservices",
+      "Vitest/Jest",
       "Git",
-      "Figma",
-      "Cursor",
-      "Claude Code",
       "Postman",
       "Docker",
       "Accessibility"
@@ -27,7 +31,14 @@
   {
     "category": "Professional Skills",
     "skills": [
+      "AI-Assisted Workflows",
+      "Agent OS",
+      "Spec-Driven Development",
+      "Prompt Engineering",
       "Software Engineering",
+      "Leadership",
+      "Mentorship",
+      "Code Review",
       "SDLC",
       "Systems Architecture",
       "Full-Stack",
@@ -37,7 +48,6 @@
       "Responsive Design",
       "Data Structures",
       "Cloud Computing",
-      "Prompt Engineering",
       "Agile",
       "Cross-functional Collaboration"
     ]
@@ -46,7 +56,10 @@
     "category": "Other Skills",
     "skills": [
       "Guitar",
+      "Piano",
       "Music Composition & Production",
+      "Recording Engineering",
+      "Sound Design",
       "Cooking",
       "Fitness/Nutrition",
       "Spanish"

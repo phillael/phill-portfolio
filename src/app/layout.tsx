@@ -1,4 +1,4 @@
-import { Audiowide, Nunito } from 'next/font/google'
+import { Audiowide, Nunito, Press_Start_2P } from 'next/font/google'
 import '@/app/globals.css'
 import Nav from '@/components/Nav'
 
@@ -12,6 +12,12 @@ const nunito = Nunito({
   weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
   variable: '--font-nunito',
+})
+
+const pressStart2P = Press_Start_2P({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-pixel',
 })
 
 export const metadata = {
@@ -31,7 +37,7 @@ export const metadata = {
 
 const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <html lang="en" className={`${audiowide.variable} ${nunito.variable}`}>
+    <html lang="en" className={`${audiowide.variable} ${nunito.variable} ${pressStart2P.variable}`}>
       <body className="font-body text-foreground custom-scrollbar">
         <Nav />
         {children}

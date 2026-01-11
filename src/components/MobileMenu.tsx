@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence, Variants } from 'framer-motion'
 import NavLinks from '@/components/NavLinks'
 import SocialLinks from '@/components/SocialLinks'
+import ResumeDownloadButton from '@/components/ResumeDownloadButton'
 
 interface MobileMenuProps {
   isOpen: boolean
@@ -154,9 +155,14 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
               </motion.button>
             </div>
 
-            {/* Navigation links and Social links */}
+            {/* Navigation links, Resume Download, and Social links */}
             <nav className="flex flex-col items-center justify-center h-[calc(100%-80px)] px-8">
               <NavLinks onLinkClick={onClose} isMobile />
+
+              {/* Resume Download Button */}
+              <div className="mt-8 w-full max-w-xs">
+                <ResumeDownloadButton variant="mobile" />
+              </div>
 
               {/* Social Links */}
               <div className="mt-12 pt-8 border-t border-primary/30">

@@ -15,56 +15,45 @@ import ProjectCard from '@/components/ProjectCard'
 import projectsData from '@/data/projects.json'
 import { Project } from '@/types/content'
 
+// Helper to filter out framer-motion props
+const filterMotionProps = (props: Record<string, unknown>) => {
+  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
+  const filtered: Record<string, unknown> = {}
+  Object.keys(props).forEach(key => {
+    if (!motionProps.includes(key)) {
+      filtered[key] = props[key]
+    }
+  })
+  return filtered
+}
+
 // Mock framer-motion to avoid animation issues in tests
 jest.mock('framer-motion', () => ({
   motion: {
-    div: ({
-      children,
-      className,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLDivElement>>) => (
-      <div className={className} {...props}>{children}</div>
+    div: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <div className={className} {...filterMotionProps(props)}>{children}</div>
     ),
-    h2: ({
-      children,
-      className,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) => (
-      <h2 className={className} {...props}>{children}</h2>
+    section: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <section className={className} {...filterMotionProps(props)}>{children}</section>
     ),
-    h3: ({
-      children,
-      className,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) => (
-      <h3 className={className} {...props}>{children}</h3>
+    h2: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <h2 className={className} {...filterMotionProps(props)}>{children}</h2>
     ),
-    span: ({
-      children,
-      className,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLSpanElement>>) => (
-      <span className={className} {...props}>{children}</span>
+    h3: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <h3 className={className} {...filterMotionProps(props)}>{children}</h3>
     ),
-    a: ({
-      children,
-      className,
-      href,
-      target,
-      rel,
-    }: React.PropsWithChildren<React.AnchorHTMLAttributes<HTMLAnchorElement>>) => (
+    span: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <span className={className} {...filterMotionProps(props)}>{children}</span>
+    ),
+    a: ({ children, className, href, target, rel }: React.PropsWithChildren<{ className?: string; href?: string; target?: string; rel?: string }>) => (
       <a className={className} href={href} target={target} rel={rel}>{children}</a>
     ),
-    article: ({
-      children,
-      className,
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
+    article: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
       <article className={className}>{children}</article>
     ),
   },
-  AnimatePresence: ({ children }: React.PropsWithChildren<object>) => (
-    <>{children}</>
-  ),
+  AnimatePresence: ({ children }: React.PropsWithChildren<object>) => <>{children}</>,
+  useReducedMotion: () => false,
 }))
 
 // Mock Next.js Image component

@@ -11,28 +11,39 @@
 import { render, screen } from '@testing-library/react'
 import AboutSection from '@/components/AboutSection'
 
+// Helper to filter out framer-motion props
+const filterMotionProps = (props: Record<string, unknown>) => {
+  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
+  const filtered: Record<string, unknown> = {}
+  Object.keys(props).forEach(key => {
+    if (!motionProps.includes(key)) {
+      filtered[key] = props[key]
+    }
+  })
+  return filtered
+}
+
 // Mock framer-motion to avoid animation issues in tests
 jest.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <div {...props}>{children}</div>
+    div: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <div className={className} {...filterMotionProps(props)}>{children}</div>
     ),
-    section: ({
-      children,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
-      <section {...props}>{children}</section>
+    section: ({ children, className, id, ...props }: React.PropsWithChildren<{ className?: string; id?: string }>) => (
+      <section className={className} id={id} {...filterMotionProps(props)}>{children}</section>
     ),
-    p: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <p {...props}>{children}</p>
+    p: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <p className={className} {...filterMotionProps(props)}>{children}</p>
     ),
-    h2: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <h2 {...props}>{children}</h2>
+    h2: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <h2 className={className} {...filterMotionProps(props)}>{children}</h2>
+    ),
+    span: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
+      <span className={className} {...filterMotionProps(props)}>{children}</span>
     ),
   },
-  AnimatePresence: ({ children }: React.PropsWithChildren<object>) => (
-    <>{children}</>
-  ),
+  AnimatePresence: ({ children }: React.PropsWithChildren<object>) => <>{children}</>,
+  useReducedMotion: () => false,
 }))
 
 describe('About Section', () => {

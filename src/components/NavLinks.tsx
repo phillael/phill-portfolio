@@ -13,6 +13,7 @@ const navItems: NavItem[] = [
   { label: 'Experience', href: '#experience' },
   { label: 'Skills', href: '#skills' },
   { label: 'Projects', href: '#projects' },
+  { label: 'Contact', href: '#contact' },
 ]
 
 interface NavLinksProps {
@@ -21,6 +22,17 @@ interface NavLinksProps {
   isMobile?: boolean
 }
 
+/**
+ * NavLinks - Navigation link list with standardized hover effects
+ *
+ * Features:
+ * - Smooth scroll behavior to section anchors
+ * - Consistent hover effects: scale 1.05, neon text glow
+ * - whileTap feedback: scale 0.95
+ * - Transitions: 150ms with easeOut
+ * - Accessible with focus-visible ring styling
+ * - Mobile variant with larger touch targets
+ */
 const NavLinks = ({ onLinkClick, className = '', isMobile = false }: NavLinksProps) => {
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault()
@@ -46,7 +58,7 @@ const NavLinks = ({ onLinkClick, className = '', isMobile = false }: NavLinksPro
             onClick={(e) => handleClick(e, item.href)}
             className={`
               font-body text-foreground no-underline
-              transition-all duration-200
+              transition-all duration-150 ease-out
               hover:text-primary
               focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background
               ${isMobile
@@ -55,9 +67,11 @@ const NavLinks = ({ onLinkClick, className = '', isMobile = false }: NavLinksPro
               }
             `}
             whileHover={{
-              textShadow: '0 0 8px hsl(var(--primary))',
+              scale: 1.05,
+              textShadow: '0 0 8px hsl(var(--primary)), 0 0 16px hsl(var(--primary) / 0.5)',
             }}
-            whileTap={{ scale: 0.98 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
           >
             {item.label}
           </motion.a>

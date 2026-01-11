@@ -16,37 +16,82 @@ import SkillChip from '@/components/SkillChip'
 import skillsData from '@/data/skills.json'
 import { SkillCategory as SkillCategoryType } from '@/types/content'
 
+// Helper to filter out framer-motion props
+const filterMotionProps = (props: Record<string, unknown>) => {
+  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
+  const filtered: Record<string, unknown> = {}
+  Object.keys(props).forEach(key => {
+    if (!motionProps.includes(key)) {
+      filtered[key] = props[key]
+    }
+  })
+  return filtered
+}
+
 // Mock framer-motion to avoid animation issues in tests
 jest.mock('framer-motion', () => ({
   motion: {
     div: ({
       children,
+      className,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLDivElement>>) => (
-      <div {...props}>{children}</div>
+      <div className={className} {...filterMotionProps(props)}>{children}</div>
     ),
     h2: ({
       children,
+      className,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) => (
-      <h2 {...props}>{children}</h2>
+      <h2 className={className} {...filterMotionProps(props)}>{children}</h2>
     ),
     h3: ({
       children,
+      className,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) => (
-      <h3 {...props}>{children}</h3>
+      <h3 className={className} {...filterMotionProps(props)}>{children}</h3>
     ),
     span: ({
       children,
+      className,
+      onClick,
+      onKeyDown,
+      role,
+      tabIndex,
       ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLSpanElement>>) => (
-      <span {...props}>{children}</span>
+    }: React.PropsWithChildren<
+      React.HTMLAttributes<HTMLSpanElement> & {
+        role?: string
+        tabIndex?: number
+      }
+    >) => (
+      <span
+        className={className}
+        onClick={onClick}
+        onKeyDown={onKeyDown}
+        role={role}
+        tabIndex={tabIndex}
+        {...filterMotionProps(props)}
+      >
+        {children}
+      </span>
+    ),
+    p: ({
+      children,
+      className,
+      ...props
+    }: React.PropsWithChildren<React.HTMLAttributes<HTMLParagraphElement>>) => (
+      <p className={className} {...filterMotionProps(props)}>{children}</p>
     ),
   },
   AnimatePresence: ({ children }: React.PropsWithChildren<object>) => (
     <>{children}</>
   ),
+  LayoutGroup: ({ children }: React.PropsWithChildren<object>) => (
+    <>{children}</>
+  ),
+  useReducedMotion: () => false,
 }))
 
 describe('SkillsSection', () => {
@@ -113,7 +158,7 @@ describe('SkillChip', () => {
     expect(screen.getByText('React')).toBeInTheDocument()
   })
 
-  it('applies hover effect classes for scale and glow', () => {
+  it('applies base styling classes', () => {
     render(<SkillChip skill="TypeScript" />)
 
     const chip = screen.getByText('TypeScript')
@@ -122,8 +167,10 @@ describe('SkillChip', () => {
     expect(chip).toHaveClass('text-accent')
     expect(chip).toHaveClass('bg-muted')
 
-    // Verify transition and hover scale classes are present
+    // Verify transition class is present
     expect(chip.className).toMatch(/transition/)
-    expect(chip.className).toMatch(/hover:scale/)
+
+    // Verify cursor pointer for click affordance
+    expect(chip).toHaveClass('cursor-pointer')
   })
 })

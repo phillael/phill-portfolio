@@ -52,6 +52,7 @@ const config: Config = {
       fontFamily: {
         heading: ['var(--font-audiowide)'],
         body: ['var(--font-nunito)'],
+        pixel: ['var(--font-pixel)'],
       },
       screens: {
         sm: '640px',

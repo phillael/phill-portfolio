@@ -1,8 +1,8 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import AnimatedSection from '@/components/AnimatedSection'
 import ProjectCard from '@/components/ProjectCard'
+import GlitchText from '@/components/GlitchText'
 import projectsData from '@/data/projects.json'
 import { Project } from '@/types/content'
 
@@ -15,6 +15,8 @@ import { Project } from '@/types/content'
  * - Section heading with neon-text-purple effect
  * - Data imported from /src/data/projects.json
  * - ProjectCard for each project with staggered entrance animations
+ * - AnimatedSection wrapper with scale-up variant for heading
+ * - GlitchText effect on heading for hover interaction
  * - Responsive grid: single column on mobile, 3 columns on desktop (lg+)
  */
 const ProjectsSection = () => {
@@ -28,11 +30,13 @@ const ProjectsSection = () => {
       className="min-h-screen py-20 md:py-32 px-4 md:px-6"
     >
       <div className="max-w-6xl mx-auto">
-        {/* Section Heading */}
-        <AnimatedSection>
-          <motion.h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center neon-text-purple mb-12 md:mb-16">
-            Projects
-          </motion.h2>
+        {/* Section Heading - scale-up animation variant with glitch effect */}
+        <AnimatedSection variant="scale-up">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
+            <GlitchText as="span" className="neon-text-purple">
+              Projects
+            </GlitchText>
+          </h2>
         </AnimatedSection>
 
         {/* Project Cards Grid */}

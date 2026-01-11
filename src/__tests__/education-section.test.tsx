@@ -14,6 +14,18 @@ import EducationCard from '@/components/EducationCard'
 import educationData from '@/data/education.json'
 import { Education } from '@/types/content'
 
+// Helper to filter out framer-motion props
+const filterMotionProps = (props: Record<string, unknown>) => {
+  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
+  const filtered: Record<string, unknown> = {}
+  Object.keys(props).forEach(key => {
+    if (!motionProps.includes(key)) {
+      filtered[key] = props[key]
+    }
+  })
+  return filtered
+}
+
 // Mock framer-motion to avoid animation issues in tests
 jest.mock('framer-motion', () => ({
   motion: {
@@ -22,14 +34,14 @@ jest.mock('framer-motion', () => ({
       className,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLDivElement>>) => (
-      <div className={className} {...props}>{children}</div>
+      <div className={className} {...filterMotionProps(props)}>{children}</div>
     ),
     h2: ({
       children,
       className,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) => (
-      <h2 className={className} {...props}>{children}</h2>
+      <h2 className={className} {...filterMotionProps(props)}>{children}</h2>
     ),
     article: ({
       children,
@@ -37,10 +49,19 @@ jest.mock('framer-motion', () => ({
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
       <article className={className}>{children}</article>
     ),
+    section: ({
+      children,
+      className,
+      id,
+      ...props
+    }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement> & { id?: string }>) => (
+      <section className={className} id={id} {...filterMotionProps(props)}>{children}</section>
+    ),
   },
   AnimatePresence: ({ children }: React.PropsWithChildren<object>) => (
     <>{children}</>
   ),
+  useReducedMotion: () => false,
 }))
 
 describe('EducationSection', () => {

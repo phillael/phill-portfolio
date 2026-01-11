@@ -1,8 +1,8 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import AnimatedSection from '@/components/AnimatedSection'
 import TimelineCard from '@/components/TimelineCard'
+import GlitchText from '@/components/GlitchText'
 import experienceData from '@/data/experience.json'
 import { Experience } from '@/types/content'
 
@@ -50,6 +50,8 @@ const TimelineEntry = ({
  * - Expandable HUD-style cards for each experience
  * - Responsive layout: dots on left with cards on right
  * - Entries ordered reverse-chronologically
+ * - AnimatedSection wrapper with slide-from-right variant for heading
+ * - GlitchText effect on heading for hover interaction
  */
 const ExperienceSection = () => {
   // Data is already ordered reverse-chronologically in the JSON
@@ -63,11 +65,13 @@ const ExperienceSection = () => {
       className="min-h-screen py-20 md:py-32 px-4 md:px-6"
     >
       <div className="max-w-4xl mx-auto">
-        {/* Section Heading */}
-        <AnimatedSection>
-          <motion.h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center neon-text-purple mb-12 md:mb-16">
-            Experience
-          </motion.h2>
+        {/* Section Heading - slide-from-right animation variant with glitch effect */}
+        <AnimatedSection variant="slide-from-right">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-8 md:mb-10">
+            <GlitchText as="span" className="neon-text-purple">
+              Experience
+            </GlitchText>
+          </h2>
         </AnimatedSection>
 
         {/* Timeline Container */}

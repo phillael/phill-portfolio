@@ -22,13 +22,13 @@
 
 ## Phase 3: Polish & Interactivity
 
-9. [ ] **Downloadable Resume** — Implement PDF resume download functionality with a well-designed, print-friendly document that matches the site's branding. `XS`
+9. [x] **Downloadable Resume** — Implement PDF resume download functionality with a well-designed, print-friendly document that matches the site's branding. `XS`
 
-10. [ ] **Micro-Interactions** — Add delightful hover effects, click animations (things that "explode"), scroll-triggered reveals, and other small touches that make the site feel alive. `M`
+10. [x] **Micro-Interactions** — Add delightful hover effects, click animations (things that "explode"), scroll-triggered reveals, and other small touches that make the site feel alive. `M`
 
-11. [ ] **Contact Section** — Create the contact area with social links, email, and an optional contact form, styled consistently with the cyberpunk theme. `S`
+11. [x] **Contact Section** — Create the contact area with social links, email, and an optional contact form, styled consistently with the cyberpunk theme. `S`
 
-12. [ ] **Responsive Optimization** — Ensure every section works flawlessly on mobile, tablet, and desktop with appropriate layout adjustments and touch-friendly interactions. `M`
+12. [x] **Responsive Optimization** — Ensure every section works flawlessly on mobile, tablet, and desktop with appropriate layout adjustments and touch-friendly interactions. `M`
 
 ## Phase 4: Accessibility & Performance
 

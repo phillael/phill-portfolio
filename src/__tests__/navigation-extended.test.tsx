@@ -1,15 +1,27 @@
 /**
  * Extended Navigation Tests
  *
- * Tests for the new navigation items added in Phase 2:
- * - NavLinks renders all navigation items: Home, About, Experience, Skills, Projects, Education
+ * Tests for navigation items:
+ * - NavLinks renders all navigation items: Home, About, Experience, Skills, Projects, Contact
  * - Navigation links have correct href anchors
- * - Mobile menu includes all new navigation items
+ * - Mobile menu includes all navigation items
  */
 
 import { render, screen, fireEvent } from '@testing-library/react'
 import NavLinks from '@/components/NavLinks'
 import Nav from '@/components/Nav'
+
+// Helper to filter out framer-motion props
+const filterMotionProps = (props: Record<string, unknown>) => {
+  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
+  const filtered: Record<string, unknown> = {}
+  Object.keys(props).forEach(key => {
+    if (!motionProps.includes(key)) {
+      filtered[key] = props[key]
+    }
+  })
+  return filtered
+}
 
 // Mock framer-motion to avoid animation issues in tests
 jest.mock('framer-motion', () => ({
@@ -18,31 +30,31 @@ jest.mock('framer-motion', () => ({
       children,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
-      <nav {...props}>{children}</nav>
+      <nav {...filterMotionProps(props)}>{children}</nav>
     ),
     div: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <div {...props}>{children}</div>
+      <div {...filterMotionProps(props)}>{children}</div>
     ),
     span: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <span {...props}>{children}</span>
+      <span {...filterMotionProps(props)}>{children}</span>
     ),
     button: ({
       children,
       ...props
     }: React.PropsWithChildren<React.ButtonHTMLAttributes<HTMLButtonElement>>) => (
-      <button {...props}>{children}</button>
+      <button {...filterMotionProps(props)}>{children}</button>
     ),
     a: ({
       children,
       ...props
     }: React.PropsWithChildren<React.AnchorHTMLAttributes<HTMLAnchorElement>>) => (
-      <a {...props}>{children}</a>
+      <a {...filterMotionProps(props)}>{children}</a>
     ),
     header: ({
       children,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
-      <header {...props}>{children}</header>
+      <header {...filterMotionProps(props)}>{children}</header>
     ),
   },
   AnimatePresence: ({ children }: React.PropsWithChildren<object>) => (
@@ -51,7 +63,7 @@ jest.mock('framer-motion', () => ({
 }))
 
 describe('Extended Navigation', () => {
-  it('renders all navigation items: Home, About, Experience, Skills, Projects, Education', () => {
+  it('renders all navigation items: Home, About, Experience, Skills, Projects, Contact', () => {
     render(<NavLinks />)
 
     const homeLink = screen.getByRole('link', { name: /home/i })
@@ -59,14 +71,14 @@ describe('Extended Navigation', () => {
     const experienceLink = screen.getByRole('link', { name: /experience/i })
     const skillsLink = screen.getByRole('link', { name: /skills/i })
     const projectsLink = screen.getByRole('link', { name: /projects/i })
-    const educationLink = screen.getByRole('link', { name: /education/i })
+    const contactLink = screen.getByRole('link', { name: /contact/i })
 
     expect(homeLink).toBeInTheDocument()
     expect(aboutLink).toBeInTheDocument()
     expect(experienceLink).toBeInTheDocument()
     expect(skillsLink).toBeInTheDocument()
     expect(projectsLink).toBeInTheDocument()
-    expect(educationLink).toBeInTheDocument()
+    expect(contactLink).toBeInTheDocument()
   })
 
   it('navigation links have correct href anchors', () => {
@@ -77,17 +89,17 @@ describe('Extended Navigation', () => {
     const experienceLink = screen.getByRole('link', { name: /experience/i })
     const skillsLink = screen.getByRole('link', { name: /skills/i })
     const projectsLink = screen.getByRole('link', { name: /projects/i })
-    const educationLink = screen.getByRole('link', { name: /education/i })
+    const contactLink = screen.getByRole('link', { name: /contact/i })
 
     expect(homeLink).toHaveAttribute('href', '#hero')
     expect(aboutLink).toHaveAttribute('href', '#about')
     expect(experienceLink).toHaveAttribute('href', '#experience')
     expect(skillsLink).toHaveAttribute('href', '#skills')
     expect(projectsLink).toHaveAttribute('href', '#projects')
-    expect(educationLink).toHaveAttribute('href', '#education')
+    expect(contactLink).toHaveAttribute('href', '#contact')
   })
 
-  it('mobile menu includes all new navigation items', () => {
+  it('mobile menu includes all navigation items', () => {
     render(<Nav />)
 
     // Open the mobile menu
@@ -103,7 +115,7 @@ describe('Extended Navigation', () => {
     const experienceLinks = screen.getAllByRole('link', { name: /experience/i })
     const skillsLinks = screen.getAllByRole('link', { name: /skills/i })
     const projectsLinks = screen.getAllByRole('link', { name: /projects/i })
-    const educationLinks = screen.getAllByRole('link', { name: /education/i })
+    const contactLinks = screen.getAllByRole('link', { name: /contact/i })
 
     // Each link should appear at least twice (desktop + mobile)
     expect(homeLinks.length).toBeGreaterThanOrEqual(2)
@@ -111,6 +123,6 @@ describe('Extended Navigation', () => {
     expect(experienceLinks.length).toBeGreaterThanOrEqual(2)
     expect(skillsLinks.length).toBeGreaterThanOrEqual(2)
     expect(projectsLinks.length).toBeGreaterThanOrEqual(2)
-    expect(educationLinks.length).toBeGreaterThanOrEqual(2)
+    expect(contactLinks.length).toBeGreaterThanOrEqual(2)
   })
 })

@@ -10,6 +10,15 @@
 import { render, screen } from '@testing-library/react'
 import SocialLinks from '@/components/SocialLinks'
 
+// Mock framer-motion to avoid animation issues in tests
+jest.mock('framer-motion', () => ({
+  motion: {
+    a: ({ children, className, href, target, rel, 'aria-label': ariaLabel }: React.PropsWithChildren<{ className?: string; href?: string; target?: string; rel?: string; 'aria-label'?: string }>) => (
+      <a className={className} href={href} target={target} rel={rel} aria-label={ariaLabel}>{children}</a>
+    ),
+  },
+}))
+
 describe('SocialLinks', () => {
   it('renders GitHub and LinkedIn icons', () => {
     render(<SocialLinks />)
@@ -45,7 +54,7 @@ describe('SocialLinks', () => {
       name: /visit phill's linkedin profile/i,
     })
 
-    expect(githubLink).toHaveAttribute('href', 'https://github.com/phillaelony')
+    expect(githubLink).toHaveAttribute('href', 'https://github.com/phillael')
     expect(githubLink).toHaveAttribute('target', '_blank')
     expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer')
 

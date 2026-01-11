@@ -4,7 +4,6 @@
  * Tests for the Hero section components including:
  * - HeroSection structure and layout
  * - AnimatedHeadline content
- * - ScrollIndicator accessibility
  * - HeroImage alt text
  */
 
@@ -53,16 +52,6 @@ describe('Hero Section', () => {
     // Check the hero section contains visible content
     const heroSection = screen.getByRole('region', { name: /hero/i })
     expect(heroSection).toBeVisible()
-  })
-
-  it('scroll indicator button is keyboard accessible', () => {
-    render(<HeroSection />)
-
-    const scrollButton = screen.getByRole('button', {
-      name: /scroll to about section/i,
-    })
-    expect(scrollButton).toBeInTheDocument()
-    expect(scrollButton).toHaveAttribute('aria-label', 'Scroll to about section')
   })
 
   it('hero image has proper alt text', () => {

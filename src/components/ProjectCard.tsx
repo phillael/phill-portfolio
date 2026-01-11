@@ -22,6 +22,7 @@ interface ProjectCardProps {
  * - Live Demo and View Code action buttons with neon border effects
  * - Gradient card base styling with hover hue-rotate effect
  * - Links open in new tab with proper security attributes
+ * - Standardized hover effects: scale 1.05, glow, whileTap 0.95
  */
 const ProjectCard = ({ project, delay = 0 }: ProjectCardProps) => {
   const [imageError, setImageError] = useState(false)
@@ -102,14 +103,14 @@ const ProjectCard = ({ project, delay = 0 }: ProjectCardProps) => {
                 border-2 border-primary
                 rounded-md
                 no-underline
-                transition-all duration-200
+                transition-all duration-150 ease-out
                 hover:bg-primary/10
                 hover:shadow-[0_0_12px_hsl(var(--primary)/0.5),0_0_24px_hsl(var(--primary)/0.3)]
-                hover:scale-105
-                focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card
               "
               whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.15 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
             >
               Live Demo
             </motion.a>
@@ -128,15 +129,15 @@ const ProjectCard = ({ project, delay = 0 }: ProjectCardProps) => {
                 border-2 border-secondary/60
                 rounded-md
                 no-underline
-                transition-all duration-200
+                transition-all duration-150 ease-out
                 hover:border-secondary
                 hover:bg-secondary/10
                 hover:shadow-[0_0_12px_hsl(var(--secondary)/0.5),0_0_24px_hsl(var(--secondary)/0.3)]
-                hover:scale-105
-                focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-card
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-card
               "
               whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.15 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
             >
               View Code
             </motion.a>

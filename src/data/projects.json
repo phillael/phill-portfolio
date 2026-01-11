@@ -2,27 +2,27 @@
   {
     "id": "number-slayers",
     "title": "Number Slayers",
-    "description": "An educational math game built with Three.js featuring immersive 3D graphics and engaging gameplay mechanics designed to make learning math fun and interactive.",
-    "techStack": ["Three.js", "JavaScript", "WebGL", "Game Design"],
+    "description": "An epic multi player online math game built with Three.js featuring immersive 3D graphics and engaging gameplay mechanics designed to make learning math fun and interactive.",
+    "techStack": ["Three.js", "TypeScript", "React", "Next.js", "Node.js", "WebGL", "Vercel"],
     "imageUrl": "/images/projects/number-slayers.png",
-    "liveUrl": "#",
-    "repoUrl": "#"
+    "liveUrl": "https://number-slayers-web.vercel.app/",
+    "repoUrl": "https://github.com/phillael/number-slayers"
   },
   {
-    "id": "2d-pong",
-    "title": "2D Pong Game",
-    "description": "A classic Pong game reimagined with modern web technologies, featuring smooth animations, responsive controls, and customizable gameplay settings.",
+    "id": "pong-multiverse-alpaca-squadron",
+    "title": "Pong Multiverse Alpaca Squadron",
+    "description": "This is one of the first things I built with JavaScript over 6 years ago. It took me months to get it working but I'm still proud of it!",
     "techStack": ["JavaScript", "HTML Canvas", "CSS", "Game Development"],
-    "imageUrl": "/images/projects/pong-game.png",
-    "liveUrl": "#",
-    "repoUrl": "#"
+    "imageUrl": "/images/projects/pong.jpg",
+    "liveUrl": "https://phillael.github.io/Pong-Multiverse-Alpaca-Squadron/",
+    "repoUrl": "https://github.com/phillael/Pong-Multiverse-Alpaca-Squadron"
   },
   {
     "id": "timelycare-platform",
     "title": "TimelyCare",
     "description": "A comprehensive telehealth platform providing mental health and medical services to university students across the nation, built with accessibility as a core priority.",
     "techStack": ["React", "React Native", "TypeScript", "Node.js", "AWS"],
-    "imageUrl": "/images/projects/timelycare.png",
+    "imageUrl": "/images/projects/timely-care.png",
     "liveUrl": "https://timelycare.com"
   }
 ]

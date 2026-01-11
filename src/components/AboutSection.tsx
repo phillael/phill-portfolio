@@ -1,7 +1,7 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import AnimatedSection from '@/components/AnimatedSection'
+import GlitchText from '@/components/GlitchText'
 
 /**
  * HighlightedText - Renders text with subtle neon glow effect
@@ -55,6 +55,7 @@ const BioParagraph = ({
  * - Section ID for navigation anchor
  * - Staggered paragraph animations on scroll
  * - Key term highlighting with neon effects
+ * - GlitchText effect on heading for hover interaction
  * - Responsive typography and spacing
  */
 const AboutSection = () => {
@@ -66,11 +67,13 @@ const AboutSection = () => {
       className="min-h-screen py-20 md:py-32 px-4 md:px-6"
     >
       <div className="max-w-4xl mx-auto">
-        {/* Section Heading */}
+        {/* Section Heading with glitch effect */}
         <AnimatedSection>
-          <motion.h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center neon-text-purple mb-12 md:mb-16">
-            About
-          </motion.h2>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
+            <GlitchText as="span" className="neon-text-purple">
+              About
+            </GlitchText>
+          </h2>
         </AnimatedSection>
 
         {/* Bio Content */}

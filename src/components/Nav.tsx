@@ -6,6 +6,7 @@ import NavLinks from '@/components/NavLinks'
 import SocialLinks from '@/components/SocialLinks'
 import HamburgerButton from '@/components/HamburgerButton'
 import MobileMenu from '@/components/MobileMenu'
+import ResumeDownloadButton from '@/components/ResumeDownloadButton'
 
 const SCROLL_THRESHOLD = 50
 
@@ -99,9 +100,10 @@ const Nav = () => {
             </a>
           </div>
 
-          {/* Desktop Navigation and Social Links */}
+          {/* Desktop Navigation, Resume Download, and Social Links */}
           <div className="hidden md:flex items-center gap-6">
             <NavLinks />
+            <ResumeDownloadButton variant="desktop" />
             <SocialLinks />
           </div>
 

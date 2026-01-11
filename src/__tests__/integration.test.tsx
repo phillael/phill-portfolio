@@ -1,79 +1,101 @@
 /**
  * Integration Tests
  *
- * Tests for Phase 1 and Phase 2 integration including:
+ * Tests for Phase 1, Phase 2, and Phase 3 integration including:
  * - Full page renders without errors
  * - All interactive elements have accessible names
  * - Mobile menu flow works end-to-end
- * - All Phase 2 sections render correctly
- * - Navigation to new sections works
+ * - All sections render correctly
+ * - Navigation to sections works
  */
 
 import { render, screen, fireEvent } from '@testing-library/react'
 import HomePage from '@/app/page'
 import Nav from '@/components/Nav'
 
+// Helper to filter out framer-motion props
+const filterMotionProps = (props: Record<string, unknown>) => {
+  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
+  const filtered: Record<string, unknown> = {}
+  Object.keys(props).forEach(key => {
+    if (!motionProps.includes(key)) {
+      filtered[key] = props[key]
+    }
+  })
+  return filtered
+}
+
 // Mock framer-motion to avoid animation issues in tests
 jest.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <div {...props}>{children}</div>
+      <div {...filterMotionProps(props)}>{children}</div>
     ),
     span: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <span {...props}>{children}</span>
+      <span {...filterMotionProps(props)}>{children}</span>
     ),
     button: ({
       children,
       ...props
     }: React.PropsWithChildren<React.ButtonHTMLAttributes<HTMLButtonElement>>) => (
-      <button {...props}>{children}</button>
+      <button {...filterMotionProps(props)}>{children}</button>
     ),
     h1: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <h1 {...props}>{children}</h1>
+      <h1 {...filterMotionProps(props)}>{children}</h1>
     ),
     h2: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <h2 {...props}>{children}</h2>
+      <h2 {...filterMotionProps(props)}>{children}</h2>
     ),
     h3: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <h3 {...props}>{children}</h3>
+      <h3 {...filterMotionProps(props)}>{children}</h3>
     ),
     p: ({ children, ...props }: React.PropsWithChildren<object>) => (
-      <p {...props}>{children}</p>
+      <p {...filterMotionProps(props)}>{children}</p>
     ),
     nav: ({
       children,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
-      <nav {...props}>{children}</nav>
+      <nav {...filterMotionProps(props)}>{children}</nav>
     ),
     header: ({
       children,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
-      <header {...props}>{children}</header>
+      <header {...filterMotionProps(props)}>{children}</header>
     ),
     section: ({
       children,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
-      <section {...props}>{children}</section>
+      <section {...filterMotionProps(props)}>{children}</section>
     ),
     a: ({
       children,
       ...props
     }: React.PropsWithChildren<React.AnchorHTMLAttributes<HTMLAnchorElement>>) => (
-      <a {...props}>{children}</a>
+      <a {...filterMotionProps(props)}>{children}</a>
     ),
     article: ({
       children,
       ...props
     }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
-      <article {...props}>{children}</article>
+      <article {...filterMotionProps(props)}>{children}</article>
+    ),
+    footer: ({
+      children,
+      ...props
+    }: React.PropsWithChildren<React.HTMLAttributes<HTMLElement>>) => (
+      <footer {...filterMotionProps(props)}>{children}</footer>
     ),
   },
   AnimatePresence: ({ children }: React.PropsWithChildren<object>) => (
     <>{children}</>
   ),
+  LayoutGroup: ({ children }: React.PropsWithChildren<object>) => (
+    <>{children}</>
+  ),
+  useReducedMotion: () => false,
 }))
 
 // Mock Next.js Image component
@@ -192,8 +214,8 @@ describe('Integration Tests', () => {
     })
   })
 
-  describe('Phase 2 - All New Sections Render', () => {
-    it('renders all Phase 2 sections without errors', () => {
+  describe('All Sections Render', () => {
+    it('renders all sections without errors', () => {
       render(<HomePage />)
 
       // Experience Section
@@ -210,39 +232,39 @@ describe('Integration Tests', () => {
       const projectsSection = screen.getByRole('region', { name: /projects/i })
       expect(projectsSection).toBeInTheDocument()
 
-      // Education Section
-      const educationSection = screen.getByRole('region', {
-        name: /education and certifications/i,
+      // Contact Section
+      const contactSection = screen.getByRole('region', {
+        name: /contact/i,
       })
-      expect(educationSection).toBeInTheDocument()
+      expect(contactSection).toBeInTheDocument()
     })
 
-    it('all Phase 2 section anchors are present for navigation', () => {
+    it('all section anchors are present for navigation', () => {
       render(<HomePage />)
 
       // Verify each section ID exists for navigation anchors
       expect(document.getElementById('experience')).toBeInTheDocument()
       expect(document.getElementById('skills')).toBeInTheDocument()
       expect(document.getElementById('projects')).toBeInTheDocument()
-      expect(document.getElementById('education')).toBeInTheDocument()
+      expect(document.getElementById('contact')).toBeInTheDocument()
     })
 
-    it('navigation includes links to all Phase 2 sections', () => {
+    it('navigation includes links to all sections', () => {
       render(<Nav />)
 
       const experienceLink = screen.getByRole('link', { name: /experience/i })
       const skillsLink = screen.getByRole('link', { name: /skills/i })
       const projectsLink = screen.getByRole('link', { name: /projects/i })
-      const educationLink = screen.getByRole('link', { name: /education/i })
+      const contactLink = screen.getByRole('link', { name: /contact/i })
 
       expect(experienceLink).toHaveAttribute('href', '#experience')
       expect(skillsLink).toHaveAttribute('href', '#skills')
       expect(projectsLink).toHaveAttribute('href', '#projects')
-      expect(educationLink).toHaveAttribute('href', '#education')
+      expect(contactLink).toHaveAttribute('href', '#contact')
     })
   })
 
-  describe('Phase 2 - Content Integration', () => {
+  describe('Content Integration', () => {
     it('Experience section displays data from JSON', () => {
       render(<HomePage />)
 
@@ -265,22 +287,25 @@ describe('Integration Tests', () => {
       render(<HomePage />)
 
       expect(screen.getByText('Number Slayers')).toBeInTheDocument()
-      expect(screen.getByText('2D Pong Game')).toBeInTheDocument()
+      expect(screen.getByText('Pong Multiverse Alpaca Squadron')).toBeInTheDocument()
       // TimelyCare project uses title "TimelyCare" (shared with experience)
       const timelycareMentions = screen.getAllByText('TimelyCare')
       expect(timelycareMentions.length).toBeGreaterThanOrEqual(1)
     })
 
-    it('Education section displays all credentials', () => {
+    it('Contact section displays LinkedIn CTA', () => {
       render(<HomePage />)
 
-      expect(screen.getByText('MongoDB/Full-stack Certificate')).toBeInTheDocument()
-      expect(screen.getByText('Ultimate Redux Course')).toBeInTheDocument()
-      expect(screen.getByText('BA Jazz Studies')).toBeInTheDocument()
+      // Check that LinkedIn text/CTA is present in the Contact section
+      expect(screen.getByText(/connect with me on linkedin/i)).toBeInTheDocument()
+
+      // Verify Contact section heading is present
+      const contactSection = screen.getByRole('region', { name: /contact/i })
+      expect(contactSection).toBeInTheDocument()
     })
   })
 
-  describe('Phase 2 - Heading Hierarchy', () => {
+  describe('Heading Hierarchy', () => {
     it('maintains proper heading hierarchy across all sections', () => {
       render(<HomePage />)
 
@@ -291,7 +316,7 @@ describe('Integration Tests', () => {
       expect(h2Texts).toContain('Experience')
       expect(h2Texts).toContain('Skills')
       expect(h2Texts).toContain('Projects')
-      expect(h2Texts).toContain('Education')
+      expect(h2Texts).toContain('Contact')
     })
   })
 })

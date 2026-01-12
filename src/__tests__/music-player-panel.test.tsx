@@ -123,13 +123,13 @@ describe('Music Player Panel Component', () => {
       expect(panel).toHaveClass('md:w-[320px]')
     })
 
-    it('has full-width on mobile', () => {
+    it('has full-screen on mobile', () => {
       render(<MusicPlayerPanel {...defaultProps} />)
 
       const panel = screen.getByTestId('music-player-panel')
-      // Mobile: full width with inset-x-0
+      // Mobile: full screen with inset-0
       expect(panel).toHaveClass('w-full')
-      expect(panel).toHaveClass('inset-x-0')
+      expect(panel).toHaveClass('inset-0')
     })
   })
 
@@ -193,12 +193,14 @@ describe('Music Player Panel Component', () => {
       expect(panel).toHaveClass('bg-background')
     })
 
-    it('has max-height and scroll for mobile', () => {
+    it('has full-screen layout on mobile with no panel scroll', () => {
       render(<MusicPlayerPanel {...defaultProps} />)
 
       const panel = screen.getByTestId('music-player-panel')
-      expect(panel).toHaveClass('max-h-[85vh]')
-      expect(panel).toHaveClass('overflow-y-auto')
+      // Mobile: full screen, no scroll (only track list scrolls)
+      expect(panel).toHaveClass('inset-0')
+      expect(panel).toHaveClass('h-full')
+      expect(panel).toHaveClass('overflow-hidden')
     })
 
     it('has fixed positioning', () => {

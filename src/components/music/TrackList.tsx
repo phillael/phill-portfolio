@@ -55,10 +55,11 @@ const TrackList = ({
 
   return (
     <div
-      className="max-h-48 overflow-y-auto custom-scrollbar space-y-1"
+      className="h-full overflow-y-auto custom-scrollbar space-y-1"
       role="listbox"
       aria-label="Track list"
       data-testid="track-list"
+      style={{ touchAction: 'pan-y' }}
     >
       {tracks.map((track, index) => {
         const isCurrent = currentTrack?.id === track.id

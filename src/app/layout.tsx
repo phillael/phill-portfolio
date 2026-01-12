@@ -1,6 +1,7 @@
 import { Audiowide, Nunito, Press_Start_2P } from 'next/font/google'
 import '@/app/globals.css'
 import Nav from '@/components/Nav'
+import { MusicPlayer } from '@/components/music'
 
 const audiowide = Audiowide({
   weight: '400',
@@ -41,6 +42,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
       <body className="font-body text-foreground custom-scrollbar">
         <Nav />
         {children}
+        <MusicPlayer />
       </body>
     </html>
   )

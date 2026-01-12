@@ -40,9 +40,9 @@
 
 ## Phase 5: Music & Audio
 
-16. [ ] **Music Player Component** — Build a custom audio player with play/pause, track selection, volume control, and progress scrubbing for Phill's original compositions. `M`
+16. [x] **Music Player Component** — Build a custom audio player with play/pause, track selection, volume control, and progress scrubbing for Phill's original compositions. `M`
 
-17. [ ] **Audio Visualizations** — Create real-time audio visualizations that respond to the music using Web Audio API, adding visual flair when tracks are playing. `L`
+17. [x] **Audio Visualizations** — Create real-time audio visualizations that respond to the music using Web Audio API, adding visual flair when tracks are playing. `L`
 
 18. [ ] **Music Section Integration** — Design the music showcase section featuring the iTunes #1 jazz album and ECO game soundtrack ($7.1M revenue, 314K units sold). `S`
 

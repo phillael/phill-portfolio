@@ -151,15 +151,16 @@ const MusicPlayerPanel = ({
             ref={panelRef}
             className="
               fixed z-50
-              md:bottom-24 md:right-6 md:w-[320px] md:rounded-lg md:inset-x-auto
-              inset-x-0 bottom-0 w-full rounded-t-lg
-              max-h-[85vh] overflow-y-auto custom-scrollbar
+              md:bottom-24 md:right-6 md:w-[320px] md:rounded-lg md:inset-auto md:max-h-[80vh] md:overflow-y-auto
+              inset-0 w-full h-full
+              flex flex-col overflow-hidden
               bg-background md:gradient-card
               border border-primary/30
             "
             style={{
               boxShadow: '0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.1)',
-              overscrollBehavior: 'contain'
+              overscrollBehavior: 'contain',
+              touchAction: 'none'
             }}
             variants={panelVariants}
             initial="hidden"
@@ -174,7 +175,7 @@ const MusicPlayerPanel = ({
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary via-secondary to-primary" />
 
             {/* Header with close button */}
-            <div className="flex justify-between items-center p-3 border-b border-primary/20">
+            <div className="flex justify-between items-center p-3 border-b border-primary/20 flex-shrink-0">
               <h2 className="text-sm font-heading text-primary">Now Playing</h2>
               <motion.button
                 ref={closeButtonRef}
@@ -198,8 +199,8 @@ const MusicPlayerPanel = ({
               </motion.button>
             </div>
 
-            {/* Content area */}
-            <div className="p-4">
+            {/* Content area - flex-1 to fill remaining space */}
+            <div className="p-4 flex-1 flex flex-col overflow-hidden">
               {children}
             </div>
 

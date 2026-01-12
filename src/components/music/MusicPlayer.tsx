@@ -85,48 +85,58 @@ const MusicPlayer = () => {
         onClose={handleClose}
         fabRef={fabRef}
       >
-        <div className="space-y-4">
+        <div className="flex flex-col h-full gap-3">
           {/* Track Info */}
-          <TrackInfo
-            track={currentTrack}
-            currentTime={currentTime}
-            duration={duration}
-          />
+          <div className="flex-shrink-0">
+            <TrackInfo
+              track={currentTrack}
+              currentTime={currentTime}
+              duration={duration}
+            />
+          </div>
 
           {/* Seek Bar */}
-          <SeekBar
-            currentTime={currentTime}
-            duration={duration}
-            onSeek={seek}
-          />
+          <div className="flex-shrink-0">
+            <SeekBar
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={seek}
+            />
+          </div>
 
           {/* Playback Controls */}
-          <PlaybackControls
-            isPlaying={isPlaying}
-            onToggle={toggle}
-            onPrevious={prevTrack}
-            onNext={nextTrack}
-          />
+          <div className="flex-shrink-0">
+            <PlaybackControls
+              isPlaying={isPlaying}
+              onToggle={toggle}
+              onPrevious={prevTrack}
+              onNext={nextTrack}
+            />
+          </div>
 
           {/* Volume Control */}
-          <VolumeControl
-            volume={volume}
-            isMuted={isMuted}
-            onVolumeChange={setVolume}
-            onToggleMute={toggleMute}
-          />
-
-          {/* Divider */}
-          <div className="border-t border-primary/20 pt-3">
-            <p className="text-xs text-foreground/50 mb-2">Track List</p>
-
-            {/* Track List */}
-            <TrackList
-              tracks={tracks}
-              currentTrack={currentTrack}
-              isPlaying={isPlaying}
-              onSelectTrack={handleSelectTrack}
+          <div className="flex-shrink-0">
+            <VolumeControl
+              volume={volume}
+              isMuted={isMuted}
+              onVolumeChange={setVolume}
+              onToggleMute={toggleMute}
             />
+          </div>
+
+          {/* Track List - fills remaining space */}
+          <div className="flex-1 min-h-0 border-t border-primary/20 pt-3 flex flex-col">
+            <p className="text-xs text-foreground/50 mb-2 flex-shrink-0">Track List</p>
+
+            {/* Track List - scrollable */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <TrackList
+                tracks={tracks}
+                currentTrack={currentTrack}
+                isPlaying={isPlaying}
+                onSelectTrack={handleSelectTrack}
+              />
+            </div>
           </div>
         </div>
       </MusicPlayerPanel>

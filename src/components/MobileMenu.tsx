@@ -139,25 +139,32 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
             <div className="flex justify-end p-4 flex-shrink-0">
               <motion.button
                 ref={firstFocusableRef}
-                className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background border border-primary/30"
+                className="flex items-center justify-center w-9 h-9 min-w-[44px] min-h-[44px] bg-transparent border-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 onClick={onClose}
                 aria-label="Close navigation menu"
                 whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.1 }}
               >
-                <svg
-                  className="w-6 h-6 text-primary"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
+                <div
+                  className="w-7 h-7"
+                  style={{
+                    filter: 'drop-shadow(0 0 4px hsl(280 100% 75%)) drop-shadow(0 0 10px hsl(280 100% 75%)) drop-shadow(0 0 20px hsl(280 100% 65%))'
+                  }}
                 >
-                  <path
+                  <svg
+                    className="w-full h-full text-secondary"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                    aria-hidden="true"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
               </motion.button>
             </div>
 

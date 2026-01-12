@@ -33,6 +33,7 @@ const FloatingPoints = ({ points, id }: FloatingPointsProps) => {
 interface ScoreCounterProps {
   score: number
   combo: number
+  isVisible?: boolean
 }
 
 /**
@@ -43,8 +44,9 @@ interface ScoreCounterProps {
  * - Pulse effect on score increase
  * - Combo multiplier display
  * - Cyberpunk neon styling
+ * - Auto-hides after inactivity (controlled by parent)
  */
-export const ScoreCounter = ({ score, combo }: ScoreCounterProps) => {
+export const ScoreCounter = ({ score, combo, isVisible = true }: ScoreCounterProps) => {
   const [displayScore, setDisplayScore] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
 
@@ -74,18 +76,21 @@ export const ScoreCounter = ({ score, combo }: ScoreCounterProps) => {
     return () => clearInterval(timer)
   }, [score, displayScore])
 
-  if (score === 0) return null
+  const shouldShow = score > 0 && isVisible
 
   return (
-    <motion.div
-      className="fixed bottom-0 left-0 right-0 z-40 px-4 py-2 md:py-3 bg-background/80 backdrop-blur-md border-t border-primary/30"
-      style={{
-        boxShadow: '0 -4px 20px hsl(var(--primary) / 0.2)',
-      }}
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
+    <AnimatePresence>
+      {shouldShow && (
+        <motion.div
+          className="fixed bottom-0 left-0 right-0 z-40 px-4 py-2 md:py-3 bg-background/80 backdrop-blur-md border-t border-primary/30"
+          style={{
+            boxShadow: '0 -4px 20px hsl(var(--primary) / 0.2)',
+          }}
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          transition={{ duration: 0.3 }}
+        >
       <div className="flex items-center justify-start gap-3 md:gap-4">
         {/* Score Section */}
         <div className="flex items-center gap-3 md:gap-4">
@@ -131,7 +136,9 @@ export const ScoreCounter = ({ score, combo }: ScoreCounterProps) => {
           )}
         </AnimatePresence>
       </div>
-    </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 

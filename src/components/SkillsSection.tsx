@@ -35,15 +35,20 @@ const SkillsSection = () => {
   const skills = skillsData as SkillCategoryType[]
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
+  const [isScoreVisible, setIsScoreVisible] = useState(false)
   const [pointPopups, setPointPopups] = useState<PointPopup[]>([])
   const comboTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const scoreHideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const popupIdRef = useRef(0)
 
-  // Clean up timeout on unmount
+  // Clean up timeouts on unmount
   useEffect(() => {
     return () => {
       if (comboTimeoutRef.current) {
         clearTimeout(comboTimeoutRef.current)
+      }
+      if (scoreHideTimeoutRef.current) {
+        clearTimeout(scoreHideTimeoutRef.current)
       }
     }
   }, [])
@@ -62,6 +67,9 @@ const SkillsSection = () => {
 
     // Add points to score
     setScore(prev => prev + totalPoints)
+
+    // Show the score counter
+    setIsScoreVisible(true)
 
     // Create floating point popup
     const popupId = popupIdRef.current++
@@ -88,6 +96,14 @@ const SkillsSection = () => {
     comboTimeoutRef.current = setTimeout(() => {
       setCombo(0)
     }, 2000)
+
+    // Hide score counter after 10 seconds of inactivity
+    if (scoreHideTimeoutRef.current) {
+      clearTimeout(scoreHideTimeoutRef.current)
+    }
+    scoreHideTimeoutRef.current = setTimeout(() => {
+      setIsScoreVisible(false)
+    }, 10000)
   }, [combo])
 
   return (
@@ -97,8 +113,8 @@ const SkillsSection = () => {
       role="region"
       className="min-h-screen py-20 md:py-32 px-4 md:px-6 overflow-x-hidden"
     >
-      {/* Score Counter - Fixed position */}
-      <ScoreCounter score={score} combo={combo} />
+      {/* Score Counter - Fixed position, auto-hides after 5 seconds */}
+      <ScoreCounter score={score} combo={combo} isVisible={isScoreVisible} />
 
       {/* Floating Point Popups */}
       <div className="fixed inset-0 pointer-events-none z-50">

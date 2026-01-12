@@ -114,8 +114,8 @@ const MusicPlayer = () => {
             />
           </div>
 
-          {/* Volume Control */}
-          <div className="flex-shrink-0">
+          {/* Volume Control - hidden on mobile (iOS doesn't support programmatic volume) */}
+          <div className="flex-shrink-0 hidden md:block">
             <VolumeControl
               volume={volume}
               isMuted={isMuted}

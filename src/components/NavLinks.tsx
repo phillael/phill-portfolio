@@ -48,7 +48,7 @@ const NavLinks = ({ onLinkClick, className = '', isMobile = false }: NavLinksPro
 
   return (
     <ul
-      className={`flex ${isMobile ? 'flex-col items-center gap-8' : 'flex-row items-center gap-6'} ${className}`}
+      className={`flex ${isMobile ? 'flex-col items-center gap-4' : 'flex-row items-center gap-6'} ${className}`}
       role="list"
     >
       {navItems.map((item) => (
@@ -62,7 +62,7 @@ const NavLinks = ({ onLinkClick, className = '', isMobile = false }: NavLinksPro
               hover:text-primary
               focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background
               ${isMobile
-                ? 'text-2xl py-4 px-8 min-h-[44px] min-w-[44px] flex items-center justify-center'
+                ? 'text-xl py-2 px-6 min-h-[44px] min-w-[44px] flex items-center justify-center'
                 : 'text-lg py-2 px-4'
               }
             `}

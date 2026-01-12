@@ -48,3 +48,17 @@ export interface Education {
   platform?: string
   year?: string
 }
+
+/**
+ * Track - Audio track entry for the music player
+ */
+export interface Track {
+  id: string
+  title: string
+  artist: string
+  album: string
+  duration: number
+  audioUrl: string
+  artworkUrl?: string
+  description?: string
+}

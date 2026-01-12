@@ -297,7 +297,7 @@ describe('Integration Tests', () => {
       render(<HomePage />)
 
       // Check that LinkedIn text/CTA is present in the Contact section
-      expect(screen.getByText(/connect with me on linkedin/i)).toBeInTheDocument()
+      expect(screen.getByText(/Seeketh me upon the LinkedIn/i)).toBeInTheDocument()
 
       // Verify Contact section heading is present
       const contactSection = screen.getByRole('region', { name: /contact/i })

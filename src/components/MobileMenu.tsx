@@ -45,6 +45,9 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
   useEffect(() => {
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown)
+      // Simple overflow hidden - works for most cases
+      document.documentElement.style.overflow = 'hidden'
+      document.body.style.overflow = 'hidden'
       // Focus the close button when menu opens
       setTimeout(() => {
         firstFocusableRef.current?.focus()
@@ -53,6 +56,8 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
+      document.documentElement.style.overflow = ''
+      document.body.style.overflow = ''
     }
   }, [isOpen, handleKeyDown])
 
@@ -117,7 +122,8 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
           {/* Menu Panel */}
           <motion.div
             ref={menuRef}
-            className="fixed top-0 right-0 h-full w-full max-w-sm bg-gradient-to-b from-background to-card z-50 md:hidden"
+            className="fixed inset-0 w-full h-full bg-gradient-to-b from-background to-card z-50 md:hidden flex flex-col overflow-hidden"
+            style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
             variants={menuVariants}
             initial="closed"
             animate="open"
@@ -130,10 +136,10 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-secondary to-accent" />
 
             {/* Close button */}
-            <div className="flex justify-end p-4">
+            <div className="flex justify-end p-4 flex-shrink-0">
               <motion.button
                 ref={firstFocusableRef}
-                className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background border border-primary/30"
                 onClick={onClose}
                 aria-label="Close navigation menu"
                 whileTap={{ scale: 0.95 }}
@@ -156,16 +162,16 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
             </div>
 
             {/* Navigation links, Resume Download, and Social links */}
-            <nav className="flex flex-col items-center justify-center h-[calc(100%-80px)] px-8">
+            <nav className="flex-1 flex flex-col items-center justify-center px-8 pb-6 gap-2">
               <NavLinks onLinkClick={onClose} isMobile />
 
               {/* Resume Download Button */}
-              <div className="mt-8 w-full max-w-xs">
+              <div className="mt-4 w-full max-w-xs">
                 <ResumeDownloadButton variant="mobile" />
               </div>
 
               {/* Social Links */}
-              <div className="mt-12 pt-8 border-t border-primary/30">
+              <div className="mt-4 pt-4 border-t border-primary/30">
                 <SocialLinks isMobile />
               </div>
             </nav>

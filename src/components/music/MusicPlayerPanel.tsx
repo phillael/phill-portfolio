@@ -103,10 +103,13 @@ const MusicPlayerPanel = ({
     [isExpanded, onClose]
   )
 
-  // Set up keyboard listener and focus management
+  // Set up keyboard listener, focus management, and scroll lock
   useEffect(() => {
     if (isExpanded) {
       document.addEventListener('keydown', handleKeyDown)
+      // Simple overflow hidden
+      document.documentElement.style.overflow = 'hidden'
+      document.body.style.overflow = 'hidden'
       // Focus the close button when panel opens
       setTimeout(() => {
         closeButtonRef.current?.focus()
@@ -115,6 +118,8 @@ const MusicPlayerPanel = ({
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
+      document.documentElement.style.overflow = ''
+      document.body.style.overflow = ''
     }
   }, [isExpanded, handleKeyDown])
 
@@ -145,15 +150,16 @@ const MusicPlayerPanel = ({
           <motion.div
             ref={panelRef}
             className="
-              fixed bottom-20 right-4 md:bottom-24 md:right-6
-              w-[calc(100%-32px)] md:w-[320px]
-              rounded-lg
-              z-50
-              gradient-card
+              fixed z-50
+              md:bottom-24 md:right-6 md:w-[320px] md:rounded-lg md:inset-x-auto
+              inset-x-0 bottom-0 w-full rounded-t-lg
+              max-h-[85vh] overflow-y-auto custom-scrollbar
+              bg-background md:gradient-card
               border border-primary/30
             "
             style={{
-              boxShadow: '0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.1)'
+              boxShadow: '0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.1)',
+              overscrollBehavior: 'contain'
             }}
             variants={panelVariants}
             initial="hidden"

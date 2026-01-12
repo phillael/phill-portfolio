@@ -123,11 +123,13 @@ describe('Music Player Panel Component', () => {
       expect(panel).toHaveClass('md:w-[320px]')
     })
 
-    it('has near-full-width on mobile', () => {
+    it('has full-width on mobile', () => {
       render(<MusicPlayerPanel {...defaultProps} />)
 
       const panel = screen.getByTestId('music-player-panel')
-      expect(panel).toHaveClass('w-[calc(100%-32px)]')
+      // Mobile: full width with inset-x-0
+      expect(panel).toHaveClass('w-full')
+      expect(panel).toHaveClass('inset-x-0')
     })
   })
 
@@ -177,21 +179,26 @@ describe('Music Player Panel Component', () => {
   })
 
   describe('Styling', () => {
-    it('has gradient-card class', () => {
+    it('has gradient-card class on desktop', () => {
       render(<MusicPlayerPanel {...defaultProps} />)
 
       const panel = screen.getByTestId('music-player-panel')
-      expect(panel).toHaveClass('gradient-card')
+      expect(panel).toHaveClass('md:gradient-card')
     })
 
-    it('has content area without panel-level scrolling', () => {
+    it('has solid background on mobile for better readability', () => {
       render(<MusicPlayerPanel {...defaultProps} />)
 
-      // Panel should not have overflow-hidden or max-height constraints
-      // (scrolling is delegated to TrackList component, not the panel itself)
       const panel = screen.getByTestId('music-player-panel')
-      expect(panel).not.toHaveClass('overflow-hidden')
-      expect(panel).not.toHaveClass('overflow-y-auto')
+      expect(panel).toHaveClass('bg-background')
+    })
+
+    it('has max-height and scroll for mobile', () => {
+      render(<MusicPlayerPanel {...defaultProps} />)
+
+      const panel = screen.getByTestId('music-player-panel')
+      expect(panel).toHaveClass('max-h-[85vh]')
+      expect(panel).toHaveClass('overflow-y-auto')
     })
 
     it('has fixed positioning', () => {

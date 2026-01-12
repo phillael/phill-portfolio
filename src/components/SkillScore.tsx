@@ -86,7 +86,7 @@ export const ScoreCounter = ({ score, combo }: ScoreCounterProps) => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex items-center justify-end gap-3 md:gap-4">
+      <div className="flex items-center justify-start gap-3 md:gap-4">
         {/* Score Section */}
         <div className="flex items-center gap-3 md:gap-4">
           <span

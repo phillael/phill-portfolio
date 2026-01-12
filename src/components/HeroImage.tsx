@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 const HeroImage = () => {
   return (
     <motion.div
-      className="hero-image-container relative w-full max-w-[400px] sm:max-w-[550px] md:max-w-[670px] lg:max-w-[800px] aspect-[4/3]"
+      className="hero-image-container relative w-full max-w-[400px] sm:max-w-[550px] md:max-w-[670px] lg:max-w-[800px] aspect-[4/3] overflow-visible"
       initial={{ scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{
@@ -16,7 +16,8 @@ const HeroImage = () => {
         duration: 0.8,
       }}
     >
-      <div className="hero-image-glow absolute inset-0 rounded-full" />
+      {/* Glow effect - extends vertically but contained horizontally to prevent overflow */}
+      <div className="hero-image-glow absolute -inset-y-10 inset-x-0 rounded-full" />
       <div className="relative w-full h-full">
         <Image
           src="/images/hero-image-phill-llamas.png"

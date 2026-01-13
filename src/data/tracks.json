@@ -6,7 +6,8 @@
     "album": "Game Soundtracks",
     "duration": 173,
     "audioUrl": "/audio/number-slayers.mp3",
-    "description": "New original track for my Number Slayers game. Written/performed/produced by me."
+    "description": "New original track for my Number Slayers game. Written/performed/produced by me.",
+    "artworkUrl": "/images/music/lasagna.png"
   },
   {
     "id": "micro-clown",
@@ -15,7 +16,8 @@
     "album": "Original Works",
     "duration": 531,
     "audioUrl": "/audio/micro-clown.mp3",
-    "description": "One of my songs we recorded with the funky knuckles. We have performed this song live in over 20 countries around the world!"
+    "description": "One of my songs we recorded with the funky knuckles. We have performed this song live in over 20 countries around the world!",
+    "artworkUrl": "/images/music/funky-knuckles.jpg"
   },
   {
     "id": "forbidden-nebula",
@@ -24,7 +26,8 @@
     "album": "Original Works",
     "duration": 206,
     "audioUrl": "/audio/forbidden-nebula.mp3",
-    "description": "This is another new track for my Number Slayers game. Written/performed/produced by me."
+    "description": "This is another new track for my Number Slayers game. Written/performed/produced by me.",
+    "artworkUrl": "/images/music/lasagna.png"
   },
   {
     "id": "pollution",
@@ -33,6 +36,7 @@
     "album": "ECO Soundtrack",
     "duration": 154,
     "audioUrl": "/audio/pollution.mp3",
-    "description": "From the ECO game soundtrack - reflecting on environmental impact."
+    "description": "From the ECO game soundtrack - reflecting on environmental impact.",
+    "artworkUrl": "/images/music/eco.jpg"
   }
 ]

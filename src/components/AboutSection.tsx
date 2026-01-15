@@ -7,7 +7,8 @@ import GlowEffect from '@/components/GlowEffect'
 import Testimonials3DCarousel from '@/components/Testimonials3DCarousel'
 
 /**
- * HighlightedText - Renders text with subtle neon glow effect
+ * HighlightedText - Renders text with neon glow effect
+ * Uses same neon-text-* classes as the hero tagline for consistency
  */
 const HighlightedText = ({
   children,
@@ -17,9 +18,9 @@ const HighlightedText = ({
   variant?: 'primary' | 'secondary' | 'accent'
 }) => {
   const variantClasses = {
-    primary: 'text-[hsl(var(--primary))] neon-text-blue',
-    secondary: 'text-[hsl(var(--secondary))] neon-text-purple',
-    accent: 'text-[hsl(var(--accent))] neon-text-green',
+    primary: 'neon-text-blue',
+    secondary: 'neon-text-purple',
+    accent: 'neon-text-green',
   }
 
   return (

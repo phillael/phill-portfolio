@@ -27,9 +27,12 @@ const SkillCategory = ({ category, skills, delay = 0, onSkillDestroyed }: SkillC
   const [destroyedSkills, setDestroyedSkills] = useState<Set<string>>(new Set())
 
   const handleSkillDestroy = (skill: string, element?: HTMLElement) => {
-    setDestroyedSkills(prev => new Set([...prev, skill]))
-    // Notify parent for scoring
+    // Notify parent for scoring immediately (points appear)
     onSkillDestroyed?.(skill, element)
+    // Delay removing from list - chips rearrange while particles still falling
+    setTimeout(() => {
+      setDestroyedSkills(prev => new Set([...prev, skill]))
+    }, 800)
   }
 
   const activeSkills = skills.filter(skill => !destroyedSkills.has(skill))
@@ -53,20 +56,24 @@ const SkillCategory = ({ category, skills, delay = 0, onSkillDestroyed }: SkillC
           <motion.div
             className="flex flex-wrap gap-2 md:gap-3"
             layout
+            transition={{
+              layout: { duration: 0.4, ease: [0.4, 0, 0.2, 1] }
+            }}
           >
             <AnimatePresence mode="popLayout">
               {activeSkills.map((skill) => (
                 <motion.div
                   key={skill}
+                  layoutId={`skill-${category}-${skill}`}
                   layout
                   initial={{ opacity: 1, scale: 1 }}
                   exit={{
                     opacity: 0,
                     scale: 0,
-                    transition: { duration: 0.2 }
+                    transition: { duration: 0.3, ease: 'easeOut' }
                   }}
                   transition={{
-                    layout: { duration: 0.3, ease: 'easeOut' }
+                    layout: { duration: 0.4, ease: [0.4, 0, 0.2, 1] }
                   }}
                 >
                   <SkillChip

@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { motion } from 'framer-motion'
+import GlowEffect from '@/components/GlowEffect'
 
 const HeroImage = () => {
   return (
@@ -16,8 +17,8 @@ const HeroImage = () => {
         duration: 0.8,
       }}
     >
-      {/* Glow effect - extends vertically but contained horizontally to prevent overflow */}
-      <div className="hero-image-glow absolute -inset-y-10 inset-x-0 rounded-full" />
+      {/* Animated glow effect - extends vertically but contained horizontally */}
+      <GlowEffect inset="-inset-y-10 inset-x-0" />
       <div className="relative w-full h-full">
         <Image
           src="/images/hero-image-phill-llamas.png"

@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import AnimatedSection from '@/components/AnimatedSection'
 import GlitchText from '@/components/GlitchText'
+import GlowEffect from '@/components/GlowEffect'
 import Testimonials3DCarousel from '@/components/Testimonials3DCarousel'
 
 /**
@@ -141,21 +142,13 @@ const AboutSection = () => {
           {/* Space Llama Image + Testimonials Preview (desktop only) */}
           <div className="flex-shrink-0 flex flex-col items-center">
             <AnimatedSection delay={0.2} variant="scale-up">
-              <div
-                className="relative w-[200px] h-[200px] md:w-[250px] md:h-[250px] lg:w-[300px] lg:h-[300px]"
-                style={{
-                  filter: `
-                    drop-shadow(0 0 10px hsl(280, 100%, 75%))
-                    drop-shadow(0 0 20px hsl(280, 100%, 65%))
-                    drop-shadow(0 0 30px hsl(280, 100%, 55%))
-                  `,
-                }}
-              >
+              <div className="relative w-[200px] h-[200px] md:w-[250px] md:h-[250px] lg:w-[300px] lg:h-[300px]">
+                <GlowEffect size="md" />
                 <Image
                   src="/images/space_llama.png"
                   alt="Space llama astronaut mascot"
                   fill
-                  className="object-contain"
+                  className="object-contain relative z-10"
                   sizes="(max-width: 768px) 200px, (max-width: 1024px) 250px, 300px"
                   priority
                 />

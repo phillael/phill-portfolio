@@ -13,18 +13,22 @@ interface Particle {
   size: number
   color: 'primary' | 'secondary' | 'accent'
   duration: number
+  // Gravity simulation: particle goes up first, then falls
+  peakY: number  // highest point (negative = up)
+  hasGravity: boolean
 }
 
 /**
  * Color map for cyberpunk particle colors
- * - primary: cyan (hsl(190 100% 75%))
- * - secondary: magenta (hsl(280 100% 85%))
- * - accent: green (hsl(130 100% 50%))
+ * Uses CSS variables to match site theme
+ * - primary: cyan
+ * - secondary: magenta/purple
+ * - accent: green
  */
 const PARTICLE_COLORS = {
-  primary: 'hsl(190, 100%, 75%)',
-  secondary: 'hsl(280, 100%, 85%)',
-  accent: 'hsl(130, 100%, 50%)',
+  primary: 'hsl(var(--primary))',
+  secondary: 'hsl(var(--secondary))',
+  accent: 'hsl(var(--accent))',
 } as const
 
 /**
@@ -44,34 +48,47 @@ const getRandomColor = (): 'primary' | 'secondary' | 'accent' => {
 
 /**
  * Generate particles for normal burst effect
- * Creates 18-25 particles with wide spread
+ * Creates 21-29 particles with wide spread (+15% from original)
  */
 const generateParticles = (): Particle[] => {
-  const count = Math.floor(randomBetween(18, 25))
+  const count = Math.floor(randomBetween(21, 29))
   return Array.from({ length: count }, (_, index) => ({
     id: Date.now() + index,
-    x: randomBetween(-150, 150),
-    y: randomBetween(-150, 150),
-    size: randomBetween(4, 8),
+    x: randomBetween(-173, 173),
+    y: randomBetween(-173, 173),
+    size: randomBetween(4, 9),
     color: getRandomColor(),
     duration: randomBetween(0.5, 0.8),
+    peakY: 0,
+    hasGravity: false, // normal burst doesn't need gravity
   }))
 }
 
 /**
  * Generate particles for mega explosion (destruction)
- * Creates 50-70 particles with massive spread for dramatic effect
+ * Creates 30-40 larger particles with gravity physics
+ * Particles explode upward then fall down
  */
 const generateMegaExplosion = (): Particle[] => {
-  const count = Math.floor(randomBetween(50, 70))
-  return Array.from({ length: count }, (_, index) => ({
-    id: Date.now() + index,
-    x: randomBetween(-300, 300),
-    y: randomBetween(-300, 300),
-    size: randomBetween(4, 10),
-    color: getRandomColor(),
-    duration: randomBetween(0.7, 1.2),
-  }))
+  const count = Math.floor(randomBetween(30, 40))
+  return Array.from({ length: count }, (_, index) => {
+    const x = randomBetween(-1100, 1100)
+    // Initial upward velocity (how high they go)
+    const peakY = randomBetween(-400, -150)
+    // Final y position (where they land, below start point due to gravity)
+    const finalY = randomBetween(300, 800)
+
+    return {
+      id: Date.now() + index,
+      x,
+      y: finalY,
+      size: randomBetween(10, 22),
+      color: getRandomColor(),
+      duration: randomBetween(5.0, 8.4),
+      peakY,
+      hasGravity: true,
+    }
+  })
 }
 
 interface ParticleComponentProps {
@@ -86,9 +103,15 @@ interface ParticleComponentProps {
  * - Variable size based on particle config
  * - Fades from opacity 1 to 0
  * - Scales from 1.5 to 0 for dramatic effect
+ * - Optional gravity: particles arc up then fall down
  * - Uses easeOut easing for natural deceleration
  */
 const ParticleComponent = ({ particle }: ParticleComponentProps) => {
+  // For gravity, use keyframes: start -> peak (up) -> final (down)
+  const yAnimation = particle.hasGravity
+    ? [0, particle.peakY, particle.y]
+    : particle.y
+
   return (
     <motion.div
       data-testid="particle"
@@ -113,14 +136,19 @@ const ParticleComponent = ({ particle }: ParticleComponentProps) => {
         scale: 0,
         opacity: 0,
         x: particle.x,
-        y: particle.y,
+        y: yAnimation,
       }}
       exit={{
         opacity: 0,
       }}
       transition={{
         duration: particle.duration,
-        ease: 'easeOut',
+        x: { ease: 'easeOut' },
+        y: particle.hasGravity
+          ? { ease: [0.2, 0, 0.8, 1], times: [0, 0.3, 1] } // fast up, slow arc down
+          : { ease: 'easeOut' },
+        scale: { ease: 'easeOut' },
+        opacity: { ease: 'easeIn', delay: particle.duration * 0.5 }, // fade later
       }}
     />
   )
@@ -149,6 +177,7 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
   const [particles, setParticles] = useState<Particle[]>([])
   const [clickCount, setClickCount] = useState(0)
   const [isDestroyed, setIsDestroyed] = useState(false)
+  const [shouldCollapse, setShouldCollapse] = useState(false)
   const shouldReduceMotion = useReducedMotion()
   const chipRef = useRef<HTMLSpanElement>(null)
 
@@ -169,8 +198,8 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
     if (newClickCount >= CLICKS_TO_DESTROY) {
       // Mega explosion!
       setParticles(generateMegaExplosion())
-      // Delay destruction slightly so explosion is visible
       const element = chipRef.current || undefined
+      // Hide chip and show points, but component stays mounted for particles
       setTimeout(() => {
         setIsDestroyed(true)
         onDestroy?.(skill, element)
@@ -208,22 +237,42 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
     }
   }, [particles])
 
+  /**
+   * Trigger collapse animation shortly after destruction
+   * This allows chips to rearrange while particles are still falling
+   */
+  useEffect(() => {
+    if (isDestroyed && !shouldCollapse) {
+      const timer = setTimeout(() => {
+        setShouldCollapse(true)
+      }, 1800) // Collapse after 1.8s, chips rearrange smoothly
+
+      return () => clearTimeout(timer)
+    }
+  }, [isDestroyed, shouldCollapse])
+
+
   // Calculate damage level for visual feedback (0-4 = healthy, warning, danger, critical)
   const damageLevel = Math.min(clickCount, CLICKS_TO_DESTROY - 1)
 
   // Shake intensity increases with damage
   const shakeIntensity = damageLevel * 1.5
 
-  if (isDestroyed) {
-    return null
-  }
-
   return (
     <motion.div
-      className="relative inline-block"
+      className={`relative inline-block overflow-visible ${isDestroyed ? 'pointer-events-none' : ''}`}
       layout
+      initial={false}
+      animate={shouldCollapse ? {
+        width: 0,
+        height: 0,
+        marginRight: -8, // compensate for gap
+      } : {}}
       transition={{
-        layout: { duration: 0.3, ease: 'easeOut' }
+        layout: { duration: 0.3, ease: 'easeOut' },
+        width: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+        height: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+        marginRight: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
       }}
     >
       {/* The chip itself - fades out during explosion */}
@@ -261,7 +310,11 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
         whileTap={{
           scale: 0.97,
         }}
-        animate={damageLevel > 0 ? {
+        animate={isDestroyed ? {
+          opacity: 0,
+          scale: 0,
+          transition: { duration: 0.15, ease: 'easeOut' }
+        } : damageLevel > 0 ? {
           x: [0, -shakeIntensity, shakeIntensity, -shakeIntensity, shakeIntensity, 0],
           transition: { duration: 0.4, ease: 'easeOut' }
         } : {}}
@@ -275,12 +328,14 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
         {skill}
       </motion.span>
 
-      {/* Particle container - absolutely positioned over the chip */}
-      <AnimatePresence>
-        {particles.map((particle) => (
-          <ParticleComponent key={particle.id} particle={particle} />
-        ))}
-      </AnimatePresence>
+      {/* Particle container - absolutely positioned over the chip with high z-index */}
+      <div className="absolute inset-0 z-50 pointer-events-none">
+        <AnimatePresence>
+          {particles.map((particle) => (
+            <ParticleComponent key={particle.id} particle={particle} />
+          ))}
+        </AnimatePresence>
+      </div>
     </motion.div>
   )
 }

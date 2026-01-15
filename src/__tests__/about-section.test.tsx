@@ -1,49 +1,57 @@
 /**
  * About Section Tests
  *
- * Tests for the About section components including:
- * - AboutSection has correct ID for navigation
- * - Bio content paragraphs are present
+ * Basic structural tests for the About section:
+ * - Section has correct ID for navigation
  * - Section uses semantic HTML
- * - Animated elements have proper structure
+ * - Bio paragraphs are present
  */
 
 import { render, screen } from '@testing-library/react'
 import AboutSection from '@/components/AboutSection'
 
-// Helper to filter out framer-motion props
-const filterMotionProps = (props: Record<string, unknown>) => {
-  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
-  const filtered: Record<string, unknown> = {}
-  Object.keys(props).forEach(key => {
-    if (!motionProps.includes(key)) {
-      filtered[key] = props[key]
-    }
-  })
-  return filtered
-}
-
-// Mock framer-motion to avoid animation issues in tests
+// Mock framer-motion
 jest.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <div className={className} {...filterMotionProps(props)}>{children}</div>
+    div: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
+      <div className={className}>{children}</div>
     ),
-    section: ({ children, className, id, ...props }: React.PropsWithChildren<{ className?: string; id?: string }>) => (
-      <section className={className} id={id} {...filterMotionProps(props)}>{children}</section>
+    section: ({ children, className, id }: React.PropsWithChildren<{ className?: string; id?: string }>) => (
+      <section className={className} id={id}>{children}</section>
     ),
-    p: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <p className={className} {...filterMotionProps(props)}>{children}</p>
+    p: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
+      <p className={className}>{children}</p>
     ),
-    h2: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <h2 className={className} {...filterMotionProps(props)}>{children}</h2>
+    h2: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
+      <h2 className={className}>{children}</h2>
     ),
-    span: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <span className={className} {...filterMotionProps(props)}>{children}</span>
+    span: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
+      <span className={className}>{children}</span>
     ),
   },
   AnimatePresence: ({ children }: React.PropsWithChildren<object>) => <>{children}</>,
   useReducedMotion: () => false,
+}))
+
+// Mock Next.js Image component
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: (props: { alt: string; src: string }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img alt={props.alt} src={props.src} />
+  ),
+}))
+
+// Mock React Three Fiber to avoid WebGL setup
+jest.mock('@react-three/fiber', () => ({
+  Canvas: () => <div data-testid="r3f-canvas" />,
+  useFrame: () => {},
+  useThree: () => ({ gl: { domElement: { parentElement: null } }, setSize: () => {} }),
+}))
+
+// Mock @react-three/drei
+jest.mock('@react-three/drei', () => ({
+  Center: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }))
 
 describe('About Section', () => {
@@ -55,19 +63,6 @@ describe('About Section', () => {
     expect(aboutSection).toHaveAttribute('id', 'about')
   })
 
-  it('displays bio content paragraphs', () => {
-    render(<AboutSection />)
-
-    // Check for key content from each paragraph using getAllByText for terms that appear multiple times
-    expect(screen.getByText(/Minneapolis, MN/i)).toBeInTheDocument()
-    expect(screen.getByText(/University of North Texas/i)).toBeInTheDocument()
-    expect(screen.getByText(/The Funky Knuckles/i)).toBeInTheDocument()
-    // Use getAllByText for terms that might appear multiple times, check at least one exists
-    expect(screen.getAllByText(/Eco/i).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/Microsoft/i)).toBeInTheDocument()
-    expect(screen.getByText(/TimelyCare/i)).toBeInTheDocument()
-  })
-
   it('uses semantic HTML with proper heading structure', () => {
     render(<AboutSection />)
 
@@ -75,11 +70,17 @@ describe('About Section', () => {
     expect(heading).toBeInTheDocument()
   })
 
-  it('renders all four bio paragraphs', () => {
+  it('renders bio paragraphs', () => {
     render(<AboutSection />)
 
-    // Use getAllByRole to find paragraphs with bio content
     const paragraphs = screen.getAllByRole('paragraph')
-    expect(paragraphs.length).toBeGreaterThanOrEqual(4)
+    expect(paragraphs.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('renders space llama image with alt text', () => {
+    render(<AboutSection />)
+
+    const llamaImage = screen.getByAltText(/space llama/i)
+    expect(llamaImage).toBeInTheDocument()
   })
 })

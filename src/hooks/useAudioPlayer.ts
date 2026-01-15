@@ -191,7 +191,7 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
         audioContextRef.current.close()
       }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   /**
    * Load track when currentTrackIndex or tracks change.
@@ -208,7 +208,7 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
         setIsPlaying(false)
       })
     }
-  }, [currentTrackIndex, currentTrack]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentTrackIndex, currentTrack])
 
   /**
    * Sync volume state with audio element.

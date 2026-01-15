@@ -290,22 +290,22 @@ a:active {
 .glow-layer {
   position: absolute;
   inset: 0;
-  filter: blur(100px) saturate(1);
+  filter: blur(60px) saturate(1);
   border-radius: 9999px;
 }
 
 .glow-layer-magenta {
-  background: radial-gradient(circle, hsl(300 100% 60% / 0.9) 0%, transparent 45%);
+  background: radial-gradient(circle, hsl(300 100% 60% / 0.9) 0%, transparent 55%);
   animation: glow-pulse 6s ease-in-out infinite;
 }
 
 .glow-layer-purple {
-  background: radial-gradient(circle, hsl(270 100% 65% / 0.9) 0%, transparent 45%);
+  background: radial-gradient(circle, hsl(270 100% 65% / 0.9) 0%, transparent 55%);
   animation: glow-pulse 6s ease-in-out infinite 2s;
 }
 
 .glow-layer-cyan {
-  background: radial-gradient(circle, hsl(185 100% 55% / 0.9) 0%, transparent 45%);
+  background: radial-gradient(circle, hsl(185 100% 55% / 0.9) 0%, transparent 55%);
   animation: glow-pulse 6s ease-in-out infinite 4s;
 }
 

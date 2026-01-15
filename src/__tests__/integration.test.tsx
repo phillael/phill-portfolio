@@ -107,6 +107,22 @@ jest.mock('next/image', () => ({
   ),
 }))
 
+// Mock React Three Fiber to avoid Canvas issues in JSDOM
+jest.mock('@react-three/fiber', () => ({
+  Canvas: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+    <div data-testid="r3f-canvas" data-props={JSON.stringify(props)}>
+      {/* Don't render children to avoid Three.js element warnings in JSDOM */}
+    </div>
+  ),
+}))
+
+// Mock React Three Drei components
+jest.mock('@react-three/drei', () => ({
+  Sparkles: (props: Record<string, unknown>) => (
+    <div data-testid="sparkles" data-props={JSON.stringify(props)} />
+  ),
+}))
+
 describe('Integration Tests', () => {
   describe('Full Page Rendering', () => {
     it('renders the full page without errors', () => {

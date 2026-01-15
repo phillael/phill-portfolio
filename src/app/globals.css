@@ -284,35 +284,39 @@ a:active {
   text-shadow: 0 0 20px hsl(var(--secondary) / 0.5);
 }
 
-/* Hero image animated glow effect */
-.hero-image-glow {
-  animation: hero-glow 4s ease-in-out infinite;
-  filter: blur(40px);
-  opacity: 0.6;
+/* Hero image animated glow effect - 3 layered approach for smooth morphing */
+/* Order: magenta → purple → cyan */
+/* Using high saturation colors for vibrant cyberpunk aesthetic */
+.glow-layer {
+  position: absolute;
+  inset: 0;
+  filter: blur(100px) saturate(1);
+  border-radius: 9999px;
 }
 
-@keyframes hero-glow {
-  0%,
-  100% {
-    background: radial-gradient(
-      circle,
-      hsl(var(--primary) / 0.8) 0%,
-      transparent 70%
-    );
+.glow-layer-magenta {
+  background: radial-gradient(circle, hsl(300 100% 60% / 0.9) 0%, transparent 45%);
+  animation: glow-pulse 6s ease-in-out infinite;
+}
+
+.glow-layer-purple {
+  background: radial-gradient(circle, hsl(270 100% 65% / 0.9) 0%, transparent 45%);
+  animation: glow-pulse 6s ease-in-out infinite 2s;
+}
+
+.glow-layer-cyan {
+  background: radial-gradient(circle, hsl(185 100% 55% / 0.9) 0%, transparent 45%);
+  animation: glow-pulse 6s ease-in-out infinite 4s;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
   }
-  33% {
-    background: radial-gradient(
-      circle,
-      hsl(var(--secondary) / 0.8) 0%,
-      transparent 70%
-    );
-  }
-  66% {
-    background: radial-gradient(
-      circle,
-      hsl(280 80% 60% / 0.8) 0%,
-      transparent 70%
-    );
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
   }
 }
 

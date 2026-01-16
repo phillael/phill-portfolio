@@ -100,7 +100,7 @@ const generateParticles = (): Particle[] => {
     y: randomBetween(-173, 173),
     size: randomBetween(4, 9),
     color: getRandomColor(),
-    duration: randomBetween(0.5, 0.8),
+    duration: randomBetween(0.25, 0.4),
     peakY: 0,
     hasGravity: false, // normal burst doesn't need gravity
   }))
@@ -108,29 +108,20 @@ const generateParticles = (): Particle[] => {
 
 /**
  * Generate particles for mega explosion (destruction)
- * Creates 30-40 larger particles with gravity physics
- * Particles explode upward then fall down
+ * Creates 30-40 larger particles with radial spread
  */
 const generateMegaExplosion = (): Particle[] => {
   const count = Math.floor(randomBetween(30, 40))
-  return Array.from({ length: count }, (_, index) => {
-    const x = randomBetween(-1100, 1100)
-    // Initial upward velocity (how high they go)
-    const peakY = randomBetween(-400, -150)
-    // Final y position (where they land, below start point due to gravity)
-    const finalY = randomBetween(300, 800)
-
-    return {
-      id: Date.now() + index,
-      x,
-      y: finalY,
-      size: randomBetween(10, 22),
-      color: getRandomColor(),
-      duration: randomBetween(5.0, 8.4),
-      peakY,
-      hasGravity: true,
-    }
-  })
+  return Array.from({ length: count }, (_, index) => ({
+    id: Date.now() + index,
+    x: randomBetween(-1100, 1100),
+    y: randomBetween(-1100, 1100),
+    size: randomBetween(10, 22),
+    color: getRandomColor(),
+    duration: randomBetween(0.25, 1),
+    peakY: 0,
+    hasGravity: false,
+  }))
 }
 
 interface ParticleComponentProps {
@@ -185,12 +176,10 @@ const ParticleComponent = ({ particle }: ParticleComponentProps) => {
       }}
       transition={{
         duration: particle.duration,
-        x: { ease: 'easeOut' },
-        y: particle.hasGravity
-          ? { ease: [0.2, 0, 0.8, 1], times: [0, 0.3, 1] } // fast up, slow arc down
-          : { ease: 'easeOut' },
-        scale: { ease: 'easeOut' },
-        opacity: { ease: 'easeIn', delay: particle.duration * 0.5 }, // fade later
+        x: { duration: particle.duration, ease: 'easeOut' },
+        y: { duration: particle.duration, ease: 'easeOut' },
+        scale: { duration: particle.duration, ease: 'easeOut' },
+        opacity: { duration: particle.duration, ease: 'easeIn', delay: particle.duration * 0.5 },
       }}
     />
   )
@@ -354,7 +343,7 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
           `}
           style={{
             textShadow: damageLevel === 0
-              ? '0 0 7px hsl(var(--accent)), 0 0 14px hsl(var(--accent) / 0.5)'
+              ? '0 0 4px hsl(var(--accent) / 0.6)'
               : undefined,
             boxShadow: damageLevel > 0
               ? `0 0 ${4 + damageLevel * 3}px hsl(${40 - damageLevel * 10}, 100%, 50%)`

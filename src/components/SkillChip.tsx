@@ -4,6 +4,18 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 /**
+ * Sparkle type definition for hover effect
+ */
+interface Sparkle {
+  id: number
+  x: number
+  y: number
+  size: number
+  delay: number
+  duration: number
+}
+
+/**
  * Particle type definition for burst effect
  */
 interface Particle {
@@ -45,6 +57,36 @@ const getRandomColor = (): 'primary' | 'secondary' | 'accent' => {
   const colors: Array<'primary' | 'secondary' | 'accent'> = ['primary', 'secondary', 'accent']
   return colors[Math.floor(Math.random() * colors.length)]
 }
+
+/**
+ * Generate sparkles for hover effect
+ */
+const generateSparkles = (count: number = 8): Sparkle[] => {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: 4 + Math.random() * 5,
+    delay: Math.random() * 0.8,
+    duration: 0.8 + Math.random() * 0.6,
+  }))
+}
+
+/**
+ * CSS keyframes for sparkle animation
+ */
+const sparkleKeyframes = `
+@keyframes sparkle-pop {
+  0%, 100% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1) rotate(180deg);
+    opacity: 1;
+  }
+}
+`
 
 /**
  * Generate particles for normal burst effect
@@ -178,10 +220,19 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
   const [clickCount, setClickCount] = useState(0)
   const [isDestroyed, setIsDestroyed] = useState(false)
   const [shouldCollapse, setShouldCollapse] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [sparkles, setSparkles] = useState<Sparkle[]>([])
   const shouldReduceMotion = useReducedMotion()
   const chipRef = useRef<HTMLSpanElement>(null)
 
   const CLICKS_TO_DESTROY = 5
+
+  // Generate sparkles when hovered
+  useEffect(() => {
+    if (isHovered && !shouldReduceMotion) {
+      setSparkles(generateSparkles(8))
+    }
+  }, [isHovered, shouldReduceMotion])
 
   /**
    * Handle click to trigger particle burst or destruction
@@ -251,7 +302,6 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
     }
   }, [isDestroyed, shouldCollapse])
 
-
   // Calculate damage level for visual feedback (0-4 = healthy, warning, danger, critical)
   const damageLevel = Math.min(clickCount, CLICKS_TO_DESTROY - 1)
 
@@ -259,84 +309,113 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
   const shakeIntensity = damageLevel * 1.5
 
   return (
-    <motion.div
-      className={`relative inline-block overflow-visible ${isDestroyed ? 'pointer-events-none' : ''}`}
-      layout
-      initial={false}
-      animate={shouldCollapse ? {
-        width: 0,
-        height: 0,
-        marginRight: -8, // compensate for gap
-      } : {}}
-      transition={{
-        layout: { duration: 0.3, ease: 'easeOut' },
-        width: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-        height: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-        marginRight: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-      }}
-    >
-      {/* The chip itself - fades out during explosion */}
-      <motion.span
-        ref={chipRef}
-        className={`
-          inline-flex items-center
-          px-3 py-1.5 md:px-4 md:py-2
-          text-sm md:text-base
-          font-medium
-          rounded-md
-          cursor-pointer
-          select-none
-          transition-colors duration-150 ease-out
-          focus:outline-none
-          focus-visible:ring-2
-          focus-visible:ring-accent
-          focus-visible:ring-offset-2
-          focus-visible:ring-offset-background
-          ${damageLevel === 0 ? 'text-accent bg-muted' : ''}
-          ${damageLevel === 1 ? 'text-accent bg-muted/90' : ''}
-          ${damageLevel === 2 ? 'text-[hsl(40,100%,70%)] bg-muted/80' : ''}
-          ${damageLevel === 3 ? 'text-[hsl(20,100%,65%)] bg-muted/70' : ''}
-          ${damageLevel >= 4 ? 'text-[hsl(0,100%,65%)] bg-muted/60' : ''}
-        `}
-        style={{
-          boxShadow: damageLevel > 0
-            ? `0 0 ${4 + damageLevel * 3}px hsl(${40 - damageLevel * 10}, 100%, 50%)`
-            : undefined,
-        }}
-        whileHover={{
-          scale: 1.05,
-          textShadow: '0 0 8px hsl(var(--accent)), 0 0 16px hsl(var(--accent) / 0.6)',
-        }}
-        whileTap={{
-          scale: 0.97,
-        }}
-        animate={isDestroyed ? {
-          opacity: 0,
-          scale: 0,
-          transition: { duration: 0.15, ease: 'easeOut' }
-        } : damageLevel > 0 ? {
-          x: [0, -shakeIntensity, shakeIntensity, -shakeIntensity, shakeIntensity, 0],
-          transition: { duration: 0.4, ease: 'easeOut' }
+    <>
+      <style dangerouslySetInnerHTML={{ __html: sparkleKeyframes }} />
+      <motion.div
+        className={`relative inline-block overflow-visible ${isDestroyed ? 'pointer-events-none' : ''}`}
+        layout
+        initial={false}
+        animate={shouldCollapse ? {
+          width: 0,
+          height: 0,
+          marginRight: -8, // compensate for gap
         } : {}}
-        transition={{ duration: 0.15 }}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        role="button"
-        tabIndex={0}
-        aria-label={`${skill} skill - click ${CLICKS_TO_DESTROY - clickCount} more times to destroy`}
+        transition={{
+          layout: { duration: 0.3, ease: 'easeOut' },
+          width: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+          height: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+          marginRight: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+        }}
       >
-        {skill}
-      </motion.span>
-
-      {/* Particle container - absolutely positioned over the chip with high z-index */}
-      <div className="absolute inset-0 z-50 pointer-events-none">
-        <AnimatePresence>
-          {particles.map((particle) => (
-            <ParticleComponent key={particle.id} particle={particle} />
+        {/* The chip itself - fades out during explosion */}
+        <motion.span
+          ref={chipRef}
+          className={`
+            inline-flex items-center
+            px-3 py-1.5 md:px-4 md:py-2
+            text-sm md:text-base
+            font-medium
+            rounded-md
+            cursor-pointer
+            select-none
+            transition-colors duration-150 ease-out
+            focus:outline-none
+            focus-visible:ring-2
+            focus-visible:ring-accent
+            focus-visible:ring-offset-2
+            focus-visible:ring-offset-background
+            overflow-visible
+            border border-primary/30
+            ${damageLevel === 0 ? 'text-accent bg-card/80' : ''}
+            ${damageLevel === 1 ? 'text-accent bg-card/70' : ''}
+            ${damageLevel === 2 ? 'text-[hsl(40,100%,70%)] bg-card/60' : ''}
+            ${damageLevel === 3 ? 'text-[hsl(20,100%,65%)] bg-card/50' : ''}
+            ${damageLevel >= 4 ? 'text-[hsl(0,100%,65%)] bg-card/40' : ''}
+          `}
+          style={{
+            textShadow: damageLevel === 0
+              ? '0 0 7px hsl(var(--accent)), 0 0 14px hsl(var(--accent) / 0.5)'
+              : undefined,
+            boxShadow: damageLevel > 0
+              ? `0 0 ${4 + damageLevel * 3}px hsl(${40 - damageLevel * 10}, 100%, 50%)`
+              : '0 0 8px hsl(var(--primary) / 0.2)',
+          }}
+          whileHover={{
+            scale: 1.05,
+            textShadow: '0 0 8px hsl(var(--accent)), 0 0 16px hsl(var(--accent) / 0.6)',
+          }}
+          whileTap={{
+            scale: 0.97,
+          }}
+          animate={isDestroyed ? {
+            opacity: 0,
+            scale: 0,
+            transition: { duration: 0.15, ease: 'easeOut' }
+          } : damageLevel > 0 ? {
+            x: [0, -shakeIntensity, shakeIntensity, -shakeIntensity, shakeIntensity, 0],
+            transition: { duration: 0.4, ease: 'easeOut' }
+          } : {}}
+          transition={{ duration: 0.15 }}
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          role="button"
+          tabIndex={0}
+          aria-label={`${skill} skill - click ${CLICKS_TO_DESTROY - clickCount} more times to destroy`}
+        >
+          {/* Sparkles on hover - cyan color */}
+          {isHovered && !shouldReduceMotion && sparkles.map((sparkle) => (
+            <span
+              key={sparkle.id}
+              className="pointer-events-none absolute text-primary"
+              style={{
+                left: `${sparkle.x}%`,
+                top: `${sparkle.y}%`,
+                width: sparkle.size,
+                height: sparkle.size,
+                animation: `sparkle-pop ${sparkle.duration}s ease-in-out infinite`,
+                animationDelay: `${sparkle.delay}s`,
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-full w-full">
+                <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+              </svg>
+            </span>
           ))}
-        </AnimatePresence>
-      </div>
-    </motion.div>
+          {skill}
+        </motion.span>
+
+        {/* Particle container - absolutely positioned over the chip with high z-index */}
+        <div className="absolute inset-0 z-50 pointer-events-none">
+          <AnimatePresence>
+            {particles.map((particle) => (
+              <ParticleComponent key={particle.id} particle={particle} />
+            ))}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </>
   )
 }
 

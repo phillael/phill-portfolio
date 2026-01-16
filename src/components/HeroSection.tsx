@@ -13,26 +13,30 @@ const HeroSection = () => {
       role="region"
       className="relative min-h-screen flex flex-col items-center justify-center px-4 py-8 overflow-hidden"
     >
-      {/* Vortex sparkles effect */}
-      <Vortex
-        particleCount={200}
-        baseHue={190}
-        rangeY={200}
-        baseSpeed={0.05}
-        rangeSpeed={0.5}
-        baseRadius={1}
-        rangeRadius={1.5}
-        containerClassName="absolute inset-0 z-0"
-      />
+      {/* Vortex sparkles effect - hidden on mobile */}
+      <div className="hidden md:block">
+        <Vortex
+          particleCount={200}
+          baseHue={190}
+          rangeY={200}
+          baseSpeed={0.05}
+          rangeSpeed={0.5}
+          baseRadius={1}
+          rangeRadius={1.5}
+          containerClassName="absolute inset-0 z-0"
+        />
+      </div>
 
-      {/* Ripple effect behind hero content */}
-      <Ripple
-        mainCircleSize={50}
-        mainCircleOpacity={0.12}
-        numCircles={6}
-        circleColor="hsl(190 100% 50% / 0.15)"
-        className="z-[1]"
-      />
+      {/* Ripple effect behind hero content - hidden on mobile */}
+      <div className="hidden md:block">
+        <Ripple
+          mainCircleSize={50}
+          mainCircleOpacity={0.12}
+          numCircles={6}
+          circleColor="hsl(190 100% 50% / 0.15)"
+          className="z-[1]"
+        />
+      </div>
 
       <div className="relative z-10 flex flex-col items-center gap-6 max-w-7xl mx-auto w-full">
         <HeroImage />

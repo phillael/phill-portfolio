@@ -19,6 +19,8 @@ const HeroImage = () => {
     >
       {/* Animated glow effect - extends vertically but contained horizontally */}
       <GlowEffect inset="-inset-y-10 inset-x-0" />
+
+
       <div className="relative w-full h-full">
         <Image
           src="/images/hero-image-phill-llamas.png"

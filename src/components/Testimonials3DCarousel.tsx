@@ -546,7 +546,7 @@ const Testimonials3DCarousel = () => {
   // Shared canvas component
   const CarouselCanvas = ({ isPreview = false }: { isPreview?: boolean }) => (
     <Canvas
-      camera={{ position: [0, 0, isPreview ? 3.8 : 1.8], fov: 50 }}
+      camera={{ position: [0, 0, isPreview ? 1.8 : 1.8], fov: 50 }}
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true }}
       resize={{ debounce: 0 }}
@@ -568,7 +568,7 @@ const Testimonials3DCarousel = () => {
       <div className="mt-8 flex flex-col items-center">
         <button
           onClick={handleExpand}
-          className="group relative w-[280px] h-[180px] md:w-[320px] md:h-[200px] rounded-lg border-2 border-primary/30 overflow-hidden transition-all duration-300 hover:border-primary hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="group relative w-[280px] h-[180px] md:w-[320px] md:h-[200px] rounded-lg overflow-hidden transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Click to expand testimonials carousel"
         >
           {isLoading ? (
@@ -591,8 +591,6 @@ const Testimonials3DCarousel = () => {
             </span>
           </div>
         </button>
-
-        <p className="text-foreground/40 text-xs mt-2">Click to expand</p>
       </div>
 
       {/* Fullscreen Modal */}

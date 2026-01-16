@@ -340,3 +340,20 @@ a:active {
     hsl(var(--muted)) 100%
   );
 }
+
+/* Ripple animation - expanding circles */
+@keyframes ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: var(--opacity, 0.24);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+.animate-ripple {
+  animation: ripple 8s linear infinite;
+}
+

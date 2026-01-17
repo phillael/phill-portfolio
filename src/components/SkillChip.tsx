@@ -238,6 +238,8 @@ const SkillChip = ({ skill, onDestroy }: SkillChipProps) => {
     if (newClickCount >= CLICKS_TO_DESTROY) {
       // Mega explosion!
       setParticles(generateMegaExplosion())
+      // Trigger screen shake effect
+      window.dispatchEvent(new CustomEvent('screenShake'))
       const element = chipRef.current || undefined
       // Hide chip and show points, but component stays mounted for particles
       setTimeout(() => {

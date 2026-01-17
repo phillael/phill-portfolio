@@ -357,3 +357,29 @@ a:active {
   animation: ripple 8s linear infinite;
 }
 
+/* Screen shake effect for skill chip destruction */
+@keyframes screen-shake {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-20px, -10px) rotate(-2deg); }
+  20% { transform: translate(20px, 10px) rotate(2deg); }
+  30% { transform: translate(-20px, 10px) rotate(-1deg); }
+  40% { transform: translate(20px, -10px) rotate(1deg); }
+  50% { transform: translate(-15px, 5px) rotate(-2deg); }
+  60% { transform: translate(15px, -5px) rotate(2deg); }
+  70% { transform: translate(-10px, 5px) rotate(-1deg); }
+  80% { transform: translate(10px, -5px) rotate(1deg); }
+  90% { transform: translate(-5px, 2px) rotate(0deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+.screen-shake {
+  animation: screen-shake 0.5s ease-out;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  body.screen-shake {
+    animation: none;
+  }
+}
+

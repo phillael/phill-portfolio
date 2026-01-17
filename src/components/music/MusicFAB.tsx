@@ -49,7 +49,7 @@ const MusicFAB = ({
         rounded-full
         flex items-center justify-center
         overflow-hidden
-        z-40
+        z-50
         bg-card border-2 border-primary/50
         transition-shadow duration-300
         focus:outline-none

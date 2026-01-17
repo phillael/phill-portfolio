@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface FloatingPointsProps {
@@ -49,6 +50,11 @@ interface ScoreCounterProps {
 export const ScoreCounter = ({ score, combo, isVisible = true }: ScoreCounterProps) => {
   const [displayScore, setDisplayScore] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Animate score counting up
   useEffect(() => {
@@ -78,7 +84,9 @@ export const ScoreCounter = ({ score, combo, isVisible = true }: ScoreCounterPro
 
   const shouldShow = score > 0 && isVisible
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <AnimatePresence>
       {shouldShow && (
         <motion.div
@@ -138,7 +146,8 @@ export const ScoreCounter = ({ score, combo, isVisible = true }: ScoreCounterPro
       </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 

@@ -5,6 +5,7 @@ import AnimatedSection from '@/components/AnimatedSection'
 import GlitchText from '@/components/GlitchText'
 import GlowEffect from '@/components/GlowEffect'
 import Testimonials3DCarousel from '@/components/Testimonials3DCarousel'
+import { useShroomMode } from '@/context/ShroomModeContext'
 
 /**
  * HighlightedText - Renders text with neon glow effect
@@ -69,6 +70,8 @@ const BioParagraph = ({
  * - WCAG 2.1 AA compliant accessibility
  */
 const AboutSection = () => {
+  const { isActive: isShroomMode } = useShroomMode()
+
   return (
     <section
       id="about"
@@ -132,12 +135,14 @@ const AboutSection = () => {
               and it is awesome and I do great work.
             </BioParagraph>
 
-            {/* Testimonials Preview - shown on mobile after bio text */}
-            <div className="md:hidden pt-4">
-              <AnimatedSection delay={0.5}>
-                <Testimonials3DCarousel />
-              </AnimatedSection>
-            </div>
+            {/* Testimonials Preview - shown on mobile after bio text (hidden in shroom mode) */}
+            {!isShroomMode && (
+              <div className="md:hidden pt-4">
+                <AnimatedSection delay={0.5}>
+                  <Testimonials3DCarousel />
+                </AnimatedSection>
+              </div>
+            )}
           </div>
 
           {/* Space Llama Image + Testimonials Preview (desktop only) */}
@@ -156,12 +161,14 @@ const AboutSection = () => {
               </div>
             </AnimatedSection>
 
-            {/* 3D Testimonials Carousel Preview - desktop only, under llama */}
-            <div className="hidden md:block">
-              <AnimatedSection delay={0.5}>
-                <Testimonials3DCarousel />
-              </AnimatedSection>
-            </div>
+            {/* 3D Testimonials Carousel Preview - desktop only, under llama (hidden in shroom mode) */}
+            {!isShroomMode && (
+              <div className="hidden md:block">
+                <AnimatedSection delay={0.5}>
+                  <Testimonials3DCarousel />
+                </AnimatedSection>
+              </div>
+            )}
           </div>
         </div>
       </div>

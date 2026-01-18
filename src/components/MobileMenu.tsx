@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, Variants } from 'framer-motion'
 import NavLinks from '@/components/NavLinks'
 import SocialLinks from '@/components/SocialLinks'
@@ -15,6 +16,11 @@ interface MobileMenuProps {
 const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null)
   const firstFocusableRef = useRef<HTMLButtonElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -104,7 +110,11 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
     },
   }
 
-  return (
+  // Don't render on server
+  if (!mounted) return null
+
+  // Portal to body so it's outside #shroom-target filter
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -188,7 +198,8 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 

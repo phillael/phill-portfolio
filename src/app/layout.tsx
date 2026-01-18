@@ -3,6 +3,8 @@ import '@/app/globals.css'
 import Nav from '@/components/Nav'
 import { MusicPlayer } from '@/components/music'
 import ScreenShakeWrapper from '@/components/ScreenShakeWrapper'
+import ShroomMode from '@/components/ShroomMode'
+import { ShroomModeProvider } from '@/context/ShroomModeContext'
 
 const audiowide = Audiowide({
   weight: '400',
@@ -71,11 +73,18 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <html lang="en" className={`${audiowide.variable} ${nunito.variable} ${pressStart2P.variable}`}>
       <body className="font-body text-foreground custom-scrollbar">
-        <Nav />
-        <ScreenShakeWrapper>
-          {children}
-        </ScreenShakeWrapper>
-        <MusicPlayer />
+        <ShroomModeProvider>
+          {/* Main content wrapper - shroom filter applies here, not body */}
+          <div id="shroom-target">
+            <Nav />
+            <ScreenShakeWrapper>
+              {children}
+            </ScreenShakeWrapper>
+          </div>
+          {/* These stay outside the filter */}
+          <MusicPlayer />
+          <ShroomMode />
+        </ShroomModeProvider>
       </body>
     </html>
   )

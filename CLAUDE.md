@@ -1,5 +1,8 @@
 # Claude Code Project Rules - Phill Portfolio
 
+## IMPORTANT: Git & GitHub Policy
+**NEVER run git commits, git push, or any GitHub CLI commands.** The user manages all version control themselves. When asked to "commit", just confirm the changes are ready - do not execute git commands.
+
 ## Project Overview
 A cyberpunk-themed developer portfolio for Phill Aelony built with Next.js 16, TypeScript, React, Tailwind CSS, and Framer Motion. Future phases will incorporate Three.js for 3D animations.
 

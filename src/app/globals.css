@@ -376,10 +376,38 @@ a:active {
   animation: screen-shake 0.5s ease-out;
 }
 
+/* Shroom Mode - Psychedelic color cycling */
+@keyframes shroom-hue-cycle {
+  0% {
+    filter: url(#shroom-filter) hue-rotate(0deg) saturate(1.5);
+  }
+  25% {
+    filter: url(#shroom-filter) hue-rotate(90deg) saturate(2);
+  }
+  50% {
+    filter: url(#shroom-filter) hue-rotate(180deg) saturate(1.8);
+  }
+  75% {
+    filter: url(#shroom-filter) hue-rotate(270deg) saturate(2);
+  }
+  100% {
+    filter: url(#shroom-filter) hue-rotate(360deg) saturate(1.5);
+  }
+}
+
+/* Shroom target wrapper needs min-height */
+#shroom-target {
+  min-height: 100vh;
+}
+
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   body.screen-shake {
     animation: none;
+  }
+  #shroom-target {
+    animation: none !important;
+    filter: none !important;
   }
 }
 

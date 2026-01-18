@@ -45,7 +45,7 @@ const MusicFAB = ({
     <motion.button
       className={`
         fixed bottom-4 right-4 md:bottom-6 md:right-6
-        w-[52px] h-[52px] md:w-14 md:h-14
+        w-10 h-10 md:w-14 md:h-14
         rounded-full
         flex items-center justify-center
         overflow-hidden
@@ -96,7 +96,7 @@ const MusicFAB = ({
         </div>
       ) : (
         <Music
-          className="w-6 h-6 md:w-7 md:h-7 text-primary"
+          className="w-5 h-5 md:w-7 md:h-7 text-primary"
           aria-hidden="true"
         />
       )}

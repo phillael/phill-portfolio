@@ -376,7 +376,410 @@ a:active {
   animation: screen-shake 0.5s ease-out;
 }
 
-/* Shroom Mode - Psychedelic color cycling */
+/* ===========================================
+   Shroom Mode - GPU-Accelerated Psychedelic Effects
+   All animations use transform, opacity, and filter
+   which are hardware-accelerated for smooth performance
+   =========================================== */
+
+/* Color cycling - smooth hue rotation with moderate saturation */
+@keyframes shroom-color-cycle {
+  0% {
+    filter: hue-rotate(0deg) saturate(1.4) contrast(1.1) brightness(1);
+  }
+  12.5% {
+    filter: hue-rotate(45deg) saturate(1.6) contrast(1.15) brightness(1.05);
+  }
+  25% {
+    filter: hue-rotate(90deg) saturate(1.8) contrast(1.2) brightness(1.08);
+  }
+  37.5% {
+    filter: hue-rotate(135deg) saturate(1.7) contrast(1.18) brightness(1.05);
+  }
+  50% {
+    filter: hue-rotate(180deg) saturate(1.6) contrast(1.15) brightness(1);
+  }
+  62.5% {
+    filter: hue-rotate(225deg) saturate(1.7) contrast(1.15) brightness(1.02);
+  }
+  75% {
+    filter: hue-rotate(270deg) saturate(1.8) contrast(1.18) brightness(1.05);
+  }
+  87.5% {
+    filter: hue-rotate(315deg) saturate(1.6) contrast(1.12) brightness(1.02);
+  }
+  100% {
+    filter: hue-rotate(360deg) saturate(1.4) contrast(1.1) brightness(1);
+  }
+}
+
+/* Breathing effect - varied shrink/expand */
+@keyframes shroom-breathe-scale {
+  0% {
+    transform: scale(1);
+  }
+  15% {
+    transform: scale(1.1);
+  }
+  30% {
+    transform: scale(0.88);
+  }
+  45% {
+    transform: scale(1.05);
+  }
+  60% {
+    transform: scale(0.92);
+  }
+  75% {
+    transform: scale(1.12);
+  }
+  90% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Perspective tilt - chaotic warping with varied movements
+   Long duration with many keyframes for unpredictable feel
+   Includes: perspective, rotation, scale, translate, skew */
+@keyframes shroom-breathe-tilt {
+  0% {
+    transform: perspective(500px) rotateX(0deg) rotateY(0deg) scale(1) translateX(0%) translateY(0%);
+  }
+  7% {
+    transform: perspective(400px) rotateX(15deg) rotateY(-10deg) scale(1.08) translateX(2%) translateY(-1%);
+  }
+  15% {
+    transform: perspective(350px) rotateX(8deg) rotateY(-20deg) scale(0.92) translateX(-1%) translateY(2%);
+  }
+  22% {
+    transform: perspective(300px) rotateX(-12deg) rotateY(-15deg) scale(1.15) translateX(3%) translateY(1%);
+  }
+  30% {
+    transform: perspective(400px) rotateX(-20deg) rotateY(5deg) scale(0.88) translateX(-2%) translateY(-2%);
+  }
+  38% {
+    transform: perspective(350px) rotateX(-8deg) rotateY(18deg) scale(1.1) translateX(1%) translateY(3%);
+  }
+  45% {
+    transform: perspective(300px) rotateX(10deg) rotateY(22deg) scale(0.9) translateX(-3%) translateY(-1%);
+  }
+  52% {
+    transform: perspective(450px) rotateX(18deg) rotateY(8deg) scale(1.12) translateX(2%) translateY(-2%);
+  }
+  60% {
+    transform: perspective(350px) rotateX(5deg) rotateY(-12deg) scale(0.85) translateX(-1%) translateY(2%);
+  }
+  68% {
+    transform: perspective(300px) rotateX(-15deg) rotateY(-18deg) scale(1.18) translateX(3%) translateY(1%);
+  }
+  75% {
+    transform: perspective(400px) rotateX(-22deg) rotateY(10deg) scale(0.9) translateX(-2%) translateY(-3%);
+  }
+  83% {
+    transform: perspective(350px) rotateX(-10deg) rotateY(15deg) scale(1.05) translateX(1%) translateY(2%);
+  }
+  92% {
+    transform: perspective(450px) rotateX(5deg) rotateY(5deg) scale(0.95) translateX(-1%) translateY(-1%);
+  }
+  100% {
+    transform: perspective(500px) rotateX(0deg) rotateY(0deg) scale(1) translateX(0%) translateY(0%);
+  }
+}
+
+/* Skew wave - varied distortion */
+@keyframes shroom-breathe-skew {
+  0% {
+    transform: skewX(0deg) skewY(0deg);
+  }
+  18% {
+    transform: skewX(4deg) skewY(-2deg);
+  }
+  35% {
+    transform: skewX(-2deg) skewY(3deg);
+  }
+  50% {
+    transform: skewX(3deg) skewY(1deg);
+  }
+  68% {
+    transform: skewX(-4deg) skewY(-3deg);
+  }
+  85% {
+    transform: skewX(1deg) skewY(2deg);
+  }
+  100% {
+    transform: skewX(0deg) skewY(0deg);
+  }
+}
+
+/* Wobble effect - symmetric for seamless loop */
+@keyframes shroom-wobble {
+  0%, 50%, 100% {
+    transform: rotate(0deg) skewX(0deg);
+  }
+  25% {
+    transform: rotate(2deg) skewX(1deg);
+  }
+  75% {
+    transform: rotate(-2deg) skewX(-1deg);
+  }
+}
+
+/* Blur pulse - smooth pulsing glow */
+@keyframes shroom-blur-pulse {
+  0% {
+    filter: blur(0px);
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  25% {
+    filter: blur(4px);
+    opacity: 0.55;
+    transform: scale(1.03);
+  }
+  50% {
+    filter: blur(8px);
+    opacity: 0.7;
+    transform: scale(1.06);
+  }
+  75% {
+    filter: blur(4px);
+    opacity: 0.55;
+    transform: scale(1.03);
+  }
+  100% {
+    filter: blur(0px);
+    opacity: 0.4;
+    transform: scale(1);
+  }
+}
+
+/* Color overlay animations - gentle flowing movement */
+@keyframes shroom-overlay-1 {
+  0% {
+    opacity: 0.3;
+    transform: scale(1) translateX(0%) translateY(0%);
+  }
+  25% {
+    opacity: 0.4;
+    transform: scale(1.05) translateX(2%) translateY(-1%);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1) translateX(3%) translateY(-2%);
+  }
+  75% {
+    opacity: 0.4;
+    transform: scale(1.05) translateX(1%) translateY(-1%);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(1) translateX(0%) translateY(0%);
+  }
+}
+
+@keyframes shroom-overlay-2 {
+  0% {
+    opacity: 0.25;
+    transform: scale(1) translateX(0%) translateY(0%);
+  }
+  25% {
+    opacity: 0.35;
+    transform: scale(0.97) translateX(-2%) translateY(1%);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.94) translateX(-3%) translateY(2%);
+  }
+  75% {
+    opacity: 0.35;
+    transform: scale(0.97) translateX(-1%) translateY(1%);
+  }
+  100% {
+    opacity: 0.25;
+    transform: scale(1) translateX(0%) translateY(0%);
+  }
+}
+
+@keyframes shroom-overlay-3 {
+  0% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  25% {
+    opacity: 0.4;
+    transform: scale(1.03);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.06);
+  }
+  75% {
+    opacity: 0.4;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+}
+
+/* Gradient shift - smooth circular movement */
+@keyframes shroom-gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  12.5% {
+    background-position: 25% 25%;
+  }
+  25% {
+    background-position: 50% 0%;
+  }
+  37.5% {
+    background-position: 75% 25%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  62.5% {
+    background-position: 75% 75%;
+  }
+  75% {
+    background-position: 50% 100%;
+  }
+  87.5% {
+    background-position: 25% 75%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Scan line effect - subtle wave */
+@keyframes shroom-scanlines {
+  0% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(2px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+}
+
+/* Combined shroom effect classes
+   Prime-ish durations so animations never sync up = apparent randomness
+   Perspective uses linear timing for smoother loop */
+.shroom-active {
+  animation:
+    shroom-color-cycle 8s linear infinite,
+    shroom-breathe-scale 11s ease-in-out infinite,
+    shroom-breathe-tilt 23s linear infinite,
+    shroom-breathe-skew 13s ease-in-out infinite;
+  transform-origin: center center;
+  will-change: transform, filter;
+}
+
+/* Intensity levels - colors speed up, warp stays slow for smoothness */
+.shroom-active.shroom-intensity-low {
+  animation:
+    shroom-color-cycle 12s linear infinite,
+    shroom-breathe-scale 17s ease-in-out infinite,
+    shroom-breathe-tilt 29s linear infinite,
+    shroom-breathe-skew 19s ease-in-out infinite;
+}
+
+.shroom-active.shroom-intensity-medium {
+  animation:
+    shroom-color-cycle 8s linear infinite,
+    shroom-breathe-scale 11s ease-in-out infinite,
+    shroom-breathe-tilt 23s linear infinite,
+    shroom-breathe-skew 13s ease-in-out infinite;
+}
+
+.shroom-active.shroom-intensity-high {
+  animation:
+    shroom-color-cycle 5s linear infinite,
+    shroom-breathe-scale 9s ease-in-out infinite,
+    shroom-breathe-tilt 23s linear infinite,
+    shroom-breathe-skew 11s ease-in-out infinite;
+}
+
+.shroom-active.shroom-intensity-max {
+  animation:
+    shroom-color-cycle 3s linear infinite,
+    shroom-breathe-scale 7s ease-in-out infinite,
+    shroom-breathe-tilt 23s linear infinite,
+    shroom-breathe-skew 9s ease-in-out infinite;
+}
+
+/* Overlay styles */
+.shroom-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  mix-blend-mode: overlay;
+  will-change: transform, opacity;
+}
+
+.shroom-overlay-1 {
+  background: radial-gradient(ellipse 80% 80% at 30% 20%, rgba(255, 0, 255, 0.4) 0%, rgba(255, 100, 200, 0.2) 30%, transparent 60%);
+  animation: shroom-overlay-1 10s ease-in-out infinite;
+}
+
+.shroom-overlay-2 {
+  background: radial-gradient(ellipse 90% 70% at 70% 80%, rgba(0, 255, 255, 0.4) 0%, rgba(100, 200, 255, 0.2) 30%, transparent 60%);
+  animation: shroom-overlay-2 12s ease-in-out infinite;
+}
+
+.shroom-overlay-3 {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 50, 0, 0.3) 0%,
+    rgba(255, 200, 0, 0.2) 15%,
+    transparent 30%,
+    rgba(0, 255, 100, 0.3) 45%,
+    rgba(0, 200, 255, 0.2) 55%,
+    transparent 70%,
+    rgba(150, 0, 255, 0.3) 85%,
+    rgba(255, 0, 150, 0.2) 100%
+  );
+  background-size: 300% 300%;
+  animation: shroom-gradient-shift 15s ease-in-out infinite;
+  mix-blend-mode: color-dodge;
+}
+
+/* Extra pulsing overlay - gentle glow */
+.shroom-overlay-4 {
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, rgba(255, 200, 255, 0.08) 30%, transparent 60%);
+  animation: shroom-blur-pulse 8s ease-in-out infinite;
+  mix-blend-mode: soft-light;
+}
+
+/* Scanlines overlay for extra trippiness - subtle CRT effect */
+.shroom-scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 31;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  animation: shroom-scanlines 4s ease-in-out infinite;
+}
+
+/* Desktop hue cycle - includes SVG filter reference combined with hue-rotate */
 @keyframes shroom-hue-cycle {
   0% {
     filter: url(#shroom-filter) hue-rotate(0deg) saturate(1.5);
@@ -395,9 +798,38 @@ a:active {
   }
 }
 
+/* Mobile hue cycle - same colors but no SVG filter (GPU-accelerated) */
+@keyframes shroom-hue-cycle-mobile {
+  0% {
+    filter: hue-rotate(0deg) saturate(1.5);
+  }
+  25% {
+    filter: hue-rotate(90deg) saturate(2);
+  }
+  50% {
+    filter: hue-rotate(180deg) saturate(1.8);
+  }
+  75% {
+    filter: hue-rotate(270deg) saturate(2);
+  }
+  100% {
+    filter: hue-rotate(360deg) saturate(1.5);
+  }
+}
+
+/* Mobile-specific shroom effect - combines hue-rotate with CSS transforms */
+.shroom-active.shroom-mobile {
+  animation:
+    shroom-hue-cycle-mobile 6s linear infinite,
+    shroom-breathe-scale 11s ease-in-out infinite,
+    shroom-breathe-tilt 23s linear infinite,
+    shroom-breathe-skew 13s ease-in-out infinite;
+}
+
 /* Shroom target wrapper needs min-height */
 #shroom-target {
   min-height: 100vh;
+  transform-origin: center center;
 }
 
 /* Respect reduced motion preference */
@@ -408,6 +840,10 @@ a:active {
   #shroom-target {
     animation: none !important;
     filter: none !important;
+  }
+  .shroom-overlay,
+  .shroom-scanlines {
+    display: none !important;
   }
 }
 

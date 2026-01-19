@@ -14,6 +14,9 @@ const ShroomWizard3D = dynamic(() => import('./ShroomWizard3D'), {
   ),
 })
 
+// Mobile breakpoint (matches Tailwind's md)
+const MOBILE_BREAKPOINT = 768
+
 /**
  * MushroomIcon - Clean mushroom icon with spots
  */
@@ -45,17 +48,10 @@ const MushroomIcon = ({ className = '', style }: { className?: string; style?: R
 )
 
 /**
- * ShroomMode - Psychedelic mode that makes the page melt and warp
+ * ShroomMode - Psychedelic mode with platform-specific effects
  *
- * Features:
- * - Small mushroom icon by default, click to summon wizard
- * - 3D animated shroom wizard character
- * - SVG displacement filter for melting/warping effect
- * - Animated turbulence for organic movement
- * - CSS hue-rotate for color cycling
- * - Confirmation modal before activation
- * - Clear escape button always visible
- * - Respects prefers-reduced-motion
+ * Desktop: SVG displacement filter + hue-rotate (original trippy effect)
+ * Mobile: CSS transforms + hue-rotate (GPU-accelerated for performance)
  */
 const ShroomMode = () => {
   const [showWizard, setShowWizard] = useState(false)
@@ -63,9 +59,20 @@ const ShroomMode = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const { isActive, setIsActive } = useShroomMode()
-  const [intensity, setIntensity] = useState(0)
+  const [intensity, setIntensity] = useState(0) // For desktop SVG filter (0-40)
+  const [isMobile, setIsMobile] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const turbulenceRef = useRef<SVGFETurbulenceElement>(null)
   const animationRef = useRef<number | null>(null)
+
+  // Detect mobile vs desktop after mount
+  useEffect(() => {
+    setIsMounted(true)
+    const checkMobile = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Called when the wizard model has loaded (but still walking on)
   const handleWizardLoaded = () => {
@@ -123,15 +130,16 @@ const ShroomMode = () => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isActive, showWizard, isExiting, setIsActive])
 
-  // Animate the turbulence for organic melting effect
+  // Main effect - handles both desktop and mobile
   useEffect(() => {
     const target = document.getElementById('shroom-target')
 
-    if (!isActive || !turbulenceRef.current || !target) {
+    if (!isActive || !target) {
       // Reset when deactivated
       if (target) {
         target.style.filter = ''
         target.style.animation = ''
+        target.classList.remove('shroom-active', 'shroom-mobile')
       }
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
@@ -146,82 +154,84 @@ const ShroomMode = () => {
       return
     }
 
-    // Apply the filter to the content wrapper (not body, so buttons stay visible)
-    target.style.filter = 'url(#shroom-filter)'
-    target.style.animation = 'shroom-hue-cycle 6s linear infinite' // Start slow
+    if (isMobile) {
+      // Mobile: Use CSS transforms + hue-rotate animation (all handled by CSS class)
+      target.classList.add('shroom-active', 'shroom-mobile')
+    } else {
+      // Desktop: Use original SVG filter implementation
+      // The shroom-hue-cycle animation includes both SVG filter and hue-rotate in each keyframe
+      target.style.animation = 'shroom-hue-cycle 6s linear infinite'
 
-    // Gradually increase intensity AND speed over 30 seconds
-    let currentIntensity = 0
-    const maxIntensity = 40 // Slightly higher max
-    const rampUpDuration = 30000 // 30 seconds to full effect
-    const startTime = Date.now()
+      // Animate SVG turbulence for organic melting effect
+      let currentIntensity = 0
+      const maxIntensity = 40
+      const rampUpDuration = 30000 // 30 seconds to full effect
+      const startTime = Date.now()
+      let seed = 0
 
-    let seed = 0
-    const animate = () => {
-      if (!turbulenceRef.current || !isActive) return
+      const animate = () => {
+        if (!turbulenceRef.current || !isActive) return
 
-      const elapsed = Date.now() - startTime
-      const progress = Math.min(1, elapsed / rampUpDuration) // 0 to 1 over 30s
+        const elapsed = Date.now() - startTime
+        const progress = Math.min(1, elapsed / rampUpDuration)
 
-      // Ramp up intensity
-      currentIntensity = progress * maxIntensity
-      setIntensity(currentIntensity)
+        // Ramp up intensity
+        currentIntensity = progress * maxIntensity
+        setIntensity(currentIntensity)
 
-      // Speed increases over time: starts at 0.1, ends at 0.8
-      const speedMultiplier = 0.1 + (progress * 0.7)
-      seed += speedMultiplier
-      turbulenceRef.current.setAttribute('seed', String(seed))
+        // Speed increases over time: starts at 0.1, ends at 0.8
+        const speedMultiplier = 0.1 + (progress * 0.7)
+        seed += speedMultiplier
+        turbulenceRef.current.setAttribute('seed', String(seed))
 
-      // Wider ripples - lower base frequency (0.003 = very wide waves)
-      // Frequency increases slightly as trip intensifies
-      const baseFreq = 0.003 + (progress * 0.004) // 0.003 to 0.007
-      const freqVariation = Math.sin(seed * 0.015) * 0.002
-      turbulenceRef.current.setAttribute('baseFrequency', String(baseFreq + freqVariation))
+        // Wider ripples - lower base frequency
+        const baseFreq = 0.003 + (progress * 0.004)
+        const freqVariation = Math.sin(seed * 0.015) * 0.002
+        turbulenceRef.current.setAttribute('baseFrequency', String(baseFreq + freqVariation))
 
-      // Speed up hue cycle as trip intensifies (6s down to 2s)
-      const hueDuration = 6 - (progress * 4)
-      target.style.animation = `shroom-hue-cycle ${hueDuration}s linear infinite`
+        // Speed up hue cycle as trip intensifies (6s down to 2s)
+        const hueDuration = 6 - (progress * 4)
+        target.style.animation = `shroom-hue-cycle ${hueDuration}s linear infinite`
 
-      animationRef.current = requestAnimationFrame(animate)
+        animationRef.current = requestAnimationFrame(animate)
+      }
+
+      animate()
     }
-
-    animate()
 
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
       }
-      document.body.style.filter = ''
-      document.body.style.animation = ''
     }
-  }, [isActive])
+  }, [isActive, isMobile])
 
   return (
     <>
-      {/* SVG Filter Definition - Always in DOM but only used when active */}
-      <svg className="absolute w-0 h-0" aria-hidden="true">
-        <defs>
-          <filter id="shroom-filter" x="-20%" y="-20%" width="140%" height="140%">
-            {/* Turbulence creates organic noise pattern */}
-            <feTurbulence
-              ref={turbulenceRef}
-              type="fractalNoise"
-              baseFrequency="0.008"
-              numOctaves="3"
-              seed="0"
-              result="noise"
-            />
-            {/* Displacement uses noise to warp the image */}
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="noise"
-              scale={intensity}
-              xChannelSelector="R"
-              yChannelSelector="G"
-            />
-          </filter>
-        </defs>
-      </svg>
+      {/* SVG Filter Definition - Only rendered on desktop */}
+      {isMounted && !isMobile && (
+        <svg className="absolute w-0 h-0" aria-hidden="true">
+          <defs>
+            <filter id="shroom-filter" x="-20%" y="-20%" width="140%" height="140%">
+              <feTurbulence
+                ref={turbulenceRef}
+                type="fractalNoise"
+                baseFrequency="0.008"
+                numOctaves="3"
+                seed="0"
+                result="noise"
+              />
+              <feDisplacementMap
+                in="SourceGraphic"
+                in2="noise"
+                scale={intensity}
+                xChannelSelector="R"
+                yChannelSelector="G"
+              />
+            </filter>
+          </defs>
+        </svg>
+      )}
 
       {/* Mushroom Icon - shown when wizard is hidden OR when loading (shows spinner) */}
       <AnimatePresence>
@@ -303,8 +313,7 @@ const ShroomMode = () => {
           </motion.button>
         )}
       </AnimatePresence>
-
-</>
+    </>
   )
 }
 

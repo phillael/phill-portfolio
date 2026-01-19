@@ -23,6 +23,7 @@ import * as THREE from 'three'
 const ANIMS = {
   IDLE: 'Hip_Hop_Dance_3',    // Index 4 - actually idle
   SPELL: 'All_Night_Dance',   // Index 0 - actually spell cast
+  WALK: 'Walking',            // Index 9 - proud strut animation
   DANCES: [
     'Boom_Dance',      // Index 1 - boom dance
     'Bubble_Dance',    // Index 2 - bubble dance
@@ -54,9 +55,12 @@ interface WizardModelProps {
   onSpellComplete?: () => void
   testAnimIndex?: number
   onClick?: () => void
+  onLoaded?: () => void
+  isWalking?: boolean
+  isExiting?: boolean
 }
 
-function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick }: WizardModelProps) {
+function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick, onLoaded, isWalking = false, isExiting = false }: WizardModelProps) {
   const group = useRef<THREE.Group>(null)
   const { scene, animations } = useGLTF('/models/shroom_wizard_merged_animations.glb')
   const { actions } = useAnimations(animations, group)
@@ -65,9 +69,19 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick }: 
   // Use Drei's useCursor hook for clean cursor management
   useCursor(hovered, 'pointer', 'auto')
 
+  // Notify parent when model is loaded
+  useEffect(() => {
+    if (scene) {
+      onLoaded?.()
+    }
+  }, [scene, onLoaded])
+
   const currentAnimRef = useRef<string>('')
 
-  // Play an animation
+  // Crossfade animation duration
+  const FADE_DURATION = 0.3
+
+  // Play an animation with smooth crossfade transition
   const playAnimation = (name: string) => {
     const action = actions[name]
     if (!action) {
@@ -75,15 +89,21 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick }: 
       return
     }
 
-    // Stop all animations
-    Object.values(actions).forEach(a => a?.stop())
+    // Skip if already playing this animation
+    if (currentAnimRef.current === name) return
 
+    // Fade out all other animations
+    Object.entries(actions).forEach(([animName, a]) => {
+      if (a && animName !== name) {
+        a.fadeOut(FADE_DURATION)
+      }
+    })
+
+    // Reset and fade in the new animation
     action.reset()
     action.setLoop(THREE.LoopRepeat, Infinity)
-    action.play()
+    action.fadeIn(FADE_DURATION).play()
     currentAnimRef.current = name
-
-    console.log('Playing animation:', name)
   }
 
   // TEST MODE: Play animation based on index
@@ -97,10 +117,16 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick }: 
     }
   }, [testAnimIndex, actions])
 
-  // NORMAL MODE: Handle animations based on isActive
+  // NORMAL MODE: Handle animations based on isActive and isWalking
   useEffect(() => {
     if (!actions || Object.keys(actions).length === 0) return
     if (TEST_MODE) return // Skip in test mode
+
+    // Walking takes priority
+    if (isWalking) {
+      playAnimation(ANIMS.WALK)
+      return
+    }
 
     if (isActive) {
       // Play spell cast, then dance after 5 seconds
@@ -113,21 +139,41 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick }: 
       // Return to idle
       playAnimation(ANIMS.IDLE)
     }
-  }, [isActive, actions])
+  }, [isActive, isWalking, actions])
 
-  // Gentle floating + slow rotation animation
-  useFrame((state) => {
+  // Track target rotation for smooth interpolation
+  const targetRotationRef = useRef(Math.PI * 0.25)
+
+  // Gentle floating + rotation animation
+  useFrame((state, delta) => {
     if (group.current) {
       // Floating
       const floatSpeed = isActive ? 2 : 0.8
       const floatAmount = isActive ? 0.1 : 0.05
       group.current.position.y = Math.sin(state.clock.elapsedTime * floatSpeed) * floatAmount - 1.2
 
-      // Slow rotation: Base rotation to face forward + gentle oscillation
-      const baseRotation = Math.PI * 0.25 // 45 degrees - face more center
-      const rotationSpeed = (2 * Math.PI) / 20 // Full cycle in 20 seconds
-      const oscillation = Math.sin(state.clock.elapsedTime * rotationSpeed) * (Math.PI * 0.2) // ±36 degrees
-      group.current.rotation.y = baseRotation + oscillation
+      // Rotation behavior depends on state
+      if (isExiting) {
+        // When exiting: face left (negative direction) to walk off screen
+        targetRotationRef.current = -Math.PI * 0.75 // -135 degrees (facing left)
+      } else if (isWalking) {
+        // When entering: face right (positive direction) to walk onto screen
+        targetRotationRef.current = Math.PI * 0.75 // 135 degrees (facing right)
+      } else {
+        // Normal idle/active state: gentle oscillation facing forward
+        const baseRotation = Math.PI * 0.25 // 45 degrees - face more center
+        const rotationSpeed = (2 * Math.PI) / 20 // Full cycle in 20 seconds
+        const oscillation = Math.sin(state.clock.elapsedTime * rotationSpeed) * (Math.PI * 0.2) // ±36 degrees
+        targetRotationRef.current = baseRotation + oscillation
+      }
+
+      // Smoothly interpolate to target rotation
+      const lerpSpeed = 5 // Higher = faster rotation
+      group.current.rotation.y = THREE.MathUtils.lerp(
+        group.current.rotation.y,
+        targetRotationRef.current,
+        delta * lerpSpeed
+      )
     }
   })
 
@@ -151,14 +197,34 @@ interface ShroomWizard3DProps {
   showModal?: boolean
   onConfirm?: () => void
   onCancel?: () => void
+  onLoaded?: () => void
+  isExiting?: boolean
+  onExitComplete?: () => void
 }
 
-const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfirm, onCancel }: ShroomWizard3DProps) => {
+const WALK_DURATION = 1.5 // seconds for walk on/off animation
+
+const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfirm, onCancel, onLoaded, isExiting = false, onExitComplete }: ShroomWizard3DProps) => {
   const [hasError, setHasError] = useState(false)
   const [testAnimIndex, setTestAnimIndex] = useState(0)
+  const [isEntering, setIsEntering] = useState(true) // Start in entering state
+  const [modelLoaded, setModelLoaded] = useState(false)
 
   const nextAnim = () => setTestAnimIndex((i) => (i + 1) % ALL_ANIMS.length)
   const prevAnim = () => setTestAnimIndex((i) => (i - 1 + ALL_ANIMS.length) % ALL_ANIMS.length)
+
+  // Handle model loaded - start walk-on animation
+  const handleModelLoaded = () => {
+    setModelLoaded(true)
+    onLoaded?.()
+    // After walk duration, stop entering state
+    setTimeout(() => {
+      setIsEntering(false)
+    }, WALK_DURATION * 1000)
+  }
+
+  // Determine if wizard should be walking
+  const isWalking = isEntering || isExiting
 
   if (hasError) {
     return (
@@ -171,10 +237,28 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
     )
   }
 
+  // Calculate positions - off-screen is far left, on-screen is normal position
+  const offScreenLeft = -300 // px - fully off screen
+  const onScreenLeftMobile = -41 // px - normal position
+  const onScreenLeftDesktop = -49 // px - normal position
+
   return (
-    <div
-      className="fixed bottom-0 -left-[41px] md:-left-[49px] z-50"
+    <motion.div
+      className="fixed bottom-0 z-50"
       style={{ filter: 'none' }}
+      initial={{ left: offScreenLeft }}
+      animate={{
+        left: isExiting ? offScreenLeft : (typeof window !== 'undefined' && window.innerWidth >= 768 ? onScreenLeftDesktop : onScreenLeftMobile)
+      }}
+      transition={{
+        duration: WALK_DURATION,
+        ease: 'easeInOut'
+      }}
+      onAnimationComplete={() => {
+        if (isExiting) {
+          onExitComplete?.()
+        }
+      }}
     >
       {/* Test Mode Controls */}
       {TEST_MODE && (
@@ -229,6 +313,9 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
               isActive={isActive}
               testAnimIndex={testAnimIndex}
               onClick={TEST_MODE ? undefined : onClick}
+              onLoaded={handleModelLoaded}
+              isWalking={isWalking}
+              isExiting={isExiting}
             />
           </Suspense>
         </Canvas>
@@ -314,8 +401,11 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
           </>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   )
 }
+
+// Preload the model so it's ready when the user clicks the shroom icon
+useGLTF.preload('/models/shroom_wizard_merged_animations.glb')
 
 export default ShroomWizard3D

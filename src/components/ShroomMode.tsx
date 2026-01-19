@@ -67,7 +67,13 @@ const ShroomMode = () => {
   const turbulenceRef = useRef<SVGFETurbulenceElement>(null)
   const animationRef = useRef<number | null>(null)
 
+  // Called when the wizard model has loaded (but still walking on)
   const handleWizardLoaded = () => {
+    // Model is loaded but keep loading state until walk-on completes
+  }
+
+  // Called when the wizard has finished walking onto the screen
+  const handleEnterComplete = () => {
     setIsLoading(false)
   }
 
@@ -76,6 +82,7 @@ const ShroomMode = () => {
       // If already active, deactivate and start exit animation
       setIsActive(false)
       setIsExiting(true)
+      setIsLoading(true)
     } else {
       // Show confirmation modal
       setShowModal(true)
@@ -86,6 +93,7 @@ const ShroomMode = () => {
   const handleExitComplete = () => {
     setIsExiting(false)
     setShowWizard(false)
+    setIsLoading(false)
   }
 
   const handleConfirm = () => {
@@ -104,8 +112,10 @@ const ShroomMode = () => {
         if (isActive) {
           setIsActive(false)
           setIsExiting(true)
+          setIsLoading(true)
         } else if (showWizard && !isExiting) {
           setIsExiting(true)
+          setIsLoading(true)
         }
       }
     }
@@ -213,9 +223,9 @@ const ShroomMode = () => {
         </defs>
       </svg>
 
-      {/* Mushroom Icon - shown when wizard is hidden (or loading spinner) */}
+      {/* Mushroom Icon - shown when wizard is hidden OR when loading (shows spinner) */}
       <AnimatePresence>
-        {!showWizard && !isActive && (
+        {((!showWizard && !isActive) || isLoading) && (
           <motion.button
             className="fixed bottom-16 right-4 md:bottom-24 md:right-6 z-40 w-10 h-10 md:w-14 md:h-14 rounded-full bg-card border-2 border-secondary/50 flex items-center justify-center hover:border-secondary transition-shadow duration-300"
             style={{
@@ -264,13 +274,14 @@ const ShroomMode = () => {
             onLoaded={handleWizardLoaded}
             isExiting={isExiting}
             onExitComplete={handleExitComplete}
+            onEnterComplete={handleEnterComplete}
           />
         </div>
       )}
 
       {/* X button to dismiss wizard / exit shroom mode */}
       <AnimatePresence>
-        {(showWizard || isActive) && !isExiting && (
+        {(showWizard || isActive) && !isExiting && !isLoading && (
           <motion.button
             className="fixed bottom-16 right-4 md:bottom-24 md:right-6 z-40 w-10 h-10 md:w-14 md:h-14 rounded-full bg-card border-2 border-destructive/50 flex items-center justify-center hover:border-destructive hover:bg-destructive/20 transition-colors"
             style={{
@@ -279,6 +290,7 @@ const ShroomMode = () => {
             onClick={() => {
               setIsActive(false)
               setIsExiting(true)
+              setIsLoading(true)
             }}
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}

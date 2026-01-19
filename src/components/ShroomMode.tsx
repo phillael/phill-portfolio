@@ -15,28 +15,29 @@ const ShroomWizard3D = dynamic(() => import('./ShroomWizard3D'), {
 })
 
 /**
- * MushroomIcon - Custom SVG mushroom icon
+ * MushroomIcon - Clean mushroom icon with spots
  */
-const MushroomIcon = ({ className = '' }: { className?: string }) => (
+const MushroomIcon = ({ className = '', style }: { className?: string; style?: React.CSSProperties }) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
     className={className}
+    style={style}
     xmlns="http://www.w3.org/2000/svg"
   >
     {/* Mushroom cap */}
     <path
-      d="M12 2C6 2 2 6 2 10C2 12 3 13 5 13H19C21 13 22 12 22 10C22 6 18 2 12 2Z"
+      d="M12 2C5.5 2 1 6.5 1 11C1 12.5 2 13 3 13H21C22 13 23 12.5 23 11C23 6.5 18.5 2 12 2Z"
       fill="currentColor"
-      opacity="0.9"
     />
-    {/* Cap spots */}
-    <circle cx="8" cy="7" r="1.5" fill="white" opacity="0.6" />
-    <circle cx="14" cy="6" r="1" fill="white" opacity="0.6" />
-    <circle cx="11" cy="9" r="1.2" fill="white" opacity="0.6" />
+    {/* Spots (lighter) */}
+    <ellipse cx="7" cy="7.5" rx="2" ry="1.8" fill="white" opacity="0.3" />
+    <ellipse cx="12.5" cy="6" rx="2.2" ry="2" fill="white" opacity="0.3" />
+    <ellipse cx="17" cy="8.5" rx="1.6" ry="1.5" fill="white" opacity="0.3" />
+    <circle cx="9.5" cy="10.5" r="1" fill="white" opacity="0.25" />
     {/* Stem */}
     <path
-      d="M8 13H16V18C16 20 14.5 22 12 22C9.5 22 8 20 8 18V13Z"
+      d="M8.5 13H15.5C15.5 13 16.5 15 16.5 17.5C16.5 20 14.5 22 12 22C9.5 22 7.5 20 7.5 17.5C7.5 15 8.5 13 8.5 13Z"
       fill="currentColor"
       opacity="0.7"
     />
@@ -206,7 +207,7 @@ const ShroomMode = () => {
           <motion.button
             className="fixed bottom-16 right-4 md:bottom-24 md:right-6 z-40 w-10 h-10 md:w-14 md:h-14 rounded-full bg-card border-2 border-secondary/50 flex items-center justify-center hover:border-secondary transition-shadow duration-300"
             style={{
-              boxShadow: '0 0 15px hsl(var(--secondary)), 0 0 30px hsl(var(--secondary) / 0.5), 0 0 45px hsl(var(--secondary) / 0.3)',
+              boxShadow: '0 0 8px hsl(var(--secondary) / 0.5), 0 0 15px hsl(var(--secondary) / 0.25), 0 0 22px hsl(var(--secondary) / 0.15)',
             }}
             onClick={() => setShowWizard(true)}
             initial={{ opacity: 0, scale: 0.5 }}
@@ -216,7 +217,12 @@ const ShroomMode = () => {
             whileTap={{ scale: 0.95 }}
             aria-label="Summon the Shroom Wizard"
           >
-            <MushroomIcon className="w-5 h-5 md:w-7 md:h-7 text-secondary" />
+            <MushroomIcon
+              className="w-5 h-5 md:w-7 md:h-7 text-secondary"
+              style={{
+                filter: 'drop-shadow(0 0 2px hsl(var(--secondary) / 0.8)) drop-shadow(0 0 5px hsl(var(--secondary) / 0.6)) drop-shadow(0 0 8px hsl(var(--secondary) / 0.4))',
+              }}
+            />
           </motion.button>
         )}
       </AnimatePresence>

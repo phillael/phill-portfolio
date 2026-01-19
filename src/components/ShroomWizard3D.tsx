@@ -4,6 +4,7 @@ import { Suspense, useRef, useEffect, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations, useCursor } from '@react-three/drei'
 import { motion, AnimatePresence } from 'framer-motion'
+import TypingText from './TypingText'
 import * as THREE from 'three'
 
 // Animation names - CORRECTED MAPPING
@@ -281,7 +282,11 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
                 />
 
                 <p className="font-heading text-sm md:text-lg text-secondary mb-3 md:mb-4">
-                  You want to go on a journey with me?
+                  <TypingText
+                    text="You want to eat mushroom?"
+                    speed={40}
+                    showCursor={true}
+                  />
                 </p>
                 <div className="flex gap-2 md:gap-3 justify-center">
                   <motion.button
@@ -293,7 +298,7 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
                     Ummm...no
                   </motion.button>
                   <motion.button
-                    className="px-3 md:px-4 py-1 md:py-1.5 rounded-md bg-secondary text-secondary-foreground font-heading text-xs md:text-sm hover:bg-secondary/80 transition-colors"
+                    className="px-3 md:px-4 py-1 md:py-1.5 rounded-md bg-secondary text-background font-heading font-bold text-xs md:text-sm hover:bg-secondary/80 transition-colors"
                     style={{
                       boxShadow: '0 0 10px hsl(var(--secondary) / 0.5)',
                     }}

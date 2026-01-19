@@ -200,15 +200,32 @@ interface ShroomWizard3DProps {
   onLoaded?: () => void
   isExiting?: boolean
   onExitComplete?: () => void
+  onEnterComplete?: () => void
 }
 
 const WALK_DURATION = 1.5 // seconds for walk on/off animation
 
-const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfirm, onCancel, onLoaded, isExiting = false, onExitComplete }: ShroomWizard3DProps) => {
+// Position constants
+const OFF_SCREEN_LEFT = -300 // px - fully off screen
+const ON_SCREEN_LEFT_MOBILE = -41 // px - normal position on mobile
+const ON_SCREEN_LEFT_DESKTOP = -49 // px - normal position on desktop
+
+const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfirm, onCancel, onLoaded, isExiting = false, onExitComplete, onEnterComplete }: ShroomWizard3DProps) => {
   const [hasError, setHasError] = useState(false)
   const [testAnimIndex, setTestAnimIndex] = useState(0)
   const [isEntering, setIsEntering] = useState(true) // Start in entering state
   const [modelLoaded, setModelLoaded] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  // Detect screen size after mount to avoid SSR/hydration issues
+  useEffect(() => {
+    setIsMounted(true)
+    const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 768)
+    checkIsDesktop()
+    window.addEventListener('resize', checkIsDesktop)
+    return () => window.removeEventListener('resize', checkIsDesktop)
+  }, [])
 
   const nextAnim = () => setTestAnimIndex((i) => (i + 1) % ALL_ANIMS.length)
   const prevAnim = () => setTestAnimIndex((i) => (i - 1 + ALL_ANIMS.length) % ALL_ANIMS.length)
@@ -217,14 +234,19 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
   const handleModelLoaded = () => {
     setModelLoaded(true)
     onLoaded?.()
-    // After walk duration, stop entering state
+    // After walk duration, stop entering state and notify parent
     setTimeout(() => {
       setIsEntering(false)
+      onEnterComplete?.()
     }, WALK_DURATION * 1000)
   }
 
   // Determine if wizard should be walking
   const isWalking = isEntering || isExiting
+
+  // Calculate target position based on state
+  const onScreenLeft = isDesktop ? ON_SCREEN_LEFT_DESKTOP : ON_SCREEN_LEFT_MOBILE
+  const targetLeft = isExiting ? OFF_SCREEN_LEFT : onScreenLeft
 
   if (hasError) {
     return (
@@ -237,19 +259,17 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
     )
   }
 
-  // Calculate positions - off-screen is far left, on-screen is normal position
-  const offScreenLeft = -300 // px - fully off screen
-  const onScreenLeftMobile = -41 // px - normal position
-  const onScreenLeftDesktop = -49 // px - normal position
+  // Don't render until mounted to ensure correct initial position
+  if (!isMounted) {
+    return null
+  }
 
   return (
     <motion.div
       className="fixed bottom-0 z-50"
       style={{ filter: 'none' }}
-      initial={{ left: offScreenLeft }}
-      animate={{
-        left: isExiting ? offScreenLeft : (typeof window !== 'undefined' && window.innerWidth >= 768 ? onScreenLeftDesktop : onScreenLeftMobile)
-      }}
+      initial={{ left: OFF_SCREEN_LEFT }}
+      animate={{ left: targetLeft }}
       transition={{
         duration: WALK_DURATION,
         ease: 'easeInOut'

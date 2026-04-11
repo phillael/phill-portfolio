@@ -57,11 +57,10 @@ const MushroomIcon = ({ className = '', style }: { className?: string; style?: R
  */
 const ShroomMode = () => {
   const [showWizard, setShowWizard] = useState(false)
-  const [showModal, setShowModal] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const { isActive, setIsActive } = useShroomMode()
-  const toggleShroomMode = () => setIsActive(!isActive)
+  const toggleShroomMode = () => setIsActive((prev) => !prev)
 
   // WizardChat state
   const [chatOpen, setChatOpen] = useState(false)
@@ -111,15 +110,6 @@ const ShroomMode = () => {
     setIsExiting(false)
     setShowWizard(false)
     setIsLoading(false)
-  }
-
-  const handleConfirm = () => {
-    setShowModal(false)
-    setIsActive(true)
-  }
-
-  const handleCancel = () => {
-    setShowModal(false)
   }
 
   // ESC key to exit shroom mode and dismiss wizard

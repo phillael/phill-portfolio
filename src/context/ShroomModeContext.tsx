@@ -4,13 +4,21 @@ import { createContext, useContext, useState, ReactNode } from 'react'
 
 interface ShroomModeContextType {
   isActive: boolean
-  setIsActive: (active: boolean) => void
+  setIsActive: (active: boolean | ((prev: boolean) => boolean)) => void
 }
 
 const ShroomModeContext = createContext<ShroomModeContextType | undefined>(undefined)
 
 export const ShroomModeProvider = ({ children }: { children: ReactNode }) => {
-  const [isActive, setIsActive] = useState(false)
+  const [isActive, setIsActiveState] = useState(false)
+
+  const setIsActive = (active: boolean | ((prev: boolean) => boolean)) => {
+    if (typeof active === 'function') {
+      setIsActiveState(active)
+    } else {
+      setIsActiveState(active)
+    }
+  }
 
   return (
     <ShroomModeContext.Provider value={{ isActive, setIsActive }}>

@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import { useShroomMode } from '@/context/ShroomModeContext'
 import { X } from 'lucide-react'
+import WizardChat, { pickRandom, TRIUMPH_LINES, DECLINE_LINES } from '@/components/WizardChat'
+import MushroomOfferBubble from '@/components/MushroomOfferBubble'
 
 // Dynamically import 3D component to avoid SSR issues with Three.js
 const ShroomWizard3D = dynamic(() => import('./ShroomWizard3D'), {
@@ -59,6 +61,13 @@ const ShroomMode = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const { isActive, setIsActive } = useShroomMode()
+  const toggleShroomMode = () => setIsActive(!isActive)
+
+  // WizardChat state
+  const [chatOpen, setChatOpen] = useState(false)
+  const [ceremonyOpen, setCeremonyOpen] = useState(false)
+  const [fallback, setFallback] = useState(false)
+  const [injectedLine, setInjectedLine] = useState<string | null>(null)
   const [intensity, setIntensity] = useState(0) // For desktop SVG filter (0-40)
   const [isMobile, setIsMobile] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
@@ -90,9 +99,10 @@ const ShroomMode = () => {
       setIsActive(false)
       setIsExiting(true)
       setIsLoading(true)
+    } else if (fallback) {
+      setCeremonyOpen(true)
     } else {
-      // Show confirmation modal
-      setShowModal(true)
+      setChatOpen(true)
     }
   }
 
@@ -278,9 +288,12 @@ const ShroomMode = () => {
             key={showWizard ? 'wizard-visible' : 'wizard-hidden'}
             onClick={handleShroomClick}
             isActive={isActive}
-            showModal={showModal}
-            onConfirm={handleConfirm}
-            onCancel={handleCancel}
+            showModal={ceremonyOpen && fallback}
+            onConfirm={() => {
+              toggleShroomMode()
+              setCeremonyOpen(false)
+            }}
+            onCancel={() => setCeremonyOpen(false)}
             onLoaded={handleWizardLoaded}
             isExiting={isExiting}
             onExitComplete={handleExitComplete}
@@ -288,6 +301,41 @@ const ShroomMode = () => {
           />
         </div>
       )}
+
+      {/* WizardChat HUD panel */}
+      <AnimatePresence>
+        {chatOpen && !fallback && (
+          <WizardChat
+            onClose={() => setChatOpen(false)}
+            onFallback={() => {
+              setFallback(true)
+              setChatOpen(false)
+            }}
+            onOfferMushroom={() => setCeremonyOpen(true)}
+            injectedLine={injectedLine}
+            onInjectedLineConsumed={() => setInjectedLine(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Centered ceremony modal */}
+      <AnimatePresence>
+        {ceremonyOpen && !fallback && (
+          <MushroomOfferBubble
+            position="centered"
+            text="You want to eat mushroom?"
+            onConfirm={() => {
+              toggleShroomMode()
+              setInjectedLine(pickRandom(TRIUMPH_LINES))
+              setCeremonyOpen(false)
+            }}
+            onCancel={() => {
+              setInjectedLine(pickRandom(DECLINE_LINES))
+              setCeremonyOpen(false)
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* X button to dismiss wizard / exit shroom mode */}
       <AnimatePresence>

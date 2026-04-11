@@ -2,7 +2,6 @@ import Anthropic from '@anthropic-ai/sdk'
 import { buildWizardSystemPrompt } from '@/lib/wizard-prompt'
 import { WIZARD_TOOLS } from '@/lib/wizard-tools'
 import { checkAndReserve, recordUsage } from '@/lib/rate-limit'
-import { moderateResponse } from '@/lib/wizard-moderator'
 
 export const runtime = 'nodejs'
 
@@ -15,7 +14,6 @@ interface ChatRequestBody {
   messages: ChatMessage[]
 }
 
-const BLOCKED_REFUSAL = 'The spores fall silent. Ask thy question another way, traveler.'
 const IP_CAP_LINE = "Fifty riddles spun, traveler. The grove falls silent. Return with tomorrow's tide."
 const BUDGET_LINE = "My spells are spent with today's sun. Return at first light."
 const TIMEOUT_LINE = 'The spores drift slowly today… ask again.'
@@ -48,19 +46,17 @@ function validateBody(raw: unknown): raw is ChatRequestBody {
 }
 
 function errorBody(
-  error: 'rate_limit' | 'budget' | 'rate_limiter_down' | 'moderation_block' | 'server',
+  error: 'rate_limit' | 'budget' | 'rate_limiter_down' | 'server',
   message: string,
 ) {
   return { error, message }
 }
 
 export async function POST(request: Request): Promise<Response> {
-  // 1. Origin check
   if (!allowedOrigin(request.headers.get('origin'))) {
     return new Response(null, { status: 403 })
   }
 
-  // 2. Parse + validate body
   let body: unknown
   try {
     body = await request.json()
@@ -71,10 +67,8 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json(errorBody('server', GENERIC_ERROR_LINE), { status: 400 })
   }
 
-  // 3. IP extraction
   const ip = request.headers.get('x-real-ip') ?? 'unknown'
 
-  // 4. Rate-limit pre-check
   const gate = await checkAndReserve(ip)
   if (!gate.ok) {
     if (gate.reason === 'ip_cap') {
@@ -86,7 +80,6 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json(errorBody('rate_limiter_down', GENERIC_ERROR_LINE), { status: 503 })
   }
 
-  // 5. Main generation
   let mainResponse
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -118,20 +111,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const candidate = textBlock.text.trim()
-
-  // 6. Moderation
-  const moderation = await moderateResponse(candidate)
-  const mainTokens =
+  const totalTokens =
     (mainResponse.usage?.input_tokens ?? 0) + (mainResponse.usage?.output_tokens ?? 0)
-  const totalTokens = mainTokens + moderation.tokens
 
   await recordUsage(ip, totalTokens)
 
-  if (!moderation.safe) {
-    return Response.json(errorBody('moderation_block', BLOCKED_REFUSAL), { status: 200 })
-  }
-
-  // 7. Success — return wizard response (and tool-use action if present)
   return Response.json({
     message: candidate,
     ...(toolBlock ? { action: 'offer_mushroom' as const } : {}),

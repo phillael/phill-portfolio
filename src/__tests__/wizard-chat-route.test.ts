@@ -6,7 +6,6 @@ import { POST } from '../app/api/wizard/chat/route'
 const mockAnthropicCreate = jest.fn()
 const mockCheckAndReserve = jest.fn()
 const mockRecordUsage = jest.fn()
-const mockModerateResponse = jest.fn()
 
 jest.mock('@anthropic-ai/sdk', () => {
   return jest.fn().mockImplementation(() => ({
@@ -17,10 +16,6 @@ jest.mock('@anthropic-ai/sdk', () => {
 jest.mock('../lib/rate-limit', () => ({
   checkAndReserve: (...args: unknown[]) => mockCheckAndReserve(...args),
   recordUsage: (...args: unknown[]) => mockRecordUsage(...args),
-}))
-
-jest.mock('../lib/wizard-moderator', () => ({
-  moderateResponse: (...args: unknown[]) => mockModerateResponse(...args),
 }))
 
 function makeRequest(body: unknown, headers: Record<string, string> = {}): Request {
@@ -43,7 +38,6 @@ describe('POST /api/wizard/chat', () => {
     process.env.WIZARD_ALLOWED_ORIGINS = 'http://localhost:3000,https://phillcodes.com'
     mockCheckAndReserve.mockResolvedValue({ ok: true })
     mockRecordUsage.mockResolvedValue(undefined)
-    mockModerateResponse.mockResolvedValue({ safe: true, tokens: 505 })
   })
 
   it('returns the wizard message on a happy-path request', async () => {
@@ -138,27 +132,19 @@ describe('POST /api/wizard/chat', () => {
     expect(body.error).toBe('rate_limiter_down')
   })
 
-  it('returns moderation_block and drops the tool-use action when classifier rejects', async () => {
+  it('records only the main-generation tokens against the budget', async () => {
     mockAnthropicCreate.mockResolvedValue({
-      content: [
-        { type: 'text', text: 'questionable content' },
-        { type: 'tool_use', name: 'offer_mushroom', id: 'x', input: {} },
-      ],
+      content: [{ type: 'text', text: 'Walrus dreams in kelp.' }],
       usage: { input_tokens: 1000, output_tokens: 50 },
     })
-    mockModerateResponse.mockResolvedValue({ safe: false, tokens: 505 })
 
     const req = makeRequest({
       messages: [{ role: 'user', content: 'hi' }],
     })
 
-    const res = await POST(req)
-    const body = await res.json()
+    await POST(req)
 
-    expect(body.error).toBe('moderation_block')
-    expect(body.message).toContain('spores fall silent')
-    expect(body.action).toBeUndefined()
-    expect(mockRecordUsage).toHaveBeenCalledWith('1.2.3.4', 1050 + 505)
+    expect(mockRecordUsage).toHaveBeenCalledWith('1.2.3.4', 1050)
   })
 
   it('returns action: offer_mushroom when the model calls the tool', async () => {

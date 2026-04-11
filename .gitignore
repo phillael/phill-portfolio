@@ -40,3 +40,5 @@ coverage
 
 # Superpowers brainstorm scratch directory
 .superpowers/
+.vercel
+.env*.local

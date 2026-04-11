@@ -174,7 +174,7 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
-        className="fixed inset-0 md:absolute md:inset-auto md:bottom-full md:left-[80px] md:mb-2 md:w-[360px] md:max-h-[60vh] md:h-[480px] z-[101] bg-[rgba(11,14,26,0.92)] backdrop-blur-md border-0 md:border md:border-cyan-400/40 md:rounded-xl flex flex-col pt-[env(safe-area-inset-top,16px)] md:pt-0"
+        className="fixed inset-0 md:inset-auto md:bottom-[200px] md:left-[40px] md:w-[360px] md:max-h-[60vh] md:h-[480px] z-[101] bg-[rgba(11,14,26,0.92)] backdrop-blur-md border-0 md:border md:border-cyan-400/40 md:rounded-xl flex flex-col pt-[env(safe-area-inset-top,16px)] md:pt-0"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}

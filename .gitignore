@@ -37,3 +37,6 @@ Thumbs.db
 
 # Testing
 coverage
+
+# Superpowers brainstorm scratch directory
+.superpowers/

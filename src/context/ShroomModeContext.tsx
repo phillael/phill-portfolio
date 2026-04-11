@@ -1,24 +1,16 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction } from 'react'
 
 interface ShroomModeContextType {
   isActive: boolean
-  setIsActive: (active: boolean | ((prev: boolean) => boolean)) => void
+  setIsActive: Dispatch<SetStateAction<boolean>>
 }
 
 const ShroomModeContext = createContext<ShroomModeContextType | undefined>(undefined)
 
 export const ShroomModeProvider = ({ children }: { children: ReactNode }) => {
-  const [isActive, setIsActiveState] = useState(false)
-
-  const setIsActive = (active: boolean | ((prev: boolean) => boolean)) => {
-    if (typeof active === 'function') {
-      setIsActiveState(active)
-    } else {
-      setIsActiveState(active)
-    }
-  }
+  const [isActive, setIsActive] = useState(false)
 
   return (
     <ShroomModeContext.Provider value={{ isActive, setIsActive }}>

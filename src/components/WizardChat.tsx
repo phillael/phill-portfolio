@@ -174,7 +174,7 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
-        className="absolute bottom-full left-[80px] mb-2 w-[360px] max-h-[60vh] md:h-[480px] z-[101] bg-[rgba(11,14,26,0.92)] backdrop-blur-md border border-cyan-400/40 rounded-xl flex flex-col"
+        className="fixed inset-0 md:absolute md:inset-auto md:bottom-full md:left-[80px] md:mb-2 md:w-[360px] md:max-h-[60vh] md:h-[480px] z-[101] bg-[rgba(11,14,26,0.92)] backdrop-blur-md border-0 md:border md:border-cyan-400/40 md:rounded-xl flex flex-col pt-[env(safe-area-inset-top,16px)] md:pt-0"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -222,6 +222,17 @@ export default function WizardChat({
           aria-label="Shroom Wizard conversation"
           className="flex-1 overflow-y-auto p-4 pt-8 pr-10 flex flex-col gap-2"
         >
+          <div className="md:hidden flex items-start gap-3 mb-2">
+            <img
+              src="/images/wizard-portrait-idle.png"
+              alt="Shroom Wizard"
+              width={72}
+              height={72}
+              className="shrink-0 border-2 border-cyan-400/60 rounded-sm image-pixelated"
+              style={{ imageRendering: 'pixelated' }}
+            />
+            <div className="flex-1 min-w-0" />
+          </div>
           {messages.map((m, idx) => {
             const isLast = idx === messages.length - 1
             const opacityClass = isLast ? 'opacity-100' : 'opacity-35'

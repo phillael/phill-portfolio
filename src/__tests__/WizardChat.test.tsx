@@ -108,4 +108,12 @@ describe('WizardChat', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('renders the mobile wizard portrait image', () => {
+    render(<WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />)
+
+    const portrait = screen.getByAltText(/shroom wizard/i) as HTMLImageElement
+    expect(portrait).toBeInTheDocument()
+    expect(portrait.src).toContain('/images/wizard-portrait-idle.png')
+  })
 })

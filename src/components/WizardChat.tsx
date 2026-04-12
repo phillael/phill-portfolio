@@ -50,6 +50,23 @@ function genId(): string {
   return Math.random().toString(36).slice(2)
 }
 
+// Session-scoped chat cache. Lives at module scope so messages persist when
+// WizardChat unmounts (close + reopen, wizard dismissed + re-summoned) inside
+// the same page load. A hard refresh reloads the module and wipes it, which
+// is the intended behavior.
+let sessionMessages: ChatMessage[] | null = null
+
+const GREETING_MESSAGE: ChatMessage = {
+  role: 'assistant',
+  content: GREETING,
+  id: 'greeting',
+}
+
+// Test-only: reset the session cache between test runs.
+export function __resetWizardChatSession(): void {
+  sessionMessages = null
+}
+
 export default function WizardChat({
   onClose,
   onFallback,
@@ -57,9 +74,19 @@ export default function WizardChat({
   injectedLine,
   onInjectedLineConsumed,
 }: WizardChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: GREETING, id: 'greeting' },
-  ])
+  const [messages, setMessagesState] = useState<ChatMessage[]>(
+    () => sessionMessages ?? [GREETING_MESSAGE],
+  )
+
+  function setMessages(
+    updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+  ): void {
+    setMessagesState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      sessionMessages = next
+      return next
+    })
+  }
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isDisabled, setIsDisabled] = useState(false)
@@ -68,11 +95,19 @@ export default function WizardChat({
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  // Autoscroll to bottom on any DOM mutation inside the scroll container.
+  // Covers both new messages and the character-by-character TypingText crawl.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    const el = scrollRef.current
+    if (!el) return
+    const pin = () => {
+      el.scrollTop = el.scrollHeight
     }
-  }, [messages, isLoading])
+    pin()
+    const observer = new MutationObserver(pin)
+    observer.observe(el, { childList: true, subtree: true, characterData: true })
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     if (injectedLine) {
@@ -174,34 +209,34 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
-        className="fixed inset-0 md:inset-auto md:bottom-[200px] md:left-[40px] md:w-[360px] md:max-h-[60vh] md:h-[480px] z-[101] bg-[rgba(11,14,26,0.92)] backdrop-blur-md border-0 md:border md:border-cyan-400/40 md:rounded-xl flex flex-col pt-[env(safe-area-inset-top,16px)] md:pt-0"
+        className="fixed inset-0 md:inset-auto md:bottom-[290px] md:left-[40px] md:w-[360px] md:h-[420px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg pt-[env(safe-area-inset-top,16px)] md:pt-0"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
         style={{
           filter: 'none',
           boxShadow:
-            '0 0 25px rgba(0, 217, 255, 0.2), 0 0 50px rgba(0, 217, 255, 0.08)',
+            '0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.1)',
         }}
         role="dialog"
         aria-label="Shroom Wizard chat"
       >
-        {/* HUD corner brackets */}
-        <div className="pointer-events-none absolute top-[-1px] left-[-1px] w-4 h-4 border-t-2 border-l-2 border-cyan-400" />
-        <div className="pointer-events-none absolute top-[-1px] right-[-1px] w-4 h-4 border-t-2 border-r-2 border-cyan-400" />
-        <div className="pointer-events-none absolute bottom-[-1px] left-[-1px] w-4 h-4 border-b-2 border-l-2 border-cyan-400" />
-        <div className="pointer-events-none absolute bottom-[-1px] right-[-1px] w-4 h-4 border-b-2 border-r-2 border-cyan-400" />
+        {/* Neon border accent on top edge (matches MusicPlayerPanel) */}
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary via-secondary to-primary" />
 
-        {/* Speech tail (desktop only) */}
+        {/* Decorative neon glow at bottom (matches MusicPlayerPanel) */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
+
+        {/* Speech tail pointing down toward the wizard (desktop only) */}
         <div
           className="hidden md:block absolute w-0 h-0"
           style={{
             bottom: '-14px',
-            left: '48px',
+            left: '93px',
             borderLeft: '14px solid transparent',
             borderRight: '14px solid transparent',
-            borderTop: '14px solid rgba(11, 14, 26, 0.92)',
-            filter: 'drop-shadow(0 2px 0 rgba(0, 217, 255, 0.4))',
+            borderTop: '14px solid hsl(var(--card))',
+            filter: 'drop-shadow(0 2px 0 hsl(var(--primary) / 0.4))',
           }}
         />
 

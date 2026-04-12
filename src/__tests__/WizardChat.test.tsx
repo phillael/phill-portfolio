@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import WizardChat from '../components/WizardChat'
+import WizardChat, { __resetWizardChatSession } from '../components/WizardChat'
 
 // TypingText finishes its crawl on unmount in jsdom; we don't need to wait for it
 jest.mock('../components/TypingText', () => {
@@ -11,6 +11,7 @@ jest.mock('../components/TypingText', () => {
 describe('WizardChat', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    __resetWizardChatSession()
     ;(global.fetch as jest.Mock | undefined)?.mockClear?.()
     global.fetch = jest.fn()
   })

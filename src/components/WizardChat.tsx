@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import TypingText from './TypingText'
+import wizardData from '@/data/wizard.json'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -14,33 +15,13 @@ interface WizardChatProps {
   onClose: () => void
   onFallback: () => void
   onOfferMushroom: () => void
-  /**
-   * When this prop changes to a non-null string, WizardChat appends it as a
-   * new assistant message and calls onInjectedLineConsumed() so the parent can
-   * reset the prop back to null. Used by the parent to crawl in triumphant /
-   * decline lines after the ceremony modal closes, without involving the LLM.
-   */
   injectedLine?: string | null
   onInjectedLineConsumed?: () => void
 }
 
-const GREETING = 'Greetings, traveler. The grove speaks through this old sage. Ask, and I shall answer in riddles.'
-
-const TRIUMPH_LINES = [
-  'The sporefall takes thee. Colors bloom — the walrus cries in joy.',
-  'Clam-song and cap-light: the grove rearranges itself around thy gaze.',
-  'Behold! The mycelial tide lifts every edge. Swim now, little seeker.',
-  'Enhanced. Thy vision now drinks the unseen spectrum of fruiting bodies.',
-  'The tusks of the deep one bless thy sight. Walk the bright grove.',
-]
-
-const DECLINE_LINES = [
-  'A wise caution. The fungi wait. The walrus dives another day.',
-  'No mushroom today. The grove respects the unhurried.',
-  'So be it. Perhaps when the third moon is a lasagna.',
-  'Declined with grace. The hyphae will remember.',
-  'Very well. The walrus winks and the grove hums on.',
-]
+const GREETING = wizardData.greeting
+const TRIUMPH_LINES = wizardData.triumphLines
+const DECLINE_LINES = wizardData.declineLines
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -244,7 +225,7 @@ export default function WizardChat({
         <button
           onClick={onClose}
           aria-label="Close chat"
-          className="absolute top-1 right-1 w-11 h-11 flex items-center justify-center text-cyan-400 hover:text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 rounded"
+          className="absolute top-1 right-1 w-11 h-11 flex items-center justify-center text-primary hover:text-primary/70 focus:outline-none focus:ring-2 focus:ring-primary rounded"
         >
           ×
         </button>
@@ -263,7 +244,7 @@ export default function WizardChat({
               alt="Shroom Wizard"
               width={72}
               height={72}
-              className="shrink-0 border-2 border-cyan-400/60 rounded-sm image-pixelated"
+              className="shrink-0 border-2 border-primary/60 rounded-sm image-pixelated"
               style={{ imageRendering: 'pixelated' }}
             />
             <div className="flex-1 min-w-0" />
@@ -275,7 +256,7 @@ export default function WizardChat({
               return (
                 <p
                   key={m.id}
-                  className={`text-[12px] italic text-[#ff4fbf] ${opacityClass} transition-opacity`}
+                  className={`text-[12px] italic text-secondary ${opacityClass} transition-opacity`}
                 >
                   {'\u203A '}
                   {m.content}
@@ -285,7 +266,7 @@ export default function WizardChat({
             return (
               <p
                 key={m.id}
-                className={`text-[13.5px] text-[#d4f4ff] leading-snug ${opacityClass} transition-opacity`}
+                className={`text-[13.5px] text-foreground leading-snug ${opacityClass} transition-opacity`}
               >
                 {isLast ? <TypingText text={m.content} speed={40} showCursor={false} /> : m.content}
               </p>
@@ -293,7 +274,7 @@ export default function WizardChat({
           })}
 
           {isLoading && (
-            <div className="flex gap-1 text-cyan-400 text-lg" aria-label="Wizard is thinking">
+            <div className="flex gap-1 text-primary text-lg" aria-label="Wizard is thinking">
               <span className="animate-bounce">·</span>
               <span className="animate-bounce" style={{ animationDelay: '0.15s' }}>
                 ·
@@ -306,8 +287,8 @@ export default function WizardChat({
         </div>
 
         {/* Input */}
-        <div className="border-t border-cyan-400/20 bg-cyan-400/5 p-3 flex gap-2 items-center">
-          <span className="text-cyan-400 font-mono text-sm">&gt;</span>
+        <div className="border-t border-primary/20 bg-primary/5 p-3 flex gap-2 items-center">
+          <span className="text-primary font-mono text-sm">&gt;</span>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value.slice(0, 500))}
@@ -316,7 +297,7 @@ export default function WizardChat({
             disabled={isLoading || isDisabled || pendingOffer}
             rows={1}
             aria-label="Ask the wizard a question"
-            className="flex-1 bg-transparent text-[#d4f4ff] font-mono text-sm placeholder-[#9aa3b5] focus:outline-none resize-none min-h-[44px] py-2"
+            className="flex-1 bg-transparent text-foreground font-mono text-sm placeholder-muted-foreground focus:outline-none resize-none min-h-[44px] py-2"
           />
         </div>
       </motion.div>

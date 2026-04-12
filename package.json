@@ -20,9 +20,11 @@
   "author": "Phill Aelony",
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.88.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@types/three": "^0.182.0",
+    "@upstash/redis": "^1.37.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.25.0",
     "lucide-react": "^0.562.0",

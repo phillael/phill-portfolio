@@ -1,10 +1,10 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction } from 'react'
 
 interface ShroomModeContextType {
   isActive: boolean
-  setIsActive: (active: boolean) => void
+  setIsActive: Dispatch<SetStateAction<boolean>>
 }
 
 const ShroomModeContext = createContext<ShroomModeContextType | undefined>(undefined)

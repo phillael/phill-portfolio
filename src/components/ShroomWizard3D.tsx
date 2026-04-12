@@ -4,7 +4,7 @@ import { Suspense, useRef, useEffect, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations, useCursor } from '@react-three/drei'
 import { motion, AnimatePresence } from 'framer-motion'
-import TypingText from './TypingText'
+import MushroomOfferBubble from './MushroomOfferBubble'
 import * as THREE from 'three'
 
 // Animation names - CORRECTED MAPPING
@@ -341,84 +341,14 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
         </Canvas>
       </div>
 
-      {/* Speech Bubble - positioned relative to wizard */}
       <AnimatePresence>
         {showModal && (
-          <>
-            {/* Backdrop - click to dismiss */}
-            <motion.div
-              className="fixed inset-0 z-[100]"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={onCancel}
-            />
-            {/* Speech bubble positioned above wizard */}
-            <motion.div
-              className="absolute bottom-full left-[60px] md:left-[80px] mb-2 w-[220px] md:w-[320px] z-[101]"
-              initial={{ opacity: 0, scale: 0.8, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 20 }}
-              style={{ filter: 'none' }}
-            >
-              {/* Bubble */}
-              <div
-                className="relative p-3 md:p-4 rounded-2xl bg-card border-2 border-secondary/50"
-                style={{
-                  boxShadow: '0 0 20px hsl(var(--secondary) / 0.4), 0 0 40px hsl(var(--secondary) / 0.2)',
-                }}
-              >
-                {/* Speech bubble tail - pointing down toward wizard */}
-                <div
-                  className="absolute -bottom-3 left-12 md:left-16 w-0 h-0"
-                  style={{
-                    borderLeft: '12px solid transparent',
-                    borderRight: '12px solid transparent',
-                    borderTop: '12px solid hsl(var(--card))',
-                    filter: 'drop-shadow(0 2px 4px hsl(var(--secondary) / 0.3))',
-                  }}
-                />
-                <div
-                  className="absolute -bottom-[14px] left-12 md:left-16 w-0 h-0"
-                  style={{
-                    borderLeft: '12px solid transparent',
-                    borderRight: '12px solid transparent',
-                    borderTop: '12px solid hsl(var(--secondary) / 0.5)',
-                    zIndex: -1,
-                  }}
-                />
-
-                <p className="font-heading text-sm md:text-lg text-secondary mb-3 md:mb-4">
-                  <TypingText
-                    text="You want to eat mushroom?"
-                    speed={40}
-                    showCursor={true}
-                  />
-                </p>
-                <div className="flex gap-2 md:gap-3 justify-center">
-                  <motion.button
-                    className="px-3 md:px-4 py-1 md:py-1.5 rounded-md bg-muted text-foreground font-heading text-xs md:text-sm hover:bg-muted/80 transition-colors"
-                    onClick={onCancel}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    Ummm...no
-                  </motion.button>
-                  <motion.button
-                    className="px-3 md:px-4 py-1 md:py-1.5 rounded-md bg-secondary text-background font-heading font-bold text-xs md:text-sm hover:bg-secondary/80 transition-colors"
-                    style={{
-                      boxShadow: '0 0 10px hsl(var(--secondary) / 0.5)',
-                    }}
-                    onClick={onConfirm}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    Sure!
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          </>
+          <MushroomOfferBubble
+            position="anchored"
+            text="You want to eat mushroom?"
+            onConfirm={onConfirm ?? (() => {})}
+            onCancel={onCancel ?? (() => {})}
+          />
         )}
       </AnimatePresence>
     </motion.div>

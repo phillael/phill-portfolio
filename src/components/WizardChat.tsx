@@ -201,7 +201,7 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
-        className="fixed inset-0 md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg"
+        className="fixed inset-0 md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden overflow-x-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -260,7 +260,7 @@ export default function WizardChat({
           role="log"
           aria-live="polite"
           aria-label="Shroom Wizard conversation"
-          className="flex-1 min-h-0 overflow-y-auto px-4 pr-10 flex flex-col gap-2"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 flex flex-col gap-2"
         >
           {messages.map((m, idx) => {
             const isLast = idx === messages.length - 1
@@ -310,7 +310,7 @@ export default function WizardChat({
             disabled={isLoading || isDisabled || pendingOffer}
             rows={1}
             aria-label="Ask the wizard a question"
-            className="flex-1 bg-transparent text-foreground font-mono text-sm placeholder-muted-foreground focus:outline-none resize-none min-h-[44px] py-2"
+            className="flex-1 bg-transparent text-foreground font-mono text-base placeholder-muted-foreground focus:outline-none resize-none min-h-[44px] py-2"
           />
         </div>
       </motion.div>

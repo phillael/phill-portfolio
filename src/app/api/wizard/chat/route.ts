@@ -40,7 +40,7 @@ function validateBody(raw: unknown): raw is ChatRequestBody {
 
   const last = body.messages[body.messages.length - 1] as ChatMessage
   if (last.role !== 'user') return false
-  if (last.content.length < 1 || last.content.length > 500) return false
+  if (last.content.length < 1 || last.content.length > 200) return false
 
   return true
 }
@@ -85,7 +85,7 @@ export async function POST(request: Request): Promise<Response> {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
     mainResponse = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
+      max_tokens: 400,
       temperature: 1.0,
       system: [
         {

@@ -6,14 +6,15 @@
     "dateRange": "Feb 2023 - Present",
     "description": "Leading full-stack development initiatives for a telehealth platform serving universities nationwide.",
     "bulletPoints": [
-      "Architected and engineered full-stack solutions with ReactJS, React Native, Typescript, NodeJS, AWS, Microservices/APIs.",
-      "Built a filterable, event driven live data report dashboard w/ SNS/SQS, SQL, NodeJS, React, Typescript enabling sales team to land multiple large clients.",
-      "Implemented unit and integration tests, reducing post-release bugs by 50% using Vitest, Playwright, Detox.",
-      "Achieved perfect VPAT accessibility score, setting benchmark for the most accessible telehealth software in the industry.",
-      "Highly effective cross-functional collaboration with design and product resulting in company goals being met ahead of schedule.",
-      "Mentored new engineers, helped with onboarding, ensured people felt welcome and supported resulting in a stronger and more effective team."
+      "Architected full-stack healthcare solutions with React, React Native, TypeScript, Node.js, and AWS, leveraging AI-assisted workflows to ship features at 5-10x velocity while maintaining production-grade quality.",
+      "Led spec-driven development sessions using Claude Code and Agent OS, quickly bringing engineering/product/design teams into alignment to solve complex problems.",
+      "Built an event-driven report dashboard (SNS/SQS, SQL, Node.js, React) directly enabling sales to close multiple large clients.",
+      "Reduced post-release bugs by 50% using Vitest, Playwright, and Detox with AI-assisted test generation.",
+      "Rapidly prototyped and iterated on features using customer feedback, driving product decisions that aligned with user needs.",
+      "Leveraged MCPs and agentic workflows to accelerate delivery while maintaining rigorous review of AI-generated code for quality.",
+      "Mentored engineers on AI tooling adoption and development best practices, accelerating team ramp-up and effectiveness."
     ],
-    "techStack": ["React", "React Native", "TypeScript", "Node.js", "AWS", "SQL", "Vitest", "Playwright"],
+    "techStack": ["React", "React Native", "TypeScript", "Node.js", "AWS", "SQL", "Claude Code", "Agent OS", "Vitest", "Playwright"],
     "type": "tech"
   },
   {
@@ -70,7 +71,8 @@
     "bulletPoints": [
       "Composed adaptive music for award-winning game ECO, contributing to acclaim and success ($7.1M revenue, 314K units sold).",
       "Collaborated with audio and software engineers to integrate adaptive music into complex 3D game environments.",
-      "Produced/performed on Meta-Musica – an album that reached #1 on the iTunes jazz charts, increasing fanbase by 10x globally."
+      "Produced/performed on Meta-Musica – an album that reached #1 on the iTunes jazz charts, increasing fanbase by 10x globally.",
+      "15+ years of teaching guitar and music theory — deep expertise in breaking down complex concepts and mentoring for all skill levels."
     ],
     "techStack": ["Music Composition", "Game Audio", "DAW", "Adaptive Music", "Studio Recording"],
     "type": "music"

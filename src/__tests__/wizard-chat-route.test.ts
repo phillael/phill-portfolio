@@ -79,9 +79,9 @@ describe('POST /api/wizard/chat', () => {
     expect(body.error).toBe('server')
   })
 
-  it('rejects a request where the last message is over 500 chars', async () => {
+  it('rejects a request where the last message is over 200 chars', async () => {
     const req = makeRequest({
-      messages: [{ role: 'user', content: 'x'.repeat(501) }],
+      messages: [{ role: 'user', content: 'x'.repeat(201) }],
     })
 
     const res = await POST(req)

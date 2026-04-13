@@ -8,8 +8,9 @@
 import experienceData from '@/data/experience.json'
 import skillsData from '@/data/skills.json'
 import projectsData from '@/data/projects.json'
+import projectDetailsData from '@/data/project-details.json'
 import educationData from '@/data/education.json'
-import type { Experience, SkillCategory, Project, Education } from '@/types/content'
+import type { Experience, SkillCategory, Project, ProjectDetails, Education } from '@/types/content'
 
 describe('Data Architecture', () => {
   describe('Experience Data', () => {
@@ -128,6 +129,32 @@ describe('Data Architecture', () => {
       )
       expect(timelycare).toBeDefined()
       expect(timelycare?.liveUrl).toBe('https://timelycare.com')
+    })
+  })
+
+  describe('Project Details Data', () => {
+    it('imports project-details.json without errors', () => {
+      expect(projectDetailsData).toBeDefined()
+      expect(Array.isArray(projectDetailsData)).toBe(true)
+    })
+
+    it('each entry has required fields', () => {
+      projectDetailsData.forEach((entry) => {
+        const details = entry as ProjectDetails
+        expect(typeof details.id).toBe('string')
+        expect(typeof details.architecture).toBe('string')
+        expect(typeof details.keyPatterns).toBe('string')
+        expect(typeof details.notableDetails).toBe('string')
+      })
+    })
+
+    it('each id is a unique non-empty string', () => {
+      const ids = projectDetailsData.map((entry) => entry.id)
+      ids.forEach((id) => {
+        expect(typeof id).toBe('string')
+        expect(id.length).toBeGreaterThan(0)
+      })
+      expect(new Set(ids).size).toBe(ids.length)
     })
   })
 

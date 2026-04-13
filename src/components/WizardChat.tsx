@@ -234,7 +234,7 @@ export default function WizardChat({
 
         {/* Fixed header — portrait + close button (never scrolls) */}
         <div className="flex-shrink-0 flex items-center justify-between p-4 pt-[max(1rem,env(safe-area-inset-top,16px))] md:p-3">
-          <div className="md:hidden">
+          <div>
             <img
               src="/images/wizard-portrait-idle.png"
               alt="Shroom Wizard"

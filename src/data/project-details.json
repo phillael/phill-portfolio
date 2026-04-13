@@ -1,0 +1,14 @@
+[
+  {
+    "id": "number-slayers",
+    "architecture": "pnpm monorepo with three packages — Next.js 14 frontend (apps/web), Colyseus WebSocket game server (apps/server), and a shared TypeScript types package (packages/types). The frontend renders 3D gameplay via React Three Fiber, while the server runs a 60fps authoritative game loop that syncs state to all clients via Colyseus schema patching.",
+    "keyPatterns": "Server-authoritative multiplayer — clients send input messages, the server validates and updates state, and Colyseus binary delta encoding pushes only changed fields to all players. Client state managed by three Zustand stores (game logic, Colyseus connection, multiplayer helpers). 3D rendering uses React Three Fiber with 18 custom hooks for player controls, character animations, physics, collision detection, and position interpolation.",
+    "notableDetails": "Dynamic math challenge generation system that scales difficulty per level. Modular cash/scoring system with per-number earnings, health bonuses, and time bonuses. Character system with selectable models, skeletal animations, and smooth crossfade transitions. Graceful server shutdown that warns active players and lets games finish. Howler.js for spatial audio."
+  },
+  {
+    "id": "phillcodes-portfolio",
+    "architecture": "Next.js 16 (App Router) with React 19, TypeScript, and Tailwind CSS. Section-based single-page layout driven by JSON data files — components map over the data rather than hardcoding content. Deployed on Vercel.",
+    "keyPatterns": "Three.js via React Three Fiber powers multiple 3D experiences — the animated Shroom Wizard model (GLTF with 11 animations), a 3D testimonials carousel (Canvas 2D rendered to Three.js sphere geometry), and particle effects. Framer Motion handles DOM animations and scroll-triggered reveals. The AI chat uses Claude Haiku via Anthropic SDK on a Next.js API route with Upstash Redis rate limiting (per-IP daily cap and global token budget).",
+    "notableDetails": "Shroom Mode psychedelic effect uses SVG feTurbulence and feDisplacementMap filters with a 30-second intensity ramp, applied to a wrapper div so the music player stays undistorted. Custom Web Audio API music player with real-time frequency visualization (bass, treble, and intensity bands). The wizard has a two-mode persona — Mystic Voice for banter, Clear Speech for career facts — with a tool-use mechanism that triggers an interactive mushroom ceremony UI."
+  }
+]

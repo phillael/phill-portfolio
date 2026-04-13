@@ -18,9 +18,16 @@ describe('buildWizardSystemPrompt', () => {
   it('embeds each data file inside its own tagged section', () => {
     const prompt = buildWizardSystemPrompt()
     expect(prompt).toMatch(/<projects>[\s\S]+<\/projects>/)
+    expect(prompt).toMatch(/<project-details>[\s\S]+<\/project-details>/)
     expect(prompt).toMatch(/<skills>[\s\S]+<\/skills>/)
     expect(prompt).toMatch(/<experience>[\s\S]+<\/experience>/)
     expect(prompt).toMatch(/<education>[\s\S]+<\/education>/)
+  })
+
+  it('includes project architecture details in the prompt', () => {
+    const prompt = buildWizardSystemPrompt()
+    expect(prompt).toContain('Colyseus')
+    expect(prompt).toContain('monorepo')
   })
 
   it('includes the inviolable rule set', () => {

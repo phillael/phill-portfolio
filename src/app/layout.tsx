@@ -24,6 +24,12 @@ const pressStart2P = Press_Start_2P({
   variable: '--font-pixel',
 })
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  interactiveWidget: 'resizes-content',
+}
+
 export const metadata = {
   metadataBase: new URL('https://www.phillcodes.com'),
   title: 'Phill Aelony | Legendary Code Sorcerer',

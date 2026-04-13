@@ -201,7 +201,7 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
-        className="fixed inset-x-0 top-0 h-dvh md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg pt-[env(safe-area-inset-top,16px)] md:pt-0"
+        className="fixed inset-0 md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg pt-[env(safe-area-inset-top,16px)] md:pt-0"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}

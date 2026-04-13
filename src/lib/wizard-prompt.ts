@@ -1,4 +1,5 @@
 import projects from '@/data/projects.json'
+import projectDetails from '@/data/project-details.json'
 import skills from '@/data/skills.json'
 import experience from '@/data/experience.json'
 import education from '@/data/education.json'
@@ -19,6 +20,10 @@ You are here to talk about Phill Aelony, a software developer whose portfolio yo
 <projects>
 {{PROJECTS_JSON}}
 </projects>
+
+<project-details>
+{{PROJECT_DETAILS_JSON}}
+</project-details>
 
 <skills>
 {{SKILLS_JSON}}
@@ -85,6 +90,7 @@ export function buildWizardSystemPrompt(): string {
   cached = PERSONA_TEMPLATE
     .replace('{{SUMMARY}}', wizardData.professionalSummary)
     .replace('{{PROJECTS_JSON}}', JSON.stringify(projects, null, 2))
+    .replace('{{PROJECT_DETAILS_JSON}}', JSON.stringify(projectDetails, null, 2))
     .replace('{{SKILLS_JSON}}', JSON.stringify(skills, null, 2))
     .replace('{{EXPERIENCE_JSON}}', JSON.stringify(experience, null, 2))
     .replace('{{EDUCATION_JSON}}', JSON.stringify(education, null, 2))

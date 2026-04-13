@@ -39,6 +39,16 @@ export interface Project {
 }
 
 /**
+ * ProjectDetails - Deep technical context for the wizard's knowledge
+ */
+export interface ProjectDetails {
+  id: string
+  architecture: string
+  keyPatterns: string
+  notableDetails: string
+}
+
+/**
  * Education - Education and certification entry
  */
 export interface Education {

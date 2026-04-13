@@ -302,7 +302,7 @@ export default function WizardChat({
           <span className="text-primary font-mono text-sm">&gt;</span>
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value.slice(0, 500))}
+            onChange={(e) => setInput(e.target.value.slice(0, 200))}
             onKeyDown={onInputKeyDown}
             placeholder="whisper thy question…"
             disabled={isLoading || isDisabled || pendingOffer}

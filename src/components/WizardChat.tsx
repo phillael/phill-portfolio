@@ -101,6 +101,17 @@ export default function WizardChat({
     }
   }, [injectedLine, onInjectedLineConsumed])
 
+  // Lock body scroll while the chat overlay is open (prevents the page
+  // underneath from being visible/scrollable on mobile when the keyboard opens).
+  useEffect(() => {
+    const scrollY = window.scrollY
+    document.body.style.cssText = `overflow: hidden; position: fixed; top: -${scrollY}px; width: 100%;`
+    return () => {
+      document.body.style.cssText = ''
+      window.scrollTo(0, scrollY)
+    }
+  }, [])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -190,7 +201,7 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
-        className="fixed inset-0 md:inset-auto md:bottom-[290px] md:left-[40px] md:w-[360px] md:h-[420px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg pt-[env(safe-area-inset-top,16px)] md:pt-0"
+        className="fixed inset-x-0 top-0 h-dvh md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg pt-[env(safe-area-inset-top,16px)] md:pt-0"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -287,7 +298,7 @@ export default function WizardChat({
         </div>
 
         {/* Input */}
-        <div className="border-t border-primary/20 bg-primary/5 p-3 flex gap-2 items-center">
+        <div className="border-t border-primary/20 bg-primary/5 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 items-center">
           <span className="text-primary font-mono text-sm">&gt;</span>
           <textarea
             value={input}

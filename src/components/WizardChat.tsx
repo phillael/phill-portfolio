@@ -201,7 +201,7 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
-        className="fixed inset-0 md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg pt-[env(safe-area-inset-top,16px)] md:pt-0"
+        className="fixed inset-0 md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -232,34 +232,36 @@ export default function WizardChat({
           }}
         />
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          aria-label="Close chat"
-          className="absolute top-1 right-1 w-11 h-11 flex items-center justify-center text-primary hover:text-primary/70 focus:outline-none focus:ring-2 focus:ring-primary rounded"
-        >
-          ×
-        </button>
+        {/* Fixed header — portrait + close button (never scrolls) */}
+        <div className="flex-shrink-0 flex items-center justify-between p-4 pt-[max(1rem,env(safe-area-inset-top,16px))] md:p-3">
+          <div className="md:hidden">
+            <img
+              src="/images/wizard-portrait-idle.png"
+              alt="Shroom Wizard"
+              width={48}
+              height={48}
+              className="rounded-sm image-pixelated"
+              style={{ imageRendering: 'pixelated' }}
+            />
+          </div>
+          <div className="flex-1" />
+          <button
+            onClick={onClose}
+            aria-label="Close chat"
+            className="w-11 h-11 flex items-center justify-center text-primary hover:text-primary/70 focus:outline-none focus:ring-2 focus:ring-primary rounded"
+          >
+            ×
+          </button>
+        </div>
 
-        {/* Conversation body */}
+        {/* Scrollable message area (only this zone scrolls) */}
         <div
           ref={scrollRef}
           role="log"
           aria-live="polite"
           aria-label="Shroom Wizard conversation"
-          className="flex-1 overflow-y-auto p-4 pt-8 pr-10 flex flex-col gap-2"
+          className="flex-1 min-h-0 overflow-y-auto px-4 pr-10 flex flex-col gap-2"
         >
-          <div className="md:hidden flex items-start gap-3 mb-2">
-            <img
-              src="/images/wizard-portrait-idle.png"
-              alt="Shroom Wizard"
-              width={72}
-              height={72}
-              className="shrink-0 border-2 border-primary/60 rounded-sm image-pixelated"
-              style={{ imageRendering: 'pixelated' }}
-            />
-            <div className="flex-1 min-w-0" />
-          </div>
           {messages.map((m, idx) => {
             const isLast = idx === messages.length - 1
             const opacityClass = isLast ? 'opacity-100' : 'opacity-35'
@@ -297,8 +299,8 @@ export default function WizardChat({
           )}
         </div>
 
-        {/* Input */}
-        <div className="border-t border-primary/20 bg-primary/5 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 items-center">
+        {/* Fixed footer — input bar (never scrolls) */}
+        <div className="flex-shrink-0 border-t border-primary/20 bg-primary/5 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 items-center">
           <span className="text-primary font-mono text-sm">&gt;</span>
           <textarea
             value={input}

@@ -37,6 +37,7 @@ describe('buildWizardSystemPrompt', () => {
     expect(prompt).toContain('NEVER break character')
     expect(prompt).toContain('WALRUS')
     expect(prompt).toContain('MYCOLOGY')
+    expect(prompt).toContain('multiverse')
   })
 
   it('mentions the offer_mushroom tool', () => {

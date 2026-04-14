@@ -269,7 +269,7 @@ export default function WizardChat({
               return (
                 <p
                   key={m.id}
-                  className={`text-[12px] italic text-secondary ${opacityClass} transition-opacity`}
+                  className={`text-[14px] italic text-secondary ${opacityClass} transition-opacity`}
                 >
                   {'\u203A '}
                   {m.content}
@@ -279,7 +279,7 @@ export default function WizardChat({
             return (
               <p
                 key={m.id}
-                className={`text-[13.5px] text-foreground leading-snug ${opacityClass} transition-opacity`}
+                className={`text-[15.5px] text-foreground leading-snug ${opacityClass} transition-opacity`}
               >
                 {isLast ? <TypingText text={m.content} speed={13} showCursor={false} /> : m.content}
               </p>

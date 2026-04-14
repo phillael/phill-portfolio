@@ -281,7 +281,7 @@ export default function WizardChat({
                 key={m.id}
                 className={`text-[13.5px] text-foreground leading-snug ${opacityClass} transition-opacity`}
               >
-                {isLast ? <TypingText text={m.content} speed={40} showCursor={false} /> : m.content}
+                {isLast ? <TypingText text={m.content} speed={13} showCursor={false} /> : m.content}
               </p>
             )
           })}

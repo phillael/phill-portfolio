@@ -20,6 +20,7 @@ interface WizardChatProps {
 }
 
 const GREETING = wizardData.greeting
+const FALLBACK_LINE = wizardData.fallbackLine
 const TRIUMPH_LINES = wizardData.triumphLines
 const DECLINE_LINES = wizardData.declineLines
 
@@ -149,6 +150,11 @@ export default function WizardChat({
       const body = await res.json()
 
       if (body.error === 'rate_limiter_down') {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: FALLBACK_LINE, id: genId() },
+        ])
+        setIsDisabled(true)
         onFallback()
         return
       }

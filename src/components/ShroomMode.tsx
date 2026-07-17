@@ -294,13 +294,10 @@ const ShroomMode = () => {
 
       {/* WizardChat HUD panel */}
       <AnimatePresence>
-        {chatOpen && !fallback && (
+        {chatOpen && (
           <WizardChat
             onClose={() => setChatOpen(false)}
-            onFallback={() => {
-              setFallback(true)
-              setChatOpen(false)
-            }}
+            onFallback={() => setFallback(true)}
             onOfferMushroom={() => setCeremonyOpen(true)}
             injectedLine={injectedLine}
             onInjectedLineConsumed={() => setInjectedLine(null)}

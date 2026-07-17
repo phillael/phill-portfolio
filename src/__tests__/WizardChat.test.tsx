@@ -84,6 +84,23 @@ describe('WizardChat', () => {
     })
   })
 
+  it('shows a farewell line and disables input when the rate limiter is down', async () => {
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      json: async () => ({ error: 'rate_limiter_down', message: 'down' }),
+    })
+
+    render(<WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />)
+
+    const input = screen.getByLabelText(/ask the wizard/i) as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'hi' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(screen.getByText(/riddles must rest/i)).toBeInTheDocument()
+    })
+    expect(input.disabled).toBe(true)
+  })
+
   it('disables the input after receiving a rate_limit error', async () => {
     ;(global.fetch as jest.Mock).mockResolvedValue({
       json: async () => ({ error: 'rate_limit', message: 'Fifty riddles spun, traveler.' }),

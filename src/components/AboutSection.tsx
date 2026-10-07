@@ -1,11 +1,18 @@
 'use client'
 
 import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import AnimatedSection from '@/components/AnimatedSection'
 import GlitchText from '@/components/GlitchText'
 import GlowEffect from '@/components/GlowEffect'
-import Testimonials3DCarousel from '@/components/Testimonials3DCarousel'
+import LazyMount from '@/components/LazyMount'
 import { useShroomMode } from '@/context/ShroomModeContext'
+import { useMediaQuery, MD_UP } from '@/hooks/useMediaQuery'
+
+// Three.js is ~270KB gzipped; keep it out of the initial bundle
+const Testimonials3DCarousel = dynamic(() => import('@/components/Testimonials3DCarousel'), {
+  ssr: false,
+})
 
 /**
  * HighlightedText - Renders text with neon glow effect
@@ -71,6 +78,9 @@ const BioParagraph = ({
  */
 const AboutSection = () => {
   const { isActive: isShroomMode } = useShroomMode()
+  // Mount exactly one carousel (each is a WebGL context + render loop);
+  // CSS-hidden copies keep rendering
+  const isDesktop = useMediaQuery(MD_UP)
 
   return (
     <section
@@ -136,10 +146,12 @@ const AboutSection = () => {
             </BioParagraph>
 
             {/* Testimonials Preview - shown on mobile after bio text (hidden in shroom mode) */}
-            {!isShroomMode && (
+            {!isShroomMode && isDesktop === false && (
               <div className="md:hidden pt-4">
                 <AnimatedSection delay={0.5}>
-                  <Testimonials3DCarousel />
+                  <LazyMount placeholderClassName="mt-8 h-[180px] md:h-[200px]">
+                    <Testimonials3DCarousel />
+                  </LazyMount>
                 </AnimatedSection>
               </div>
             )}
@@ -162,10 +174,12 @@ const AboutSection = () => {
             </AnimatedSection>
 
             {/* 3D Testimonials Carousel Preview - desktop only, under llama (hidden in shroom mode) */}
-            {!isShroomMode && (
+            {!isShroomMode && isDesktop && (
               <div className="hidden md:block">
                 <AnimatedSection delay={0.5}>
-                  <Testimonials3DCarousel />
+                  <LazyMount placeholderClassName="mt-8 h-[180px] md:h-[200px]">
+                    <Testimonials3DCarousel />
+                  </LazyMount>
                 </AnimatedSection>
               </div>
             )}

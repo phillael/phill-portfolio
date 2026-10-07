@@ -4,8 +4,13 @@ import HeroImage from '@/components/HeroImage'
 import { AnimatedTagline } from '@/components/AnimatedHeadline'
 import { Ripple } from '@/components/ui/Ripple'
 import { Vortex } from '@/components/ui/Vortex'
+import { useMediaQuery, MD_UP } from '@/hooks/useMediaQuery'
 
 const HeroSection = () => {
+  // Only mount the vortex where it's shown; a CSS-hidden canvas keeps its
+  // animation loop (and blur passes) running on phones
+  const isDesktop = useMediaQuery(MD_UP)
+
   return (
     <section
       id="hero"
@@ -13,8 +18,8 @@ const HeroSection = () => {
       role="region"
       className="relative min-h-screen flex flex-col items-center justify-center px-4 py-8 overflow-hidden"
     >
-      {/* Vortex sparkles effect - hidden on mobile */}
-      <div className="hidden md:block">
+      {/* Vortex sparkles effect - desktop only */}
+      {isDesktop && (
         <Vortex
           particleCount={200}
           baseHue={190}
@@ -25,7 +30,7 @@ const HeroSection = () => {
           rangeRadius={1.5}
           containerClassName="absolute inset-0 z-0"
         />
-      </div>
+      )}
 
       {/* Ripple effect behind hero content - hidden on mobile */}
       <div className="hidden md:block">

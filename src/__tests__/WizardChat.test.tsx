@@ -127,6 +127,72 @@ describe('WizardChat', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps Escape from reaching listeners behind the chat', () => {
+    const behind = jest.fn()
+    document.body.addEventListener('keydown', behind)
+    render(<WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />)
+
+    fireEvent.keyDown(screen.getByLabelText(/ask the wizard/i), { key: 'Escape' })
+
+    expect(behind).not.toHaveBeenCalled()
+    document.body.removeEventListener('keydown', behind)
+  })
+
+  it('does not abort an in-flight request when the parent re-renders', async () => {
+    let signal: AbortSignal | undefined
+    ;(global.fetch as jest.Mock).mockImplementation((_url, init: RequestInit) => {
+      signal = init.signal ?? undefined
+      return new Promise(() => {})
+    })
+
+    const { rerender } = render(
+      <WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />,
+    )
+    const input = screen.getByLabelText(/ask the wizard/i)
+    fireEvent.change(input, { target: { value: 'hi' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(signal).toBeDefined())
+
+    // New callback identities, as an inline-arrow parent produces every render
+    rerender(<WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />)
+
+    expect(signal?.aborted).toBe(false)
+  })
+
+  it('keeps focus in the input while waiting for a reply', async () => {
+    ;(global.fetch as jest.Mock).mockImplementation(() => new Promise(() => {}))
+    render(<WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />)
+
+    const input = screen.getByLabelText(/ask the wizard/i) as HTMLTextAreaElement
+    expect(document.activeElement).toBe(input)
+    fireEvent.change(input, { target: { value: 'hi' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(input.readOnly).toBe(true))
+    expect(input.disabled).toBe(false)
+  })
+
+  it('does not send client-side error lines back to the model', async () => {
+    ;(global.fetch as jest.Mock)
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ json: async () => ({ message: 'Back again.' }) })
+    render(<WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />)
+
+    const input = screen.getByLabelText(/ask the wizard/i)
+    fireEvent.change(input, { target: { value: 'first' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(screen.getByText(/whispers are tangled/i)).toBeInTheDocument())
+
+    fireEvent.change(input, { target: { value: 'second' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(screen.getByText(/back again/i)).toBeInTheDocument())
+
+    const sent = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body).messages
+    expect(sent.map((m: { content: string }) => m.content)).not.toContain(
+      "The grove's whispers are tangled. A moment, traveler.",
+    )
+  })
+
   it('renders the mobile wizard portrait image', () => {
     render(<WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />)
 

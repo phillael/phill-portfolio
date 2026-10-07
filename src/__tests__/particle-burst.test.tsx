@@ -3,7 +3,7 @@
  *
  * Tests for the particle burst functionality on SkillChip components:
  * - Clicking SkillChip triggers particle generation
- * - 18-25 particles are created on click
+ * - 21-28 particles are created on click
  * - Particles are removed from DOM after animation completes
  * - Particles use cyberpunk colors (cyan, magenta, green)
  * - Reduced motion preference disables particle animation
@@ -105,15 +105,15 @@ describe('SkillChip Particle Burst Effect', () => {
     expect(particles.length).toBeGreaterThan(0)
   })
 
-  it('generates 18-25 particles on click', () => {
+  it('generates 21-28 particles on click', () => {
     render(<SkillChip skill="TypeScript" />)
 
     const chip = screen.getByText('TypeScript')
     fireEvent.click(chip)
 
     const particles = screen.getAllByTestId('particle')
-    expect(particles.length).toBeGreaterThanOrEqual(18)
-    expect(particles.length).toBeLessThanOrEqual(25)
+    expect(particles.length).toBeGreaterThanOrEqual(21)
+    expect(particles.length).toBeLessThanOrEqual(28)
   })
 
   it('particles are removed from DOM after animation completes', async () => {

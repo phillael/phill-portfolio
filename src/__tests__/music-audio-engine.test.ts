@@ -262,6 +262,33 @@ describe('Audio Engine - useAudioPlayer Hook', () => {
     })
   })
 
+  describe('Track End', () => {
+    it('auto-advances to the next track when a track ends', () => {
+      const { result } = renderHook(() => useAudioPlayer(mockTracks))
+
+      act(() => {
+        mockAudioInstance.simulateEnded()
+      })
+
+      expect(result.current.currentTrack).toEqual(mockTracks[1])
+    })
+
+    it('stops on the last track instead of running past the playlist', () => {
+      const { result } = renderHook(() => useAudioPlayer(mockTracks))
+      const lastIndex = mockTracks.length - 1
+
+      act(() => {
+        result.current.setTrack(mockTracks[lastIndex])
+      })
+      act(() => {
+        mockAudioInstance.simulateEnded()
+      })
+
+      expect(result.current.currentTrack).toEqual(mockTracks[lastIndex])
+      expect(result.current.isPlaying).toBe(false)
+    })
+  })
+
   describe('Volume Controls', () => {
     it('setVolume() updates volume state', () => {
       const { result } = renderHook(() => useAudioPlayer(mockTracks))

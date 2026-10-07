@@ -1,62 +1,80 @@
 'use client'
 
-import { useRef, useMemo } from 'react'
+import { useRef, type ComponentRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Sparkles, MeshWobbleMaterial } from '@react-three/drei'
 import * as THREE from 'three'
 import type { FrequencyData } from '@/lib/audio-utils'
 
-interface VisualizerSphereProps {
-  bass: number
-  treble: number
-  intensity: number
+const CYAN = new THREE.Color(0x00ffff)
+const MAGENTA = new THREE.Color(0xff00ff)
+
+interface VisualizerProps {
+  frequencyData: FrequencyData
 }
 
 /**
  * Animated sphere that responds to audio frequency data.
- * Uses MeshWobbleMaterial for dynamic wobble effect driven by bass.
+ * Everything audio-driven is applied inside useFrame from the live
+ * frequencyData object, so playback never re-renders React.
  */
-const VisualizerSphere = ({ bass, treble, intensity }: VisualizerSphereProps) => {
+const VisualizerSphere = ({ frequencyData }: VisualizerProps) => {
   const meshRef = useRef<THREE.Mesh>(null)
-  const materialRef = useRef<typeof MeshWobbleMaterial.prototype>(null)
+  const materialRef = useRef<ComponentRef<typeof MeshWobbleMaterial>>(null)
 
-  // Color interpolation from cyan to magenta based on intensity
-  const color = useMemo(() => {
-    const cyan = new THREE.Color(0x00ffff)
-    const magenta = new THREE.Color(0xff00ff)
-    return cyan.clone().lerp(magenta, intensity)
-  }, [intensity])
-
-  // Update material properties based on audio
   useFrame(() => {
-    if (meshRef.current) {
-      // Scale slightly with bass
-      const scale = 1 + bass * 0.3
-      meshRef.current.scale.setScalar(scale)
-
-      // Rotate based on treble
-      meshRef.current.rotation.x += 0.01 + treble * 0.02
-      meshRef.current.rotation.y += 0.01 + treble * 0.015
+    const { bass, treble, intensity } = frequencyData
+    const mesh = meshRef.current
+    if (mesh) {
+      // Scale slightly with bass, rotate faster with treble
+      mesh.scale.setScalar(1 + bass * 0.3)
+      mesh.rotation.x += 0.01 + treble * 0.02
+      mesh.rotation.y += 0.01 + treble * 0.015
+    }
+    const material = materialRef.current
+    if (material) {
+      // Wobble driven by bass (0.5 - 3), color shifts cyan -> magenta with intensity
+      material.factor = 0.5 + bass * 2.5
+      material.color.lerpColors(CYAN, MAGENTA, intensity)
+      material.emissive.copy(material.color)
+      material.emissiveIntensity = 0.3 + intensity * 0.4
     }
   })
-
-  // Map bass to wobble factor (0.5 - 3)
-  const wobbleFactor = 0.5 + bass * 2.5
 
   return (
     <mesh ref={meshRef}>
       <sphereGeometry args={[0.8, 32, 32]} />
       <MeshWobbleMaterial
         ref={materialRef}
-        color={color}
-        factor={wobbleFactor}
-        speed={2 + treble * 2}
-        emissive={color}
-        emissiveIntensity={0.3 + intensity * 0.4}
+        color={CYAN}
+        factor={0.5}
+        speed={2.5}
+        emissive={CYAN}
+        emissiveIntensity={0.3}
         metalness={0.6}
         roughness={0.2}
       />
     </mesh>
+  )
+}
+
+/**
+ * Sparkles pulse with treble. The particle count stays fixed: changing it
+ * makes drei rebuild every particle buffer.
+ */
+const VisualizerSparkles = ({ frequencyData }: VisualizerProps) => {
+  const groupRef = useRef<THREE.Group>(null)
+
+  useFrame(() => {
+    if (groupRef.current) {
+      groupRef.current.scale.setScalar(1 + frequencyData.treble * 0.4)
+    }
+  })
+
+  return (
+    <group ref={groupRef}>
+      <Sparkles count={30} scale={2.5} size={3} speed={1.2} color="#80ffff" opacity={0.8} />
+    </group>
   )
 }
 
@@ -71,12 +89,12 @@ interface AudioVisualizerProps {
  *
  * Features:
  * - Wobbling sphere with MeshWobbleMaterial driven by bass frequency
- * - Sparkles particles driven by treble
+ * - Sparkles particles pulsing with treble
  * - Color shifts from cyan to magenta based on intensity
  * - Only renders when audio is playing for performance
  *
  * @param isPlaying - Whether audio is currently playing
- * @param frequencyData - Object containing bass, treble, and intensity (0-1)
+ * @param frequencyData - Live object with bass, treble, and intensity (0-1)
  * @param className - Additional CSS classes
  */
 const AudioVisualizer = ({
@@ -84,19 +102,6 @@ const AudioVisualizer = ({
   frequencyData,
   className = ''
 }: AudioVisualizerProps) => {
-  const { bass, treble, intensity } = frequencyData
-
-  // Sparkles count and speed driven by treble (10-50 particles)
-  const sparklesCount = Math.floor(10 + treble * 40)
-  const sparklesSpeed = 0.5 + treble * 1.5
-
-  // Color for sparkles - shifts with intensity
-  const sparkleColor = useMemo(() => {
-    const cyan = new THREE.Color(0x00ffff)
-    const magenta = new THREE.Color(0xff00ff)
-    return '#' + cyan.clone().lerp(magenta, intensity).getHexString()
-  }, [intensity])
-
   if (!isPlaying) {
     return null
   }
@@ -116,22 +121,8 @@ const AudioVisualizer = ({
         <pointLight position={[5, 5, 5]} intensity={100} color="#00ffff" />
         <pointLight position={[-5, -5, 5]} intensity={60} color="#ff00ff" />
 
-        {/* Wobbling sphere */}
-        <VisualizerSphere
-          bass={bass}
-          treble={treble}
-          intensity={intensity}
-        />
-
-        {/* Sparkles particles */}
-        <Sparkles
-          count={sparklesCount}
-          scale={2.5}
-          size={2 + treble * 3}
-          speed={sparklesSpeed}
-          color={sparkleColor}
-          opacity={0.6 + intensity * 0.4}
-        />
+        <VisualizerSphere frequencyData={frequencyData} />
+        <VisualizerSparkles frequencyData={frequencyData} />
       </Canvas>
     </div>
   )

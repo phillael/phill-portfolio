@@ -11,6 +11,11 @@ import { render, screen } from '@testing-library/react'
 import AboutSection from '@/components/AboutSection'
 
 // Mock framer-motion
+// AboutSection reads shroom mode; the real provider lives in the root layout
+jest.mock('@/context/ShroomModeContext', () => ({
+  useShroomMode: () => ({ isActive: false, setIsActive: jest.fn() }),
+}))
+
 jest.mock('framer-motion', () => ({
   motion: {
     div: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
@@ -37,7 +42,7 @@ jest.mock('framer-motion', () => ({
 jest.mock('next/image', () => ({
   __esModule: true,
   default: (props: { alt: string; src: string }) => (
-    // eslint-disable-next-line @next/next/no-img-element
+     
     <img alt={props.alt} src={props.src} />
   ),
 }))

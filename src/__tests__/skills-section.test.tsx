@@ -165,7 +165,7 @@ describe('SkillChip', () => {
 
     // Check that the chip has the expected base classes
     expect(chip).toHaveClass('text-accent')
-    expect(chip).toHaveClass('bg-muted')
+    expect(chip).toHaveClass('bg-card/80')
 
     // Verify transition class is present
     expect(chip.className).toMatch(/transition/)

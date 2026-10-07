@@ -1,9 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { buildWizardSystemPrompt } from '@/lib/wizard-prompt'
 import { WIZARD_TOOLS } from '@/lib/wizard-tools'
-import { checkAndReserve, recordUsage } from '@/lib/rate-limit'
+import { checkAndReserve, settleUsage } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
+export const maxDuration = 30
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -18,6 +19,17 @@ const IP_CAP_LINE = "Fifty riddles spun, traveler. The grove falls silent. Retur
 const BUDGET_LINE = "My spells are spent with today's sun. Return at first light."
 const TIMEOUT_LINE = 'The spores drift slowly today… ask again.'
 const GENERIC_ERROR_LINE = "The grove's whispers are tangled. A moment, traveler."
+// Used when the model calls offer_mushroom without saying anything
+const OFFER_LINE = 'The spores stir, traveler… I have a gift for thee.'
+
+// Request limits. The client caps typed input at 200 chars and the model's
+// replies are bounded by max_tokens, so anything larger was not sent by the
+// site. Checked on every message: only checking the last one let earlier
+// turns carry arbitrary payloads into the prompt.
+const MAX_MESSAGES = 40
+const MAX_USER_CHARS = 200
+const MAX_ASSISTANT_CHARS = 2000
+const MAX_TOTAL_CHARS = 20000
 
 function allowedOrigin(origin: string | null): boolean {
   if (!origin) return false
@@ -29,18 +41,23 @@ function validateBody(raw: unknown): raw is ChatRequestBody {
   if (typeof raw !== 'object' || raw === null) return false
   const body = raw as { messages?: unknown }
   if (!Array.isArray(body.messages)) return false
-  if (body.messages.length === 0 || body.messages.length > 40) return false
+  if (body.messages.length === 0 || body.messages.length > MAX_MESSAGES) return false
 
+  let totalChars = 0
   for (const msg of body.messages) {
     if (typeof msg !== 'object' || msg === null) return false
     const m = msg as { role?: unknown; content?: unknown }
     if (m.role !== 'user' && m.role !== 'assistant') return false
     if (typeof m.content !== 'string') return false
+    const limit = m.role === 'user' ? MAX_USER_CHARS : MAX_ASSISTANT_CHARS
+    if (m.content.length > limit) return false
+    totalChars += m.content.length
   }
+  if (totalChars > MAX_TOTAL_CHARS) return false
 
   const last = body.messages[body.messages.length - 1] as ChatMessage
   if (last.role !== 'user') return false
-  if (last.content.length < 1 || last.content.length > 200) return false
+  if (last.content.trim().length < 1) return false
 
   return true
 }
@@ -82,7 +99,12 @@ export async function POST(request: Request): Promise<Response> {
 
   let mainResponse
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+    // Fail fast so the user sees TIMEOUT_LINE instead of a hung request
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+      timeout: 20_000,
+      maxRetries: 1,
+    })
     mainResponse = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
@@ -98,26 +120,32 @@ export async function POST(request: Request): Promise<Response> {
       messages: body.messages.map((m) => ({ role: m.role, content: m.content })),
     })
   } catch {
+    await settleUsage(0)
     return Response.json(errorBody('server', TIMEOUT_LINE), { status: 502 })
   }
+
+  // Settle before any early return so every billed call is counted.
+  // Cache reads are billed at ~10% of the input rate, so weight them to match.
+  const usage = mainResponse.usage
+  await settleUsage(
+    (usage?.input_tokens ?? 0) +
+      (usage?.output_tokens ?? 0) +
+      (usage?.cache_creation_input_tokens ?? 0) +
+      Math.round((usage?.cache_read_input_tokens ?? 0) * 0.1),
+  )
 
   const textBlock = mainResponse.content.find((b) => b.type === 'text')
   const toolBlock = mainResponse.content.find(
     (b) => b.type === 'tool_use' && b.name === 'offer_mushroom',
   )
+  const text = textBlock?.type === 'text' ? textBlock.text.trim() : ''
 
-  if (!textBlock || textBlock.type !== 'text') {
+  if (!text && !toolBlock) {
     return Response.json(errorBody('server', GENERIC_ERROR_LINE), { status: 502 })
   }
 
-  const candidate = textBlock.text.trim()
-  const totalTokens =
-    (mainResponse.usage?.input_tokens ?? 0) + (mainResponse.usage?.output_tokens ?? 0)
-
-  await recordUsage(ip, totalTokens)
-
   return Response.json({
-    message: candidate,
+    message: text || OFFER_LINE,
     ...(toolBlock ? { action: 'offer_mushroom' as const } : {}),
   })
 }

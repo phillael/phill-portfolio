@@ -77,7 +77,7 @@ jest.mock('framer-motion', () => ({
 jest.mock('next/image', () => ({
   __esModule: true,
   default: function MockImage(props: Record<string, unknown>) {
-    // eslint-disable-next-line @next/next/no-img-element
+     
     return <img alt={props.alt as string} src={props.src as string} />
   },
 }))

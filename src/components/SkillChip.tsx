@@ -90,7 +90,7 @@ const sparkleKeyframes = `
 
 /**
  * Generate particles for normal burst effect
- * Creates 21-29 particles with wide spread (+15% from original)
+ * Creates 21-28 particles with wide spread (+15% from original)
  */
 const generateParticles = (): Particle[] => {
   const count = Math.floor(randomBetween(21, 29))

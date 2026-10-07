@@ -57,9 +57,9 @@ describe('Music FAB Component', () => {
       render(<MusicFAB {...defaultProps} />)
 
       const fab = screen.getByTestId('music-fab')
-      // Check for 52px width/height classes (min-w-[52px] min-h-[52px])
-      expect(fab).toHaveClass('w-[52px]')
-      expect(fab).toHaveClass('h-[52px]')
+      // 44px on mobile (w-11/h-11), 56px from md up
+      expect(fab).toHaveClass('w-11')
+      expect(fab).toHaveClass('h-11')
     })
 
     it('shows music icon when not playing', () => {
@@ -71,10 +71,11 @@ describe('Music FAB Component', () => {
       expect(screen.queryByTestId('audio-visualizer')).not.toBeInTheDocument()
     })
 
-    it('shows visualizer when playing', () => {
+    it('shows visualizer when playing', async () => {
       render(<MusicFAB {...defaultProps} isPlaying={true} />)
 
-      expect(screen.getByTestId('audio-visualizer')).toBeInTheDocument()
+      // The visualizer is code-split, so it appears once its chunk loads
+      expect(await screen.findByTestId('audio-visualizer')).toBeInTheDocument()
     })
   })
 

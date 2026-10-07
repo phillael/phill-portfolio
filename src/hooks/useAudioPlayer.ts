@@ -14,6 +14,11 @@ export interface AudioPlayerState {
   duration: number
   volume: number
   isMuted: boolean
+  /**
+   * Live frequency bands, mutated in place every animation frame while
+   * playing. Read it inside a render loop (e.g. R3F useFrame), not during
+   * React render: updating it doesn't trigger re-renders.
+   */
   frequencyData: FrequencyData
 }
 
@@ -59,7 +64,9 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
   const [duration, setDuration] = useState(0)
   const [volume, setVolumeState] = useState(0.7)
   const [isMuted, setIsMuted] = useState(false)
-  const [frequencyData, setFrequencyData] = useState<FrequencyData>({
+  // Mutated in place each frame instead of setState, which used to re-render
+  // the whole music player tree 60-120 times a second while a track played
+  const frequencyDataRef = useRef<FrequencyData>({
     bass: 0,
     treble: 0,
     intensity: 0
@@ -73,6 +80,15 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
   const animationFrameRef = useRef<number | null>(null)
 
   const currentTrack = tracks.length > 0 ? tracks[currentTrackIndex] : null
+
+  // The audio element's listeners are bound once on mount; read the live
+  // playlist position through refs so they don't see stale values
+  const trackIndexRef = useRef(currentTrackIndex)
+  const trackCountRef = useRef(tracks.length)
+  useEffect(() => {
+    trackIndexRef.current = currentTrackIndex
+    trackCountRef.current = tracks.length
+  }, [currentTrackIndex, tracks.length])
 
   /**
    * Initialize Web Audio API components.
@@ -112,7 +128,7 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
     }
 
     analyserRef.current.getByteFrequencyData(frequencyArrayRef.current)
-    setFrequencyData(extractFrequencyBands(frequencyArrayRef.current))
+    Object.assign(frequencyDataRef.current, extractFrequencyBands(frequencyArrayRef.current))
 
     animationFrameRef.current = requestAnimationFrame(updateFrequencyData)
   }, [isPlaying])
@@ -128,7 +144,7 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
         cancelAnimationFrame(animationFrameRef.current)
         animationFrameRef.current = null
       }
-      setFrequencyData({ bass: 0, treble: 0, intensity: 0 })
+      Object.assign(frequencyDataRef.current, { bass: 0, treble: 0, intensity: 0 })
     }
 
     return () => {
@@ -157,7 +173,7 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
 
     const handleEnded = () => {
       // Auto-advance to next track
-      if (currentTrackIndex < tracks.length - 1) {
+      if (trackIndexRef.current < trackCountRef.current - 1) {
         setCurrentTrackIndex((prev) => prev + 1)
       } else {
         setIsPlaying(false)
@@ -191,6 +207,8 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
         audioContextRef.current.close()
       }
     }
+    // Mount-only: the element is created once; volume is synced by its own effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /**
@@ -208,6 +226,8 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
         setIsPlaying(false)
       })
     }
+    // Only a track change should reload; isPlaying is read as a snapshot
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrackIndex, currentTrack])
 
   /**
@@ -340,7 +360,7 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
     duration,
     volume,
     isMuted,
-    frequencyData,
+    frequencyData: frequencyDataRef.current,
     // Actions
     play,
     pause,

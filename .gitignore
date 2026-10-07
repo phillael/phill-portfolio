@@ -42,3 +42,6 @@ coverage
 .superpowers/
 .vercel
 .env*.local
+
+# Claude Code worktrees
+.claude/worktrees/

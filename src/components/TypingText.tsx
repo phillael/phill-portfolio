@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 
 interface TypingTextProps {
   text: string
@@ -24,6 +24,10 @@ interface TypingTextProps {
  * - Variable speed for natural typing rhythm
  * - Blinking cursor
  * - Completion callback
+ *
+ * Screen readers get the full text once (sr-only copy); the typed copy is
+ * aria-hidden so live regions don't announce it character by character.
+ * With reduced motion the text appears immediately.
  */
 const TypingText = ({
   text,
@@ -35,13 +39,22 @@ const TypingText = ({
 }: TypingTextProps) => {
   const [displayedText, setDisplayedText] = useState('')
   const [isComplete, setIsComplete] = useState(false)
+  const shouldReduceMotion = useReducedMotion()
 
   useEffect(() => {
+    if (shouldReduceMotion) {
+      setDisplayedText(text)
+      setIsComplete(true)
+      onComplete?.()
+      return
+    }
+
     // Reset when text changes
     setDisplayedText('')
     setIsComplete(false)
 
     let currentIndex = 0
+    let timer: ReturnType<typeof setTimeout>
 
     const typeNextChar = () => {
       if (currentIndex < text.length) {
@@ -62,33 +75,37 @@ const TypingText = ({
           }
         }
 
-        setTimeout(typeNextChar, delay)
+        timer = setTimeout(typeNextChar, delay)
       } else {
         setIsComplete(true)
         onComplete?.()
       }
     }
 
-    // Start typing after a brief delay
-    const startTimeout = setTimeout(typeNextChar, 200)
+    // Start typing after a brief delay. `timer` always holds the latest
+    // pending step, so cleanup stops the whole chain, not just the first one.
+    timer = setTimeout(typeNextChar, 200)
 
-    return () => clearTimeout(startTimeout)
-  }, [text, speed, naturalSpeed, onComplete])
+    return () => clearTimeout(timer)
+  }, [text, speed, naturalSpeed, onComplete, shouldReduceMotion])
 
   return (
     <span className={className}>
-      {displayedText}
-      {showCursor && !isComplete && (
-        <motion.span
-          className="inline-block ml-0.5 w-0.5 h-[1em] bg-current align-middle"
-          animate={{ opacity: [1, 0] }}
-          transition={{
-            duration: 0.5,
-            repeat: Infinity,
-            repeatType: 'reverse',
-          }}
-        />
-      )}
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {displayedText}
+        {showCursor && !isComplete && (
+          <motion.span
+            className="inline-block ml-0.5 w-0.5 h-[1em] bg-current align-middle"
+            animate={{ opacity: [1, 0] }}
+            transition={{
+              duration: 0.5,
+              repeat: Infinity,
+              repeatType: 'reverse',
+            }}
+          />
+        )}
+      </span>
     </span>
   )
 }

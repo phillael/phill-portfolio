@@ -9,7 +9,13 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   id: string
+  /** Client-side status line (errors, fallback); never sent to the model */
+  local?: boolean
 }
+
+// The API accepts up to 40 messages; send a recent window so long chats keep
+// working instead of hitting that cap and failing on every message after it
+const HISTORY_WINDOW = 20
 
 interface WizardChatProps {
   onClose: () => void
@@ -75,7 +81,14 @@ export default function WizardChat({
   const [pendingOffer, setPendingOffer] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const onCloseRef = useRef(onClose)
+  const pendingOfferRef = useRef(pendingOffer)
+  useEffect(() => {
+    onCloseRef.current = onClose
+    pendingOfferRef.current = pendingOffer
+  }, [onClose, pendingOffer])
 
   // Autoscroll to bottom on any DOM mutation inside the scroll container.
   // Covers both new messages and the character-by-character TypingText crawl.
@@ -113,16 +126,30 @@ export default function WizardChat({
     }
   }, [])
 
+  // Move focus into the dialog on open and give it back on close
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    inputRef.current?.focus({ preventScroll: true })
+    return () => previouslyFocused?.focus?.({ preventScroll: true })
+  }, [])
+
+  // Escape closes the chat and nothing behind it. Capture phase + stopPropagation
+  // keeps ShroomMode's window listener from also dismissing the wizard. While
+  // the mushroom offer is up, the offer's own buttons decide.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      if (!pendingOfferRef.current) onCloseRef.current()
     }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      abortRef.current?.abort()
-    }
-  }, [onClose])
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  // Abort an in-flight request only when the chat actually unmounts. This
+  // used to live in an effect keyed on the onClose prop, so any parent
+  // re-render with a new callback silently cancelled the request.
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   async function sendMessage() {
     const text = input.trim()
@@ -142,7 +169,10 @@ export default function WizardChat({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          messages: nextMessages.map(({ role, content }) => ({ role, content })),
+          messages: nextMessages
+            .filter((m) => !m.local)
+            .slice(-HISTORY_WINDOW)
+            .map(({ role, content }) => ({ role, content })),
         }),
         signal: controller.signal,
       })
@@ -152,7 +182,7 @@ export default function WizardChat({
       if (body.error === 'rate_limiter_down') {
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: FALLBACK_LINE, id: genId() },
+          { role: 'assistant', content: FALLBACK_LINE, id: genId(), local: true },
         ])
         setIsDisabled(true)
         onFallback()
@@ -182,6 +212,7 @@ export default function WizardChat({
         role: 'assistant',
         content: "The grove's whispers are tangled. A moment, traveler.",
         id: genId(),
+        local: true,
       }
       setMessages((prev) => [...prev, errorMsg])
     } finally {
@@ -217,6 +248,7 @@ export default function WizardChat({
             '0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.1)',
         }}
         role="dialog"
+        aria-modal="true"
         aria-label="Shroom Wizard chat"
       >
         {/* Neon border accent on top edge (matches MusicPlayerPanel) */}
@@ -272,7 +304,8 @@ export default function WizardChat({
         >
           {messages.map((m, idx) => {
             const isLast = idx === messages.length - 1
-            const opacityClass = isLast ? 'opacity-100' : 'opacity-35'
+            // Older lines dim but stay readable (35% failed WCAG AA contrast)
+            const opacityClass = isLast ? 'opacity-100' : 'opacity-60'
             if (m.role === 'user') {
               return (
                 <p
@@ -295,12 +328,13 @@ export default function WizardChat({
           })}
 
           {isLoading && (
-            <div className="flex gap-1 text-primary text-lg" aria-label="Wizard is thinking">
-              <span className="animate-bounce">·</span>
-              <span className="animate-bounce" style={{ animationDelay: '0.15s' }}>
+            <div className="flex gap-1 text-primary text-lg" role="status">
+              <span className="sr-only">Wizard is thinking</span>
+              <span className="animate-bounce" aria-hidden="true">·</span>
+              <span className="animate-bounce" style={{ animationDelay: '0.15s' }} aria-hidden="true">
                 ·
               </span>
-              <span className="animate-bounce" style={{ animationDelay: '0.3s' }}>
+              <span className="animate-bounce" style={{ animationDelay: '0.3s' }} aria-hidden="true">
                 ·
               </span>
             </div>
@@ -311,11 +345,15 @@ export default function WizardChat({
         <div className="flex-shrink-0 border-t border-primary/20 bg-primary/5 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 items-center">
           <span className="text-primary font-mono text-sm">&gt;</span>
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value.slice(0, 200))}
             onKeyDown={onInputKeyDown}
             placeholder="whisper thy question…"
-            disabled={isLoading || isDisabled || pendingOffer}
+            // readOnly (not disabled) while waiting so focus stays in the input
+            readOnly={isLoading}
+            aria-busy={isLoading}
+            disabled={isDisabled || pendingOffer}
             rows={1}
             aria-label="Ask the wizard a question"
             className="flex-1 bg-transparent text-foreground font-mono text-base placeholder-muted-foreground focus:outline-none resize-none min-h-[44px] py-2"

@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useRef, useEffect, useState } from 'react'
+import { Suspense, useRef, useEffect, useState, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations, useCursor } from '@react-three/drei'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -69,12 +69,17 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick, on
   // Use Drei's useCursor hook for clean cursor management
   useCursor(hovered, 'pointer', 'auto')
 
-  // Notify parent when model is loaded
+  // Notify parent once when the model is loaded. Read the callback through a
+  // ref so a new function identity on re-render doesn't re-fire it.
+  const onLoadedRef = useRef(onLoaded)
+  useEffect(() => {
+    onLoadedRef.current = onLoaded
+  }, [onLoaded])
   useEffect(() => {
     if (scene) {
-      onLoaded?.()
+      onLoadedRef.current?.()
     }
-  }, [scene, onLoaded])
+  }, [scene])
 
   const currentAnimRef = useRef<string>('')
 
@@ -82,7 +87,7 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick, on
   const FADE_DURATION = 0.3
 
   // Play an animation with smooth crossfade transition
-  const playAnimation = (name: string) => {
+  const playAnimation = useCallback((name: string) => {
     const action = actions[name]
     if (!action) {
       console.warn('Animation not found:', name)
@@ -104,7 +109,7 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick, on
     action.setLoop(THREE.LoopRepeat, Infinity)
     action.fadeIn(FADE_DURATION).play()
     currentAnimRef.current = name
-  }
+  }, [actions])
 
   // TEST MODE: Play animation based on index
   useEffect(() => {
@@ -115,7 +120,7 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick, on
     if (animName) {
       playAnimation(animName)
     }
-  }, [testAnimIndex, actions])
+  }, [testAnimIndex, actions, playAnimation])
 
   // NORMAL MODE: Handle animations based on isActive and isWalking
   useEffect(() => {
@@ -129,17 +134,19 @@ function WizardModel({ isActive, onSpellComplete, testAnimIndex = 0, onClick, on
     }
 
     if (isActive) {
-      // Play spell cast, then dance after 5 seconds
+      // Play spell cast, then dance after 5 seconds (cancelled if shroom mode
+      // ends first, so the wizard doesn't start dancing after going idle)
       playAnimation(ANIMS.SPELL)
-      setTimeout(() => {
+      const danceTimer = setTimeout(() => {
         const randomDance = ANIMS.DANCES[Math.floor(Math.random() * ANIMS.DANCES.length)]
         playAnimation(randomDance)
       }, 5000)
-    } else {
-      // Return to idle
-      playAnimation(ANIMS.IDLE)
+      return () => clearTimeout(danceTimer)
     }
-  }, [isActive, isWalking, actions])
+
+    // Return to idle
+    playAnimation(ANIMS.IDLE)
+  }, [isActive, isWalking, actions, playAnimation])
 
   // Track target rotation for smooth interpolation
   const targetRotationRef = useRef(Math.PI * 0.25)
@@ -227,6 +234,12 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
     return () => window.removeEventListener('resize', checkIsDesktop)
   }, [])
 
+  // Walk-on timer; cleared if the wizard unmounts mid-walk
+  const enterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (enterTimerRef.current) clearTimeout(enterTimerRef.current)
+  }, [])
+
   const nextAnim = () => setTestAnimIndex((i) => (i + 1) % ALL_ANIMS.length)
   const prevAnim = () => setTestAnimIndex((i) => (i - 1 + ALL_ANIMS.length) % ALL_ANIMS.length)
 
@@ -235,7 +248,8 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
     setModelLoaded(true)
     onLoaded?.()
     // After walk duration, stop entering state and notify parent
-    setTimeout(() => {
+    if (enterTimerRef.current) clearTimeout(enterTimerRef.current)
+    enterTimerRef.current = setTimeout(() => {
       setIsEntering(false)
       onEnterComplete?.()
     }, WALK_DURATION * 1000)
@@ -355,7 +369,9 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
   )
 }
 
-// Preload the model so it's ready when the user clicks the shroom icon
+// Start fetching the model as soon as this chunk loads. ShroomMode imports the
+// chunk when the summon button is hovered or focused, so the download starts
+// before the click.
 useGLTF.preload('/models/shroom_wizard_merged_animations.glb')
 
 export default ShroomWizard3D

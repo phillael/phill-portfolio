@@ -9,7 +9,8 @@ import WizardChat, { pickRandom, TRIUMPH_LINES, DECLINE_LINES } from '@/componen
 import MushroomOfferBubble from '@/components/MushroomOfferBubble'
 
 // Dynamically import 3D component to avoid SSR issues with Three.js
-const ShroomWizard3D = dynamic(() => import('./ShroomWizard3D'), {
+const loadShroomWizard3D = () => import('./ShroomWizard3D')
+const ShroomWizard3D = dynamic(loadShroomWizard3D, {
   ssr: false,
   loading: () => (
     <div className="fixed bottom-2 left-2 md:bottom-4 md:left-4 z-50 w-[120px] h-[150px]" />
@@ -18,6 +19,21 @@ const ShroomWizard3D = dynamic(() => import('./ShroomWizard3D'), {
 
 // Mobile breakpoint (matches Tailwind's md)
 const MOBILE_BREAKPOINT = 768
+
+// Desktop trip tuning
+const MAX_DISPLACEMENT = 40
+const RAMP_UP_MS = 30000 // 30 seconds to full effect
+// The displacement filter repaints the whole page whenever it changes, so cap
+// how often we touch it. feTurbulence rounds its seed to an integer anyway.
+const WARP_UPDATE_MS = 1000 / 30
+const HUE_KEYFRAMES: Keyframe[] = [
+  { filter: 'hue-rotate(0deg) saturate(1.5)' },
+  { filter: 'hue-rotate(90deg) saturate(2)' },
+  { filter: 'hue-rotate(180deg) saturate(1.8)' },
+  { filter: 'hue-rotate(270deg) saturate(2)' },
+  { filter: 'hue-rotate(360deg) saturate(1.5)' },
+]
+const HUE_BASE_DURATION_MS = 6000
 
 /**
  * MushroomIcon - Clean mushroom icon with spots
@@ -52,7 +68,8 @@ const MushroomIcon = ({ className = '', style }: { className?: string; style?: R
 /**
  * ShroomMode - Psychedelic mode with platform-specific effects
  *
- * Desktop: SVG displacement filter + hue-rotate (original trippy effect)
+ * Desktop: hue-rotate Web Animation on #shroom-target + SVG displacement
+ *          filter on the inner #shroom-warp (throttled to 30 updates/s)
  * Mobile: CSS transforms + hue-rotate (GPU-accelerated for performance)
  */
 const ShroomMode = () => {
@@ -67,11 +84,10 @@ const ShroomMode = () => {
   const [ceremonyOpen, setCeremonyOpen] = useState(false)
   const [fallback, setFallback] = useState(false)
   const [injectedLine, setInjectedLine] = useState<string | null>(null)
-  const [intensity, setIntensity] = useState(0) // For desktop SVG filter (0-40)
   const [isMobile, setIsMobile] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const turbulenceRef = useRef<SVGFETurbulenceElement>(null)
-  const animationRef = useRef<number | null>(null)
+  const displacementRef = useRef<SVGFEDisplacementMapElement>(null)
 
   // Detect mobile vs desktop after mount
   useEffect(() => {
@@ -133,76 +149,64 @@ const ShroomMode = () => {
   // Main effect - handles both desktop and mobile
   useEffect(() => {
     const target = document.getElementById('shroom-target')
-
-    if (!isActive || !target) {
-      // Reset when deactivated
-      if (target) {
-        target.style.filter = ''
-        target.style.animation = ''
-        target.classList.remove('shroom-active', 'shroom-mobile')
-      }
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
-      setIntensity(0)
-      return
-    }
+    const warp = document.getElementById('shroom-warp')
+    if (!isActive || !target || !warp) return
 
     // Check for reduced motion preference
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReducedMotion) {
-      return
-    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     if (isMobile) {
-      // Mobile: Use CSS transforms + hue-rotate animation (all handled by CSS class)
+      // Mobile: CSS transforms + hue-rotate animation (all handled by CSS class)
       target.classList.add('shroom-active', 'shroom-mobile')
-    } else {
-      // Desktop: Use original SVG filter implementation
-      // The shroom-hue-cycle animation includes both SVG filter and hue-rotate in each keyframe
-      target.style.animation = 'shroom-hue-cycle 6s linear infinite'
-
-      // Animate SVG turbulence for organic melting effect
-      let currentIntensity = 0
-      const maxIntensity = 40
-      const rampUpDuration = 30000 // 30 seconds to full effect
-      const startTime = Date.now()
-      let seed = 0
-
-      const animate = () => {
-        if (!turbulenceRef.current || !isActive) return
-
-        const elapsed = Date.now() - startTime
-        const progress = Math.min(1, elapsed / rampUpDuration)
-
-        // Ramp up intensity
-        currentIntensity = progress * maxIntensity
-        setIntensity(currentIntensity)
-
-        // Speed increases over time: starts at 0.1, ends at 0.8
-        const speedMultiplier = 0.1 + (progress * 0.7)
-        seed += speedMultiplier
-        turbulenceRef.current.setAttribute('seed', String(seed))
-
-        // Wider ripples - lower base frequency
-        const baseFreq = 0.003 + (progress * 0.004)
-        const freqVariation = Math.sin(seed * 0.015) * 0.002
-        turbulenceRef.current.setAttribute('baseFrequency', String(baseFreq + freqVariation))
-
-        // Speed up hue cycle as trip intensifies (6s down to 2s)
-        const hueDuration = 6 - (progress * 4)
-        target.style.animation = `shroom-hue-cycle ${hueDuration}s linear infinite`
-
-        animationRef.current = requestAnimationFrame(animate)
-      }
-
-      animate()
+      return () => target.classList.remove('shroom-active', 'shroom-mobile')
     }
 
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
+    // Desktop: the hue cycle runs on the outer wrapper as a compositor-friendly
+    // Web Animation; the SVG displacement warp runs on the inner wrapper.
+    const turbulence = turbulenceRef.current
+    const displacement = displacementRef.current
+    if (!turbulence || !displacement) return
+
+    const hue = target.animate(HUE_KEYFRAMES, {
+      duration: HUE_BASE_DURATION_MS,
+      iterations: Infinity,
+    })
+    warp.style.filter = 'url(#shroom-filter)'
+
+    const startTime = performance.now()
+    let lastFrame = startTime
+    let lastWarpUpdate = -Infinity
+    let seed = 0
+    let frameId = 0
+
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startTime) / RAMP_UP_MS)
+      // Seed speed ramps from 0.1 to 0.8 per 60Hz frame, independent of refresh rate
+      seed += (0.1 + progress * 0.7) * ((now - lastFrame) / (1000 / 60))
+      lastFrame = now
+
+      if (now - lastWarpUpdate >= WARP_UPDATE_MS) {
+        lastWarpUpdate = now
+        displacement.setAttribute('scale', String(progress * MAX_DISPLACEMENT))
+        turbulence.setAttribute('seed', String(Math.round(seed)))
+        // Wider ripples - lower base frequency
+        const baseFreq = 0.003 + progress * 0.004 + Math.sin(seed * 0.015) * 0.002
+        turbulence.setAttribute('baseFrequency', String(baseFreq))
+        // Hue cycle speeds up as the trip intensifies (6s down to 2s);
+        // updatePlaybackRate keeps the current hue so there's no jump
+        const rate = HUE_BASE_DURATION_MS / (6000 - progress * 4000)
+        if (Math.abs(hue.playbackRate - rate) > 0.05) hue.updatePlaybackRate(rate)
       }
+
+      frameId = requestAnimationFrame(animate)
+    }
+    frameId = requestAnimationFrame(animate)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      hue.cancel()
+      warp.style.filter = ''
+      displacement.setAttribute('scale', '0')
     }
   }, [isActive, isMobile])
 
@@ -222,9 +226,10 @@ const ShroomMode = () => {
                 result="noise"
               />
               <feDisplacementMap
+                ref={displacementRef}
                 in="SourceGraphic"
                 in2="noise"
-                scale={intensity}
+                scale="0"
                 xChannelSelector="R"
                 yChannelSelector="G"
               />
@@ -245,6 +250,9 @@ const ShroomMode = () => {
               setIsLoading(true)
               setShowWizard(true)
             }}
+            // Warm the 3D chunk + model before the click lands
+            onPointerEnter={() => void loadShroomWizard3D()}
+            onFocus={() => void loadShroomWizard3D()}
             disabled={isLoading}
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}

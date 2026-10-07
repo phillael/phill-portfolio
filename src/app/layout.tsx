@@ -81,11 +81,14 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
       <body className="font-body text-foreground custom-scrollbar">
         <ShroomModeProvider>
           {/* Main content wrapper - shroom filter applies here, not body */}
+          {/* Hue cycle runs on the outer wrapper, the SVG warp on the inner one */}
           <div id="shroom-target">
-            <Nav />
-            <ScreenShakeWrapper>
-              {children}
-            </ScreenShakeWrapper>
+            <div id="shroom-warp">
+              <Nav />
+              <ScreenShakeWrapper>
+                {children}
+              </ScreenShakeWrapper>
+            </div>
           </div>
           {/* These stay outside the filter */}
           <MusicPlayer />

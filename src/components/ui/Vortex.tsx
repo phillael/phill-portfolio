@@ -189,7 +189,11 @@ export const Vortex = (props: VortexProps) => {
     resize(canvas);
     initParticles(canvas);
 
-    let animationId: number;
+    // Decorative only: skip the animation entirely for reduced motion
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let animationId = 0;
+    let running = false;
 
     const draw = () => {
       tickRef.current++;
@@ -207,7 +211,18 @@ export const Vortex = (props: VortexProps) => {
       animationId = window.requestAnimationFrame(draw);
     };
 
-    draw();
+    // Run the loop (two full-canvas blur passes per frame) only while the
+    // hero is on screen
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !running) {
+        running = true;
+        animationId = window.requestAnimationFrame(draw);
+      } else if (!entry.isIntersecting && running) {
+        running = false;
+        window.cancelAnimationFrame(animationId);
+      }
+    });
+    observer.observe(canvas);
 
     const handleResize = () => {
       resize(canvas);
@@ -216,9 +231,12 @@ export const Vortex = (props: VortexProps) => {
     window.addEventListener("resize", handleResize);
 
     return () => {
+      observer.disconnect();
       window.cancelAnimationFrame(animationId);
       window.removeEventListener("resize", handleResize);
     };
+    // Mount-only: the particle system is set up once from the initial props
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

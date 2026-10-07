@@ -29,4 +29,11 @@ export default [
       'react-hooks/exhaustive-deps': 'warn',
     },
   },
+  {
+    // Tests stub next/image with a plain <img>
+    files: ['src/__tests__/**'],
+    rules: {
+      '@next/next/no-img-element': 'off',
+    },
+  },
 ]

@@ -71,10 +71,11 @@ describe('Music FAB Component', () => {
       expect(screen.queryByTestId('audio-visualizer')).not.toBeInTheDocument()
     })
 
-    it('shows visualizer when playing', () => {
+    it('shows visualizer when playing', async () => {
       render(<MusicFAB {...defaultProps} isPlaying={true} />)
 
-      expect(screen.getByTestId('audio-visualizer')).toBeInTheDocument()
+      // The visualizer is code-split, so it appears once its chunk loads
+      expect(await screen.findByTestId('audio-visualizer')).toBeInTheDocument()
     })
   })
 

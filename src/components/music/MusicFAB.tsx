@@ -1,9 +1,12 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
 import { Music } from 'lucide-react'
-import AudioVisualizer from './AudioVisualizer'
 import type { FrequencyData } from '@/lib/audio-utils'
+
+// Loaded on first play so Three.js stays out of the initial bundle
+const AudioVisualizer = dynamic(() => import('./AudioVisualizer'), { ssr: false })
 
 interface MusicFABProps {
   isPlaying: boolean

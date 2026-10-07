@@ -452,6 +452,34 @@ const ResizeFix = () => {
   return null
 }
 
+interface CarouselCanvasProps {
+  textures: THREE.CanvasTexture[]
+  isAutoRotating: boolean
+  /** Pause the render loop when the canvas can't be seen */
+  active: boolean
+}
+
+/**
+ * Shared canvas for the preview and the fullscreen view. Defined at module
+ * scope: a component declared inside another component's render is a new
+ * type every render, which remounted the Canvas (new WebGL context) each time.
+ */
+const CarouselCanvas = ({ textures, isAutoRotating, active }: CarouselCanvasProps) => (
+  <Canvas
+    camera={{ position: [0, 0, 1.8], fov: 50 }}
+    dpr={[1, 2]}
+    gl={{ antialias: true, alpha: true }}
+    resize={{ debounce: 0 }}
+    frameloop={active ? 'always' : 'never'}
+  >
+    <ResizeFix />
+    <CyberpunkLighting />
+    <Center>
+      <CarouselGroup textures={textures} isAutoRotating={isAutoRotating} />
+    </Center>
+  </Canvas>
+)
+
 /**
  * 3D Testimonials Carousel Component
  * Compact preview that expands to fullscreen on click
@@ -461,7 +489,20 @@ const Testimonials3DCarousel = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isAutoRotating, setIsAutoRotating] = useState(true)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false)
+  const previewRef = useRef<HTMLDivElement>(null)
   const shouldReduceMotion = useReducedMotion()
+
+  // Only animate the preview while it's on screen
+  useEffect(() => {
+    const el = previewRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsPreviewVisible(entry.isIntersecting)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // Generate textures
   useEffect(() => {
@@ -543,29 +584,10 @@ const Testimonials3DCarousel = () => {
     setIsAutoRotating(true)
   }
 
-  // Shared canvas component
-  const CarouselCanvas = ({ isPreview = false }: { isPreview?: boolean }) => (
-    <Canvas
-      camera={{ position: [0, 0, isPreview ? 1.8 : 1.8], fov: 50 }}
-      dpr={[1, 2]}
-      gl={{ antialias: true, alpha: true }}
-      resize={{ debounce: 0 }}
-    >
-      <ResizeFix />
-      <CyberpunkLighting />
-      <Center>
-        <CarouselGroup
-          textures={textures}
-          isAutoRotating={isAutoRotating}
-        />
-      </Center>
-    </Canvas>
-  )
-
   return (
     <>
       {/* Compact Preview - clickable to expand */}
-      <div className="mt-8 flex flex-col items-center">
+      <div ref={previewRef} className="mt-8 flex flex-col items-center">
         <button
           onClick={handleExpand}
           className="group relative w-[280px] h-[180px] md:w-[320px] md:h-[200px] rounded-lg overflow-hidden transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -577,7 +599,11 @@ const Testimonials3DCarousel = () => {
             </div>
           ) : textures.length > 0 ? (
             <div className="w-full h-full" onPointerDown={(e) => e.stopPropagation()}>
-              <CarouselCanvas isPreview />
+              <CarouselCanvas
+                textures={textures}
+                isAutoRotating={isAutoRotating}
+                active={isPreviewVisible && !isExpanded}
+              />
             </div>
           ) : null}
 
@@ -635,7 +661,9 @@ const Testimonials3DCarousel = () => {
                 className="w-[95vw] h-[75vh] md:w-[85vw] md:h-[75vh] pointer-events-auto"
                 onPointerDown={() => setIsAutoRotating(false)}
               >
-                {textures.length > 0 && <CarouselCanvas />}
+                {textures.length > 0 && (
+                  <CarouselCanvas textures={textures} isAutoRotating={isAutoRotating} active />
+                )}
               </div>
 
               {/* Instruction */}

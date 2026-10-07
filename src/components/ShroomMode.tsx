@@ -237,7 +237,7 @@ const ShroomMode = () => {
       <AnimatePresence>
         {((!showWizard && !isActive) || isLoading) && (
           <motion.button
-            className="fixed bottom-16 right-4 md:bottom-24 md:right-6 z-40 w-10 h-10 md:w-14 md:h-14 rounded-full bg-card border-2 border-secondary/50 flex items-center justify-center hover:border-secondary transition-shadow duration-300"
+            className="fixed bottom-16 right-4 md:bottom-24 md:right-6 z-40 w-11 h-11 md:w-14 md:h-14 rounded-full bg-card border-2 border-secondary/50 flex items-center justify-center hover:border-secondary transition-shadow duration-300"
             style={{
               boxShadow: '0 0 8px hsl(var(--secondary) / 0.5), 0 0 15px hsl(var(--secondary) / 0.25), 0 0 22px hsl(var(--secondary) / 0.15)',
             }}
@@ -328,7 +328,7 @@ const ShroomMode = () => {
       <AnimatePresence>
         {(showWizard || isActive) && !isExiting && !isLoading && (
           <motion.button
-            className="fixed bottom-16 right-4 md:bottom-24 md:right-6 z-40 w-10 h-10 md:w-14 md:h-14 rounded-full bg-card border-2 border-destructive/50 flex items-center justify-center hover:border-destructive hover:bg-destructive/20 transition-colors"
+            className="fixed bottom-16 right-4 md:bottom-24 md:right-6 z-40 w-11 h-11 md:w-14 md:h-14 rounded-full bg-card border-2 border-destructive/50 flex items-center justify-center hover:border-destructive hover:bg-destructive/20 transition-colors"
             style={{
               boxShadow: '0 0 8px hsl(var(--destructive) / 0.4), 0 0 16px hsl(var(--destructive) / 0.2)',
             }}

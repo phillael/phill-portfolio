@@ -45,7 +45,7 @@ const MusicFAB = ({
     <motion.button
       className={`
         fixed bottom-4 right-4 md:bottom-6 md:right-6
-        w-10 h-10 md:w-14 md:h-14
+        w-11 h-11 md:w-14 md:h-14
         rounded-full
         flex items-center justify-center
         overflow-hidden

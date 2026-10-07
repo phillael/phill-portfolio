@@ -26,6 +26,11 @@ const filterMotionProps = (props: Record<string, unknown>) => {
 }
 
 // Mock framer-motion to avoid animation issues in tests
+// AboutSection reads shroom mode; the real provider lives in the root layout
+jest.mock('@/context/ShroomModeContext', () => ({
+  useShroomMode: () => ({ isActive: false, setIsActive: jest.fn() }),
+}))
+
 jest.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: React.PropsWithChildren<object>) => (

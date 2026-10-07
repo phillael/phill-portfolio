@@ -57,9 +57,9 @@ describe('Music FAB Component', () => {
       render(<MusicFAB {...defaultProps} />)
 
       const fab = screen.getByTestId('music-fab')
-      // Check for 52px width/height classes (min-w-[52px] min-h-[52px])
-      expect(fab).toHaveClass('w-[52px]')
-      expect(fab).toHaveClass('h-[52px]')
+      // 44px on mobile (w-11/h-11), 56px from md up
+      expect(fab).toHaveClass('w-11')
+      expect(fab).toHaveClass('h-11')
     })
 
     it('shows music icon when not playing', () => {

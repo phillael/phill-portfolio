@@ -70,7 +70,7 @@ PR #37 (perf + chat hardening) is merged and live. Phill asked for a cleanup PR 
 Do them in order. One task ≈ one commit. T1 must come first; T2 must come before T3–T5.
 
 - [x] **T1: Setup.** Bump `package.json` to 1.2.0. Add the dev dependencies `jest-axe` and `@types/jest-axe`, and register `toHaveNoViolations` in `jest.setup.ts`. Commit: `chore: bump to 1.2.0, add jest-axe`.
-- [ ] **T2: `useFocusTrap` hook.** Implement it per the contract, with tests in `src/__tests__/use-focus-trap.test.tsx`:
+- [x] **T2: `useFocusTrap` hook.** Implement it per the contract, with tests in `src/__tests__/use-focus-trap.test.tsx`:
   - Tab wraps from last to first and Shift+Tab from first to last.
   - It focuses `initialFocusRef` or the first focusable element on activation.
   - It restores focus on deactivation.

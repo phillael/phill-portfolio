@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, Variants } from 'framer-motion'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import NavLinks from '@/components/NavLinks'
 import SocialLinks from '@/components/SocialLinks'
 import ResumeDownloadButton from '@/components/ResumeDownloadButton'
@@ -22,30 +23,20 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
     setMounted(true)
   }, [])
 
+  // Tab cycling + focus on the close button. Focus goes back to the hamburger
+  // explicitly below, since Safari doesn't focus buttons on click.
+  useFocusTrap(menuRef, isOpen && mounted, {
+    initialFocusRef: firstFocusableRef,
+    returnFocus: false,
+  })
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose()
       }
-
-      // Focus trap
-      if (event.key === 'Tab' && isOpen && menuRef.current) {
-        const focusableElements = menuRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-        const firstElement = focusableElements[0]
-        const lastElement = focusableElements[focusableElements.length - 1]
-
-        if (event.shiftKey && document.activeElement === firstElement) {
-          event.preventDefault()
-          lastElement?.focus()
-        } else if (!event.shiftKey && document.activeElement === lastElement) {
-          event.preventDefault()
-          firstElement?.focus()
-        }
-      }
     },
-    [isOpen, onClose]
+    [onClose]
   )
 
   useEffect(() => {
@@ -54,10 +45,6 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
       // Simple overflow hidden - works for most cases
       document.documentElement.style.overflow = 'hidden'
       document.body.style.overflow = 'hidden'
-      // Focus the close button when menu opens
-      setTimeout(() => {
-        firstFocusableRef.current?.focus()
-      }, 100)
     }
 
     return () => {
@@ -67,10 +54,15 @@ const MobileMenu = ({ isOpen, onClose, hamburgerButtonRef }: MobileMenuProps) =>
     }
   }, [isOpen, handleKeyDown])
 
-  // Return focus to hamburger button when menu closes
+  // Return focus to hamburger button when menu closes (not on first mount,
+  // which would steal focus from the top of the page)
+  const wasOpenRef = useRef(false)
   useEffect(() => {
-    if (!isOpen && hamburgerButtonRef.current) {
-      hamburgerButtonRef.current.focus()
+    if (isOpen) {
+      wasOpenRef.current = true
+    } else if (wasOpenRef.current) {
+      wasOpenRef.current = false
+      hamburgerButtonRef.current?.focus()
     }
   }, [isOpen, hamburgerButtonRef])
 

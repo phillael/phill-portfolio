@@ -1,3 +1,4 @@
+import type { Metadata, Viewport } from 'next'
 import { Audiowide, Nunito, Press_Start_2P } from 'next/font/google'
 import '@/app/globals.css'
 import Nav from '@/components/Nav'
@@ -7,6 +8,7 @@ import ShroomMode from '@/components/ShroomMode'
 import MotionProvider from '@/components/MotionProvider'
 import SkipLink from '@/components/SkipLink'
 import { ShroomModeProvider } from '@/context/ShroomModeContext'
+import { SITE_URL, BACKGROUND_COLOR } from '@/lib/site'
 
 const audiowide = Audiowide({
   weight: '400',
@@ -26,14 +28,18 @@ const pressStart2P = Press_Start_2P({
   variable: '--font-pixel',
 })
 
-export const viewport = {
+export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   interactiveWidget: 'resizes-content',
+  themeColor: BACKGROUND_COLOR,
 }
 
-export const metadata = {
-  metadataBase: new URL('https://www.phillcodes.com'),
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  alternates: {
+    canonical: '/',
+  },
   title: 'Phill Aelony | Legendary Code Sorcerer',
   description:
     'Phill Aelony - Full Stack Developer, Musician, and Builder of Dreams. A cyberpunk developer portfolio showcasing skills, projects, and experience.',

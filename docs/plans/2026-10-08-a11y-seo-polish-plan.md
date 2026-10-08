@@ -109,7 +109,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Check `globals.css`'s `prefers-reduced-motion` block covers the remaining CSS keyframe effects (glitch, neon pulse, glow, scanlines, screen shake); add any that are missing.
   - Components that already call `useReducedMotion` keep doing so.
   - Test: render something under the provider with `matchMedia('(prefers-reduced-motion: reduce)')` mocked true and assert the provider is present. Keep it light; this is mostly a browser check (see Verification).
-- [ ] **T8: SEO metadata files.**
+- [x] **T8: SEO metadata files.**
   - Add `src/app/robots.ts`, `src/app/sitemap.ts` and `src/app/manifest.ts`, plus `alternates.canonical` and `viewport.themeColor` in `layout.tsx`, all per the contract.
   - Delete `public/site.webmanifest`.
   - Test: unit-test that the `robots()`, `sitemap()` and `manifest()` return values match the contract.

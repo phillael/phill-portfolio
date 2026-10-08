@@ -133,7 +133,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Emulate `prefers-reduced-motion: reduce` and confirm nothing large moves: Vortex is off, glitch/typing are static, and section reveals are instant or opacity-only.
   - Fix small issues found here. One task's worth or less goes in this commit; anything bigger goes in Stop conditions.
   - Record the results in the **Results** section below.
-- [ ] **T14: Lighthouse, PR and the device checklist.**
+- [x] **T14: Lighthouse, PR and the device checklist.**
   - Run Lighthouse (mobile and desktop) on the prod build at `http://localhost:3002`. All categories must stay at 100; record the scores in Results.
   - Verify the SEO files with curl (see Acceptance).
   - Run all gates.
@@ -210,6 +210,8 @@ Notes from the executor:
 - For T13: `GlitchText` gives every section heading `tabIndex={0}`, so each h2 is a tab stop (see Results).
 
 ## Results
+
+**PR:** https://github.com/phillael/phill-portfolio/pull/38. Vercel preview deployed (checks green). The preview's `/opengraph-image` sits behind Vercel deployment protection (302 to login), so link unfurlers can't fetch it until production.
 
 ### T14 Lighthouse (prod build, localhost:3002, chrome-devtools MCP)
 

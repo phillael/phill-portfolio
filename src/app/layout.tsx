@@ -4,6 +4,7 @@ import Nav from '@/components/Nav'
 import { MusicPlayer } from '@/components/music'
 import ScreenShakeWrapper from '@/components/ScreenShakeWrapper'
 import ShroomMode from '@/components/ShroomMode'
+import MotionProvider from '@/components/MotionProvider'
 import SkipLink from '@/components/SkipLink'
 import { ShroomModeProvider } from '@/context/ShroomModeContext'
 
@@ -81,21 +82,23 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
     <html lang="en" className={`${audiowide.variable} ${nunito.variable} ${pressStart2P.variable}`}>
       <body className="font-body text-foreground custom-scrollbar">
         <SkipLink />
-        <ShroomModeProvider>
-          {/* Main content wrapper - shroom filter applies here, not body */}
-          {/* Hue cycle runs on the outer wrapper, the SVG warp on the inner one */}
-          <div id="shroom-target">
-            <div id="shroom-warp">
-              <Nav />
-              <ScreenShakeWrapper>
-                {children}
-              </ScreenShakeWrapper>
+        <MotionProvider>
+          <ShroomModeProvider>
+            {/* Main content wrapper - shroom filter applies here, not body */}
+            {/* Hue cycle runs on the outer wrapper, the SVG warp on the inner one */}
+            <div id="shroom-target">
+              <div id="shroom-warp">
+                <Nav />
+                <ScreenShakeWrapper>
+                  {children}
+                </ScreenShakeWrapper>
+              </div>
             </div>
-          </div>
-          {/* These stay outside the filter */}
-          <MusicPlayer />
-          <ShroomMode />
-        </ShroomModeProvider>
+            {/* These stay outside the filter */}
+            <MusicPlayer />
+            <ShroomMode />
+          </ShroomModeProvider>
+        </MotionProvider>
       </body>
     </html>
   )

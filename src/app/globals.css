@@ -526,8 +526,15 @@ a:active {
 
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-  body.screen-shake {
-    animation: none;
+  /* The shake class lands on ScreenShakeWrapper's div, not body */
+  .screen-shake,
+  .timeline-dot,
+  .glow-layer,
+  .animate-ripple,
+  .marquee-text,
+  .animate-bounce,
+  .animate-pulse {
+    animation: none !important;
   }
   #shroom-target {
     animation: none !important;

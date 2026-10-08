@@ -104,7 +104,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Exactly one h1.
   - The skip link is the first focusable element and targets `#main`.
   - Every `<section>` with an h2 is labelled by it.
-- [ ] **T7: Reduced motion everywhere.**
+- [x] **T7: Reduced motion everywhere.**
   - Add a client `MotionProvider` (`src/components/MotionProvider.tsx`) wrapping the layout tree with `<MotionConfig reducedMotion="user">`.
   - Check `globals.css`'s `prefers-reduced-motion` block covers the remaining CSS keyframe effects (glitch, neon pulse, glow, scanlines, screen shake); add any that are missing.
   - Components that already call `useReducedMotion` keep doing so.

@@ -151,9 +151,9 @@ All Jest runs: `npx jest --ci --no-watchman <test paths>`. Every task also runs 
 | Task | Proof |
 |---|---|
 | T1 | `npx jest --ci --no-watchman src/__tests__/music-fab.test.tsx` still passes (smoke test that the setup change didn't break Jest); `grep '"version": "1.2.0"' package.json` |
-| T2 | `use-focus-trap.test.tsx`, plus the MobileMenu and MusicPlayerPanel test files (find them with `ls src/__tests__ \| grep -i -E 'mobile\|music'`) |
+| T2 | `use-focus-trap.test.tsx`, `navigation.test.tsx`, `navigation-extended.test.tsx`, `music-player-panel.test.tsx` |
 | T3 | `src/__tests__/WizardChat.test.tsx` |
-| T4 | the bubble test file plus `src/__tests__/shroom*` tests |
+| T4 | `src/__tests__/MushroomOfferBubble.test.tsx` and `src/__tests__/ShroomMode.test.tsx` |
 | T5 | `src/__tests__/about-section.test.tsx` plus any testimonials test |
 | T6 | the hero, about, contact and integration tests plus the new landmark tests |
 | T7 | the new test, then the browser check in T13 |

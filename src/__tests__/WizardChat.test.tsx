@@ -139,6 +139,20 @@ describe('WizardChat', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
+  it('takes focus back into the input when an offer closes', () => {
+    const props = { onClose: () => {}, onFallback: () => {}, onOfferMushroom: () => {} }
+    const { rerender } = render(<WizardChat {...props} offerOpen />)
+    // Focus is on the offer's button, still animating out
+    const offerButton = document.createElement('button')
+    document.body.appendChild(offerButton)
+    offerButton.focus()
+
+    rerender(<WizardChat {...props} offerOpen={false} />)
+
+    expect(screen.getByLabelText(/ask the wizard/i)).toHaveFocus()
+    offerButton.remove()
+  })
+
   it('keeps Escape from reaching listeners behind the chat', () => {
     const behind = jest.fn()
     document.body.addEventListener('keydown', behind)

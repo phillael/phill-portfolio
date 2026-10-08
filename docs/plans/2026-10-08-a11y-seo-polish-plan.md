@@ -126,7 +126,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Delete `EducationSection.tsx` and `education-section.test.tsx`; grep first to confirm nothing else imports it.
   - If `AnimatedHeadline`'s default export is unused (only `AnimatedTagline` is imported), delete the default export and its now-unused code, keeping `AnimatedTagline`. Update `hero-section.test.tsx` if it mocks the removed export.
 - [x] **T12: Page-level axe regression test.** Add `src/__tests__/a11y.test.tsx`, which renders the full `HomePage` (reuse the mocks from `integration.test.tsx`) and asserts `toHaveNoViolations()`. Disable only the `color-contrast` rule, since jsdom can't compute it, and leave a comment saying so.
-- [ ] **T13: Browser sweep on the prod build.**
+- [x] **T13: Browser sweep on the prod build.**
   - Build and serve on port 3002 (see Ground rules).
   - Keyboard-only walkthrough with chrome-devtools MCP: skip link → nav → each section → carousel preview (open, Tab, Escape) → music FAB panel → summon wizard → chat (stubbed, see Ground rules) → offer bubble (Escape declines, wizard stays).
   - Take an accessibility-tree snapshot of the page and of each dialog open. Confirm visible focus on every stop.
@@ -207,8 +207,35 @@ Notes from the executor:
 - T6: the footer landmark holds the copyright line (moved out of `ContactSection` into `SiteFooter`), not the LinkedIn/GitHub links. Moving those would restructure the Contact section visually. Padding is split (`pt-*` on the section, `pb-*` on the footer) so the page looks the same. Hero keeps `aria-label="Hero section"` since it has no h2.
 - T9: `curl -s localhost:3002 | grep -c 'application/ld+json'` prints 2, not 1. There is exactly one `<script type="application/ld+json">` tag (`grep -o '<script type="application/ld+json"' | wc -l` → 1); the other match is the RSC hydration payload serializing the same element. The Acceptance DOM check (one script that parses) is the real check. ContactSection's LinkedIn/GitHub links also read `src/data/socials.ts`.
 - T11: education renders through `TimelineCard` (`type: 'education'` in experience.json), not `EducationCard`. `EducationCard` was only used by `EducationSection`, so it went too. `education.json` and the `Education` type stay (content; covered by data-architecture.test).
-- For T13: `GlitchText` gives every section heading `tabIndex={0}`, so each h2 is a tab stop. Check whether that's noisy in the keyboard walkthrough.
+- For T13: `GlitchText` gives every section heading `tabIndex={0}`, so each h2 is a tab stop (see Results).
 
 ## Results
 
-_(filled in by T13/T14)_
+### T13 browser sweep (prod build, localhost:3002, Chrome via chrome-devtools MCP; chat stubbed with a `fetch` initScript, `__chatCalls` = 1 per run, no real API calls)
+
+**Live DOM:** one h1 ("Phill Aelony, Software Engineer"), one ld+json script that parses, 5 testimonial blockquotes in the sr-only list, `main#main` + one `footer`, every h2 section labelled by its h2. Nothing has focus on load (desktop and 500px).
+
+**Keyboard walkthrough**
+
+| Stop | Result |
+|---|---|
+| Skip link | First Tab shows it top-left with the ring; Enter moves focus to `main#main` |
+| All tab stops (83 at 1440px) | Every stop shows a visible focus indicator (outline/box-shadow differs from blurred) |
+| Testimonials preview → modal | `dialog "Testimonials"` (modal, described), focus on Close, Tab stays, Escape closes, focus back on the preview, scroll lock released |
+| Music FAB → panel | `dialog "Music player"` (modal), focus on Close, Shift+Tab wraps to the last track option, Escape closes, focus back on the FAB |
+| Mobile menu (500px) | `dialog "Navigation menu"` (modal), focus on Close, Shift+Tab wraps to LinkedIn, Escape closes, focus back on the hamburger |
+| Summon wizard → chat | Focus lands on the wizard after the walk-on; Enter opens `dialog "Shroom Wizard chat"` (modal) with focus in the input; Tab wraps input → Close |
+| Offer bubble | `alertdialog "You want to eat mushroom?"` (modal), focus on "Sure!", Tab wraps to "Ummm...no" |
+| Escape layering | Escape #1 declines the offer (decline line injected, chat + wizard stay, focus back in the input); #2 closes the chat (wizard stays, focus on the wizard); #3 dismisses the wizard (focus on the summon button) |
+
+**Reduced motion** (headless Chrome via puppeteer-core with `prefers-reduced-motion: reduce`, scrolled through the whole page sampling `document.getAnimations()`): the only running animations are header color/border/shadow/backdrop transitions and a project-card opacity fade. No transform animation anywhere. Glitch hover leaves `transform: none` (normal: jitters). Vortex mounts its canvas but returns before starting its loop.
+
+**Fixed in this task**
+- Summoning the wizard disabled, then removed, the focused summon button, so focus fell to `<body>`. The wizard now takes focus after its walk-on if nothing else has it, and `ShroomMode` hands focus to the summon button when the wizard leaves.
+- The wizard's `aria-label` said "Click the wizard to enter Shroom Mode" but activating it opens the chat. Now "Talk to the Shroom Wizard" (not visible text).
+- After the offer resolved, focus was stranded on `<body>`: the chat input is disabled while an offer is up, so the bubble had nothing to restore to. The chat now takes focus back into its input when the offer resolves. `useFocusTrap` no longer "restores" to `<body>`.
+- `.gradient-card` has `transition: all 0.8s`, so project cards still slid 30px under reduced motion (Framer jumps `y`, CSS animated the jump). The reduced-motion block now limits it to color/shadow/filter/opacity.
+
+**Not fixed (suggestions for Phill)**
+- `GlitchText` gives every section heading `tabIndex={0}` (5 extra tab stops that do nothing but glitch on focus), and the 50 skill chips are each a tab stop. Both are deliberate features; consider dropping the heading tab stops or making the chip grid a single stop with arrow-key navigation.
+

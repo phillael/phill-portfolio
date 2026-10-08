@@ -72,7 +72,9 @@ export function useFocusTrap(
       document.removeEventListener('keydown', onKeyDown)
       const index = trapStack.indexOf(id)
       if (index !== -1) trapStack.splice(index, 1)
-      if (returnFocus) previouslyFocused?.focus?.({ preventScroll: true })
+      if (returnFocus && previouslyFocused !== document.body) {
+        previouslyFocused?.focus?.({ preventScroll: true })
+      }
     }
   }, [active, containerRef, initialFocusRef, returnFocus])
 }

@@ -52,6 +52,7 @@ describe('globals.css reduced-motion block', () => {
     '.marquee-text',
     '.animate-bounce',
     '.animate-pulse',
+    '.gradient-card',
     '#shroom-target',
   ])('stops %s', (selector) => {
     expect(start).toBeGreaterThan(-1)

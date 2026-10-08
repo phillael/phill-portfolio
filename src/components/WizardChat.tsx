@@ -135,6 +135,21 @@ export default function WizardChat({
   // back on close
   useFocusTrap(dialogRef, true, { initialFocusRef: inputRef })
 
+  // The input is disabled while an offer is up, so browsers drop focus to
+  // <body> and the offer has nothing to hand focus back to. Once the offer
+  // resolves (its bubble may still be animating out), take focus back.
+  const offerBlocking = pendingOffer || offerOpen
+  const wasOfferBlockingRef = useRef(offerBlocking)
+  useEffect(() => {
+    const wasBlocking = wasOfferBlockingRef.current
+    wasOfferBlockingRef.current = offerBlocking
+    if (wasBlocking && !offerBlocking) {
+      if (!dialogRef.current?.contains(document.activeElement)) {
+        inputRef.current?.focus({ preventScroll: true })
+      }
+    }
+  }, [offerBlocking])
+
   // Escape closes the chat and nothing behind it. Capture phase + stopPropagation
   // keeps ShroomMode's window listener from also dismissing the wizard. While
   // the mushroom offer is up, the offer handles Escape (decline).

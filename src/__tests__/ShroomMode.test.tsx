@@ -11,8 +11,21 @@ jest.mock('../components/TypingText', () => {
 })
 
 // Stub the Three.js wizard: a plain button wired to ShroomMode's click handler.
+// It finishes its walk-off immediately.
 jest.mock('next/dynamic', () => () => {
-  return function WizardModelStub({ onClick, isExiting }: { onClick: () => void; isExiting?: boolean }) {
+  const { useEffect } = jest.requireActual<typeof import('react')>('react')
+  return function WizardModelStub({
+    onClick,
+    isExiting,
+    onExitComplete,
+  }: {
+    onClick: () => void
+    isExiting?: boolean
+    onExitComplete?: () => void
+  }) {
+    useEffect(() => {
+      if (isExiting) onExitComplete?.()
+    }, [isExiting, onExitComplete])
     return <button aria-label="wizard model" data-exiting={String(!!isExiting)} onClick={onClick} />
   }
 })
@@ -99,6 +112,8 @@ describe('ShroomMode – mushroom offer Escape', () => {
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(declineLine()).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: /shroom wizard chat/i })).toBeInTheDocument()
+    // The input was disabled while the offer was up; focus comes back to it
+    await waitFor(() => expect(screen.getByLabelText(/ask the wizard/i)).toHaveFocus())
     expect(screen.getByRole('button', { name: /wizard model/i })).toHaveAttribute('data-exiting', 'false')
   })
 
@@ -115,5 +130,20 @@ describe('ShroomMode – mushroom offer Escape', () => {
 
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: /wizard model/i })).toHaveAttribute('data-exiting', 'false')
+  })
+})
+
+describe('ShroomMode – dismissing the wizard', () => {
+  it('hands focus to the summon button when the wizard leaves', async () => {
+    renderShroomMode()
+    fireEvent.click(screen.getByRole('button', { name: /summon the shroom wizard/i }))
+    await screen.findByRole('button', { name: /wizard model/i })
+    ;(document.activeElement as HTMLElement | null)?.blur()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /summon the shroom wizard/i })).toHaveFocus(),
+    )
   })
 })

@@ -536,6 +536,10 @@ a:active {
   .animate-pulse {
     animation: none !important;
   }
+  /* `transition: all` would slide in-view reveals that Framer jumps instantly */
+  .gradient-card {
+    transition-property: color, background-color, border-color, box-shadow, filter, opacity;
+  }
   #shroom-target {
     animation: none !important;
     filter: none !important;

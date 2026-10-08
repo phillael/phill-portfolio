@@ -113,7 +113,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Add `src/app/robots.ts`, `src/app/sitemap.ts` and `src/app/manifest.ts`, plus `alternates.canonical` and `viewport.themeColor` in `layout.tsx`, all per the contract.
   - Delete `public/site.webmanifest`.
   - Test: unit-test that the `robots()`, `sitemap()` and `manifest()` return values match the contract.
-- [ ] **T9: JSON-LD.**
+- [x] **T9: JSON-LD.**
   - Add `src/lib/structured-data.ts`, which builds the `@graph` from the data files. Render it from `src/app/page.tsx` (or the layout) as a server component.
   - Extract the GitHub/LinkedIn URLs into `src/data/socials.ts` and have `SocialLinks.tsx` and the JSON-LD both read them, so they can't drift.
   - Tests: the graph contains Person with `jobTitle === experience[0].title`, `sameAs` equals the socials, and the output contains no raw `<`.
@@ -205,6 +205,7 @@ Notes from the executor:
 
 - T4: the chat's capture listener is registered before the offer bubble's, so in the fallback flow (chat open + anchored bubble) Escape closed both. `WizardChat` now takes `offerOpen` from ShroomMode and leaves Escape to the bubble.
 - T6: the footer landmark holds the copyright line (moved out of `ContactSection` into `SiteFooter`), not the LinkedIn/GitHub links. Moving those would restructure the Contact section visually. Padding is split (`pt-*` on the section, `pb-*` on the footer) so the page looks the same. Hero keeps `aria-label="Hero section"` since it has no h2.
+- T9: `curl -s localhost:3002 | grep -c 'application/ld+json'` prints 2, not 1. There is exactly one `<script type="application/ld+json">` tag (`grep -o '<script type="application/ld+json"' | wc -l` → 1); the other match is the RSC hydration payload serializing the same element. The Acceptance DOM check (one script that parses) is the real check. ContactSection's LinkedIn/GitHub links also read `src/data/socials.ts`.
 - For T13: `GlitchText` gives every section heading `tabIndex={0}`, so each h2 is a tab stop. Check whether that's noisy in the keyboard walkthrough.
 
 ## Results

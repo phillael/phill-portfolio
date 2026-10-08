@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { socials } from '@/data/socials'
 
 interface SocialLinksProps {
   className?: string
@@ -26,7 +27,7 @@ const SocialLinks = ({ className = '', isMobile = false }: SocialLinksProps) => 
       aria-label="Social media links"
     >
       <motion.a
-        href="https://github.com/phillael"
+        href={socials.github}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Visit Phill's GitHub profile"
@@ -50,7 +51,7 @@ const SocialLinks = ({ className = '', isMobile = false }: SocialLinksProps) => 
       </motion.a>
 
       <motion.a
-        href="https://www.linkedin.com/in/phill-aelony"
+        href={socials.linkedin}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Visit Phill's LinkedIn profile"

@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import AnimatedSection from '@/components/AnimatedSection'
 import GlitchText from '@/components/GlitchText'
+import { socials } from '@/data/socials'
 
 /**
  * LinkedIn CTA Button - Primary contact method with neon glow effect
@@ -16,7 +17,7 @@ import GlitchText from '@/components/GlitchText'
 const LinkedInButton = () => {
   return (
     <motion.a
-      href="https://www.linkedin.com/in/phill-aelony"
+      href={socials.linkedin}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Connect with Phill on LinkedIn"
@@ -64,7 +65,7 @@ const LinkedInButton = () => {
 const GitHubLink = () => {
   return (
     <motion.a
-      href="https://github.com/phillael"
+      href={socials.github}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Visit Phill's GitHub profile"

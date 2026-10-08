@@ -60,14 +60,14 @@ const ExperienceSection = () => {
   return (
     <section
       id="experience"
-      aria-label="Work Experience"
+      aria-labelledby="experience-heading"
       role="region"
       className="min-h-screen py-20 md:py-32 px-4 md:px-6"
     >
       <div className="max-w-4xl mx-auto">
         {/* Section Heading - slide-from-right animation variant with glitch effect */}
         <AnimatedSection variant="slide-from-right">
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-8 md:mb-10">
+          <h2 id="experience-heading" className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-8 md:mb-10">
             <GlitchText as="span" className="neon-text-purple">
               Experience
             </GlitchText>

@@ -8,6 +8,7 @@ import GlowEffect from '@/components/GlowEffect'
 import LazyMount from '@/components/LazyMount'
 import { useShroomMode } from '@/context/ShroomModeContext'
 import { useMediaQuery, MD_UP } from '@/hooks/useMediaQuery'
+import { testimonials } from '@/data/testimonials'
 
 // Three.js is ~270KB gzipped; keep it out of the initial bundle
 const Testimonials3DCarousel = dynamic(() => import('@/components/Testimonials3DCarousel'), {
@@ -85,14 +86,14 @@ const AboutSection = () => {
   return (
     <section
       id="about"
-      aria-label="About section"
+      aria-labelledby="about-heading"
       role="region"
       className="min-h-screen py-20 md:py-32 px-4 md:px-6 lg:px-8 overflow-visible"
     >
       <div className="max-w-4xl mx-auto">
         {/* Section Heading */}
         <AnimatedSection>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
+          <h2 id="about-heading" className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
             <GlitchText as="span" className="neon-text-purple">
               About
             </GlitchText>
@@ -145,6 +146,17 @@ const AboutSection = () => {
               and it is awesome and I do great work.
             </BioParagraph>
 
+            {/* The carousel draws quotes onto WebGL textures, so screen readers
+                and crawlers get them here. Always rendered, even before the
+                carousel mounts and in shroom mode. */}
+            <ul className="sr-only" aria-label="Testimonials">
+              {testimonials.map((t) => (
+                <li key={t.id}>
+                  <blockquote>{t.body}</blockquote> — {t.name}, {t.position}
+                </li>
+              ))}
+            </ul>
+
             {/* Testimonials Preview - shown on mobile after bio text (hidden in shroom mode) */}
             {!isShroomMode && isDesktop === false && (
               <div className="md:hidden pt-4">
@@ -168,7 +180,6 @@ const AboutSection = () => {
                   fill
                   className="object-contain relative z-10"
                   sizes="(max-width: 768px) 200px, (max-width: 1024px) 250px, 300px"
-                  priority
                 />
               </div>
             </AnimatedSection>

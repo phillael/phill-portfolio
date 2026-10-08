@@ -132,6 +132,22 @@ describe('MusicPlayer Integration', () => {
       expect(screen.getByTestId('track-list')).toBeInTheDocument()
     })
 
+    it('returns focus to the FAB on close even if the click never focused it', async () => {
+      render(<MusicPlayer />)
+
+      // fireEvent.click doesn't move focus, like Safari clicking a button
+      fireEvent.click(screen.getByTestId('music-fab'))
+      await waitFor(() => {
+        expect(screen.getByTestId('panel-close-button')).toHaveFocus()
+      })
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('music-fab')).toHaveFocus()
+      })
+    })
+
     it('clicking FAB again or close button closes panel', async () => {
       render(<MusicPlayer />)
 

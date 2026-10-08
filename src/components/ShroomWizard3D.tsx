@@ -236,6 +236,7 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
 
   // Walk-on timer; cleared if the wizard unmounts mid-walk
   const enterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wizardButtonRef = useRef<HTMLDivElement>(null)
   useEffect(() => () => {
     if (enterTimerRef.current) clearTimeout(enterTimerRef.current)
   }, [])
@@ -252,6 +253,11 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
     enterTimerRef.current = setTimeout(() => {
       setIsEntering(false)
       onEnterComplete?.()
+      // The summon button disables and unmounts while the wizard loads, which
+      // drops keyboard focus to <body>. Pick it up on the wizard instead.
+      if (!document.activeElement || document.activeElement === document.body) {
+        wizardButtonRef.current?.focus({ preventScroll: true })
+      }
     }, WALK_DURATION * 1000)
   }
 
@@ -321,8 +327,9 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
       {/* Wizard Canvas - responsive sizing */}
       <div
         className="w-[192px] h-[144px] md:w-[360px] md:h-[280px]"
+        ref={wizardButtonRef}
         role="button"
-        aria-label={isActive ? 'Click to exit Shroom Mode' : 'Click the wizard to enter Shroom Mode'}
+        aria-label={isActive ? 'Click to exit Shroom Mode' : 'Talk to the Shroom Wizard'}
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {

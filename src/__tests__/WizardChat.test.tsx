@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import WizardChat, { __resetWizardChatSession } from '../components/WizardChat'
 
 // TypingText finishes its crawl on unmount in jsdom; we don't need to wait for it
@@ -127,6 +128,31 @@ describe('WizardChat', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('leaves Escape to an open mushroom offer', () => {
+    const onClose = jest.fn()
+    render(
+      <WizardChat onClose={onClose} onFallback={() => {}} onOfferMushroom={() => {}} offerOpen />,
+    )
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('takes focus back into the input when an offer closes', () => {
+    const props = { onClose: () => {}, onFallback: () => {}, onOfferMushroom: () => {} }
+    const { rerender } = render(<WizardChat {...props} offerOpen />)
+    // Focus is on the offer's button, still animating out
+    const offerButton = document.createElement('button')
+    document.body.appendChild(offerButton)
+    offerButton.focus()
+
+    rerender(<WizardChat {...props} offerOpen={false} />)
+
+    expect(screen.getByLabelText(/ask the wizard/i)).toHaveFocus()
+    offerButton.remove()
+  })
+
   it('keeps Escape from reaching listeners behind the chat', () => {
     const behind = jest.fn()
     document.body.addEventListener('keydown', behind)
@@ -136,6 +162,36 @@ describe('WizardChat', () => {
 
     expect(behind).not.toHaveBeenCalled()
     document.body.removeEventListener('keydown', behind)
+  })
+
+  it('traps Tab inside the dialog', async () => {
+    const user = userEvent.setup()
+    render(<WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />)
+
+    const input = screen.getByLabelText(/ask the wizard/i)
+    const close = screen.getByRole('button', { name: /close chat/i })
+    expect(input).toHaveFocus()
+
+    // The input is the last focusable element; Tab wraps to the close button
+    await user.tab()
+    expect(close).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(input).toHaveFocus()
+  })
+
+  it('gives focus back to the opener when it unmounts', () => {
+    const opener = document.createElement('button')
+    document.body.appendChild(opener)
+    opener.focus()
+
+    const { unmount } = render(
+      <WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={() => {}} />,
+    )
+    expect(screen.getByLabelText(/ask the wizard/i)).toHaveFocus()
+    unmount()
+
+    expect(opener).toHaveFocus()
+    opener.remove()
   })
 
   it('does not abort an in-flight request when the parent re-renders', async () => {

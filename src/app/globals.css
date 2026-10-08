@@ -526,8 +526,19 @@ a:active {
 
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-  body.screen-shake {
-    animation: none;
+  /* The shake class lands on ScreenShakeWrapper's div, not body */
+  .screen-shake,
+  .timeline-dot,
+  .glow-layer,
+  .animate-ripple,
+  .marquee-text,
+  .animate-bounce,
+  .animate-pulse {
+    animation: none !important;
+  }
+  /* `transition: all` would slide in-view reveals that Framer jumps instantly */
+  .gradient-card {
+    transition-property: color, background-color, border-color, box-shadow, filter, opacity;
   }
   #shroom-target {
     animation: none !important;

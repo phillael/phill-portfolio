@@ -1,7 +1,9 @@
 'use client'
 
+import { useEffect, useId, useRef } from 'react'
 import { motion } from 'framer-motion'
 import TypingText from './TypingText'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 export interface MushroomOfferBubbleProps {
   /**
@@ -21,6 +23,29 @@ export default function MushroomOfferBubble({
   onCancel,
 }: MushroomOfferBubbleProps) {
   const backdropHandler = position === 'anchored' ? onCancel : undefined
+  const isCentered = position === 'centered'
+  const questionId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const confirmRef = useRef<HTMLButtonElement>(null)
+
+  useFocusTrap(dialogRef, true, { initialFocusRef: confirmRef })
+
+  // Escape declines. This is the innermost Escape layer (offer → chat →
+  // ShroomMode), so it handles Escape in the capture phase and stops it from
+  // reaching ShroomMode, which would dismiss the wizard.
+  const onCancelRef = useRef(onCancel)
+  useEffect(() => {
+    onCancelRef.current = onCancel
+  }, [onCancel])
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      onCancelRef.current()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
 
   const bubbleClassName =
     position === 'centered'
@@ -43,6 +68,12 @@ export default function MushroomOfferBubble({
         onClick={backdropHandler}
       />
       <motion.div
+        ref={dialogRef}
+        role={isCentered ? 'alertdialog' : 'dialog'}
+        // Modal in both positions: the anchored bubble renders beside the
+        // chat's aria-modal dialog, which would otherwise make it inert
+        aria-modal
+        aria-labelledby={questionId}
         className={bubbleClassName}
         initial={{ opacity: 0, scale: 0.8, y: position === 'centered' ? 0 : 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -78,7 +109,7 @@ export default function MushroomOfferBubble({
               />
             </>
           )}
-          <p className="font-heading text-sm md:text-lg text-secondary mb-3 md:mb-4">
+          <p id={questionId} className="font-heading text-sm md:text-lg text-secondary mb-3 md:mb-4">
             <TypingText text={text} speed={40} showCursor={true} />
           </p>
           <div className="flex gap-2 md:gap-3 justify-center">
@@ -91,6 +122,7 @@ export default function MushroomOfferBubble({
               Ummm...no
             </motion.button>
             <motion.button
+              ref={confirmRef}
               className="min-w-[44px] min-h-[44px] px-3 md:px-4 py-1 md:py-1.5 rounded-md bg-secondary text-background font-heading font-bold text-xs md:text-sm hover:bg-secondary/80 transition-colors focus:outline-none focus:ring-2 focus:ring-secondary"
               style={{
                 boxShadow: '0 0 10px hsl(var(--secondary) / 0.5)',

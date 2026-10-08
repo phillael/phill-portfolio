@@ -1,4 +1,7 @@
 import '@testing-library/jest-dom'
+import { toHaveNoViolations } from 'jest-axe'
+
+expect.extend(toHaveNoViolations)
 
 // jsdom doesn't implement window.scrollTo; WizardChat's body-scroll-lock
 // cleanup calls it on unmount, which would spam every suite with

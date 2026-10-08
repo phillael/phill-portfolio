@@ -79,7 +79,7 @@ describe('ExperienceSection', () => {
   it('has proper accessibility attributes', () => {
     render(<ExperienceSection />)
 
-    const section = screen.getByRole('region', { name: /work experience/i })
+    const section = screen.getByRole('region', { name: /^experience$/i })
     expect(section).toBeInTheDocument()
   })
 })

@@ -13,6 +13,8 @@ interface MusicFABProps {
   isExpanded: boolean
   frequencyData: FrequencyData
   onToggleExpand: () => void
+  /** The panel hands focus back here on close */
+  ref?: React.Ref<HTMLButtonElement>
 }
 
 /**
@@ -35,7 +37,8 @@ const MusicFAB = ({
   isPlaying,
   isExpanded,
   frequencyData,
-  onToggleExpand
+  onToggleExpand,
+  ref,
 }: MusicFABProps) => {
   // Determine aria label based on state
   const ariaLabel = isExpanded
@@ -46,6 +49,7 @@ const MusicFAB = ({
 
   return (
     <motion.button
+      ref={ref}
       className={`
         fixed bottom-4 right-4 md:bottom-6 md:right-6
         w-11 h-11 md:w-14 md:h-14

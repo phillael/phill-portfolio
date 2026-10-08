@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import TypingText from './TypingText'
 import wizardData from '@/data/wizard.json'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -23,6 +24,8 @@ interface WizardChatProps {
   onOfferMushroom: () => void
   injectedLine?: string | null
   onInjectedLineConsumed?: () => void
+  /** A mushroom offer is open over the chat; Escape belongs to it */
+  offerOpen?: boolean
 }
 
 const GREETING = wizardData.greeting
@@ -61,6 +64,7 @@ export default function WizardChat({
   onOfferMushroom,
   injectedLine,
   onInjectedLineConsumed,
+  offerOpen = false,
 }: WizardChatProps) {
   const [messages, setMessagesState] = useState<ChatMessage[]>(
     () => sessionMessages ?? [GREETING_MESSAGE],
@@ -80,15 +84,16 @@ export default function WizardChat({
   const [isDisabled, setIsDisabled] = useState(false)
   const [pendingOffer, setPendingOffer] = useState(false)
 
+  const dialogRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const onCloseRef = useRef(onClose)
-  const pendingOfferRef = useRef(pendingOffer)
+  const pendingOfferRef = useRef(pendingOffer || offerOpen)
   useEffect(() => {
     onCloseRef.current = onClose
-    pendingOfferRef.current = pendingOffer
-  }, [onClose, pendingOffer])
+    pendingOfferRef.current = pendingOffer || offerOpen
+  }, [onClose, pendingOffer, offerOpen])
 
   // Autoscroll to bottom on any DOM mutation inside the scroll container.
   // Covers both new messages and the character-by-character TypingText crawl.
@@ -126,16 +131,28 @@ export default function WizardChat({
     }
   }, [])
 
-  // Move focus into the dialog on open and give it back on close
+  // Move focus into the dialog on open, keep Tab inside it, and give focus
+  // back on close
+  useFocusTrap(dialogRef, true, { initialFocusRef: inputRef })
+
+  // The input is disabled while an offer is up, so browsers drop focus to
+  // <body> and the offer has nothing to hand focus back to. Once the offer
+  // resolves (its bubble may still be animating out), take focus back.
+  const offerBlocking = pendingOffer || offerOpen
+  const wasOfferBlockingRef = useRef(offerBlocking)
   useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null
-    inputRef.current?.focus({ preventScroll: true })
-    return () => previouslyFocused?.focus?.({ preventScroll: true })
-  }, [])
+    const wasBlocking = wasOfferBlockingRef.current
+    wasOfferBlockingRef.current = offerBlocking
+    if (wasBlocking && !offerBlocking) {
+      if (!dialogRef.current?.contains(document.activeElement)) {
+        inputRef.current?.focus({ preventScroll: true })
+      }
+    }
+  }, [offerBlocking])
 
   // Escape closes the chat and nothing behind it. Capture phase + stopPropagation
   // keeps ShroomMode's window listener from also dismissing the wizard. While
-  // the mushroom offer is up, the offer's own buttons decide.
+  // the mushroom offer is up, the offer handles Escape (decline).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
@@ -238,6 +255,7 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
+        ref={dialogRef}
         className="fixed inset-0 md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden overflow-x-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

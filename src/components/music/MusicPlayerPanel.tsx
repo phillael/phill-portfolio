@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence, Variants } from 'framer-motion'
 import { X } from 'lucide-react'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface MusicPlayerPanelProps {
   isExpanded: boolean
@@ -75,45 +76,27 @@ const MusicPlayerPanel = ({
     }
   }
 
+  // Tab cycling + focus on the close button. Focus goes back to the FAB
+  // explicitly below, since Safari doesn't focus buttons on click.
+  useFocusTrap(panelRef, isExpanded, { initialFocusRef: closeButtonRef, returnFocus: false })
+
   // Handle keyboard events
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose()
-        return
-      }
-
-      // Focus trap
-      if (event.key === 'Tab' && isExpanded && panelRef.current) {
-        const focusableElements = panelRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-        const firstElement = focusableElements[0]
-        const lastElement = focusableElements[focusableElements.length - 1]
-
-        if (event.shiftKey && document.activeElement === firstElement) {
-          event.preventDefault()
-          lastElement?.focus()
-        } else if (!event.shiftKey && document.activeElement === lastElement) {
-          event.preventDefault()
-          firstElement?.focus()
-        }
       }
     },
-    [isExpanded, onClose]
+    [onClose]
   )
 
-  // Set up keyboard listener, focus management, and scroll lock
+  // Set up keyboard listener and scroll lock
   useEffect(() => {
     if (isExpanded) {
       document.addEventListener('keydown', handleKeyDown)
       // Simple overflow hidden
       document.documentElement.style.overflow = 'hidden'
       document.body.style.overflow = 'hidden'
-      // Focus the close button when panel opens
-      setTimeout(() => {
-        closeButtonRef.current?.focus()
-      }, 100)
     }
 
     return () => {
@@ -123,10 +106,15 @@ const MusicPlayerPanel = ({
     }
   }, [isExpanded, handleKeyDown])
 
-  // Return focus to FAB when panel closes
+  // Return focus to FAB when panel closes (not on first mount, which would
+  // steal focus from the top of the page)
+  const wasExpandedRef = useRef(false)
   useEffect(() => {
-    if (!isExpanded && fabRef?.current) {
-      fabRef.current.focus()
+    if (isExpanded) {
+      wasExpandedRef.current = true
+    } else if (wasExpandedRef.current) {
+      wasExpandedRef.current = false
+      fabRef?.current?.focus()
     }
   }, [isExpanded, fabRef])
 

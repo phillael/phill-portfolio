@@ -77,6 +77,7 @@ const MusicPlayer = () => {
         isExpanded={isExpanded}
         frequencyData={frequencyData}
         onToggleExpand={handleToggleExpand}
+        ref={fabRef}
       />
 
       {/* Expanded Player Panel */}

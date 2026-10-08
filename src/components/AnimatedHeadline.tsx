@@ -26,30 +26,6 @@ const lineVariants: Variants = {
   },
 }
 
-const AnimatedHeadline = () => {
-  return (
-    <motion.div
-      className="text-center"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      <motion.h1
-        className="text-4xl md:text-5xl lg:text-6xl font-heading neon-text-blue mb-1"
-        variants={lineVariants}
-      >
-        Phill Aelony
-      </motion.h1>
-      <motion.p
-        className="text-xl md:text-2xl lg:text-3xl font-heading text-foreground/90"
-        variants={lineVariants}
-      >
-        Software Engineer
-      </motion.p>
-    </motion.div>
-  )
-}
-
 export const AnimatedTagline = () => {
   return (
     <motion.div
@@ -71,5 +47,3 @@ export const AnimatedTagline = () => {
     </motion.div>
   )
 }
-
-export default AnimatedHeadline

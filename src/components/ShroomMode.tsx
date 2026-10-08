@@ -128,6 +128,21 @@ const ShroomMode = () => {
     setIsLoading(false)
   }
 
+  // When the wizard walks off, its focused element goes with it. Give keyboard
+  // users the summon button back instead of <body>.
+  const summonButtonRef = useRef<HTMLButtonElement>(null)
+  const wizardShown = showWizard || isActive
+  const wasWizardShownRef = useRef(wizardShown)
+  useEffect(() => {
+    const wasShown = wasWizardShownRef.current
+    wasWizardShownRef.current = wizardShown
+    if (wasShown && !wizardShown) {
+      if (!document.activeElement || document.activeElement === document.body) {
+        summonButtonRef.current?.focus({ preventScroll: true })
+      }
+    }
+  }, [wizardShown])
+
   // ESC key to exit shroom mode and dismiss wizard
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -242,6 +257,7 @@ const ShroomMode = () => {
       <AnimatePresence>
         {((!showWizard && !isActive) || isLoading) && (
           <motion.button
+            ref={summonButtonRef}
             className="fixed bottom-16 right-4 md:bottom-24 md:right-6 z-40 w-11 h-11 md:w-14 md:h-14 rounded-full bg-card border-2 border-secondary/50 flex items-center justify-center hover:border-secondary transition-shadow duration-300"
             style={{
               boxShadow: '0 0 8px hsl(var(--secondary) / 0.5), 0 0 15px hsl(var(--secondary) / 0.25), 0 0 22px hsl(var(--secondary) / 0.15)',
@@ -309,6 +325,7 @@ const ShroomMode = () => {
             onOfferMushroom={() => setCeremonyOpen(true)}
             injectedLine={injectedLine}
             onInjectedLineConsumed={() => setInjectedLine(null)}
+            offerOpen={ceremonyOpen}
           />
         )}
       </AnimatePresence>

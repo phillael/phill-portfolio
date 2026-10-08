@@ -8,6 +8,7 @@ import GlowEffect from '@/components/GlowEffect'
 import LazyMount from '@/components/LazyMount'
 import { useShroomMode } from '@/context/ShroomModeContext'
 import { useMediaQuery, MD_UP } from '@/hooks/useMediaQuery'
+import { testimonials } from '@/data/testimonials'
 
 // Three.js is ~270KB gzipped; keep it out of the initial bundle
 const Testimonials3DCarousel = dynamic(() => import('@/components/Testimonials3DCarousel'), {
@@ -144,6 +145,17 @@ const AboutSection = () => {
               <HighlightedText variant="secondary">TimelyCare</HighlightedText>{' '}
               and it is awesome and I do great work.
             </BioParagraph>
+
+            {/* The carousel draws quotes onto WebGL textures, so screen readers
+                and crawlers get them here. Always rendered, even before the
+                carousel mounts and in shroom mode. */}
+            <ul className="sr-only" aria-label="Testimonials">
+              {testimonials.map((t) => (
+                <li key={t.id}>
+                  <blockquote>{t.body}</blockquote> — {t.name}, {t.position}
+                </li>
+              ))}
+            </ul>
 
             {/* Testimonials Preview - shown on mobile after bio text (hidden in shroom mode) */}
             {!isShroomMode && isDesktop === false && (

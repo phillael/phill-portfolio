@@ -18,6 +18,7 @@ import {
   waitForFonts,
 } from '@/lib/canvas-utils'
 import type { Testimonial } from '@/types/testimonial'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 // Canvas dimensions - taller cards with larger fonts for better readability
 const CANVAS_WIDTH = 800
@@ -491,7 +492,24 @@ const Testimonials3DCarousel = () => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isPreviewVisible, setIsPreviewVisible] = useState(false)
   const previewRef = useRef<HTMLDivElement>(null)
+  const previewButtonRef = useRef<HTMLButtonElement>(null)
+  const modalRef = useRef<HTMLDivElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
   const shouldReduceMotion = useReducedMotion()
+
+  // Focus moves to the close button and Tab stays in the modal. Focus goes
+  // back to the preview explicitly below, since Safari doesn't focus buttons
+  // on click.
+  useFocusTrap(modalRef, isExpanded, { initialFocusRef: closeButtonRef, returnFocus: false })
+  const wasExpandedRef = useRef(false)
+  useEffect(() => {
+    if (isExpanded) {
+      wasExpandedRef.current = true
+    } else if (wasExpandedRef.current) {
+      wasExpandedRef.current = false
+      previewButtonRef.current?.focus({ preventScroll: true })
+    }
+  }, [isExpanded])
 
   // Only animate the preview while it's on screen
   useEffect(() => {
@@ -546,21 +564,23 @@ const Testimonials3DCarousel = () => {
     }
   }, [textures])
 
-  // Handle escape key to close expanded view
+  // Escape closes the expanded view and nothing behind it (capture phase +
+  // stopPropagation keeps ShroomMode from also dismissing the wizard)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isExpanded) {
-        setIsExpanded(false)
-      }
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setIsExpanded(false)
+      setIsAutoRotating(true)
     }
 
     if (isExpanded) {
-      document.addEventListener('keydown', handleKeyDown)
+      window.addEventListener('keydown', handleKeyDown, true)
       document.body.style.overflow = 'hidden'
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keydown', handleKeyDown, true)
       document.body.style.overflow = ''
     }
   }, [isExpanded])
@@ -589,6 +609,7 @@ const Testimonials3DCarousel = () => {
       {/* Compact Preview - clickable to expand */}
       <div ref={previewRef} className="mt-8 flex flex-col items-center">
         <button
+          ref={previewButtonRef}
           onClick={handleExpand}
           className="group relative w-[280px] h-[180px] md:w-[320px] md:h-[200px] rounded-lg overflow-hidden transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Click to expand testimonials carousel"
@@ -623,15 +644,21 @@ const Testimonials3DCarousel = () => {
       <AnimatePresence>
         {isExpanded && (
           <motion.div
+            ref={modalRef}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
             className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm"
             onClick={handleClose}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Testimonials"
+            aria-describedby="testimonials-modal-description"
           >
             {/* Close button */}
             <button
+              ref={closeButtonRef}
               onClick={handleClose}
               className="absolute top-4 right-4 z-10 w-12 h-12 flex items-center justify-center rounded-full border-2 border-primary/50 bg-card/80 text-primary transition-all duration-150 hover:border-primary hover:bg-primary/10 hover:shadow-[0_0_12px_hsl(var(--primary)/0.5)] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label="Close testimonials"
@@ -642,7 +669,7 @@ const Testimonials3DCarousel = () => {
             </button>
 
             {/* ARIA description for screen readers */}
-            <div className="sr-only">
+            <div id="testimonials-modal-description" className="sr-only">
               Interactive 3D carousel showing {testimonials.length} testimonials from colleagues.
               Drag left or right to rotate and view different testimonials.
               Press Escape or click the close button to exit.

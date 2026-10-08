@@ -87,7 +87,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Escape while the centered bubble is open calls `onCancel` and does **not** dismiss the wizard. Write it at the `ShroomMode` level if feasible; otherwise test that the bubble stops propagation.
   - Focus lands on confirm.
   - axe reports no violations with the bubble open.
-- [ ] **T5: Testimonials modal dialog + readable testimonials.**
+- [x] **T5: Testimonials modal dialog + readable testimonials.**
   - Give the modal dialog semantics, a trap and focus in/out per the contract.
   - Add the always-present `sr-only` testimonial list. It probably belongs in `AboutSection` next to the `LazyMount`, so it exists before the carousel loads.
 

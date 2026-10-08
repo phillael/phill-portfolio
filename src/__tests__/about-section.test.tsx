@@ -9,6 +9,7 @@
 
 import { render, screen } from '@testing-library/react'
 import AboutSection from '@/components/AboutSection'
+import { testimonials } from '@/data/testimonials'
 
 // Mock framer-motion
 // AboutSection reads shroom mode; the real provider lives in the root layout
@@ -87,5 +88,19 @@ describe('About Section', () => {
 
     const llamaImage = screen.getByAltText(/space llama/i)
     expect(llamaImage).toBeInTheDocument()
+  })
+
+  it('renders every testimonial as text before the 3D carousel mounts', () => {
+    const { container } = render(<AboutSection />)
+
+    // LazyMount's IntersectionObserver never fires in jsdom, so no carousel
+    expect(screen.queryByTestId('r3f-canvas')).not.toBeInTheDocument()
+    const list = screen.getByRole('list', { name: /testimonials/i })
+    const quotes = container.querySelectorAll('blockquote')
+    expect(quotes).toHaveLength(testimonials.length)
+    testimonials.forEach((t, i) => {
+      expect(quotes[i]).toHaveTextContent(t.body)
+      expect(list).toHaveTextContent(`${t.name}, ${t.position}`)
+    })
   })
 })

@@ -211,6 +211,17 @@ Notes from the executor:
 
 ## Results
 
+### T14 Lighthouse (prod build, localhost:3002, chrome-devtools MCP)
+
+| Device | Accessibility | Best Practices | SEO | Agentic Browsing | Audits |
+|---|---|---|---|---|---|
+| Mobile | 100 | 100 | 100 | 100 | 56 passed, 0 failed |
+| Desktop | 100 | 100 | 100 | 100 | 58 passed, 0 failed |
+
+SEO files on the prod build: `robots.txt` has `Disallow: /api/` and `Sitemap: https://www.phillcodes.com/sitemap.xml`; `sitemap.xml` has `<loc>https://www.phillcodes.com</loc>`; `manifest.webmanifest` name is "Phill Aelony | Phil Codes"; the head has `rel="canonical"`, `theme-color` `#060709`, `rel="manifest"`, and `og:image` → `/opengraph-image?…` with `og:image:width` 1200.
+
+Gates: `tsc --noEmit` clean, `npm run lint` clean, Jest 41 suites / 394 tests passed, `npm run build` OK.
+
 ### T13 browser sweep (prod build, localhost:3002, Chrome via chrome-devtools MCP; chat stubbed with a `fetch` initScript, `__chatCalls` = 1 per run, no real API calls)
 
 **Live DOM:** one h1 ("Phill Aelony, Software Engineer"), one ld+json script that parses, 5 testimonial blockquotes in the sr-only list, `main#main` + one `footer`, every h2 section labelled by its h2. Nothing has focus on load (desktop and 500px).

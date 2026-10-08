@@ -121,7 +121,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Add `src/app/opengraph-image.tsx` and `twitter-image.tsx` per the contract (load the font and hero art with `readFile` from `public/`/`node_modules` as the Next `ImageResponse` docs show; check current docs via context7 first).
   - Remove the explicit `images` arrays from the metadata, delete `public/images/og-image.jpg`, and grep that nothing references it.
   - Verify the rendered PNG visually (see Verification).
-- [ ] **T11: Small cleanups.**
+- [x] **T11: Small cleanups.**
   - Remove `priority` from the `AboutSection` image.
   - Delete `EducationSection.tsx` and `education-section.test.tsx`; grep first to confirm nothing else imports it.
   - If `AnimatedHeadline`'s default export is unused (only `AnimatedTagline` is imported), delete the default export and its now-unused code, keeping `AnimatedTagline`. Update `hero-section.test.tsx` if it mocks the removed export.
@@ -206,6 +206,7 @@ Notes from the executor:
 - T4: the chat's capture listener is registered before the offer bubble's, so in the fallback flow (chat open + anchored bubble) Escape closed both. `WizardChat` now takes `offerOpen` from ShroomMode and leaves Escape to the bubble.
 - T6: the footer landmark holds the copyright line (moved out of `ContactSection` into `SiteFooter`), not the LinkedIn/GitHub links. Moving those would restructure the Contact section visually. Padding is split (`pt-*` on the section, `pb-*` on the footer) so the page looks the same. Hero keeps `aria-label="Hero section"` since it has no h2.
 - T9: `curl -s localhost:3002 | grep -c 'application/ld+json'` prints 2, not 1. There is exactly one `<script type="application/ld+json">` tag (`grep -o '<script type="application/ld+json"' | wc -l` → 1); the other match is the RSC hydration payload serializing the same element. The Acceptance DOM check (one script that parses) is the real check. ContactSection's LinkedIn/GitHub links also read `src/data/socials.ts`.
+- T11: education renders through `TimelineCard` (`type: 'education'` in experience.json), not `EducationCard`. `EducationCard` was only used by `EducationSection`, so it went too. `education.json` and the `Education` type stay (content; covered by data-architecture.test).
 - For T13: `GlitchText` gives every section heading `tabIndex={0}`, so each h2 is a tab stop. Check whether that's noisy in the keyboard walkthrough.
 
 ## Results

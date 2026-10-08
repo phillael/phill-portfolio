@@ -3,7 +3,7 @@
  *
  * Tests for the Hero section components including:
  * - HeroSection structure and layout
- * - AnimatedHeadline content
+ * - AnimatedTagline content
  * - HeroImage alt text
  */
 

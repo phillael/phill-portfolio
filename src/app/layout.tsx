@@ -62,7 +62,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Phill Aelony | Legendary Code Sorcerer',
     description: 'Full Stack Developer, Musician, and Builder of Dreams. Vanquisher of Bugs.',
-    url: 'https://www.phillcodes.com',
+    url: SITE_URL,
     siteName: 'Phill Aelony Portfolio',
     locale: 'en_US',
     type: 'website',

@@ -70,7 +70,9 @@ export default function MushroomOfferBubble({
       <motion.div
         ref={dialogRef}
         role={isCentered ? 'alertdialog' : 'dialog'}
-        aria-modal={isCentered ? true : undefined}
+        // Modal in both positions: the anchored bubble renders beside the
+        // chat's aria-modal dialog, which would otherwise make it inert
+        aria-modal
         aria-labelledby={questionId}
         className={bubbleClassName}
         initial={{ opacity: 0, scale: 0.8, y: position === 'centered' ? 0 : 20 }}

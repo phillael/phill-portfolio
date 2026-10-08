@@ -93,7 +93,9 @@ describe('MushroomOfferBubble', () => {
     expect(dialog).toHaveAttribute('aria-modal', 'true')
   })
 
-  it('is a non-modal dialog when anchored', () => {
+  // Rendered beside the chat's aria-modal dialog, so it must be modal too or
+  // screen readers treat it as inert
+  it('is a modal dialog when anchored', () => {
     render(
       <MushroomOfferBubble
         position="anchored"
@@ -104,7 +106,7 @@ describe('MushroomOfferBubble', () => {
     )
 
     const dialog = screen.getByRole('dialog', { name: 'You want to eat mushroom?' })
-    expect(dialog).not.toHaveAttribute('aria-modal')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
   })
 
   it.each(['centered', 'anchored'] as const)('focuses the confirm button on open (%s)', (position) => {

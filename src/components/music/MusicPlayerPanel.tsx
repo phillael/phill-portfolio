@@ -76,8 +76,9 @@ const MusicPlayerPanel = ({
     }
   }
 
-  // Tab cycling, focus on the close button, and focus restored on close
-  useFocusTrap(panelRef, isExpanded, { initialFocusRef: closeButtonRef })
+  // Tab cycling + focus on the close button. Focus goes back to the FAB
+  // explicitly below, since Safari doesn't focus buttons on click.
+  useFocusTrap(panelRef, isExpanded, { initialFocusRef: closeButtonRef, returnFocus: false })
 
   // Handle keyboard events
   const handleKeyDown = useCallback(

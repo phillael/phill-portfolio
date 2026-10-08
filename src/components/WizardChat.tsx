@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import TypingText from './TypingText'
 import wizardData from '@/data/wizard.json'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -80,6 +81,7 @@ export default function WizardChat({
   const [isDisabled, setIsDisabled] = useState(false)
   const [pendingOffer, setPendingOffer] = useState(false)
 
+  const dialogRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -126,12 +128,9 @@ export default function WizardChat({
     }
   }, [])
 
-  // Move focus into the dialog on open and give it back on close
-  useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null
-    inputRef.current?.focus({ preventScroll: true })
-    return () => previouslyFocused?.focus?.({ preventScroll: true })
-  }, [])
+  // Move focus into the dialog on open, keep Tab inside it, and give focus
+  // back on close
+  useFocusTrap(dialogRef, true, { initialFocusRef: inputRef })
 
   // Escape closes the chat and nothing behind it. Capture phase + stopPropagation
   // keeps ShroomMode's window listener from also dismissing the wizard. While
@@ -238,6 +237,7 @@ export default function WizardChat({
         onClick={onClose}
       />
       <motion.div
+        ref={dialogRef}
         className="fixed inset-0 md:inset-auto md:h-[420px] md:bottom-[290px] md:left-[40px] md:w-[360px] md:max-h-[calc(100vh-330px)] z-[101] flex flex-col overflow-hidden overflow-x-hidden bg-background md:gradient-card border-0 md:border md:border-primary/30 md:rounded-lg"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

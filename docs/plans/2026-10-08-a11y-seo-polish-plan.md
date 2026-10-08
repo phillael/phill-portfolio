@@ -78,7 +78,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - It picks up elements added after activation.
 
   Refactor `MobileMenu` and `MusicPlayerPanel` to use it. Their Escape handling stays where it is, and their existing tests must pass unchanged.
-- [ ] **T3: WizardChat focus trap.** Apply `useFocusTrap` to the chat panel. Its existing focus-on-open and restore-on-close behavior can move into the hook if behavior is identical; otherwise keep it and set `returnFocus: false`. Add a test that Tab from the last focusable wraps to the first, and keep the existing Escape and focus tests green.
+- [x] **T3: WizardChat focus trap.** Apply `useFocusTrap` to the chat panel. Its existing focus-on-open and restore-on-close behavior can move into the hook if behavior is identical; otherwise keep it and set `returnFocus: false`. Add a test that Tab from the last focusable wraps to the first, and keep the existing Escape and focus tests green.
 - [ ] **T4: Offer bubble dialog + Escape fix.** Make `MushroomOfferBubble` a dialog per the contract:
   - Add a trap and initial focus on confirm.
   - Add a capture-phase Escape listener that calls `onCancel` and stops propagation.

@@ -128,6 +128,17 @@ describe('WizardChat', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('leaves Escape to an open mushroom offer', () => {
+    const onClose = jest.fn()
+    render(
+      <WizardChat onClose={onClose} onFallback={() => {}} onOfferMushroom={() => {}} offerOpen />,
+    )
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('keeps Escape from reaching listeners behind the chat', () => {
     const behind = jest.fn()
     document.body.addEventListener('keydown', behind)

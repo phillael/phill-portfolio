@@ -309,6 +309,7 @@ const ShroomMode = () => {
             onOfferMushroom={() => setCeremonyOpen(true)}
             injectedLine={injectedLine}
             onInjectedLineConsumed={() => setInjectedLine(null)}
+            offerOpen={ceremonyOpen}
           />
         )}
       </AnimatePresence>

@@ -24,6 +24,8 @@ interface WizardChatProps {
   onOfferMushroom: () => void
   injectedLine?: string | null
   onInjectedLineConsumed?: () => void
+  /** A mushroom offer is open over the chat; Escape belongs to it */
+  offerOpen?: boolean
 }
 
 const GREETING = wizardData.greeting
@@ -62,6 +64,7 @@ export default function WizardChat({
   onOfferMushroom,
   injectedLine,
   onInjectedLineConsumed,
+  offerOpen = false,
 }: WizardChatProps) {
   const [messages, setMessagesState] = useState<ChatMessage[]>(
     () => sessionMessages ?? [GREETING_MESSAGE],
@@ -86,11 +89,11 @@ export default function WizardChat({
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const onCloseRef = useRef(onClose)
-  const pendingOfferRef = useRef(pendingOffer)
+  const pendingOfferRef = useRef(pendingOffer || offerOpen)
   useEffect(() => {
     onCloseRef.current = onClose
-    pendingOfferRef.current = pendingOffer
-  }, [onClose, pendingOffer])
+    pendingOfferRef.current = pendingOffer || offerOpen
+  }, [onClose, pendingOffer, offerOpen])
 
   // Autoscroll to bottom on any DOM mutation inside the scroll container.
   // Covers both new messages and the character-by-character TypingText crawl.
@@ -134,7 +137,7 @@ export default function WizardChat({
 
   // Escape closes the chat and nothing behind it. Capture phase + stopPropagation
   // keeps ShroomMode's window listener from also dismissing the wizard. While
-  // the mushroom offer is up, the offer's own buttons decide.
+  // the mushroom offer is up, the offer handles Escape (decline).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return

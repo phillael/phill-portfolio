@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import MushroomOfferBubble from '../components/MushroomOfferBubble'
 
 describe('MushroomOfferBubble', () => {
@@ -76,5 +77,79 @@ describe('MushroomOfferBubble', () => {
     const backdrop = container.querySelector('[data-testid="offer-bubble-backdrop"]') as HTMLElement
     fireEvent.click(backdrop)
     expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it('is a modal alertdialog labelled by the question when centered', () => {
+    render(
+      <MushroomOfferBubble
+        position="centered"
+        text="You want to eat mushroom?"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+
+    const dialog = screen.getByRole('alertdialog', { name: 'You want to eat mushroom?' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+  })
+
+  it('is a non-modal dialog when anchored', () => {
+    render(
+      <MushroomOfferBubble
+        position="anchored"
+        text="You want to eat mushroom?"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: 'You want to eat mushroom?' })
+    expect(dialog).not.toHaveAttribute('aria-modal')
+  })
+
+  it.each(['centered', 'anchored'] as const)('focuses the confirm button on open (%s)', (position) => {
+    render(
+      <MushroomOfferBubble
+        position={position}
+        text="You want to eat mushroom?"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /sure/i })).toHaveFocus()
+  })
+
+  it('declines on Escape and keeps it from reaching listeners behind it', () => {
+    const onCancel = jest.fn()
+    const behind = jest.fn()
+    window.addEventListener('keydown', behind)
+    render(
+      <MushroomOfferBubble
+        position="centered"
+        text="You want to eat mushroom?"
+        onConfirm={() => {}}
+        onCancel={onCancel}
+      />,
+    )
+
+    fireEvent.keyDown(screen.getByRole('button', { name: /sure/i }), { key: 'Escape' })
+
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(behind).not.toHaveBeenCalled()
+    window.removeEventListener('keydown', behind)
+  })
+
+  it.each(['centered', 'anchored'] as const)('has no axe violations (%s)', async (position) => {
+    const { container } = render(
+      <MushroomOfferBubble
+        position={position}
+        text="You want to eat mushroom?"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

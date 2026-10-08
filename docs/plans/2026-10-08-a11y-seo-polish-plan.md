@@ -125,7 +125,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Remove `priority` from the `AboutSection` image.
   - Delete `EducationSection.tsx` and `education-section.test.tsx`; grep first to confirm nothing else imports it.
   - If `AnimatedHeadline`'s default export is unused (only `AnimatedTagline` is imported), delete the default export and its now-unused code, keeping `AnimatedTagline`. Update `hero-section.test.tsx` if it mocks the removed export.
-- [ ] **T12: Page-level axe regression test.** Add `src/__tests__/a11y.test.tsx`, which renders the full `HomePage` (reuse the mocks from `integration.test.tsx`) and asserts `toHaveNoViolations()`. Disable only the `color-contrast` rule, since jsdom can't compute it, and leave a comment saying so.
+- [x] **T12: Page-level axe regression test.** Add `src/__tests__/a11y.test.tsx`, which renders the full `HomePage` (reuse the mocks from `integration.test.tsx`) and asserts `toHaveNoViolations()`. Disable only the `color-contrast` rule, since jsdom can't compute it, and leave a comment saying so.
 - [ ] **T13: Browser sweep on the prod build.**
   - Build and serve on port 3002 (see Ground rules).
   - Keyboard-only walkthrough with chrome-devtools MCP: skip link → nav → each section → carousel preview (open, Tab, Escape) → music FAB panel → summon wizard → chat (stubbed, see Ground rules) → offer bubble (Escape declines, wizard stays).

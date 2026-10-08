@@ -64,14 +64,6 @@ export const metadata: Metadata = {
     description: 'Full Stack Developer, Musician, and Builder of Dreams. Vanquisher of Bugs.',
     url: 'https://www.phillcodes.com',
     siteName: 'Phill Aelony Portfolio',
-    images: [
-      {
-        url: '/images/og-image.jpg',
-        width: 1200,
-        height: 1200,
-        alt: 'Phill Aelony - Software Engineer in cyberpunk Tokyo with llamas',
-      },
-    ],
     locale: 'en_US',
     type: 'website',
   },
@@ -79,7 +71,6 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Phill Aelony | Legendary Code Sorcerer',
     description: 'Full Stack Developer, Musician, and Builder of Dreams. Vanquisher of Bugs.',
-    images: ['/images/og-image.jpg'],
   },
 }
 

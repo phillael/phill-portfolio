@@ -117,7 +117,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - Add `src/lib/structured-data.ts`, which builds the `@graph` from the data files. Render it from `src/app/page.tsx` (or the layout) as a server component.
   - Extract the GitHub/LinkedIn URLs into `src/data/socials.ts` and have `SocialLinks.tsx` and the JSON-LD both read them, so they can't drift.
   - Tests: the graph contains Person with `jobTitle === experience[0].title`, `sameAs` equals the socials, and the output contains no raw `<`.
-- [ ] **T10: OG/Twitter image.**
+- [x] **T10: OG/Twitter image.**
   - Add `src/app/opengraph-image.tsx` and `twitter-image.tsx` per the contract (load the font and hero art with `readFile` from `public/`/`node_modules` as the Next `ImageResponse` docs show; check current docs via context7 first).
   - Remove the explicit `images` arrays from the metadata, delete `public/images/og-image.jpg`, and grep that nothing references it.
   - Verify the rendered PNG visually (see Verification).

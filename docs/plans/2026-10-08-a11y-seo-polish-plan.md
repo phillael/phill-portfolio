@@ -95,7 +95,7 @@ Do them in order. One task ≈ one commit. T1 must come first; T2 must come befo
   - The list renders every testimonial from `testimonials.ts` before the carousel mounts.
   - The modal has `role="dialog"` and focus moves to the close button.
   - axe reports no violations with the modal open (the Canvas is already mocked in the existing tests; follow that pattern).
-- [ ] **T6: Landmarks and headings.**
+- [x] **T6: Landmarks and headings.**
   - Add the `sr-only` h1 in the hero, the skip link and `main#main`.
   - Wrap `ContactSection`'s social links / bottom area in a `<footer>` if it's the natural page end; otherwise add a minimal `<footer>` landmark after `</main>` holding the existing social links (move them, don't duplicate them).
   - Give each section `aria-labelledby` pointing at its h2 id.
@@ -201,7 +201,11 @@ The executor stops and writes a note here rather than guessing when:
 - A **footer landmark** would require restructuring `ContactSection` visually.
 - Anything requires a real Anthropic call, a Vercel env change, or touching `src/app/api/**` beyond reading it.
 
-Notes from the executor: _(none yet)_
+Notes from the executor:
+
+- T4: the chat's capture listener is registered before the offer bubble's, so in the fallback flow (chat open + anchored bubble) Escape closed both. `WizardChat` now takes `offerOpen` from ShroomMode and leaves Escape to the bubble.
+- T6: the footer landmark holds the copyright line (moved out of `ContactSection` into `SiteFooter`), not the LinkedIn/GitHub links. Moving those would restructure the Contact section visually. Padding is split (`pt-*` on the section, `pb-*` on the footer) so the page looks the same. Hero keeps `aria-label="Hero section"` since it has no h2.
+- For T13: `GlitchText` gives every section heading `tabIndex={0}`, so each h2 is a tab stop. Check whether that's noisy in the keyboard walkthrough.
 
 ## Results
 

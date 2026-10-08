@@ -86,14 +86,14 @@ const AboutSection = () => {
   return (
     <section
       id="about"
-      aria-label="About section"
+      aria-labelledby="about-heading"
       role="region"
       className="min-h-screen py-20 md:py-32 px-4 md:px-6 lg:px-8 overflow-visible"
     >
       <div className="max-w-4xl mx-auto">
         {/* Section Heading */}
         <AnimatedSection>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
+          <h2 id="about-heading" className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
             <GlitchText as="span" className="neon-text-purple">
               About
             </GlitchText>

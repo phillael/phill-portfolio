@@ -117,14 +117,14 @@ const ContactSection = () => {
   return (
     <section
       id="contact"
-      aria-label="Contact section"
+      aria-labelledby="contact-heading"
       role="region"
-      className="py-20 md:py-32 px-4 md:px-6"
+      className="pt-20 md:pt-32 px-4 md:px-6"
     >
       <div className="max-w-4xl mx-auto text-center">
         {/* Section Heading with glitch effect */}
         <AnimatedSection variant="fade-up">
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading mb-8 md:mb-12">
+          <h2 id="contact-heading" className="text-4xl md:text-5xl lg:text-6xl font-heading mb-8 md:mb-12">
             <GlitchText as="span" className="neon-text-blue">
               Contact
             </GlitchText>
@@ -155,14 +155,7 @@ const ContactSection = () => {
           </div>
         </AnimatedSection>
 
-        {/* Footer copyright */}
-        <AnimatedSection variant="fade-in" delay={0.4}>
-          <div className="mt-16 md:mt-24 pt-8 border-t border-[hsl(var(--primary)/0.2)]">
-            <p className="text-sm text-[hsl(var(--foreground)/0.5)]">
-              {new Date().getFullYear()} Phill Aelony. Built React, Typescript, and Next.js.
-            </p>
-          </div>
-        </AnimatedSection>
+        {/* Copyright lives in SiteFooter (the page's contentinfo landmark) */}
       </div>
     </section>
   )

@@ -241,7 +241,7 @@ describe('Integration Tests', () => {
 
       // Experience Section
       const experienceSection = screen.getByRole('region', {
-        name: /work experience/i,
+        name: /^experience$/i,
       })
       expect(experienceSection).toBeInTheDocument()
 

@@ -4,6 +4,7 @@ import Nav from '@/components/Nav'
 import { MusicPlayer } from '@/components/music'
 import ScreenShakeWrapper from '@/components/ScreenShakeWrapper'
 import ShroomMode from '@/components/ShroomMode'
+import SkipLink from '@/components/SkipLink'
 import { ShroomModeProvider } from '@/context/ShroomModeContext'
 
 const audiowide = Audiowide({
@@ -79,6 +80,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <html lang="en" className={`${audiowide.variable} ${nunito.variable} ${pressStart2P.variable}`}>
       <body className="font-body text-foreground custom-scrollbar">
+        <SkipLink />
         <ShroomModeProvider>
           {/* Main content wrapper - shroom filter applies here, not body */}
           {/* Hue cycle runs on the outer wrapper, the SVG warp on the inner one */}

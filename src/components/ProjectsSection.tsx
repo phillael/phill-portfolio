@@ -25,14 +25,14 @@ const ProjectsSection = () => {
   return (
     <section
       id="projects"
-      aria-label="Projects"
+      aria-labelledby="projects-heading"
       role="region"
       className="min-h-screen py-20 md:py-32 px-4 md:px-6"
     >
       <div className="max-w-6xl mx-auto">
         {/* Section Heading - scale-up animation variant with glitch effect */}
         <AnimatedSection variant="scale-up">
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
+          <h2 id="projects-heading" className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
             <GlitchText as="span" className="neon-text-purple">
               Projects
             </GlitchText>

@@ -52,6 +52,22 @@
   .hud .stats { order: 11; }
   .prompt { border-top: 1px solid var(--line); background: var(--panel); padding: 10px 14px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
   .prompt pre { margin: 0; white-space: pre-wrap; font: 12px/1.5 var(--mono); color: #c9d3e1; max-height: 150px; overflow-y: auto; }
+  /* Reduced motion: a plain, accessible HTML resume instead of the 3D one (no WebGL animation) */
+  .rpanel { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(3,5,10,.82); }
+  .rpanel[hidden] { display: none; }
+  .rpanel .card { width: min(780px, 100%); max-height: 100%; overflow-y: auto; background: #0b0f18; border: 1px solid rgba(128,234,255,.35); border-radius: 14px;
+    color: #e3ecf6; font: 15px/1.6 "Nunito", system-ui, sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .rpanel .bar { position: sticky; top: 0; display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 10px 12px; background: #0b0f18; border-bottom: 1px solid var(--line); }
+  .rpanel .bar a, .rpanel .bar button { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; border-radius: 8px;
+    font: 600 14px "Nunito", system-ui, sans-serif; color: #80eaff; background: transparent; border: 1px solid rgba(128,234,255,.5); text-decoration: none; cursor: pointer; }
+  .rpanel .body { padding: 8px 28px 28px; }
+  .rpanel h2 { font: 400 28px/1.2 "Audiowide", system-ui, sans-serif; color: #80eaff; margin: 12px 0 2px; }
+  .rpanel h3 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: #80eaff; margin: 22px 0 6px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .rpanel h4 { font-size: 16px; margin: 12px 0 0; color: #fff; }
+  .rpanel .sub, .rpanel .muted { color: #a9b6c8; margin: 0; }
+  .rpanel ul { margin: 6px 0; padding-left: 20px; } .rpanel li { margin: 4px 0; }
+  .rpanel p { margin: 6px 0; } .rpanel strong { color: #fff; }
+  @media (prefers-reduced-motion: reduce) { .hbtn, .site, .site.dissolving { transition: none; } .hbtn:hover, .hbtn:focus-visible { transform: none; } }
   /* while the resume is open: close (top right; Esc) */
   .closeR { position: absolute; top: 10px; right: 12px; z-index: 3; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; padding: 0;
     font-size: 22px; line-height: 1; color: var(--text); background: rgba(8,10,16,.72); border: 1px solid var(--line); backdrop-filter: blur(6px); cursor: pointer; transition: opacity .6s ease .4s; }
@@ -266,6 +282,12 @@
           <div class="note">best with sound on</div>
         </div>
       </div>
+      <div class="rpanel" id="rpanel" hidden role="dialog" aria-modal="true" aria-labelledby="rpTitle">
+        <div class="card">
+          <div class="bar"><a id="rpPdf" href="../../../public/Phillip_Aelony_Resume_2025.pdf" download="Phillip_Aelony_Resume.pdf">⤓ Download PDF</a><button type="button" id="rpClose" aria-label="Close the resume">× Close</button></div>
+          <div class="body" id="rpBody"></div>
+        </div>
+      </div>
       <button class="closeR" id="btnClose" type="button" aria-label="Close the resume (Esc)" title="Close (Esc)">×</button>
       <div class="hud">
         <a class="btn" id="btnPdf" href="../../../public/Phillip_Aelony_Resume_2025.pdf" download="Phillip_Aelony_Resume.pdf" title="Download the PDF">⤓ PDF</a>
@@ -380,10 +402,10 @@ const DEFAULTS = {
   soundOn: true, volume: 0.7,
   introTime: 3, holePull: 1, tiltForce: 12, shake: true,
   dance: 1, danceStyle: 'groove', mosh: 0, pulse: 0.6,
-  entrance: 'hero',
+  entrance: 'hero', simReduced: false,
 };
 const state = { ...DEFAULTS };
-const VIEW_KEYS = ['tilt', 'yaw', 'zoom', 'quality', 'layoutSource', 'paper', 'soundOn', 'volume', 'entrance'];
+const VIEW_KEYS = ['tilt', 'yaw', 'zoom', 'quality', 'layoutSource', 'paper', 'soundOn', 'volume', 'entrance', 'simReduced'];
 
 const PRESETS = [
   { name: 'Bumper Cars', note: 'Balanced default', values: {} },
@@ -407,6 +429,7 @@ const SCHEMA = [
   ] },
   { group: 'Site integration', open: true, items: [
     { k: 'entrance', label: 'Entrance', type: 'select', site: true, options: [['hero', 'The phillcodes.com hero (mock)'], ['button', '"View Resume" start screen']], hint: 'what you see before the resume opens' },
+    { k: 'simReduced', label: 'Simulate reduced motion', type: 'toggle', hint: 'what prefers-reduced-motion visitors get: every trigger opens a plain HTML resume (no WebGL animation)' },
   ] },
   { group: 'Finish', open: true, items: [
     { k: 'pageFinish', label: 'Page', type: 'select', options: [['paper', 'Textured paper'], ['matte', 'Smooth (like the PDF)'], ['foil', 'Holographic foil'], ['metal', 'Brushed metal']] },
@@ -2202,6 +2225,7 @@ function originPx(origin) {
   const b = heroImg.getBoundingClientRect(); return [b.left + b.width / 2 - rc.left, b.top + b.height / 2 - rc.top];
 }
 function openResume({ origin, find: q, fromRoute = false } = {}) {
+  if (reducedMotion()) return openPanel(origin);
   if (diss || closing || !stage.classList.contains('prestart') || state.entrance !== 'hero') return false;
   if (q != null) pendingFind = q || null;
   SFX.init(); loadResume();
@@ -3122,7 +3146,8 @@ function setEntrance() {
   showSite(hero); startEl.classList.toggle('gone', hero);
   if (hero) measureSite(); else loadResume();
 }
-document.getElementById('btnGo').onclick = () => {
+document.getElementById('btnGo').onclick = (e) => {
+  if (reducedMotion()) return openPanel(e.currentTarget);
   SFX.init(); pushRoute();
   loadResume().then(() => {
     startEl.classList.add('gone'); stage.classList.remove('prestart');
@@ -3162,6 +3187,54 @@ function loadResume() {
 const heroBtn = document.getElementById('heroBtn');
 document.getElementById('siteResume').addEventListener('click', (e) => openResume({ origin: e.currentTarget }));
 heroBtn.addEventListener('click', (e) => openResume({ origin: e.detail === 0 ? heroBtn : { x: e.clientX, y: e.clientY } })); // detail 0: Enter/Space
+// ---- Reduced motion: every trigger opens a plain, accessible HTML resume built from DATA (no phone or email) ----
+const reducedMotion = () => state.simReduced || matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rpanel = document.getElementById('rpanel');
+let rpReturn = null;
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const rich = (t) => parseRich(t).map((r) => (r.b ? `<strong>${esc(r.t)}</strong>` : esc(r.t))).join('');
+function buildPanel() {
+  const d = DATA;
+  document.getElementById('rpBody').innerHTML = `
+    <h2 id="rpTitle" tabindex="-1">${esc(d.name)}</h2>
+    <p class="sub">${esc(d.headline)} · ${esc(d.subheadline)}</p>
+    <p class="muted">${d.contact.map(esc).join(' · ')}</p>
+    <p>${rich(d.summary)}</p>
+    <h3>Skills</h3><ul>${d.skills.map((x) => `<li><strong>${esc(x.label)}:</strong> ${esc(x.items)}</li>`).join('')}</ul>
+    <h3>Experience</h3>${d.experience.map((j) => `<h4>${esc(j.company)} <span class="muted">— ${esc(j.blurb)} · ${esc(j.dates)}</span></h4>
+      <p class="muted">${(j.roles || []).map((r) => `${esc(r.title)} (${esc(r.dates)})`).join(' · ')}</p>
+      <ul>${(j.bullets || []).map((b) => `<li>${rich(typeof b === 'string' ? b : b.text)}</li>`).join('')}</ul>`).join('')}
+    <h3>Projects</h3>${d.projects.map((x) => `<h4>${esc(x.name)} <span class="muted">— ${esc(x.blurb)}</span></h4><p class="muted">${esc(x.stack)}</p><p>${rich(x.text)}</p>`).join('')}
+    <h3>Earlier</h3>${d.earlier.map((e) => `<h4>${esc(e.title)}, ${esc(e.company)} <span class="muted">· ${esc(e.dates)}</span></h4>${e.text ? `<p>${rich(e.text)}</p>` : ''}`).join('')}
+    <h3>Music</h3><h4>${esc(d.music.title)}, ${esc(d.music.company)} <span class="muted">· ${esc(d.music.dates)}</span></h4><p>${rich(d.music.text)}</p>
+    <h3>Education</h3>${d.education.map((e) => `<p><strong>${esc(e.degree)}</strong> · ${esc(e.school)}</p>`).join('')}`;
+}
+function openPanel(origin) {
+  if (!rpanel.hidden) return true;
+  rpReturn = origin && origin.focus ? origin : document.activeElement;
+  buildPanel(); rpanel.hidden = false; siteEl.inert = true; startEl.inert = true;
+  document.querySelectorAll('aside, .prompt').forEach((el) => (el.inert = true)); // a modal: nothing behind it is reachable
+  document.getElementById('rpTitle').focus();
+  return true;
+}
+function closePanel() {
+  if (rpanel.hidden) return;
+  rpanel.hidden = true; siteEl.inert = siteEl.classList.contains('gone'); syncInert();
+  document.querySelectorAll('aside, .prompt').forEach((el) => (el.inert = false));
+  if (routeFind()) leaveRoute();
+  if (siteEl.classList.contains('gone') && state.entrance === 'hero') showSite(true); // (a deep link hid the site)
+  (rpReturn && document.contains(rpReturn) ? rpReturn : document.getElementById('siteResume')).focus();
+}
+document.getElementById('rpClose').onclick = closePanel;
+window.addEventListener('keydown', (e) => {
+  if (rpanel.hidden) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePanel(); return; }
+  if (e.key !== 'Tab') return;
+  // keep Tab inside the dialog (the title, focused on open, comes after its buttons in the DOM)
+  const f = [...rpanel.querySelectorAll('a[href], button:not([disabled])')], i = f.indexOf(document.activeElement);
+  e.preventDefault(); e.stopPropagation();
+  f[i < 0 ? (e.shiftKey ? f.length - 1 : 0) : (i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+}, true);
 // Skills chips deep-link into the Finder: the resume opens from the chip, and that skill lights up once the page lands
 document.querySelectorAll('.schip').forEach((b) => {
   if (!CHIPS.some(([n]) => n === b.dataset.q)) console.warn('Skills chip has no Finder chip:', b.dataset.q);
@@ -3198,6 +3271,7 @@ function leaveRoute() {
   else history.replaceState(null, '', location.pathname + location.search); // arrived by deep link: just drop the hash
 }
 function openDirect(q) {
+  if (reducedMotion()) return openPanel();
   if (q) pendingFind = q;
   showSite(false); startEl.classList.add('gone');
   loadResume().then(() => {
@@ -3236,7 +3310,7 @@ updateCamera(0);
 requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 window.__jelly = { state, rebuild, chaos, burstAll, healAll, clickAt, rayAt, toggleShroom, applyPreset, pickParticle, bodies: () => bodies, cam,
   startIntro, find, MUSIC, startHole, moveHole, releaseHole, hole, tiltG, shakeIt, SFX, intro: () => intro, go: () => document.getElementById('btnGo').click(),
-  heroSparks, hp, openResume, closeResume, diss: () => diss, closing: () => closing, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
+  heroSparks, hp, openResume, closeResume, openPanel, closePanel, diss: () => diss, closing: () => closing, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
 </script>
 </body>
 </html>

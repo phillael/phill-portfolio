@@ -3162,6 +3162,11 @@ function loadResume() {
 const heroBtn = document.getElementById('heroBtn');
 document.getElementById('siteResume').addEventListener('click', (e) => openResume({ origin: e.currentTarget }));
 heroBtn.addEventListener('click', (e) => openResume({ origin: e.detail === 0 ? heroBtn : { x: e.clientX, y: e.clientY } })); // detail 0: Enter/Space
+// Skills chips deep-link into the Finder: the resume opens from the chip, and that skill lights up once the page lands
+document.querySelectorAll('.schip').forEach((b) => {
+  if (!CHIPS.some(([n]) => n === b.dataset.q)) console.warn('Skills chip has no Finder chip:', b.dataset.q);
+  b.addEventListener('click', () => openResume({ origin: b, find: b.dataset.q }));
+});
 heroBtn.addEventListener('pointermove', (e) => { const r = heroBtn.getBoundingClientRect(); heroBtn.style.setProperty('--tx', (e.clientX - r.left) + 'px'); heroBtn.style.setProperty('--ty', (e.clientY - r.top) + 'px'); });
 heroBtn.addEventListener('pointerleave', () => { heroBtn.style.removeProperty('--tx'); heroBtn.style.removeProperty('--ty'); });
 ['pointerenter', 'focus'].forEach((ev) => heroBtn.addEventListener(ev, () => (site.hover = true)));

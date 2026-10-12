@@ -68,7 +68,7 @@ Order matters: T0 first; T2 before T5; T3 → T4 → T5; T7 needs T3–T5; T8 ne
   - Give the pool its own GPU buffers: pos, tail, alpha, age, color and **heat**.
   - Draw it with the comet program extended by `aHeat`: color = mix(photo color, comet ramp(age), heat).
   - Debug: `__jelly.heroSparks(true)` hides the DOM image and shows the pool at rest, so the sparks should reproduce the photo in place.
-- [ ] **T4: the dissolve.** `openResume({ origin })` starts it, where `origin` is the click point or the trigger element's center. Each spark gets a release time from distance to the origin plus value-noise jitter, so a dissolve front sweeps out from the origin across the photo; the DOM image hides at t = 0, which is safe because the sparks match it.
+- [x] **T4: the dissolve.** `openResume({ origin })` starts it, where `origin` is the click point or the trigger element's center. Each spark gets a release time from distance to the origin plus value-noise jitter, so a dissolve front sweeps out from the origin across the photo; the DOM image hides at t = 0, which is safe because the sparks match it.
   - The mock chrome (nav, tagline, skills, glow) fades and blurs out over about 0.6 s, revealing the nebula.
   - A released spark's heat goes 0 → 1 over about 0.25 s. It gets an outward kick, follows the existing swirl flow, and eases into a galaxy slot (`galaxyAt`-style spiral) within about 1.6 s (shorter on Low quality).
   - Play the SFX whoosh.

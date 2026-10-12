@@ -117,6 +117,7 @@
      the canvas draws the site's background, the pulsing hero glow and the vortex sparkles, so the dissolve can reveal the nebula */
   .site { position: absolute; inset: 0; z-index: 6; container-type: size; pointer-events: none; color: #f0ffff; font: 16px/1.5 "Nunito", system-ui, sans-serif; transition: opacity .5s ease; }
   .site.gone { opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s .5s; }
+  .site.dissolving { opacity: 0; filter: blur(6px); transition: opacity .6s ease, filter .6s ease; } /* the chrome fades and blurs out as the hero dissolves */
   .site a, .site button { pointer-events: auto; font-family: inherit; }
   .site a:focus-visible, .site button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .snav { position: absolute; top: 0; left: 0; right: 0; height: 64px; max-width: 1280px; margin: 0 auto; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -627,7 +628,7 @@ const CELL = 0.2, ROWS = 3, PAD_X = 0.035, PAD_TOP = 0.035, DRIP = 0.75, R_COL =
 const SLAB_MIN = 0.03, SLAB_MAX = 0.085; // loose words slide just over the page, touching the text
 let bodies = [], NP = 0, NS = 0;
 let pos, vel, home, off, frc, inv, pBody, sa, sb, srest, sk, vis; // off: per-frame target offsets (finder lift, dancing)
-let pageH = 8, pageBottom = -4;
+let pageH = 11, pageBottom = -5.5; // Letter until the resume loads, so the camera doesn't move when it does (the hero sparks sit in front of it)
 let shroomAmt = 0, time = 0;
 let seed = 7;
 const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -885,8 +886,8 @@ function burst(bd, shock = true) {
 const smooth = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
 
 // Where each particle sits in the entrance galaxy: a two-armed spiral of stardust behind the page
-function galaxyAt(k, t, out) {
-  const r = ptGal[k * 3], a = ptGal[k * 3 + 1] + t * 0.75 / Math.sqrt(r / 4), z = ptGal[k * 3 + 2];
+function galaxyAt(k, t, out, gal = ptGal) {
+  const r = gal[k * 3], a = gal[k * 3 + 1] + t * 0.75 / Math.sqrt(r / 4), z = gal[k * 3 + 2];
   out[0] = Math.cos(a) * r; out[1] = Math.sin(a) * r * 0.55 + (cam.y ?? 0); out[2] = -3.5 + Math.sin(a) * r * 0.35 + z;
 }
 const gtmp = [0, 0, 0];
@@ -1307,9 +1308,12 @@ function buildTextures(list) {
   ptPos = new Float32Array(NPT * 3); ptVel = new Float32Array(NPT * 3); ptHome = new Float32Array(NPT * 3); ptAlpha = new Float32Array(NPT); ptAge = new Float32Array(NPT);
   ptPrev = new Float32Array(NPT * 3); ptSV = new Float32Array(NPT * 3); ptTail = new Float32Array(NPT * 3); // for the comet trails
   // entrance galaxy: radius, starting angle (on one of two spiral arms), depth jitter
-  ptGal = new Float32Array(NPT * 3);
-  const gauss = () => (rnd() + rnd() + rnd() - 1.5) * 0.8;
-  for (let k = 0; k < NPT; k++) { const r = 3.2 + 11 * rnd() ** 1.4; ptGal[k * 3] = r; ptGal[k * 3 + 1] = (k % 2) * Math.PI + r * 0.42 + gauss() * (0.25 + 0.04 * r); ptGal[k * 3 + 2] = gauss() * 0.8; }
+  ptGal = galaxySlots(NPT, rnd);
+}
+function galaxySlots(n, rand) {
+  const g = new Float32Array(n * 3), gauss = () => (rand() + rand() + rand() - 1.5) * 0.8;
+  for (let k = 0; k < n; k++) { const r = 3.2 + 11 * rand() ** 1.4; g[k * 3] = r; g[k * 3 + 1] = (k % 2) * Math.PI + r * 0.42 + gauss() * (0.25 + 0.04 * r); g[k * 3 + 2] = gauss() * 0.8; }
+  return g;
 }
 
 // =====================================================================
@@ -2103,7 +2107,7 @@ function introCam() { if (!intro) return stage.classList.contains('prestart') ? 
 // its pixel on screen; at rest its world position is that pixel unprojected onto a plane in front of the camera (re-derived every
 // frame, so camera changes never misalign it). Drawn with the comet program: heat 0 = the photo's color, heat 1 = the comet ramp.
 // =====================================================================
-const hp = { N: 0, show: false, dot: 2, dist: 10, key: '', camKey: '', dirtyPos: true, dirtyAttr: true, scr: null, col: null, pos: null, tail: null, vel: null, alpha: null, age: null, heat: null, vao: null, buf: {} };
+const hp = { N: 0, show: false, cover: false, gal: null, dot: 2, dist: 10, key: '', camKey: '', dirtyPos: true, dirtyAttr: true, scr: null, col: null, pos: null, tail: null, vel: null, alpha: null, age: null, heat: null, vao: null, buf: {} };
 function buildHeroSparks() {
   const rc = canvas.getBoundingClientRect(), b = heroImg.getBoundingClientRect();
   if (!heroImg.complete || !heroImg.naturalWidth || b.width < 2 || rc.width < 2) return false;
@@ -2140,6 +2144,7 @@ function buildHeroSparks() {
   hp.buf = { pos: inst('aPos', 3, hp.pos, gl.DYNAMIC_DRAW), tail: inst('aTail', 3, hp.tail, gl.DYNAMIC_DRAW), alpha: inst('aAlpha', 1, hp.alpha, gl.DYNAMIC_DRAW),
     age: inst('aAge', 1, hp.age, gl.DYNAMIC_DRAW), heat: inst('aHeat', 1, hp.heat, gl.DYNAMIC_DRAW) };
   inst('aCol', 3, hp.col); inst('aId', 1, Float32Array.from({ length: N }, (_, i) => i));
+  let gs = 23; hp.gal = galaxySlots(N, () => { gs = (gs * 1664525 + 1013904223) >>> 0; return gs / 4294967296; });
   gl.bindVertexArray(null);
   hp.camKey = ''; hp.dirtyAttr = true; heroRest();
   return true;
@@ -2155,6 +2160,75 @@ function heroRest() {
   hp.dist = 0.85 * Math.hypot(cam.eye[0] - cam.target[0], cam.eye[1] - cam.target[1], cam.eye[2] - cam.target[2]);
   for (let i = 0; i < hp.N; i++) { heroHome(i, tmp); const o = i * 3; for (let a = 0; a < 3; a++) hp.pos[o + a] = hp.tail[o + a] = tmp[a]; }
 }
+// ---- The dissolve: a front sweeps out from the click across the photo; each spark it passes heats from the photo's color to
+// white-hot and follows the comet ramp, gets an outward kick, rides the swirl and eases into its galaxy slot ----
+let diss = null;
+const vnoise2 = (x, y) => { // smooth value noise, so the dissolve front is ragged rather than a perfect circle
+  const h = (i, j) => { const v = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  return (h(i, j) * (1 - sx) + h(i + 1, j) * sx) * (1 - sy) + (h(i, j + 1) * (1 - sx) + h(i + 1, j + 1) * sx) * sy;
+};
+function originPx(origin) {
+  const rc = canvas.getBoundingClientRect();
+  if (origin && origin.getBoundingClientRect) { const b = origin.getBoundingClientRect(); return [b.left + b.width / 2 - rc.left, b.top + b.height / 2 - rc.top]; }
+  if (origin && origin.x != null) return [origin.x - rc.left, origin.y - rc.top];
+  const b = heroImg.getBoundingClientRect(); return [b.left + b.width / 2 - rc.left, b.top + b.height / 2 - rc.top];
+}
+function openResume({ origin } = {}) {
+  if (diss || !stage.classList.contains('prestart') || state.entrance !== 'hero') return false;
+  SFX.init(); loadResume();
+  if (!buildHeroSparks()) return false;
+  const low = quality() === 'low', T = (state.dissolveTime ?? 1.6) * (low ? 0.7 : 1), sweep = T * 0.42;
+  const [ox, oy] = originPx(origin), N = hp.N;
+  // the front starts at the photo's nearest point to the click (the nav button is outside the photo) and crosses it in `sweep`
+  let dMin = Infinity, dMax = 0; for (let i = 0; i < N; i++) { const dd = Math.hypot(hp.scr[i * 2] - ox, hp.scr[i * 2 + 1] - oy); dMin = Math.min(dMin, dd); dMax = Math.max(dMax, dd); }
+  const rel = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const x = hp.scr[i * 2], y = hp.scr[i * 2 + 1];
+    rel[i] = sweep * ((Math.hypot(x - ox, y - oy) - dMin) / Math.max(1, dMax - dMin) + 0.22 * vnoise2(x / 45, y / 45) + 0.05 * Math.random());
+  }
+  heroRest();
+  hp.vel.fill(0); hp.sv = new Float32Array(N * 3); hp.prev = hp.pos.slice();
+  diss = { t: 0, rel, travel: T, sweep, ox, oy };
+  hp.show = true; hp.cover = true; heroImg.style.visibility = 'hidden'; // the sparks match the photo, so the swap is invisible
+  siteEl.classList.add('dissolving'); siteEl.inert = true;
+  SFX.intro(2);
+  return true;
+}
+function updateDissolve(dt) {
+  const d = diss, N = hp.N, T = d.travel, SW = state.swirl * 3, tr = 0.05 * state.trail;
+  d.t += dt;
+  site.amt = 1 - smooth(d.t / 0.7); // the site's background and glow fade, revealing the nebula
+  const rx = cam.right, uy = cam.up, fw = cam.fwd;
+  let arrived = 0;
+  for (let i = 0; i < N; i++) {
+    const o = i * 3, u = d.t - d.rel[i];
+    if (u < 0) { heroHome(i, tmp); for (let a = 0; a < 3; a++) hp.pos[o + a] = hp.tail[o + a] = hp.prev[o + a] = tmp[a]; continue; } // not reached by the front yet: still a pixel of the photo
+    if (hp.heat[i] === 0) {
+      // released: kick outward from the origin (in screen terms), a little toward the camera
+      const dx = hp.scr[i * 2] - d.ox, dy = hp.scr[i * 2 + 1] - d.oy, l = Math.hypot(dx, dy) || 1, sp = 1.5 + Math.random() * 2.5;
+      for (let a = 0; a < 3; a++) hp.vel[o + a] = (rx[a] * dx / l - uy[a] * dy / l) * sp - fw[a] * (0.5 + Math.random());
+      hp.age[i] = 0;
+    }
+    hp.heat[i] = Math.max(1e-4, Math.min(1, u / 0.25)); hp.age[i] = u;
+    galaxyAt(i, time, gtmp, hp.gal);
+    const k = smooth(u / T);
+    if (k >= 1) { for (let a = 0; a < 3; a++) hp.pos[o + a] = gtmp[a]; arrived++; }
+    else {
+      if (SW > 0) { // the same divergence-free swirl the resume's sparks ride
+        const a1 = 1.3 * hp.pos[o] + 0.7 * time + hp.pos[o + 2], b1 = 1.1 * hp.pos[o + 1] - 0.6 * time;
+        hp.vel[o] += -1.1 * Math.sin(a1) * Math.sin(b1) * SW * dt; hp.vel[o + 1] += -1.3 * Math.cos(a1) * Math.cos(b1) * SW * dt;
+      }
+      const drag = Math.max(0, 1 - (1 + 4 * k) * dt), pull = 1 - Math.exp(-(1 + 22 * k * k) * dt);
+      for (let a = 0; a < 3; a++) { hp.vel[o + a] *= drag; hp.pos[o + a] += hp.vel[o + a] * dt; hp.pos[o + a] += (gtmp[a] - hp.pos[o + a]) * pull; }
+    }
+    // comet tails from the smoothed recent motion
+    for (let a = 0; a < 3; a++) { const v = (hp.pos[o + a] - hp.prev[o + a]) / Math.max(dt, 1e-3); hp.sv[o + a] += (v - hp.sv[o + a]) * 0.45; hp.tail[o + a] = hp.pos[o + a] - hp.sv[o + a] * tr; hp.prev[o + a] = hp.pos[o + a]; }
+  }
+  d.arrived = arrived;
+  hp.dirtyPos = hp.dirtyAttr = true;
+}
+
 let hpTimer = 0;
 const scheduleHeroSparks = () => { clearTimeout(hpTimer); hpTimer = setTimeout(buildHeroSparks, 120); };
 // Debug: hide the <img> and show the pool at rest; it should reproduce the photo in place
@@ -2598,7 +2672,7 @@ function frame(now) {
     statsEl.textContent = `${bodies.length} words · ${loose} loose · ${bursts} bursting · physics ${physMs.toFixed(1)}ms · ${fps} fps`;
     syncMusicUI();
   }
-  if (hp.show) heroRest();
+  if (diss) updateDissolve(dt); else if (hp.show) heroRest();
   render();
   requestAnimationFrame(frame);
 }
@@ -2716,8 +2790,10 @@ function renderScene() {
   gl.bindBuffer(gl.ARRAY_BUFFER, ptTailBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, ptTail);
   gl.bindBuffer(gl.ARRAY_BUFFER, ptAlphaBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, ptAlpha);
   gl.bindBuffer(gl.ARRAY_BUFFER, ptAgeBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, ptAge);
-  sparkUniforms(camDist, false);
-  gl.bindVertexArray(ptVAO); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, NPT);
+  if (!hp.cover) { // (while the hero sparks stand in for the galaxy, the resume's own stardust stays hidden)
+    sparkUniforms(camDist, false);
+    gl.bindVertexArray(ptVAO); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, NPT);
+  }
 
   // Finder links: dots flowing along arcs between consecutive matches, in reading order
   if (searchAmt > 0.02 && searchN > 1) {
@@ -2975,7 +3051,7 @@ updateCamera(0);
 requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 window.__jelly = { state, rebuild, chaos, burstAll, healAll, clickAt, rayAt, toggleShroom, applyPreset, pickParticle, bodies: () => bodies, cam,
   startIntro, find, MUSIC, startHole, moveHole, releaseHole, hole, tiltG, shakeIt, SFX, intro: () => intro, go: () => document.getElementById('btnGo').click(),
-  heroSparks, hp, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
+  heroSparks, hp, openResume, diss: () => diss, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
 </script>
 </body>
 </html>

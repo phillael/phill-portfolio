@@ -52,6 +52,12 @@
   .hud .stats { order: 11; }
   .prompt { border-top: 1px solid var(--line); background: var(--panel); padding: 10px 14px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
   .prompt pre { margin: 0; white-space: pre-wrap; font: 12px/1.5 var(--mono); color: #c9d3e1; max-height: 150px; overflow-y: auto; }
+  /* while the resume is open: close (top right; Esc) */
+  .closeR { position: absolute; top: 10px; right: 12px; z-index: 3; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; padding: 0;
+    font-size: 22px; line-height: 1; color: var(--text); background: rgba(8,10,16,.72); border: 1px solid var(--line); backdrop-filter: blur(6px); cursor: pointer; transition: opacity .6s ease .4s; }
+  .closeR:hover { border-color: var(--accent); color: var(--accent); }
+  .prestart .closeR { opacity: 0; pointer-events: none; transition: none; }
+  a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   .err { position: absolute; inset: 0; display: none; place-items: center; color: #ffb4b4; padding: 40px; text-align: center; }
   #btnControls { display: none; }
   .btn.on { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px rgba(128,234,255,.3); }
@@ -70,7 +76,7 @@
   .chip:hover { border-color: var(--accent); }
   .chip.on { border-color: var(--accent); color: #041016; background: var(--accent); box-shadow: 0 0 14px rgba(128,234,255,.55); }
   /* Navigator: a mini map of the page with the view box; click or drag it to move, buttons to zoom */
-  .nav { position: absolute; right: 12px; top: 10px; z-index: 2; display: flex; flex-direction: column; gap: 6px; align-items: stretch;
+  .nav { position: absolute; right: 64px; top: 10px; z-index: 2; display: flex; flex-direction: column; gap: 6px; align-items: stretch;
     background: rgba(8,10,16,.72); border: 1px solid var(--line); border-radius: 10px; padding: 6px; backdrop-filter: blur(6px); }
   .nav .map { position: relative; width: 104px; overflow: hidden; border-radius: 4px; cursor: pointer; touch-action: none; transition: height .25s ease, opacity .25s ease; }
   .nav.fit .map { height: 0 !important; opacity: 0; }
@@ -140,6 +146,13 @@
   .sburger { display: none; width: 44px; height: 44px; background: none; border: 0; color: #80eaff; font-size: 24px; cursor: default; }
   .shero { position: absolute; inset: 64px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 0 16px 16px; }
   .hbox { position: relative; flex: none; width: min(800px, 92cqw, calc((100cqh - 190px) * 4 / 3)); aspect-ratio: 4 / 3; min-height: 0; }
+  /* the hero is a real button: hover/focus brightens the glow (canvas), lifts the photo and shows a hint that follows the cursor */
+  .hbtn { position: absolute; inset: 0; padding: 0; margin: 0; border: 0; background: none; cursor: pointer; border-radius: 12px; transition: transform .25s ease; }
+  .hbtn:hover, .hbtn:focus-visible { transform: translateY(-6px); }
+  .hbtn::after { content: '✨ click to open my resume'; position: absolute; left: var(--tx, 50%); top: var(--ty, 88%); transform: translate(-50%, -150%); white-space: nowrap;
+    font: 600 13px "Nunito", system-ui, sans-serif; color: #e9fbff; background: rgba(5,8,18,.82); border: 1px solid rgba(128,234,255,.55); border-radius: 999px; padding: 6px 12px;
+    box-shadow: 0 0 14px rgba(128,234,255,.35); pointer-events: none; opacity: 0; transition: opacity .2s ease; z-index: 2; }
+  .hbtn:hover::after, .hbtn:focus-visible::after { opacity: 1; }
   .hbox img { position: absolute; top: 0; bottom: 0; left: 0; right: 0; margin: auto; height: 100%; width: auto; aspect-ratio: 1; display: block; user-select: none; -webkit-user-drag: none; }
   .stag { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 20px; }
   .stag .sep { margin: 0 8px; color: rgba(240,255,255,.5); }
@@ -166,7 +179,8 @@
     aside { position: fixed; inset: 0 auto 0 0; width: min(340px, 88vw); z-index: 20; transform: translateX(-100%); transition: transform .2s ease; box-shadow: 8px 0 30px rgba(0,0,0,.5); }
     aside.open { transform: none; }
     .prompt, .hint-overlay, .hud .stats { display: none; }
-    .finder { top: 8px; left: 8px; right: 8px; max-width: none; }
+    .finder { top: 8px; left: 8px; right: 60px; max-width: none; }
+    .closeR { top: 8px; right: 8px; }
     .hud .k { display: none; } /* keyboard shortcuts mean nothing on a phone */
     .nav { right: 8px; padding: 4px; }
     .nav .map { width: 64px; }
@@ -239,7 +253,7 @@
           </div>
         </header>
         <div class="shero">
-          <div class="hbox" id="heroBox"><img id="heroImg" src="../../../public/images/hero-image-phill-llamas.png" alt="Phill Aelony wearing a poncho and cowboy hat, throwing a rock hand sign, surrounded by three llamas" draggable="false"></div>
+          <div class="hbox" id="heroBox"><button class="hbtn" id="heroBtn" type="button" aria-label="Open the interactive resume"><img id="heroImg" src="../../../public/images/hero-image-phill-llamas.png" alt="" draggable="false"></button></div>
           <div class="stag"><span class="ng">Legendary Code Sorcerer</span><span class="sep">|</span><span class="np">Vanquisher of Bugs</span><span class="sep">|</span><span class="nb">Builder of Dreams</span></div>
           <div class="sskills" id="siteSkills" role="group" aria-label="Skills"><span class="lbl">Skills</span></div>
         </div>
@@ -252,7 +266,9 @@
           <div class="note">best with sound on</div>
         </div>
       </div>
+      <button class="closeR" id="btnClose" type="button" aria-label="Close the resume (Esc)" title="Close (Esc)">×</button>
       <div class="hud">
+        <a class="btn" id="btnPdf" href="../../../public/Phillip_Aelony_Resume_2025.pdf" download="Phillip_Aelony_Resume.pdf" title="Download the PDF">⤓ PDF</a>
         <button class="btn" id="btnChaos">Chaos<span class="k"> (C)</span></button>
         <button class="btn" id="btnBurst">Burst all<span class="k"> (B)</span></button>
         <button class="btn" id="btnHeal">Heal all<span class="k"> (H)</span></button>
@@ -1322,7 +1338,7 @@ function galaxySlots(n, rand) {
 const canvas = document.getElementById('gl');
 // the site mock (wired up under Boot); declared here because resize() measures it
 const siteEl = document.getElementById('site'), heroBox = document.getElementById('heroBox'), heroImg = document.getElementById('heroImg');
-const site = { amt: 1, glow: new Float32Array([0, 0, 1, 1]) }; // amt: how much the mock covers the stage (the canvas draws its background)
+const site = { amt: 1, boost: 0, hover: false, glow: new Float32Array([0, 0, 1, 1]) }; // amt: how much the mock covers the stage (the canvas draws its background)
 const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, premultipliedAlpha: true });
 const fail = (m) => { const e = document.getElementById('err'); e.style.display = 'grid'; e.textContent = m; throw new Error(m); };
 if (!gl) fail('WebGL2 is not available in this browser.');
@@ -1701,12 +1717,12 @@ void main(){
 const SITEBG_FS = `#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 o;
-uniform vec2 uRes; uniform vec4 uGlow; uniform float uTime, uAmt, uSpark, uPx;
+uniform vec2 uRes; uniform vec4 uGlow; uniform float uTime, uAmt, uSpark, uPx, uBoost;
 ${HSV}
 float h2(vec2 p){ vec3 q = fract(vec3(p.xyx)*vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y)*q.z); }
 float layer(float r, float delay){
-  float k = 0.5 - 0.5*cos((uTime - delay)*1.0471976), R = uGlow.z*(1.0 + 0.1*k);
-  return 0.9*(0.4 + 0.6*k)*pow(clamp(1.0 - r/(R + 0.7*uGlow.w), 0.0, 1.0), 1.3);
+  float k = 0.5 - 0.5*cos((uTime - delay)*1.0471976), R = uGlow.z*(1.0 + 0.1*k)*(1.0 + 0.12*uBoost);
+  return min(1.0, 0.9*(0.4 + 0.6*k)*(1.0 + 0.5*uBoost)*pow(clamp(1.0 - r/(R + 0.7*uGlow.w), 0.0, 1.0), 1.3)); // (uBoost: the hero is hovered)
 }
 void main(){
   vec2 px = vUv*uRes;
@@ -2112,8 +2128,8 @@ function buildHeroSparks() {
   const rc = canvas.getBoundingClientRect(), b = heroImg.getBoundingClientRect();
   if (!heroImg.complete || !heroImg.naturalWidth || b.width < 2 || rc.width < 2) return false;
   const want = Math.round((quality() === 'low' ? 6000 : 18000) * (state.heroSparks ?? 1));
-  const key = [b.left - rc.left, b.top - rc.top, b.width, b.height, want, dprNow].map((v) => Math.round(v)).join(',');
-  if (key === hp.key) return true;
+  const key = [b.width, b.height, want, dprNow].map((v) => Math.round(v)).join(',');
+  if (key === hp.key) { placeHeroSparks(b, rc); return true; } // same size: just follow the photo (the hover lift moves it)
   const k = Math.min(dprNow, 1400 / b.width), W = Math.round(b.width * k), H = Math.round(b.height * k);
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(heroImg, 0, 0, W, H);
@@ -2130,11 +2146,12 @@ function buildHeroSparks() {
     for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) { const o = (yy * W + xx) * 4; all++; if (px[o + 3] < 128) continue; rr += px[o]; gg += px[o + 1]; bb += px[o + 2]; n++; }
     if (n < all * 0.5) continue;
     const cx = x + step * (0.5 + (r() - 0.5) * 0.3), cy = y + step * (0.5 + (r() - 0.5) * 0.3);
-    S.push(b.left - rc.left + cx / k, b.top - rc.top + cy / k); C.push(rr / n / 255, gg / n / 255, bb / n / 255);
+    S.push(cx / k, cy / k); C.push(rr / n / 255, gg / n / 255, bb / n / 255);
   }
   const N = S.length / 2;
   hp.N = N; hp.key = key; hp.dot = 0.74 * step / k * dprNow; // dot radius in canvas px: neighbours overlap, so the photo is solid
-  hp.scr = Float32Array.from(S); hp.col = Float32Array.from(C);
+  hp.loc = Float32Array.from(S); hp.scr = new Float32Array(S.length); hp.col = Float32Array.from(C); hp.at = null;
+  placeHeroSparks(b, rc);
   hp.pos = new Float32Array(N * 3); hp.tail = new Float32Array(N * 3); hp.vel = new Float32Array(N * 3);
   hp.alpha = new Float32Array(N).fill(1); hp.age = new Float32Array(N).fill(9); hp.heat = new Float32Array(N);
   if (hp.vao) gl.deleteVertexArray(hp.vao);
@@ -2148,6 +2165,13 @@ function buildHeroSparks() {
   gl.bindVertexArray(null);
   hp.camKey = ''; hp.dirtyAttr = true; heroRest();
   return true;
+}
+// Each spark's pixel on the canvas: its place in the photo plus where the photo is now
+function placeHeroSparks(b, rc) {
+  const x = b.left - rc.left, y = b.top - rc.top;
+  if (hp.at && hp.at[0] === x && hp.at[1] === y) return;
+  hp.at = [x, y]; hp.camKey = '';
+  for (let i = 0; i < hp.N; i++) { hp.scr[i * 2] = hp.loc[i * 2] + x; hp.scr[i * 2 + 1] = hp.loc[i * 2 + 1] + y; }
 }
 // Each spark's pixel, unprojected onto the plane in front of the camera at hp.dist (just in front of the page)
 function heroHome(i, out) {
@@ -2691,6 +2715,7 @@ function frame(now) {
     statsEl.textContent = `${bodies.length} words · ${loose} loose · ${bursts} bursting · physics ${physMs.toFixed(1)}ms · ${fps} fps`;
     syncMusicUI();
   }
+  site.boost += ((site.hover ? 1 : 0) - site.boost) * Math.min(1, dt * 6);
   if (diss) updateDissolve(dt); else if (hp.show) heroRest();
   render();
   requestAnimationFrame(frame);
@@ -2731,7 +2756,7 @@ function drawHeroSparks() {
 function drawSiteBg() {
   gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   gl.useProgram(SITEBG.p); const u = SITEBG.u;
-  gl.uniform2f(u.uRes, canvas.width, canvas.height); gl.uniform4fv(u.uGlow, site.glow); gl.uniform1f(u.uTime, time); gl.uniform1f(u.uAmt, site.amt);
+  gl.uniform2f(u.uRes, canvas.width, canvas.height); gl.uniform4fv(u.uGlow, site.glow); gl.uniform1f(u.uTime, time); gl.uniform1f(u.uAmt, site.amt); gl.uniform1f(u.uBoost, site.boost);
   gl.uniform1f(u.uSpark, quality() === 'high' ? 1 : 0); gl.uniform1f(u.uPx, dprNow); // the site only runs the vortex on desktop
   gl.bindVertexArray(siteVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.bindVertexArray(null); gl.depthMask(true);
 }
@@ -3058,8 +3083,38 @@ function loadResume() {
   }).catch((err) => { load.state = 'error'; console.error('Resume failed to load', err); });
   return load.p;
 }
+// ---- Triggers: the nav Resume button (primary) and the hero photo (a bonus: a hint on hover/focus, opens from the click point) ----
+const heroBtn = document.getElementById('heroBtn');
+document.getElementById('siteResume').addEventListener('click', (e) => openResume({ origin: e.currentTarget }));
+heroBtn.addEventListener('click', (e) => openResume({ origin: e.detail === 0 ? heroBtn : { x: e.clientX, y: e.clientY } })); // detail 0: Enter/Space
+heroBtn.addEventListener('pointermove', (e) => { const r = heroBtn.getBoundingClientRect(); heroBtn.style.setProperty('--tx', (e.clientX - r.left) + 'px'); heroBtn.style.setProperty('--ty', (e.clientY - r.top) + 'px'); });
+heroBtn.addEventListener('pointerleave', () => { heroBtn.style.removeProperty('--tx'); heroBtn.style.removeProperty('--ty'); });
+['pointerenter', 'focus'].forEach((ev) => heroBtn.addEventListener(ev, () => (site.hover = true)));
+['pointerleave', 'blur'].forEach((ev) => heroBtn.addEventListener(ev, () => (site.hover = heroBtn.matches(':hover') || document.activeElement === heroBtn)));
+// Close: back to the site (T7 plays it in reverse); for now, put everything back at once
+function closeResume() {
+  if (stage.classList.contains('prestart') || diss) return false;
+  if (hole.on) releaseHole();
+  findEl.value = ''; find(''); setMusicOpen(false);
+  stage.classList.add('prestart');
+  startIntro(true); // the resume goes back to waiting as a galaxy, so the next open replays
+  hp.show = false; hp.cover = false; heroImg.style.visibility = '';
+  siteEl.classList.remove('dissolving'); setEntrance();
+  (state.entrance === 'hero' ? document.getElementById('siteResume') : document.getElementById('btnGo')).focus();
+  return true;
+}
+document.getElementById('btnClose').onclick = () => closeResume();
+// hidden UI stays out of the tab order and the accessibility tree: the resume's controls while the site (or start screen) is up, and vice versa
+function syncInert() {
+  const pre = stage.classList.contains('prestart');
+  document.querySelectorAll('.hud, .finder, .nav, .closeR').forEach((el) => (el.inert = pre));
+  startEl.inert = startEl.classList.contains('gone');
+}
+new MutationObserver(syncInert).observe(stage, { attributes: true, attributeFilter: ['class'] });
+new MutationObserver(syncInert).observe(startEl, { attributes: true, attributeFilter: ['class'] });
+syncInert();
 // every trigger prefetches on hover or focus
-[document.getElementById('siteResume'), heroBox, ...document.querySelectorAll('.schip'), document.getElementById('siteShroom'), document.getElementById('btnGo')]
+[document.getElementById('siteResume'), heroBtn, ...document.querySelectorAll('.schip'), document.getElementById('siteShroom'), document.getElementById('btnGo')]
   .forEach((el) => ['pointerenter', 'focus'].forEach((ev) => el.addEventListener(ev, () => loadResume())));
 syncControls();
 bakeSky(); buildStars(); resize();
@@ -3070,7 +3125,7 @@ updateCamera(0);
 requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 window.__jelly = { state, rebuild, chaos, burstAll, healAll, clickAt, rayAt, toggleShroom, applyPreset, pickParticle, bodies: () => bodies, cam,
   startIntro, find, MUSIC, startHole, moveHole, releaseHole, hole, tiltG, shakeIt, SFX, intro: () => intro, go: () => document.getElementById('btnGo').click(),
-  heroSparks, hp, openResume, diss: () => diss, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
+  heroSparks, hp, openResume, closeResume, diss: () => diss, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
 </script>
 </body>
 </html>

@@ -76,7 +76,7 @@ Order matters: T0 first; T2 before T5; T3 → T4 → T5; T7 needs T3–T5; T8 ne
   - Put the resume particles (INTRO pre-state) at the hero spark positions (k → k mod H) and fade the hero pool out over about 0.3 s.
   - Then run `startIntro()` from the pre-state. Its existing galaxy easing and swirl take over, so there's no pop.
   - If the load isn't done, the hero sparks idle in the galaxy until it is.
-- [ ] **T6: triggers and hints.**
+- [x] **T6: triggers and hints.**
   - The mock **Resume** button calls `openResume` with the origin at the button.
   - **Hero:** a real button with the hover/focus hint (glow brighter, slight lift, tooltip) and a click origin at the cursor; keyboard Enter/Space works.
   - The Resume HUD gets **⤓ PDF** (the Download button) and **×** (close; the reverse animation comes in T7).

@@ -1499,10 +1499,10 @@ void main(){
 // instanced quad. One premultiplied pass both darkens a soft haze under the streak and adds the bright core, so it glows
 // on white paper as well as in space.
 const PT_VS = `#version 300 es
-in vec2 aCorner; in vec3 aPos; in vec3 aTail; in vec3 aCol; in float aAlpha; in float aId; in float aAge;
-uniform mat4 uMVP; uniform vec2 uView; uniform float uSize, uScale, uTime, uHue, uShroom, uFlash, uGlow; uniform int uMode;
+in vec2 aCorner; in vec3 aPos; in vec3 aTail; in vec3 aCol; in float aAlpha; in float aId; in float aAge; in float aHeat;
+uniform mat4 uMVP; uniform vec2 uView; uniform float uSize, uScale, uTime, uHue, uShroom, uFlash, uGlow, uDot; uniform int uMode, uHero;
 uniform vec3 uJelly, uNeonA, uNeonB, uNeonC, uElec, uBlue, uViolet;
-out vec2 vP; out float vLen, vW, vHalo, vA, vHot; out vec3 vCol, vWorld;
+out vec2 vP; out float vLen, vW, vHalo, vA, vHot, vPh; out vec3 vCol, vWorld;
 ${HSV}
 void main(){
   vWorld = aPos; vA = aAlpha;
@@ -1514,7 +1514,10 @@ void main(){
   if(len > 160.0){ d *= 160.0/len; st = sh - d; len = 160.0; }
   vec2 dir = len > 0.01 ? d/len : vec2(1.0, 0.0), nrm = vec2(-dir.y, dir.x);
   float w = clamp(0.32*uSize*uScale/h.w, 0.9, 4.5);  // core radius, px: thin and crisp at any zoom
-  float halo = w*(1.5 + 2.4*uGlow);
+  // hero sparks: heat 0 is a pixel of the photo (an opaque dot sized to the sampling grid); heat 1 is a comet spark
+  float heat = clamp(aHeat, 0.0, 1.0), ph = uHero == 1 ? 1.0 - heat : 0.0;
+  w = mix(w, uDot, ph);
+  float halo = mix(w*(1.5 + 2.4*uGlow), w*1.25, ph);
   vec2 sp = mix(st - dir*halo, sh + dir*halo, aCorner.x) + nrm*aCorner.y*halo;
   vP = vec2(mix(-halo, len + halo, aCorner.x), aCorner.y*halo); vLen = len; vW = w; vHalo = halo;
   gl_Position = vec4((sp/uView*2.0 - 1.0)*h.w, h.z, h.w);
@@ -1523,16 +1526,16 @@ void main(){
   vec3 comet = age < 0.12 ? mix(vec3(1.0), uNeonA, age/0.12) : age < 0.5 ? mix(uNeonA, uElec, (age - 0.12)/0.38)
              : age < 1.1 ? mix(uElec, uBlue, (age - 0.5)/0.6) : mix(uBlue, uViolet, clamp((age - 1.1)/0.9, 0.0, 1.0));
   comet = mix(comet, uNeonA, clamp(len/90.0, 0.0, 0.6));
-  if(uMode == 4) vA *= mix(1.0, 0.45, clamp((age - 0.9)/1.4, 0.0, 1.0)*(1.0 - clamp(len/60.0, 0.0, 1.0))); // cooling sparks dim, like embers; fast ones stay lit
+  if(uMode == 4) vA *= mix(1.0, 0.45, clamp((age - 0.9)/1.4, 0.0, 1.0)*(1.0 - clamp(len/60.0, 0.0, 1.0))*(1.0 - ph)); // cooling sparks dim, like embers; fast ones stay lit (photo pixels don't)
   vec3 rainbow = hsv(fract(uTime*0.15 + aId*0.0137), 0.85, 1.0);
   vec3 neon = r < 0.45 ? uNeonA : r < 0.85 ? uNeonB : uNeonC;
-  vec3 c = uMode == 1 ? aCol : uMode == 2 ? rainbow : uMode == 3 ? neon : uMode == 4 ? comet : uJelly;
+  vec3 c = uHero == 1 ? mix(aCol, comet, heat) : uMode == 1 ? aCol : uMode == 2 ? rainbow : uMode == 3 ? neon : uMode == 4 ? comet : uJelly;
   vCol = mix(c, hsv(fract(uTime*uHue + aPos.x*0.05 + aPos.y*0.08), 0.85, 1.0), uShroom);
-  vHot = uFlash*exp(-aAge*6.0);
+  vHot = uFlash*exp(-aAge*6.0); vPh = ph;
 }`;
 const PT_FS = `#version 300 es
 precision highp float;
-in vec2 vP; in float vLen, vW, vHalo, vA, vHot; in vec3 vCol, vWorld; out vec4 o;
+in vec2 vP; in float vLen, vW, vHalo, vA, vHot, vPh; in vec3 vCol, vWorld; out vec4 o;
 uniform vec3 uEye; uniform float uFog, uFogStart, uFogEnd, uGlow;
 void main(){
   float x = clamp(vP.x, 0.0, vLen), d = length(vec2(vP.x - x, vP.y));
@@ -1544,6 +1547,7 @@ void main(){
   float fd = smoothstep(uFogStart, uFogEnd, distance(vWorld, uEye))*uFog, k = vA*(1.0 - 0.85*fd);
   vec3 rgb = vCol*(core*1.2 + glow*0.7) + vec3(1.0)*core*core*(0.2 + vHot);
   float a = clamp(core*0.95 + glow*0.55, 0.0, 0.95); // enough coverage that the color, not the paper, shows through
+  if(vPh > 0.001){ float pd = 1.0 - smoothstep(vW*0.95, vW*1.2, d); rgb = mix(rgb, vCol*pd, vPh); a = mix(a, pd, vPh); } // a photo pixel
   if(a*k < 0.004) discard;
   o = vec4(rgb*k, a*k);
 }`;
@@ -2092,7 +2096,73 @@ function revealY() {
   const d = intro.dur, f = (intro.t - intro.lead - 0.25 - d * 0.18) / (d * 0.66);
   return pageH / 2 + 0.3 - (pageH + 0.6) * smooth(f);
 }
-function introCam() { if (!intro) return 0; if (intro.pre) return 1; return 1 - smooth((intro.t - intro.lead * 0.5) / (intro.dur * 0.75 + 0.6)); }
+function introCam() { if (!intro) return stage.classList.contains('prestart') ? 1 : 0; if (intro.pre) return 1; return 1 - smooth((intro.t - intro.lead * 0.5) / (intro.dur * 0.75 + 0.6)); }
+
+// =====================================================================
+// Hero sparks: the hero photo as ~18K sparks (~6K on Low quality), sampled from its own pixels on a stratified grid. Each keeps
+// its pixel on screen; at rest its world position is that pixel unprojected onto a plane in front of the camera (re-derived every
+// frame, so camera changes never misalign it). Drawn with the comet program: heat 0 = the photo's color, heat 1 = the comet ramp.
+// =====================================================================
+const hp = { N: 0, show: false, dot: 2, dist: 10, key: '', camKey: '', dirtyPos: true, dirtyAttr: true, scr: null, col: null, pos: null, tail: null, vel: null, alpha: null, age: null, heat: null, vao: null, buf: {} };
+function buildHeroSparks() {
+  const rc = canvas.getBoundingClientRect(), b = heroImg.getBoundingClientRect();
+  if (!heroImg.complete || !heroImg.naturalWidth || b.width < 2 || rc.width < 2) return false;
+  const want = Math.round((quality() === 'low' ? 6000 : 18000) * (state.heroSparks ?? 1));
+  const key = [b.left - rc.left, b.top - rc.top, b.width, b.height, want, dprNow].map((v) => Math.round(v)).join(',');
+  if (key === hp.key) return true;
+  const k = Math.min(dprNow, 1400 / b.width), W = Math.round(b.width * k), H = Math.round(b.height * k);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(heroImg, 0, 0, W, H);
+  let px; try { px = g.getImageData(0, 0, W, H).data; } catch (err) { console.warn('Hero sparks need http:// (a file:// page taints the canvas)', err); return false; }
+  let A = 0; for (let i = 3; i < px.length; i += 16) if (px[i] > 127) A += 4;
+  if (!A) return false;
+  if (A > W * H * 0.97) console.warn('The hero image has no transparent background; the sparks would include it');
+  // one spark per grid cell that's mostly photo, colored by the cell's average (so the dots read as the photo, not as aliasing)
+  const step = Math.sqrt(A / want), S = [], C = [];
+  let sd = 11; const r = () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; };
+  for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) {
+    const x0 = Math.floor(x), y0 = Math.floor(y), x1 = Math.min(W, Math.ceil(x + step)), y1 = Math.min(H, Math.ceil(y + step));
+    let rr = 0, gg = 0, bb = 0, n = 0, all = 0;
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) { const o = (yy * W + xx) * 4; all++; if (px[o + 3] < 128) continue; rr += px[o]; gg += px[o + 1]; bb += px[o + 2]; n++; }
+    if (n < all * 0.5) continue;
+    const cx = x + step * (0.5 + (r() - 0.5) * 0.3), cy = y + step * (0.5 + (r() - 0.5) * 0.3);
+    S.push(b.left - rc.left + cx / k, b.top - rc.top + cy / k); C.push(rr / n / 255, gg / n / 255, bb / n / 255);
+  }
+  const N = S.length / 2;
+  hp.N = N; hp.key = key; hp.dot = 0.74 * step / k * dprNow; // dot radius in canvas px: neighbours overlap, so the photo is solid
+  hp.scr = Float32Array.from(S); hp.col = Float32Array.from(C);
+  hp.pos = new Float32Array(N * 3); hp.tail = new Float32Array(N * 3); hp.vel = new Float32Array(N * 3);
+  hp.alpha = new Float32Array(N).fill(1); hp.age = new Float32Array(N).fill(9); hp.heat = new Float32Array(N);
+  if (hp.vao) gl.deleteVertexArray(hp.vao);
+  hp.vao = gl.createVertexArray();
+  attr(PTS, hp.vao, 'aCorner', 2, new Float32Array([0, -1, 1, -1, 0, 1, 1, 1]));
+  const inst = (name, size, data, usage) => { const bf = attr(PTS, hp.vao, name, size, data, usage); const loc = gl.getAttribLocation(PTS.p, name); if (loc >= 0) gl.vertexAttribDivisor(loc, 1); return bf; };
+  hp.buf = { pos: inst('aPos', 3, hp.pos, gl.DYNAMIC_DRAW), tail: inst('aTail', 3, hp.tail, gl.DYNAMIC_DRAW), alpha: inst('aAlpha', 1, hp.alpha, gl.DYNAMIC_DRAW),
+    age: inst('aAge', 1, hp.age, gl.DYNAMIC_DRAW), heat: inst('aHeat', 1, hp.heat, gl.DYNAMIC_DRAW) };
+  inst('aCol', 3, hp.col); inst('aId', 1, Float32Array.from({ length: N }, (_, i) => i));
+  gl.bindVertexArray(null);
+  hp.camKey = ''; hp.dirtyAttr = true; heroRest();
+  return true;
+}
+// Each spark's pixel, unprojected onto the plane in front of the camera at hp.dist (just in front of the page)
+function heroHome(i, out) {
+  const nx = hp.scr[i * 2] / canvas.clientWidth * 2 - 1, ny = 1 - hp.scr[i * 2 + 1] / canvas.clientHeight * 2, tf = Math.tan(FOV / 2), D = hp.dist;
+  for (let a = 0; a < 3; a++) out[a] = cam.eye[a] + (cam.fwd[a] + cam.right[a] * nx * tf * cam.aspect + cam.up[a] * ny * tf) * D;
+}
+function heroRest() {
+  const ck = cam.eye.join() + cam.target.join() + canvas.width + 'x' + canvas.height; if (ck === hp.camKey) return; // the camera hasn't moved
+  hp.camKey = ck; hp.dirtyPos = true;
+  hp.dist = 0.85 * Math.hypot(cam.eye[0] - cam.target[0], cam.eye[1] - cam.target[1], cam.eye[2] - cam.target[2]);
+  for (let i = 0; i < hp.N; i++) { heroHome(i, tmp); const o = i * 3; for (let a = 0; a < 3; a++) hp.pos[o + a] = hp.tail[o + a] = tmp[a]; }
+}
+let hpTimer = 0;
+const scheduleHeroSparks = () => { clearTimeout(hpTimer); hpTimer = setTimeout(buildHeroSparks, 120); };
+// Debug: hide the <img> and show the pool at rest; it should reproduce the photo in place
+function heroSparks(on = true) {
+  if (on && !buildHeroSparks()) return { ok: false };
+  hp.show = on; heroImg.style.visibility = on ? 'hidden' : '';
+  return { ok: true, N: hp.N, dot: +hp.dot.toFixed(2) };
+}
 
 // =====================================================================
 // Finder: matching words lift off the page and glow; everything else dims
@@ -2493,7 +2563,7 @@ function resize() {
   if (bodies.length && state.layoutSource === 'runtime' && pageWidthFor() !== PAGE_W) rebuild();
   const r = stage.getBoundingClientRect(), dpr = dprNow = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr));
-  measureSite(); }
+  measureSite(); if (hp.N) scheduleHeroSparks(); }
 new ResizeObserver(resize).observe(stage); resize();
 const statsEl = document.getElementById('stats');
 let last = performance.now(), frames = 0, fpsT = 0, physMs = 0;
@@ -2528,6 +2598,7 @@ function frame(now) {
     statsEl.textContent = `${bodies.length} words · ${loose} loose · ${bursts} bursting · physics ${physMs.toFixed(1)}ms · ${fps} fps`;
     syncMusicUI();
   }
+  if (hp.show) heroRest();
   render();
   requestAnimationFrame(frame);
 }
@@ -2536,6 +2607,33 @@ function render() {
   // while the site mock covers the stage, the canvas only draws its background (the resume behind it isn't visible)
   if (site.amt < 0.999) renderScene(); else { gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); }
   if (site.amt > 0.001) drawSiteBg();
+  if (hp.show && hp.N) drawHeroSparks();
+}
+// The comet-spark program's uniforms, for the resume's sparks and for the hero pool (photo colors heating into the comet ramp)
+function sparkUniforms(camDist, heroPass) {
+  gl.useProgram(PTS.p);
+  gl.uniformMatrix4fv(PTS.u.uMVP, false, cam.mvp); gl.uniform1f(PTS.u.uSize, 0.045 * state.pSize);
+  gl.uniform1f(PTS.u.uFlash, state.flash); gl.uniform1f(PTS.u.uGlow, state.pGlow);
+  gl.uniform1f(PTS.u.uScale, canvas.height / (2 * Math.tan(FOV / 2))); gl.uniform1f(PTS.u.uTime, time); gl.uniform1f(PTS.u.uHue, state.hueSpeed);
+  gl.uniform1f(PTS.u.uShroom, heroPass ? 0 : shroomAmt); gl.uniform1i(PTS.u.uMode, heroPass ? 4 : PCOLORS.findIndex(([k]) => k === state.pColor));
+  gl.uniform1i(PTS.u.uHero, heroPass ? 1 : 0); gl.uniform1f(PTS.u.uDot, hp.dot);
+  gl.uniform3fv(PTS.u.uJelly, hex(JELLY[state.jelly][1]));
+  gl.uniform3fv(PTS.u.uNeonA, hex(SITE.cyan)); gl.uniform3fv(PTS.u.uNeonB, hex(SITE.purple)); gl.uniform3fv(PTS.u.uNeonC, hex(SITE.green));
+  gl.uniform3fv(PTS.u.uElec, hex(SITE.electric)); gl.uniform3fv(PTS.u.uBlue, [0.25, 0.42, 1.0]); gl.uniform3fv(PTS.u.uViolet, [0.3, 0.2, 0.82]); // cools to deep indigo, not violet (violet dots on white read pastel)
+  gl.uniform2f(PTS.u.uView, canvas.width, canvas.height);
+  gl.uniform3fv(PTS.u.uEye, cam.eye); gl.uniform1f(PTS.u.uFog, heroPass ? 0 : state.fog); gl.uniform1f(PTS.u.uFogStart, camDist + 3); gl.uniform1f(PTS.u.uFogEnd, camDist + 26);
+}
+// The hero pool draws over everything (it starts as the photo in front of the page)
+function drawHeroSparks() {
+  gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  const b = hp.buf; // upload only what changed (at rest, nothing does)
+  if (hp.dirtyPos) { gl.bindBuffer(gl.ARRAY_BUFFER, b.pos); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.pos); gl.bindBuffer(gl.ARRAY_BUFFER, b.tail); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.tail); }
+  if (hp.dirtyAttr) { gl.bindBuffer(gl.ARRAY_BUFFER, b.alpha); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.alpha);
+    gl.bindBuffer(gl.ARRAY_BUFFER, b.age); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.age); gl.bindBuffer(gl.ARRAY_BUFFER, b.heat); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.heat); }
+  hp.dirtyPos = hp.dirtyAttr = false;
+  sparkUniforms(hp.dist, true);
+  gl.bindVertexArray(hp.vao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, hp.N);
+  gl.bindVertexArray(null); gl.depthMask(true);
 }
 function drawSiteBg() {
   gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -2618,16 +2716,7 @@ function renderScene() {
   gl.bindBuffer(gl.ARRAY_BUFFER, ptTailBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, ptTail);
   gl.bindBuffer(gl.ARRAY_BUFFER, ptAlphaBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, ptAlpha);
   gl.bindBuffer(gl.ARRAY_BUFFER, ptAgeBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, ptAge);
-  gl.useProgram(PTS.p);
-  gl.uniformMatrix4fv(PTS.u.uMVP, false, cam.mvp); gl.uniform1f(PTS.u.uSize, 0.045 * state.pSize);
-  gl.uniform1f(PTS.u.uFlash, state.flash); gl.uniform1f(PTS.u.uGlow, state.pGlow);
-  gl.uniform1f(PTS.u.uScale, canvas.height / (2 * Math.tan(FOV / 2))); gl.uniform1f(PTS.u.uTime, time); gl.uniform1f(PTS.u.uHue, state.hueSpeed);
-  gl.uniform1f(PTS.u.uShroom, shroomAmt); gl.uniform1i(PTS.u.uMode, PCOLORS.findIndex(([k]) => k === state.pColor));
-  gl.uniform3fv(PTS.u.uJelly, hex(JELLY[state.jelly][1]));
-  gl.uniform3fv(PTS.u.uNeonA, hex(SITE.cyan)); gl.uniform3fv(PTS.u.uNeonB, hex(SITE.purple)); gl.uniform3fv(PTS.u.uNeonC, hex(SITE.green));
-  gl.uniform3fv(PTS.u.uElec, hex(SITE.electric)); gl.uniform3fv(PTS.u.uBlue, [0.25, 0.42, 1.0]); gl.uniform3fv(PTS.u.uViolet, [0.3, 0.2, 0.82]); // cools to deep indigo, not violet (violet dots on white read pastel)
-  gl.uniform2f(PTS.u.uView, canvas.width, canvas.height);
-  gl.uniform3fv(PTS.u.uEye, cam.eye); gl.uniform1f(PTS.u.uFog, state.fog); gl.uniform1f(PTS.u.uFogStart, camDist + 3); gl.uniform1f(PTS.u.uFogEnd, camDist + 26);
+  sparkUniforms(camDist, false);
   gl.bindVertexArray(ptVAO); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, NPT);
 
   // Finder links: dots flowing along arcs between consecutive matches, in reading order
@@ -2828,7 +2917,8 @@ function measureSite() {
   site.glow[0] = (b.left + hw - rc.left) * k; site.glow[1] = (rc.bottom - b.top - b.height / 2) * k;
   site.glow[2] = 0.55 * Math.hypot(hw, hh) * k; site.glow[3] = 60 * s * k;
 }
-heroImg.addEventListener('load', measureSite);
+heroImg.addEventListener('load', () => { measureSite(); scheduleHeroSparks(); });
+if (document.fonts) document.fonts.ready.then(() => { measureSite(); scheduleHeroSparks(); }); // the tagline's font can move the hero
 function showSite(on) { siteEl.classList.toggle('gone', !on); siteEl.inert = !on; site.amt = on ? 1 : 0; }
 // 'hero': the site mock; 'button': the "View Resume" start screen (only while the resume isn't open)
 function setEntrance() {
@@ -2885,7 +2975,7 @@ updateCamera(0);
 requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 window.__jelly = { state, rebuild, chaos, burstAll, healAll, clickAt, rayAt, toggleShroom, applyPreset, pickParticle, bodies: () => bodies, cam,
   startIntro, find, MUSIC, startHole, moveHole, releaseHole, hole, tiltG, shakeIt, SFX, intro: () => intro, go: () => document.getElementById('btnGo').click(),
-  loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
+  heroSparks, hp, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
 </script>
 </body>
 </html>

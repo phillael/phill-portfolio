@@ -181,6 +181,14 @@
   .sfab:hover { transform: scale(1.1); }
   .sfab.shroomfab { bottom: 96px; border: 2px solid rgba(233,179,255,.5); box-shadow: 0 0 8px rgba(233,179,255,.5), 0 0 15px rgba(233,179,255,.25), 0 0 22px rgba(233,179,255,.15); }
   .sfab.musicfab { bottom: 24px; color: #80eaff; border: 2px solid rgba(128,234,255,.5); box-shadow: 0 0 8px rgba(128,234,255,.5), 0 0 15px rgba(128,234,255,.25); }
+  /* the 🍄 summon (mocked: no wizard, no network) */
+  .sbubble { position: absolute; right: 92px; bottom: 104px; width: min(270px, calc(100cqw - 110px)); z-index: 7; padding: 12px 14px; background: hsl(220 20% 8%);
+    border: 1px solid rgba(233,179,255,.55); border-radius: 14px 14px 4px 14px; box-shadow: 0 0 18px rgba(233,179,255,.3); font-size: 15px; line-height: 1.4; }
+  .sbubble[hidden] { display: none; }
+  .sbubble p { margin: 0 0 10px; }
+  .sbubble .row { display: flex; gap: 8px; }
+  .sbtn { min-height: 44px; padding: 0 14px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; color: #120a1a; background: #e9b3ff; border: 1px solid #e9b3ff; }
+  .sbtn.ghost { color: #e9b3ff; background: transparent; }
   @media (pointer: coarse) { .schip { min-height: 44px; } }
   @container (max-width: 1240px) { .slinks { gap: 4px; } .slinks a { font-size: 16px; padding: 8px 10px; } .sright { gap: 16px; } }
   @container (max-width: 1023px) { .stag { font-size: 18px; } }
@@ -189,6 +197,7 @@
     .snav { padding: 0 16px; } .slogo b { font-size: 18px; } .slogo i { font-size: 12px; }
     .stag { flex-direction: column; gap: 4px; font-size: 16px; } .stag .sep { display: none; }
     .sfab { right: 16px; width: 44px; height: 44px; font-size: 20px; } .sfab.shroomfab { bottom: 64px; } .sfab.musicfab { bottom: 16px; }
+    .sbubble { right: 68px; bottom: 72px; }
   }
   @media (max-width: 820px) {
     .app { grid-template-columns: 1fr; }
@@ -273,7 +282,11 @@
           <div class="stag"><span class="ng">Legendary Code Sorcerer</span><span class="sep">|</span><span class="np">Vanquisher of Bugs</span><span class="sep">|</span><span class="nb">Builder of Dreams</span></div>
           <div class="sskills" id="siteSkills" role="group" aria-label="Skills"><span class="lbl">Skills</span></div>
         </div>
-        <button class="sfab shroomfab" id="siteShroom" type="button" aria-label="Summon the Shroom Wizard">🍄</button>
+        <button class="sfab shroomfab" id="siteShroom" type="button" aria-label="Summon the Shroom Wizard" aria-expanded="false" aria-controls="sBubble">🍄</button>
+        <div class="sbubble" id="sBubble" role="dialog" aria-label="The Shroom Wizard" hidden>
+          <p>Shall I summon Phill's resume? ✨</p>
+          <div class="row"><button class="sbtn" id="sSummon" type="button">Summon</button><button class="sbtn ghost" id="sNo" type="button">Not now</button></div>
+        </div>
         <button class="sfab musicfab" id="siteMusic" type="button" aria-label="Open the music player">♫</button>
       </div>
       <div class="start gone" id="start">
@@ -1546,7 +1559,7 @@ void main(){
 // on white paper as well as in space.
 const PT_VS = `#version 300 es
 in vec2 aCorner; in vec3 aPos; in vec3 aTail; in vec3 aCol; in float aAlpha; in float aId; in float aAge; in float aHeat;
-uniform mat4 uMVP; uniform vec2 uView; uniform float uSize, uScale, uTime, uHue, uShroom, uFlash, uGlow, uDot; uniform int uMode, uHero;
+uniform mat4 uMVP; uniform vec2 uView; uniform float uSize, uScale, uTime, uHue, uShroom, uFlash, uGlow, uDot, uTint; uniform int uMode, uHero; uniform vec3 uTintCol;
 uniform vec3 uJelly, uNeonA, uNeonB, uNeonC, uElec, uBlue, uViolet;
 out vec2 vP; out float vLen, vW, vHalo, vA, vHot, vPh; out vec3 vCol, vWorld;
 ${HSV}
@@ -1572,6 +1585,7 @@ void main(){
   vec3 comet = age < 0.12 ? mix(vec3(1.0), uNeonA, age/0.12) : age < 0.5 ? mix(uNeonA, uElec, (age - 0.12)/0.38)
              : age < 1.1 ? mix(uElec, uBlue, (age - 0.5)/0.6) : mix(uBlue, uViolet, clamp((age - 1.1)/0.9, 0.0, 1.0));
   comet = mix(comet, uNeonA, clamp(len/90.0, 0.0, 0.6));
+  comet = mix(comet, uTintCol, uTint*(1.0 - smoothstep(0.05, 0.8, age))); // the 🍄 summon: the heat starts violet, then the usual ramp
   if(uMode == 4) vA *= mix(1.0, 0.45, clamp((age - 0.9)/1.4, 0.0, 1.0)*(1.0 - clamp(len/60.0, 0.0, 1.0))*(1.0 - ph)); // cooling sparks dim, like embers; fast ones stay lit (photo pixels don't)
   vec3 rainbow = hsv(fract(uTime*0.15 + aId*0.0137), 0.85, 1.0);
   vec3 neon = r < 0.45 ? uNeonA : r < 0.85 ? uNeonB : uNeonC;
@@ -2152,7 +2166,7 @@ function introCam() { if (closing) return closing.cam; if (!intro) return stage.
 // its pixel on screen; at rest its world position is that pixel unprojected onto a plane in front of the camera (re-derived every
 // frame, so camera changes never misalign it). Drawn with the comet program: heat 0 = the photo's color, heat 1 = the comet ramp.
 // =====================================================================
-const hp = { N: 0, show: false, cover: false, gal: null, dot: 2, dist: 10, key: '', camKey: '', dirtyPos: true, dirtyAttr: true, scr: null, col: null, pos: null, tail: null, vel: null, alpha: null, age: null, heat: null, vao: null, buf: {} };
+const hp = { N: 0, show: false, cover: false, tint: 0, gal: null, dot: 2, dist: 10, key: '', camKey: '', dirtyPos: true, dirtyAttr: true, scr: null, col: null, pos: null, tail: null, vel: null, alpha: null, age: null, heat: null, vao: null, buf: {} };
 function buildHeroSparks() {
   const rc = canvas.getBoundingClientRect(), b = heroImg.getBoundingClientRect();
   if (!heroImg.complete || !heroImg.naturalWidth || b.width < 2 || rc.width < 2) return false;
@@ -2227,7 +2241,7 @@ function originPx(origin) {
   if (origin && origin.x != null) return [origin.x - rc.left, origin.y - rc.top];
   const b = heroImg.getBoundingClientRect(); return [b.left + b.width / 2 - rc.left, b.top + b.height / 2 - rc.top];
 }
-function openResume({ origin, find: q, fromRoute = false } = {}) {
+function openResume({ origin, find: q, fromRoute = false, tint = 0 } = {}) {
   if (reducedMotion()) return openPanel(origin);
   if (diss || closing || !stage.classList.contains('prestart') || state.entrance !== 'hero') return false;
   if (q != null) pendingFind = q || null;
@@ -2244,7 +2258,8 @@ function openResume({ origin, find: q, fromRoute = false } = {}) {
   }
   heroRest();
   hp.vel.fill(0); hp.sv = new Float32Array(N * 3); hp.prev = hp.pos.slice();
-  diss = { t: 0, rel, travel: T, sweep, ox, oy };
+  diss = { t: 0, rel, travel: T, sweep, ox, oy }; hp.tint = tint;
+  if (!sBubble.hidden) setBubble(false);
   hp.show = true; hp.cover = true; heroImg.style.visibility = 'hidden'; // the sparks match the photo, so the swap is invisible
   siteEl.classList.add('dissolving'); siteEl.inert = true;
   SFX.intro(2);
@@ -2326,6 +2341,7 @@ function reverseClose(cam0) {
     hp.heat[i] = 1; hp.age[i] = 0; hp.alpha[i] = 1;
     rel[i] = 0.22 * Math.random();
   }
+  hp.tint = 0;
   closing = { t: 0, T, rel, cam: cam0, reveal: pageBottom - 0.3, landed: false, fade: 0 };
   hp.show = true; hp.cover = true;
   startIntro(true); // every word hides at once (they're the sparks now) and the resume waits as a galaxy again
@@ -2837,6 +2853,7 @@ function sparkUniforms(camDist, heroPass) {
   gl.uniform1f(PTS.u.uScale, canvas.height / (2 * Math.tan(FOV / 2))); gl.uniform1f(PTS.u.uTime, time); gl.uniform1f(PTS.u.uHue, state.hueSpeed);
   gl.uniform1f(PTS.u.uShroom, heroPass ? 0 : shroomAmt); gl.uniform1i(PTS.u.uMode, heroPass ? 4 : PCOLORS.findIndex(([k]) => k === state.pColor));
   gl.uniform1i(PTS.u.uHero, heroPass ? 1 : 0); gl.uniform1f(PTS.u.uDot, hp.dot);
+  gl.uniform1f(PTS.u.uTint, heroPass ? hp.tint : 0); gl.uniform3fv(PTS.u.uTintCol, [0.6, 0.42, 1.0]); // a blue-violet (#996bff): the site violet read pink once it was white-hot
   gl.uniform3fv(PTS.u.uJelly, hex(JELLY[state.jelly][1]));
   gl.uniform3fv(PTS.u.uNeonA, hex(SITE.cyan)); gl.uniform3fv(PTS.u.uNeonB, hex(SITE.purple)); gl.uniform3fv(PTS.u.uNeonC, hex(SITE.green));
   gl.uniform3fv(PTS.u.uElec, hex(SITE.electric)); gl.uniform3fv(PTS.u.uBlue, [0.25, 0.42, 1.0]); gl.uniform3fv(PTS.u.uViolet, [0.3, 0.2, 0.82]); // cools to deep indigo, not violet (violet dots on white read pastel)
@@ -3243,6 +3260,14 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault(); e.stopPropagation();
   f[i < 0 ? (e.shiftKey ? f.length - 1 : 0) : (i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
 }, true);
+// ---- The 🍄 summon: a speech bubble offers to summon the resume (mocked: no wizard, no chat API, no network) ----
+const sFab = document.getElementById('siteShroom'), sBubble = document.getElementById('sBubble');
+function setBubble(open) { sBubble.hidden = !open; sFab.setAttribute('aria-expanded', String(open)); if (open) document.getElementById('sSummon').focus(); }
+sFab.addEventListener('click', () => setBubble(sBubble.hidden));
+document.getElementById('sSummon').addEventListener('click', () => { setBubble(false); openResume({ origin: sFab, tint: 1 }); });
+document.getElementById('sNo').addEventListener('click', () => { setBubble(false); sFab.focus(); });
+sBubble.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); setBubble(false); sFab.focus(); } });
+document.getElementById('sSummon').addEventListener('pointerenter', () => loadResume());
 // Skills chips deep-link into the Finder: the resume opens from the chip, and that skill lights up once the page lands
 document.querySelectorAll('.schip').forEach((b) => {
   if (!CHIPS.some(([n]) => n === b.dataset.q)) console.warn('Skills chip has no Finder chip:', b.dataset.q);

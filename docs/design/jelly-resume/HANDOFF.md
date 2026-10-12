@@ -193,7 +193,7 @@ Plan: `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md` (T0–T12, on
 - **Reduced motion** (the media query, or the setting `simReduced`): every trigger opens a plain HTML resume dialog built from `DATA` (no phone or email). Focus moves in, Tab is trapped, Esc closes and focus returns to the trigger; it has Download PDF. No dissolve runs.
 - **Settings:** a "Site integration" group with `entrance`, `dissolveTime`, `heroSparks` and `simReduced`. Each adds a Copy-prompt line, and the brief now describes the integration.
 - **Debug hook:** `window.__jelly` adds `openResume, closeResume, loadResume, loadState, heroSparks, hp, diss(), closing(), openPanel, closePanel`.
-- **Measured:** desktop 120 fps throughout (the dissolve and the 18K-spark pool at rest). Emulated phone (390×844, 4× CPU, 6K sparks): 104 fps dissolve, 79 fps reverse.
+- **Measured:** desktop 120 fps throughout (the dissolve and the 18K-spark pool at rest). Emulated phone (390×844, 4× CPU, 6K sparks): 104 fps dissolve, 79 fps reverse. **Known hitch:** if the resume wasn't prefetched, the cold load lands mid-dissolve as one ~257 ms frame on the throttled phone (the snapshot parse plus the synchronous `rebuild()`). Preloaded, the worst frame is 25 ms. On a phone, hover prefetch doesn't happen before a tap, so this is worth fixing before shipping (idle-chunked rebuild, a worker, or the smaller WebP snapshot).
 - **Bug fixed on the way:** with nothing loaded, the front mist drew opaque (blending was only re-enabled in the skipped block).
 - **Version bump:** none here (no PR). When the integration is ported in a PR, bump `package.json` minor.
 

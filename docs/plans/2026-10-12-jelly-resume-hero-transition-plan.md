@@ -132,6 +132,19 @@ After all boxes are ticked, in a fresh isolated tab on the http URL:
 8. No console errors (except the favicon 404). Close all test tabs and pause any audio you started.
 9. `git log --oneline feat/jelly-resume-playground` shows one commit per task. `git status` is clean apart from ignored files. **Nothing pushed.**
 
+## Acceptance results (2026-10-12, fresh isolated tab)
+
+All nine items pass:
+1. **Mock at load:** it matches phillcodes.com, and only the page and the hero PNG load (no snapshot).
+2. **Open:** hover requests the snapshot, and the click dissolves from the button's center. The resume is usable: rotate (yaw −0.75), Finder ("AI": 27 words), Chaos (113 loose), black hole (30 eaten), music dance (Micro Clown, live analyser; paused afterwards).
+3. **Close and reopen:** × plays the reverse, a hero click reopens from the click point, and Esc closes.
+4. **Deep link:** `#resume?find=React` (14 matches) works; Back plays the reverse and Forward reopens.
+5. **Skills chip:** TypeScript opens with `#resume?find=TypeScript` (2 matches).
+6. **Reduced motion:** the simulated setting opens the panel with no dissolve; Esc closes it and focus returns.
+7. **fps:** desktop 120 open / 119 close. Emulated phone at 4× CPU: 104 open, 109 Chaos, 89 close (all averages ≥ 45). **Known hitch:** a cold open (resume not prefetched) has one ~257 ms frame mid-dissolve on the throttled phone: the 1.5 MB snapshot parse plus the synchronous `rebuild()`. Preloaded, the same flow's worst frame is 25 ms. Options for later: rebuild in idle chunks or a worker, or the smaller WebP snapshot planned for the real site.
+8. **Console:** no errors apart from the expected favicon 404. Test tabs are closed and the music is paused.
+9. **Git:** see `git log` (one commit per task); nothing pushed.
+
 ## Stop conditions / open questions (only Phill can decide)
 
 - **Pushing or opening a PR:** do not push. Before any push, Phill must confirm that nothing private is committed. The snapshot with phone and email is gitignored, so it must never be committed, and the real site will need a Rezmancer "web" variant without contact details.

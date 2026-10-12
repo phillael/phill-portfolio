@@ -1,0 +1,236 @@
+# Jelly Resume: design handoff
+
+**Status (2026-10-12, session 2):** design and workshop phase. Jazz, entrance, finder, black hole and tilt added (see below). Everything lives in one self-contained playground. Nothing is in the phillcodes.com app yet. Phill wants it fully dialed in before it goes on the site.
+
+**Open it:** `open ~/Desktop/dev/phill-portfolio/docs/design/jelly-resume/playground.html` (plain `file://`, no server).
+
+## The idea
+
+A "View Resume" button on phillcodes.com opens a full-screen 3D view of Phill's resume. It looks exactly like the PDF from his Rezmancer app and floats in a cyberpunk nebula. At rest it's just a readable page. When you click on it, it misbehaves in a Jelly Mario way:
+
+- the clicked word and its neighbors break loose and float over the page;
+- loose words bump into each other and into the text still on the page, and hard hits knock that text loose too (chain reactions);
+- some loose words fly toward the camera (growing) or off past the edge into the distance (shrinking);
+- on a hard impact, after floating a while, or when a loose word is clicked, a word bursts into glowing particles;
+- the particles then swarm home and the word re-forms, so the page always heals itself.
+
+Reference: [Jelly Mario](https://jellymar.io/). Its `build/main.js` shows a GPU particle simulation stored in float textures, springs (stiffness 1700, damping 6), a grid for collisions, and sprites texture-mapped onto particle lattices. We copied the core trick, a texture mapped onto a spring lattice, on the CPU.
+
+## Files (all untracked, in `docs/design/`)
+
+| File | What it is |
+|---|---|
+| `jelly-resume/playground.html` | **The current playground.** ~1,560 lines. Raw WebGL2, no dependencies. |
+| `jelly-resume/rezmancer-snapshot.js` | Generated (~1.5 MB). Exact layout of the Rezmancer resume: word boxes and styles, a text-layer PNG and a decorations PNG. Loaded by the playground with a `<script>` tag. |
+| `jelly-resume/tools/snapshot.mjs` | Generates the snapshot from Rezmancer's printed HTML using headless Chrome (puppeteer-core). |
+| `jelly-resume/playground-v1..v11.html` | Earlier versions, kept for reference (v1: floor and gummy boxes; v2: before space; v3: before site colors; v4: before the snapshot; v5: before finishes and 3D text; v6: before jazz, entrance, finder, black hole; v7: before the jazz engine was removed; v8: before map-style navigation; v9: before rotate-by-default and the bending paper; v10: before the scroll-stability fix; v11: before comet sparks). |
+| `paper-shatters/playground.html` | Abandoned first concept: the page shatters into a neon "Career Skyline" of job towers. **Phill dropped the towers as too complicated.** Kept only for ideas, such as the glowing cracks and the shard shader. |
+
+Refresh the snapshot after changing the resume in Rezmancer:
+
+```bash
+# in ~/Desktop/dev/rezmancer: regenerate out/*.html (pnpm resume), then
+node ~/Desktop/dev/phill-portfolio/docs/design/jelly-resume/tools/snapshot.mjs \
+  ~/Desktop/dev/rezmancer/out/Phill_Aelony_Resume_AI_Engineer.html \
+  ~/Desktop/dev/phill-portfolio/docs/design/jelly-resume/rezmancer-snapshot.js
+```
+
+The tool lays the HTML out at 710 px (Letter 8.5in minus Rezmancer's 0.55in side margins, from `packages/render/src/resume.css` `@page`) at 3× resolution. It walks the text nodes with `Range.getClientRects()` to get one box per word and classifies each word as heading, bold or body. It takes two screenshots: text only on a transparent background, and decorations only (`color: transparent`, which keeps the bullets, tint bars, rules and separators). It hard-codes the puppeteer-core path from `~/.npm/_npx` and the system Chrome path; the env vars `PUPPETEER_CORE` and `CHROME` override them.
+
+## How the playground works (map of the code)
+
+- **Data:**
+  - `DATA` is the resume in the same shape as `rezmancer/content/resume.yaml` (phone and email left out). It feeds the "Reflow from resume data" layout.
+  - `window.REZ_SNAPSHOT` feeds the default "Exact Rezmancer output" layout. `snapshotBodies()` converts snapshot words into the same body records the reflow layout produces (1 page unit = 1 inch = 96 CSS px).
+- **Bodies:** one jelly body per word (or per line run in the "ribbons" setting). Each body is a 3-row particle lattice with cell size 0.2. Springs: structural, shear (×0.7) and bend (×0.35). Bold words are softer (`boldSoft`); headings are stiffer and heavier.
+- **States:** `HOME → LOOSE → (BURST → REFORM) | RETURN → HOME`.
+  - A **home spring** (`homePull`) keeps the page readable.
+  - A word breaks loose when its displacement exceeds `breakDist`, when clicked, or randomly in shroom mode.
+- **Physics:** semi-implicit Euler, 4 substeps per frame, all in typed arrays.
+  - **Float mode:** loose words are confined to a thin layer just above the page (z 0.03–0.085), "air hockey" style, so they collide with the text that's still on it.
+  - **Collisions:** a hash grid over loose particles plus the particles of words still at home. Hitting home text transfers momentum scaled by `contagion`.
+  - **Escapees:** words that escape skip the layer, then burst when they reach the camera or get far away.
+- **Bursts:** each word stores 6–90 glyph sample points taken from the atlas alpha. On burst, the points are placed through the current lattice by bilinear lookup and fly apart. They drift for `burstTime`, then ease toward their home positions while the word fades back in.
+- **Rendering** (WebGL2, premultiplied alpha):
+  - **Backdrop:** a nebula baked once into an equirectangular texture (fbm with domain warp, a band, dust lanes, filaments, base haze), plus about 2,600 3D star points and about 16 instanced mist sprites (back ones, a halo behind the page, and front wisps that are off on Low quality).
+  - **Page:** the decorations backing texture.
+  - **Words:** atlas-textured lattices that discard empty pixels and write depth.
+  - **Burst particles:** points.
+  - **Distance fog:** in the word and particle shaders.
+- **Camera:**
+  - **Zoom:** 1 fits the whole page; smaller values zoom in.
+  - **Mouse:** wheel scrolls, Ctrl or pinch zooms, dragging on empty space orbits (clamped), double-click or R resets.
+  - **Touch:** drag scrolls, tap knocks words loose, long-press grabs, pinch zooms.
+- **Controls:** every slider lives in `SCHEMA`; presets are in `PRESETS`. **Copy prompt** produces an implementation brief listing only the settings changed from the defaults, plus exact JSON.
+- **Debug hook:** `window.__jelly` exposes `state, rebuild, chaos, burstAll, healAll, clickAt, rayAt, pickParticle, bodies(), cam` for scripted testing.
+
+## Added 2026-10-12: finishes, 3D text, bigger bursts (backup before this: playground-v5.html)
+
+- **Page finish:** textured paper (default), smooth, holographic foil, or brushed metal.
+  - A grain/fiber/mottle texture is baked once on the GPU (`GRAINBAKE_FS`, 1024², mirrored-repeat) and used for bump lighting.
+  - Foil is an iridescent tint driven by the view angle; metal has anisotropic streaks and reflects the nebula.
+- **Text finish:** embossed (default), flat, chrome, or iridescent foil.
+  - Normals come from the glyph alpha gradient, mapped into world space with a derivative-based tangent frame.
+  - Chrome reflects the baked nebula (`skyLook(reflect(-V, n))`).
+- **Text thickness:** the word face is lifted by `textDepth * 0.05` and the gap filled with 1–6 darker stacked copies (`uPass` 1). Phones (Low quality) are capped at 2.
+- **Drop shadows** (`uPass` 2): words are projected onto the page along the light, the atlas is sampled with a mip bias to soften it, and the shadow fades with height.
+- **Bursts:**
+  - default force 5.5, about 1.8× more particles per word (`pDensity`);
+  - a flash that enlarges and whitens particles right after the burst (per-particle age attribute), and a soft halo (`pGlow`);
+  - a **shockwave** that shoves nearby words, which can chain into more bursts. It's skipped when more than 12 words burst in one frame, and by "Burst all".
+- **New presets:** Chrome (chrome text on brushed metal) and Holo Foil.
+- **Measured:** desktop 120 fps, physics about 1.5 ms. Emulated phone (4× CPU) 120 fps at rest, 113 with 200 words loose (physics about 7.6 ms).
+- **Still to judge with Phill:** whether embossed and 0.35 thickness is the right default. At steep orbit angles the stacked layers can read as a doubled outline; lowering thickness or shadows fixes it.
+
+## Added 2026-10-12, session 2: jazz, entrance, finder, black hole, tilt (backup before this: playground-v6.html)
+
+Goal: make it unique, fun and impressive. Phill picked all four directions.
+
+- **Drop shadows removed** (Phill: "making it look kind of messy"). The slider, the shader pass and the prompt line are gone.
+- **Jazz (`JAZZ` module, Web Audio, all synthesized, no files):**
+  - **Instruments:** Karplus-Strong guitar (words breaking loose) and bass; vibraphone, Rhodes (FM) or kalimba for bursts (`burstTone`); brush ghost notes for bumps; bell tinks when words re-form.
+  - **Timing:** notes snap to a swung triplet grid over a ii–V–I–VI in F at `tempo` 126. A note is the chord tone nearest the word's height on the page, and the line walks there a step or two at a time, so chain reactions come out as runs. Each slot has a cap per instrument, and overflow slides to the next slots.
+  - **Band:** a walking bass plus ride and hi-hat comes in when 3+ words are loose (`band`). When the page heals, a C13 → Fmaj9 cadence plays.
+  - **Big moments:** Chaos plays an altered stab; Burst all plays a vibes glissando.
+  - **Shroom mode:** switches to drifting lydian chords with heavy echo and detune.
+  - **Mix:** generated-impulse reverb, dotted-eighth echo, compressor. Voices are capped at 48.
+  - **Verified:** voices drain back to 0 at rest. **Not yet heard by Phill.**
+- **Entrance:** the start screen is a neon "View Resume" button (Audiowide). Behind it, the resume waits as a two-armed spiral galaxy of its own glyph particles (`ptGal`, `galaxyAt`). Pressing it does the following:
+  - the camera swings in (`introCam`);
+  - a cyan scanline prints the page top to bottom (`uReveal` in the page shader);
+  - each word's stardust streams in, and the word lands with a jelly splat, playing a note in a run down the page;
+  - it ends on an Fmaj9 strum.
+
+  ▶ Intro (I) replays it: the page dissolves into the galaxy first. The `INTRO` state and `bd.rt` give the landing its own re-form time.
+- **Finder:** a search bar plus chips (AI, React, TypeScript, AWS, Node, Data, Impact, Music). `/` focuses it, Esc clears it.
+  - Matches lift (z +0.7), scale to 1.6× and bob. They get a cyan/purple halo from a fixed-LOD blur of their own glyphs.
+  - The page and the other words dim.
+  - Dots flow along arcs between matches in reading order (`LINK` program).
+  - "Impact" finds the metrics (numbers, %, ×, K/M, not years or the phone number). "Music" also brings the band in. Search plays an arpeggio.
+- **Black hole:** hold Space at the cursor, or toggle 🕳 (G) and press and hold (works on touch).
+  - It grows over about 2 s and pulls words with a swirl. The near end of a word is pulled harder than the far end, so lattices stretch like spaghetti.
+  - It swallows words (state `EATEN`, with a gulp) and eats burst particles.
+  - Sprite: a black core, a white photon ring, and a neon disk with real coverage so it reads over white paper.
+  - Its drone drops in pitch as it grows.
+  - Release sprays everything back out as particles with a shockwave and a boom; the words re-form. Setting: `holePull`.
+- **Phone tilt** (📱, touch only; asks iOS for permission): loose words and particles slide downhill (`tiltForce`, handles landscape). A hard shake scrambles the page (`shake`). Only tested with synthetic events.
+- **Layout:** the camera now measures the finder and the HUD (`measureUI` → `uiFrac`) and fits the page between them. The hints moved into the HUD's second row.
+- **Measured:** desktop 120 fps, physics 1.1–2.8 ms, including a black hole with 140 words bursting. Emulated phone (4× CPU) 120 fps, physics about 4.8 ms at rest.
+- **Debug hook:** `window.__jelly` adds `startIntro, find, startHole, moveHole, releaseHole, hole, tiltG, shakeIt, JAZZ (JAZZ.debug), intro(), go()`.
+
+## Added 2026-10-12, session 3: the resume dances to music
+
+Phill's idea: play a track and every word dances to it.
+- **♫ Music** (HUD; P plays and pauses) opens a popover with the site's four tracks from `public/audio` (Micro Clown, Number Slayers, Forbidden Nebula, Pollution) plus "your own file". While a track plays, the jazz notes and the band rest.
+- **`MUSIC` module:** an `AnalyserNode` (fftSize 2048) produces three things:
+  - 40 log-spaced bands from 35 Hz to 14 kHz, each normalized by its own slowly falling peak;
+  - a waveform smoothed to 96 points;
+  - beats, detected as bass flux over a running average.
+- **Dancing:** `updateTargets()` writes a per-particle target offset `off` each frame. The finder lift now lives there too. The home spring pulls toward `home + off`, so words dance like jelly. Targets ease over about 50 ms, and the break-loose distance grows while dancing; without both, the lag tore words loose and the whole page exploded. Styles (`danceStyle`):
+  - **Groove:** a spectrum analyzer across the page (bass in the middle columns, treble at the edges) plus kick ripples.
+  - **Equalizer:** the spectrum only.
+  - **Waveform:** the live wave runs across the page, offset per line, and words ride it.
+  - **Kick ripples:** only the rings that kicks send across the page.
+
+  Other settings: `dance` (strength), `mosh` (big kicks knock words loose; off by default), `pulse` (the nebula and mist breathe with the bass).
+- **File limitation:** opened from a local file, Chrome plays the MP3 but the analyser reads zeros (a cross-origin restriction), and the popover then shows a warning. Serve it instead: `cd ~/Desktop/dev/phill-portfolio && python3 -m http.server 8765 --bind 127.0.0.1`, then open http://127.0.0.1:8765/docs/design/jelly-resume/playground.html. Your own file (a blob URL) works either way.
+- **On the real site:** the resume overlay should read the global music player's analyser. `useAudioPlayer` already exposes `getFrequencyData()` (fftSize 256, so 128 bins, which is enough for the spectrum). The waveform needs a `getByteTimeDomainData` accessor, or the hook should expose the analyser itself.
+- **Measured:** 0 words torn loose over 8 s of Micro Clown at 120 fps, physics about 1.2 ms.
+
+## Added 2026-10-12, session 4: map-style navigation (backup before this: playground-v8.html)
+
+Phill: "hard to navigate the resume up and down … zoom a little more freely". Navigation now works like a map or Figma:
+- **Zoom toward the cursor:** Ctrl-scroll, trackpad pinch (arrives as Ctrl+wheel), or a touch pinch at the midpoint between the fingers, via `zoomAt()`. The point under the cursor stays put; verified to about 0.003 world units over 12 steps. Closest zoom is now 0.15 (`ZMIN`).
+- **Pan in 2D:** the camera has `scrollX` as well as `scrollY`. Trackpad two-finger scrolling pans both axes, Shift+wheel pans sideways, arrow keys pan a third of the view, and Page Up/Down a whole view.
+- **Drag to pan:** dragging anywhere that isn't a word pans when zoomed in (cursor: grab/grabbing), and a release flings with momentum (`fling`, `cam.mom`). Dragging a word still grabs and throws it. When the whole page fits, a plain drag still orbits; right-drag or Shift-drag always orbits.
+- **Limits:** when the page is bigger than the view, its edges stop at the edges of the free area. When it's smaller, it can slide around while staying fully on screen. Near the size where the page just fits, there's extra sideways room so zooming at the cursor holds the point. Wheel panning is off at whole-page view, and zooming back out to whole-page view recenters.
+- **Navigator** (top right; on phones, below the finder): a thumbnail of the page (backing plus atlas words, `buildMiniMap`) with the cyan view box. Click or drag it to jump there; scroll on it to zoom. It has − / Fit / + buttons; the thumbnail hides at whole-page view, and on phones the whole widget hides then.
+- **Keys and gestures:** double-click on paper or empty space zooms in there; at the closest zoom it goes back to the whole page. Double-clicking words does nothing extra. `+` / `−` zoom at the center, `0` or R resets.
+- **Phones:** one-finger drag pans both axes with a fling, and a two-finger pinch zooms and pans at once. The HUD hides its keyboard-shortcut labels, bringing it from 4 rows to 3.
+- **Rotate** (added after Phill asked where the 3D rotation went): the navigator has a ✥ Pan / ⟳ Rotate toggle (O). In Rotate mode, any drag rotates the page, even one that starts on a word, while clicks still knock words loose; one finger rotates on phones, so the navigator always shows there. Option-, Shift- and right-drag also rotate. The range is wider: yaw ±1.25, tilt −0.6…1.1.
+
+## Added 2026-10-12, session 5: rotate by default, a living sheet of paper (backup before this: playground-v9.html)
+
+- **Drag rotates by default** (Phill: "make it like it is in rotate mode"). Word drag-and-throw is removed completely: the `grab` physics, the long-press and `startGrab` are gone. Clicks still knock words loose and loose words still burst on click. The ✥ Pan / ⟳ Rotate toggle stays, defaulting to Rotate. Scrolling, the navigator and the keys still pan. One finger rotates on phones.
+- **The page is a real sheet** (Phill: "some thickness … curves … like an actual piece of paper"):
+  - **Thickness:** the page mesh now has a front grid (40 × pageH·4), a back grid and a rim (`aSide` 0/1/2/3; the rim carries its outward normal in `aUv`). Setting: `paperThick`, default 0.08.
+  - **Bending:** one bend function, `BEND` / `bendZ` in `PAGE_VS`, is mirrored in JS (`bendZ`). Slow waves run through the sheet (`paperBend`, default 0.5). The bottom-right corner curls up and breathes, with a smaller curl at the top left (`paperCurl`, default 0.5). Shroom mode's old wobble moved into the same function. While a track plays, the waves swell with the bass.
+  - **Lighting:** the front gets a geometric normal from finite differences, and the curves shade relative to flat, so a flat page still matches the PDF exactly. The back and edges are plain paper lit by the bend.
+  - **CPU side:** a 24×32 table (`updateBend`, `bendAt`) is filled once per frame and sampled bilinearly. `updateTargets` adds the bend to every word's target, so words ride the paper. Loose words' slab, the page guard, burst-particle bounces and re-form targets all use `bendAt`.
+  - **Measured:** physics about 1.2 ms at defaults and about 2 ms during Chaos at maximum bend, 120 fps.
+
+## Fixed 2026-10-12: scrolling no longer knocks words off the page (backup before this: playground-v10.html)
+
+A two-finger trackpad scroll sends dozens of wheel events per second. Each one added the "scroll slosh" kick, and the kicks piled up until every word broke loose: 634 of 634 in a test scroll. Now the slosh is a capped velocity (a wobble, never a fling). `navCalm` (1 while scrolling, panning, zooming or rotating, fading over ~0.5 s) triples the break-loose distance and pauses the hover squish. The same test scroll now leaves 0 words loose.
+
+## Added 2026-10-12, session 6: comet sparks (backup before this: playground-v11.html)
+
+Phill picked "comet sparks" from the options; the other ideas were ink-to-ember, glyph shards and code glyphs.
+- **Rendering:** particles are now instanced quads (`drawArraysInstanced`, 4-vertex strip per spark) instead of points. Each one is a capsule from its tail (`ptTail` = position − smoothed recent velocity × 0.05 × `trail`; `updateTrails`) to its head, with the screen-space length capped at 160 px. The core is thin (0.9–4.5 px) with a soft halo.
+- **Color** (`pColor: 'comet'`, the new default): white-hot at the burst, cooling cyan → electric → deep blue → indigo. Fast sparks are pulled back toward cyan, and slow cooled sparks dim like embers. Violet was dropped because violet dots on white read pastel.
+- **Glow on white:** one premultiplied pass (ONE, ONE_MINUS_SRC_ALPHA) both darkens the paper under the streak (coverage up to 0.95) and adds the color, so sparks glow on white paper and in space alike.
+- **Swirl** (`swirl`): while drifting, sparks follow a divergence-free flow (the curl of sin(1.3x + 0.7t)·cos(1.1y − 0.6t)), like the hero vortex.
+- `pDensity` dropped from 1.8 to 1.2, because streaks fill more space.
+- **Measured:** 120 fps; physics 2.1–2.3 ms during Burst all (634 words, ~25K sparks).
+
+**Particle look (open, Phill asked for options):** he finds the cyan/purple/green dots "Easter colored" and likes the hero's Vortex. The hero uses about 200 comet streaks along a simplex-noise flow, hues 190–290 (cyan → blue → violet, no green), with additive "lighter" compositing and two blur passes for bloom.
+
+## Next: hero → resume transition (plan ready, 2026-10-12)
+
+Phill approved this integration: the hero photo disintegrates into comet sparks that become the galaxy and print the resume.
+- **Triggers:** the nav Resume button is primary; hero click is a bonus.
+- **Loading:** the resume lazy-loads, and the dissolve hides the load.
+- **Links:** Skills chips deep-link into the Finder, and `#resume` is a real URL.
+- **Close:** a reverse transition re-forms the hero.
+- **Extras:** an optional Shroom summon, and a reduced-motion fallback.
+
+The plan, with tasks T0–T12, is `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md`. Run it with the /loop prompt from that session.
+
+## Next to workshop (after session 2)
+
+2. **Real phone:** tilt, shake, audio unlock and GPU cost. This still needs the artifact link or a local network URL.
+3. **Burst particle noise:** big chain reactions (black hole, chaos) leave lots of stray dots. Consider capping bursts per second or shortening `burstTime` while many words are bursting.
+4. **Finder on phones:** matches are tiny at full-page zoom. Consider auto-zooming to the densest cluster.
+
+## Decisions Phill has made (don't re-litigate)
+
+- **No towers or skyline.** Just "View Resume" → the 3D page → chaos on click.
+- **No drop shadows** (2026-10-12: messy).
+- **No jazz / musical notes on interaction** (2026-10-12: removed; `playground-v7.html` keeps the old `JAZZ` engine). Clicks are silent. Sound is only `SFX`: the black hole's drone, gulps and boom, and the entrance whoosh. Music comes from real tracks (the dance feature).
+- **Pure text.** No gummy boxes behind loose words (the `gummy` slider exists but defaults to 0; he said the boxes made it less fun).
+- **No ghost text.** Knocked-off words leave clean holes; the drama is the point.
+- **The whole page is visible by default.** Zoom 1 = fit page; a floor must never cover the page.
+- **The formatting must match the Rezmancer PDF exactly.** Hence the snapshot approach rather than re-implementing Rezmancer's CSS.
+- **Outer space with a nebula, not an HDRI.** The nebula is procedural and baked once, so there's no download and it can be tuned live.
+- **Colors come from the site's tokens** (`src/app/globals.css`): cyan `#80eaff` (primary), electric `#00d4ff`, purple `#d580ff` / `#c44dff` (secondary family), green `#00ff2b` (accent, used sparingly), deep blue `#141f52` (muted), teal `#0e2525` (background-end). Burst particles default to the "site neon" mix (≈45% cyan, 40% purple, 15% green).
+- **Performance and mobile are hard requirements.**
+
+## Measured so far
+
+- **Desktop:** 634 words, about 1.1–1.9 ms physics per frame, 112–120 fps (Chrome on an M-series Mac).
+- **Emulated phone** (390×844, CPU 4× slower): 116–120 fps at rest, about 90 fps during Chaos, physics up to about 6–10 ms.
+- **Not yet tested on a real phone.** The GPU side (sky lookup, about 11 mist sprites, points) is the unknown.
+
+## Open items and ideas to workshop next
+
+1. **Feel tuning.** Phill hasn't settled the physics. Have him try presets (Bumper Cars default, Popcorn, Zero-G Drift, Domino Chaos, Gravity, Into the Void, Wobbly Jello, Total Melt) and copy the prompt when something feels right.
+2. **Real-phone test.** Publishing the playground as a private artifact link was offered so he can open it on his phone, but not done yet. If he wants it, the snapshot JS has to be inlined or published as a supporting file.
+3. **Phone readability.** The exact Letter page is small on a portrait phone until you pinch-zoom. Options: start phones zoomed to the top of the page, or fall back to the reflow layout on narrow screens.
+4. **Contact details.** The snapshot includes phone and email because the PDF does. The public site probably wants a Rezmancer "web" variant without them; ask Phill.
+5. **Snapshot size.** About 1 MB of the 1.5 MB is the 3× text PNG. Before shipping, use WebP/AVIF or 2× resolution.
+6. **Missing separators.** The contact-line separators (`·`, drawn by CSS `::before`) are very faint or missing in the backing image. Check against the PDF.
+7. **Burst look.** Particles now have a flash and a halo. Still open: trails or streaks, and whether the glow reads on white paper (the halo shows mostly over space).
+8. **Shroom mode** (S) melts, drips and hue-cycles everything. Not reviewed much since the space backdrop went in; check that it still looks good over the nebula.
+9. **Sound.** Not explored. Pops on burst, or reacting to the site's music player (`useAudioPlayer` exposes live frequency data), could be fun.
+10. **Accessibility in the real build.** The semantic DOM resume stays the source of truth (SEO, screen readers); `prefers-reduced-motion` shows only the DOM resume.
+
+## When it's time to build it into the site (not yet)
+
+- **Location:** phillcodes.com is Next 16 + R3F, in `~/Desktop/dev/phill-portfolio`. Follow its CLAUDE.md Performance Rules: lazy-load Three via `next/dynamic` behind the button, use one canvas, never setState per frame, mutate refs inside `useFrame`.
+- **Physics:** port the CPU physics as plain TS modules driven from `useFrame`. Consider a Web Worker if mobile physics gets heavy.
+- **Data flow:** Rezmancer's publish step (its PR 4b deploy isn't done yet) should produce the snapshot (layout JSON + text layer + decorations) next to the PDF. The site fetches it and revalidates on publish.
+- **Process:** use the make-loop-prompt workflow (plan doc + /loop) once the design is final. Paste the playground's **Copy prompt** output into that plan.
+
+## Starter prompt for the next session
+
+> Read docs/design/jelly-resume/HANDOFF.md in ~/Desktop/dev/phill-portfolio, then open docs/design/jelly-resume/playground.html. We're still workshopping the Jelly Resume design (not building it into the site yet). Next I want to: …

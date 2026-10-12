@@ -275,8 +275,7 @@
   </main>
 </div>
 
-<!-- Exact Rezmancer layout: words, text layer and page decorations (see tools/snapshot.mjs) -->
-<script src="rezmancer-snapshot.js"></script>
+<!-- The exact Rezmancer layout (rezmancer-snapshot.js: words, text layer, page decorations; see tools/snapshot.mjs) loads lazily: loadResume() -->
 <script>
 'use strict';
 // =====================================================================
@@ -357,7 +356,7 @@ const DEFAULTS = {
   pageFinish: 'paper', grain: 0.5, paperThick: 0.08, paperBend: 0.5, paperCurl: 0.5, inkFinish: 'emboss', shine: 0.5, textDepth: 0.35,
   fingerRadius: 0.7, fingerForce: 20, flick: 0.8, smack: 5, slosh: 0.4,
   gummy: 0, jelly: 'cyan', paper: 'white', tilt: 0.05, yaw: 0, zoom: 1,
-  layoutSource: window.REZ_SNAPSHOT ? 'rezmancer' : 'runtime',
+  layoutSource: 'rezmancer', // falls back to 'runtime' if rezmancer-snapshot.js is missing
   shroom: false, melt: 0.7, drip: 0.5, dropRate: 0.3, hueSpeed: 0.12,
   backdrop: 'nebula', nebula: 'philcodes', nebulaSeed: 3, nebulaBright: 1, starDensity: 1,
   mist: 0.6, fgMist: 0.2, mistDrift: 0.3, fog: 0.6, quality: 'auto',
@@ -382,12 +381,12 @@ const PRESETS = [
   { name: 'Total Melt', note: 'Shroom mode, max goo', values: { shroom: true, melt: 1, drip: 0.9, dropRate: 0.75, hueSpeed: 0.22, stiffness: 420, homePull: 40, pColor: 'rainbow' } },
 ];
 
-const SNAP = window.REZ_SNAPSHOT || null;
+let SNAP = null; // window.REZ_SNAPSHOT, once loadResume() has fetched it
 const SCHEMA = [
   { group: 'Page', open: true, items: [
     { k: 'layoutSource', label: 'Layout', type: 'select', rebuild: true,
-      options: [...(SNAP ? [['rezmancer', 'Exact Rezmancer output (snapshot)']] : []), ['runtime', 'Reflow from resume data']],
-      hint: SNAP ? `Snapshot of ${SNAP.source}, ${SNAP.words.length} words` : 'No rezmancer-snapshot.js found; run tools/snapshot.mjs' },
+      options: [['rezmancer', 'Exact Rezmancer output (snapshot)'], ['runtime', 'Reflow from resume data']],
+      hint: 'the snapshot loads when the resume opens' },
   ] },
   { group: 'Site integration', open: true, items: [
     { k: 'entrance', label: 'Entrance', type: 'select', site: true, options: [['hero', 'The phillcodes.com hero (mock)'], ['button', '"View Resume" start screen']], hint: 'what you see before the resume opens' },
@@ -1962,6 +1961,7 @@ function buildMiniMap(back) {
   });
 }
 function rebuild() {
+  if (!resumeOn) return; // nothing to build until loadResume() has the snapshot
   seed = 7;
   let list;
   if (state.layoutSource === 'rezmancer' && SNAP) {
@@ -2513,10 +2513,12 @@ function frame(now) {
   updateTargets(dt);
   searchAmt += ((searchN ? 1 : 0) - searchAmt) * Math.min(1, dt * 4);
   const t0 = performance.now();
-  for (let s = 0; s < 4; s++) step(dt / 4);
-  collide();
-  updateStates(dt);
-  updateParticles(dt);
+  if (NP) { // no bodies until the resume loads
+    for (let s = 0; s < 4; s++) step(dt / 4);
+    collide();
+    updateStates(dt);
+    updateParticles(dt);
+  }
   physMs = physMs * 0.9 + (performance.now() - t0) * 0.1;
   if (hole.amt > 0 || hole.on) SFX.hole(hole.amt);
   frames++; fpsT += dt;
@@ -2565,6 +2567,7 @@ function renderScene() {
   }
   if (state.backdrop === 'nebula') drawMist(false);
   gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND);
+  if (NP) { // the page, the words, the sparks and the finder links (none until the resume loads)
   gl.useProgram(PAGE.p);
   gl.uniformMatrix4fv(PAGE.u.uMVP, false, cam.mvp); gl.uniform1f(PAGE.u.uTime, time); gl.uniform1f(PAGE.u.uShroom, shroomAmt);
   gl.uniform1f(PAGE.u.uHue, state.hueSpeed); gl.uniform1f(PAGE.u.uAspect, pageH / PAGE_W);
@@ -2652,6 +2655,7 @@ function renderScene() {
     gl.bindVertexArray(linkVAO); gl.drawArrays(gl.POINTS, 0, n);
     gl.enable(gl.DEPTH_TEST); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   }
+  } // NP
   // Black hole on top of everything it's eating
   if (hole.amt > 0.01) {
     gl.disable(gl.DEPTH_TEST); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -2831,32 +2835,57 @@ function setEntrance() {
   if (!stage.classList.contains('prestart')) return;
   const hero = state.entrance === 'hero';
   showSite(hero); startEl.classList.toggle('gone', hero);
-  if (hero) measureSite();
+  if (hero) measureSite(); else loadResume();
 }
 document.getElementById('btnGo').onclick = () => {
   SFX.init();
-  startEl.classList.add('gone'); stage.classList.remove('prestart');
-  startIntro();
-  canvas.focus?.();
+  loadResume().then(() => {
+    startEl.classList.add('gone'); stage.classList.remove('prestart');
+    startIntro();
+    canvas.focus?.();
+  });
 };
+// ---- The resume loads lazily: nothing heavy at page load. Hovering or focusing a trigger prefetches it; the dissolve hides the rest ----
 const loadImg = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
-Promise.all([
-  document.fonts ? document.fonts.ready : null,
-  SNAP ? loadImg(SNAP.textPng).then((i) => (snapText = i)) : null,
-  SNAP ? loadImg(SNAP.backingPng).then((i) => (snapBack = i)) : null,
-]).then(() => {
-  syncControls();
-  rebuild();
-  bakeSky(); buildStars(); resize();
-  startIntro(true); // the resume waits as a galaxy behind the "View Resume" button
-  updateAll();
-  setEntrance();
-  if (state.entrance === 'button') document.getElementById('btnGo').focus();
-  updateCamera(0);
-  requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
-});
+const SLOW = Math.max(0, +new URLSearchParams(location.search).get('slow') || 0); // ?slow=<ms>: pretend the network is slow (testing)
+const load = { state: 'idle', t0: 0, ms: 0, p: null };
+let resumeOn = false;
+function loadResume() {
+  if (load.p) return load.p;
+  load.state = 'loading'; load.t0 = performance.now();
+  const script = () => new Promise((res) => {
+    if (window.REZ_SNAPSHOT) return res();
+    const el = document.createElement('script'); el.src = 'rezmancer-snapshot.js'; el.onload = el.onerror = () => res(); document.head.appendChild(el);
+  });
+  load.p = new Promise((r) => setTimeout(r, SLOW)).then(script).then(() => {
+    SNAP = window.REZ_SNAPSHOT || null;
+    if (!SNAP && state.layoutSource === 'rezmancer') state.layoutSource = 'runtime'; // no snapshot (run tools/snapshot.mjs): reflow from DATA
+    return Promise.all([document.fonts ? document.fonts.ready : null,
+      SNAP && loadImg(SNAP.textPng).then((i) => (snapText = i)), SNAP && loadImg(SNAP.backingPng).then((i) => (snapBack = i))]);
+  }).then(() => {
+    resumeOn = true;
+    rebuild();
+    startIntro(true); // the resume waits as a galaxy (behind the hero, or the "View Resume" button)
+    const hint = inputs.layoutSource.el.parentElement.querySelector('.hint');
+    if (hint) hint.textContent = SNAP ? `Snapshot of ${SNAP.source}, ${SNAP.words.length} words` : 'No rezmancer-snapshot.js found; run tools/snapshot.mjs';
+    syncControls(); updateAll();
+    load.state = 'ready'; load.ms = Math.round(performance.now() - load.t0);
+  }).catch((err) => { load.state = 'error'; console.error('Resume failed to load', err); });
+  return load.p;
+}
+// every trigger prefetches on hover or focus
+[document.getElementById('siteResume'), heroBox, ...document.querySelectorAll('.schip'), document.getElementById('siteShroom'), document.getElementById('btnGo')]
+  .forEach((el) => ['pointerenter', 'focus'].forEach((ev) => el.addEventListener(ev, () => loadResume())));
+syncControls();
+bakeSky(); buildStars(); resize();
+updateAll();
+setEntrance();
+if (state.entrance === 'button') { loadResume(); document.getElementById('btnGo').focus(); } // the start screen's galaxy is the resume itself
+updateCamera(0);
+requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 window.__jelly = { state, rebuild, chaos, burstAll, healAll, clickAt, rayAt, toggleShroom, applyPreset, pickParticle, bodies: () => bodies, cam,
-  startIntro, find, MUSIC, startHole, moveHole, releaseHole, hole, tiltG, shakeIt, SFX, intro: () => intro, go: () => document.getElementById('btnGo').click() };
+  startIntro, find, MUSIC, startHole, moveHole, releaseHole, hole, tiltG, shakeIt, SFX, intro: () => intro, go: () => document.getElementById('btnGo').click(),
+  loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
 </script>
 </body>
 </html>

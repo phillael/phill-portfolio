@@ -902,7 +902,7 @@ function updateParticles(dt) {
       for (let k = bd.pt0; k < bd.pt0 + bd.ptN; k++) {
         const o = k * 3; galaxyAt(k, time, gtmp);
         for (let a = 0; a < 3; a++) ptPos[o + a] += (gtmp[a] - ptPos[o + a]) * ease;
-        ptAlpha[k] = 1; ptAge[k] = 9;
+        ptAlpha[k] = Math.min(1, ptAlpha[k] + dt * 3); ptAge[k] = 9; // (fades in: see heroHandoff)
       }
       continue;
     }
@@ -2227,6 +2227,25 @@ function updateDissolve(dt) {
   }
   d.arrived = arrived;
   hp.dirtyPos = hp.dirtyAttr = true;
+  if (d.handed) { // after the handoff, the slots no resume particle took over fade out
+    d.fade = Math.max(0, d.fade - dt / 0.3);
+    for (let i = NPT; i < N; i++) hp.alpha[i] = d.fade;
+    if (d.fade <= 0) { hp.show = false; diss = null; }
+  } else if (arrived === N && load.state === 'ready') heroHandoff(); // (until the resume has loaded, the galaxy just keeps swirling)
+}
+// ---- Handoff: the resume's stardust takes over exactly where the hero sparks are (k → k mod H), then the entrance prints the page ----
+function heroHandoff() {
+  const d = diss, H = hp.N;
+  siteEl.classList.add('gone'); site.amt = 0;
+  stage.classList.remove('prestart');
+  startIntro(); // from the pre-state (it keeps the stardust where it is): its galaxy easing and swirl take over, then it prints the page
+  for (let k = 0; k < NPT; k++) {
+    const o = k * 3, h = (k % H) * 3;
+    for (let a = 0; a < 3; a++) { ptGal[o + a] = hp.gal[h + a]; ptPos[o + a] = ptPrev[o + a] = hp.pos[h + a]; ptSV[o + a] = hp.sv[h + a]; ptTail[o + a] = hp.tail[h + a]; }
+    ptAlpha[k] = k < H ? 1 : 0; ptAge[k] = 9; // a twin (k ≥ H) sits exactly on its hero spark, so it fades in rather than doubling it
+  }
+  for (let i = 0; i < Math.min(H, NPT); i++) hp.alpha[i] = 0; // covered slots switch over on the same frame (same place, same color)
+  hp.cover = false; d.handed = true; d.fade = 1;
 }
 
 let hpTimer = 0;
@@ -2838,7 +2857,7 @@ function renderScene() {
     gl.uniform1f(FLOOR.u.uTime, time); gl.uniform1f(FLOOR.u.uHue, state.hueSpeed); gl.uniform3fv(FLOOR.u.uLine, hex(JELLY[state.jelly][1]));
     gl.bindVertexArray(floorVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
-  if (state.backdrop === 'nebula') { gl.blendFunc(gl.ONE, gl.ONE); drawMist(true); }
+  if (state.backdrop === 'nebula') { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); drawMist(true); } // (blend is off here when nothing's loaded yet)
   gl.bindVertexArray(null); gl.depthMask(true);
 }
 

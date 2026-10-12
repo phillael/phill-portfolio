@@ -72,7 +72,7 @@ Order matters: T0 first; T2 before T5; T3 → T4 → T5; T7 needs T3–T5; T8 ne
   - The mock chrome (nav, tagline, skills, glow) fades and blurs out over about 0.6 s, revealing the nebula.
   - A released spark's heat goes 0 → 1 over about 0.25 s. It gets an outward kick, follows the existing swirl flow, and eases into a galaxy slot (`galaxyAt`-style spiral) within about 1.6 s (shorter on Low quality).
   - Play the SFX whoosh.
-- [ ] **T5: handoff to the resume.** When `loadResume()` is ready **and** the hero sparks have reached the galaxy:
+- [x] **T5: handoff to the resume.** When `loadResume()` is ready **and** the hero sparks have reached the galaxy:
   - Put the resume particles (INTRO pre-state) at the hero spark positions (k → k mod H) and fade the hero pool out over about 0.3 s.
   - Then run `startIntro()` from the pre-state. Its existing galaxy easing and swirl take over, so there's no pop.
   - If the load isn't done, the hero sparks idle in the galaxy until it is.

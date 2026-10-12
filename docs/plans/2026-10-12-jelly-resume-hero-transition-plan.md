@@ -80,7 +80,7 @@ Order matters: T0 first; T2 before T5; T3 → T4 → T5; T7 needs T3–T5; T8 ne
   - The mock **Resume** button calls `openResume` with the origin at the button.
   - **Hero:** a real button with the hover/focus hint (glow brighter, slight lift, tooltip) and a click origin at the cursor; keyboard Enter/Space works.
   - The Resume HUD gets **⤓ PDF** (the Download button) and **×** (close; the reverse animation comes in T7).
-- [ ] **T7: close plus the reverse transition.** × and Esc call `closeResume()`:
+- [x] **T7: close plus the reverse transition.** × and Esc call `closeResume()`:
   - The visible words burst into the hero pool, using the resume particle positions mapped k → k mod H.
   - Sparks fly back to their hero pixel homes over about 1.4 s and cool from comet colors back to photo colors (heat 1 → 0).
   - When they land, the DOM hero cross-fades in and the sparks fade out. The mock chrome fades back and the resume HUD hides.

@@ -2112,11 +2112,11 @@ function updateIntro(dt) {
 // The neon scanline that prints the page, top to bottom, just ahead of the words landing
 function revealY() {
   if (!intro) return -1e9;
-  if (intro.pre) return 1e9;
+  if (intro.pre) return closing ? closing.reveal : 1e9; // closing: the sheet un-prints bottom to top behind the scanline
   const d = intro.dur, f = (intro.t - intro.lead - 0.25 - d * 0.18) / (d * 0.66);
   return pageH / 2 + 0.3 - (pageH + 0.6) * smooth(f);
 }
-function introCam() { if (!intro) return stage.classList.contains('prestart') ? 1 : 0; if (intro.pre) return 1; return 1 - smooth((intro.t - intro.lead * 0.5) / (intro.dur * 0.75 + 0.6)); }
+function introCam() { if (closing) return closing.cam; if (!intro) return stage.classList.contains('prestart') ? 1 : 0; if (intro.pre) return 1; return 1 - smooth((intro.t - intro.lead * 0.5) / (intro.dur * 0.75 + 0.6)); }
 
 // =====================================================================
 // Hero sparks: the hero photo as ~18K sparks (~6K on Low quality), sampled from its own pixels on a stratified grid. Each keeps
@@ -2199,7 +2199,7 @@ function originPx(origin) {
   const b = heroImg.getBoundingClientRect(); return [b.left + b.width / 2 - rc.left, b.top + b.height / 2 - rc.top];
 }
 function openResume({ origin } = {}) {
-  if (diss || !stage.classList.contains('prestart') || state.entrance !== 'hero') return false;
+  if (diss || closing || !stage.classList.contains('prestart') || state.entrance !== 'hero') return false;
   SFX.init(); loadResume();
   if (!buildHeroSparks()) return false;
   const low = quality() === 'low', T = (state.dissolveTime ?? 1.6) * (low ? 0.7 : 1), sweep = T * 0.42;
@@ -2270,6 +2270,75 @@ function heroHandoff() {
   }
   for (let i = 0; i < Math.min(H, NPT); i++) hp.alpha[i] = 0; // covered slots switch over on the same frame (same place, same color)
   hp.cover = false; d.handed = true; d.fade = 1;
+}
+
+// ---- Close, in reverse: the words burst into the hero pool, the sparks fly home to their pixels cooling from comet colors back to
+// the photo's, the camera swings back out, then the hero <img> and the site chrome cross-fade back in ----
+let closing = null;
+function particleAt(k, out) { // where resume particle k is right now: on its word's lattice if the word shows, else wherever it flies
+  const bd = bodies[ptBody[k]];
+  if (hidden(bd)) { out[0] = ptPos[k * 3]; out[1] = ptPos[k * 3 + 1]; out[2] = ptPos[k * 3 + 2]; } else bilerp(pos, bd, ptLu[k], ptLv[k], out);
+}
+let ptBody = null;
+function reverseClose(cam0) {
+  if (!buildHeroSparks()) return false;
+  if (!ptBody || ptBody.length !== NPT) { ptBody = new Int32Array(NPT); bodies.forEach((bd, bi) => ptBody.fill(bi, bd.pt0, bd.pt0 + bd.ptN)); }
+  const N = hp.N, low = quality() === 'low', T = (state.dissolveTime ?? 1.6) * (low ? 0.65 : 0.9);
+  hp.prev = hp.prev && hp.prev.length === N * 3 ? hp.prev : new Float32Array(N * 3); hp.sv = new Float32Array(N * 3);
+  const rel = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const o = i * 3; particleAt(i % NPT, tmp);
+    const th = Math.random() * 6.283, sp = 1.5 + Math.random() * 2.5;
+    for (let a = 0; a < 3; a++) hp.pos[o + a] = hp.prev[o + a] = hp.tail[o + a] = tmp[a];
+    hp.vel[o] = Math.cos(th) * sp; hp.vel[o + 1] = Math.sin(th) * sp; hp.vel[o + 2] = 0.6 + Math.random() * 1.5;
+    hp.heat[i] = 1; hp.age[i] = 0; hp.alpha[i] = 1;
+    rel[i] = 0.22 * Math.random();
+  }
+  closing = { t: 0, T, rel, cam: cam0, reveal: pageBottom - 0.3, landed: false, fade: 0 };
+  hp.show = true; hp.cover = true;
+  startIntro(true); // every word hides at once (they're the sparks now) and the resume waits as a galaxy again
+  SFX.intro(2);
+  return true;
+}
+function updateClosing(dt) {
+  const c = closing, N = hp.N, SW = state.swirl * 3, tr = 0.05 * state.trail;
+  c.t += dt;
+  c.cam = Math.max(c.cam, smooth(c.t / (c.T + 0.3)));
+  c.reveal = pageBottom - 0.3 + (pageH + 0.6) * smooth(c.t / 0.6);
+  hp.dist = 0.85 * Math.hypot(cam.eye[0] - cam.target[0], cam.eye[1] - cam.target[1], cam.eye[2] - cam.target[2]);
+  let home = 0;
+  for (let i = 0; i < N; i++) {
+    const o = i * 3, u = Math.max(0, c.t - c.rel[i]), k = smooth(u / c.T);
+    heroHome(i, tmp); // its pixel on the photo, from wherever the camera is now
+    if (k >= 1) { for (let a = 0; a < 3; a++) hp.pos[o + a] = tmp[a]; home++; }
+    else {
+      if (SW > 0) {
+        const a1 = 1.3 * hp.pos[o] + 0.7 * time + hp.pos[o + 2], b1 = 1.1 * hp.pos[o + 1] - 0.6 * time;
+        hp.vel[o] += -1.1 * Math.sin(a1) * Math.sin(b1) * SW * dt * (1 - k); hp.vel[o + 1] += -1.3 * Math.cos(a1) * Math.cos(b1) * SW * dt * (1 - k);
+      }
+      const drag = Math.max(0, 1 - (1 + 5 * k) * dt), pull = 1 - Math.exp(-(0.5 + 26 * k * k) * dt);
+      for (let a = 0; a < 3; a++) { hp.vel[o + a] *= drag; hp.pos[o + a] += hp.vel[o + a] * dt; hp.pos[o + a] += (tmp[a] - hp.pos[o + a]) * pull; }
+    }
+    hp.heat[i] = 1 - smooth((u / c.T - 0.4) / 0.6); hp.age[i] = u; // cools back to the photo's colors as it lands
+    for (let a = 0; a < 3; a++) { const v = (hp.pos[o + a] - hp.prev[o + a]) / Math.max(dt, 1e-3); hp.sv[o + a] += (v - hp.sv[o + a]) * 0.45; hp.tail[o + a] = hp.pos[o + a] - hp.sv[o + a] * tr * (1 - k); hp.prev[o + a] = hp.pos[o + a]; }
+  }
+  if (!c.landed && home === N) {
+    // landed: the real <img> and the chrome fade back in over the sparks
+    c.landed = true; heroImg.style.visibility = '';
+    siteEl.classList.remove('gone', 'dissolving'); siteEl.inert = false;
+  }
+  if (c.landed) {
+    c.fade = Math.min(1, c.fade + dt / 0.5);
+    site.amt = smooth(c.fade);
+    for (let i = 0; i < N; i++) hp.alpha[i] = 1 - smooth(c.fade);
+    if (c.fade >= 1) finishClose();
+  }
+  hp.dirtyPos = hp.dirtyAttr = true;
+}
+function finishClose() {
+  closing = null; hp.show = false; hp.cover = false; hp.alpha.fill(1); hp.heat.fill(0); hp.age.fill(9); hp.dirtyAttr = true;
+  resetView(); setEntrance();
+  if (siteEl.contains(document.activeElement) || document.activeElement === document.body) document.getElementById('siteResume').focus({ preventScroll: true });
 }
 
 let hpTimer = 0;
@@ -2650,6 +2719,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (k === '/') { e.preventDefault(); findEl.focus(); findEl.select(); return; }
   if (k === 'escape' && findEl.value) { findEl.value = ''; find(''); return; }
+  if (k === 'escape') { closeResume(); return; }
   if (k === 's') toggleShroom(); else if (k === 'c') chaos(); else if (k === 'b') burstAll(); else if (k === 'h') healAll(); else if (k === 'r') resetView();
   else if (k === 'g') setHoleMode(!holeMode); else if (k === 'm') toggleSound(); else if (k === 'i') startIntro(); else if (k === 'p') MUSIC.toggle(); else if (k === 'o') setNavMode(navMode === 'rotate' ? 'pan' : 'rotate');
   else if (e.key.startsWith('Arrow') || e.key === 'PageDown' || e.key === 'PageUp') {
@@ -2716,7 +2786,7 @@ function frame(now) {
     syncMusicUI();
   }
   site.boost += ((site.hover ? 1 : 0) - site.boost) * Math.min(1, dt * 6);
-  if (diss) updateDissolve(dt); else if (hp.show) heroRest();
+  if (diss) updateDissolve(dt); else if (closing) updateClosing(dt); else if (hp.show) heroRest();
   render();
   requestAnimationFrame(frame);
 }
@@ -3091,15 +3161,17 @@ heroBtn.addEventListener('pointermove', (e) => { const r = heroBtn.getBoundingCl
 heroBtn.addEventListener('pointerleave', () => { heroBtn.style.removeProperty('--tx'); heroBtn.style.removeProperty('--ty'); });
 ['pointerenter', 'focus'].forEach((ev) => heroBtn.addEventListener(ev, () => (site.hover = true)));
 ['pointerleave', 'blur'].forEach((ev) => heroBtn.addEventListener(ev, () => (site.hover = heroBtn.matches(':hover') || document.activeElement === heroBtn)));
-// Close: back to the site (T7 plays it in reverse); for now, put everything back at once
+// Close (×, Esc): back to the site, in reverse (the "View Resume" start screen just comes back)
 function closeResume() {
-  if (stage.classList.contains('prestart') || diss) return false;
+  if (stage.classList.contains('prestart') || diss || closing) return false;
   if (hole.on) releaseHole();
   findEl.value = ''; find(''); setMusicOpen(false);
-  stage.classList.add('prestart');
+  const cam0 = introCam(); // (before prestart, which would read as the pre-intro pose)
+  stage.classList.add('prestart'); // the resume's controls fade out
+  if (state.entrance === 'hero' && reverseClose(cam0)) return true;
   startIntro(true); // the resume goes back to waiting as a galaxy, so the next open replays
   hp.show = false; hp.cover = false; heroImg.style.visibility = '';
-  siteEl.classList.remove('dissolving'); setEntrance();
+  siteEl.classList.remove('dissolving'); resetView(); setEntrance();
   (state.entrance === 'hero' ? document.getElementById('siteResume') : document.getElementById('btnGo')).focus();
   return true;
 }
@@ -3125,7 +3197,7 @@ updateCamera(0);
 requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 window.__jelly = { state, rebuild, chaos, burstAll, healAll, clickAt, rayAt, toggleShroom, applyPreset, pickParticle, bodies: () => bodies, cam,
   startIntro, find, MUSIC, startHole, moveHole, releaseHole, hole, tiltG, shakeIt, SFX, intro: () => intro, go: () => document.getElementById('btnGo').click(),
-  heroSparks, hp, openResume, closeResume, diss: () => diss, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
+  heroSparks, hp, openResume, closeResume, diss: () => diss, closing: () => closing, loadResume, loadState: () => ({ state: load.state, ms: load.ms, slow: SLOW, words: bodies.length }) };
 </script>
 </body>
 </html>

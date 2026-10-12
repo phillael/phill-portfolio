@@ -2106,7 +2106,10 @@ function updateIntro(dt) {
   if (!intro || intro.pre) return;
   intro.t += dt;
   const landed = intro.lead + 0.25 + intro.dur * 0.84;
-  if (!intro.ended && intro.t > landed) intro.ended = true;
+  if (!intro.ended && intro.t > landed) {
+    intro.ended = true;
+    if (pendingFind) { findEl.value = pendingFind; find(pendingFind); pendingFind = null; } // a deep link or a Skills chip: light it up once the page has landed
+  }
   if (intro.t > landed + 1.5) intro = null;
 }
 // The neon scanline that prints the page, top to bottom, just ahead of the words landing
@@ -2198,8 +2201,9 @@ function originPx(origin) {
   if (origin && origin.x != null) return [origin.x - rc.left, origin.y - rc.top];
   const b = heroImg.getBoundingClientRect(); return [b.left + b.width / 2 - rc.left, b.top + b.height / 2 - rc.top];
 }
-function openResume({ origin } = {}) {
+function openResume({ origin, find: q, fromRoute = false } = {}) {
   if (diss || closing || !stage.classList.contains('prestart') || state.entrance !== 'hero') return false;
+  if (q != null) pendingFind = q || null;
   SFX.init(); loadResume();
   if (!buildHeroSparks()) return false;
   const low = quality() === 'low', T = (state.dissolveTime ?? 1.6) * (low ? 0.7 : 1), sweep = T * 0.42;
@@ -2217,6 +2221,7 @@ function openResume({ origin } = {}) {
   hp.show = true; hp.cover = true; heroImg.style.visibility = 'hidden'; // the sparks match the photo, so the swap is invisible
   siteEl.classList.add('dissolving'); siteEl.inert = true;
   SFX.intro(2);
+  if (!fromRoute) pushRoute(q);
   return true;
 }
 function updateDissolve(dt) {
@@ -2254,7 +2259,7 @@ function updateDissolve(dt) {
   if (d.handed) { // after the handoff, the slots no resume particle took over fade out
     d.fade = Math.max(0, d.fade - dt / 0.3);
     for (let i = NPT; i < N; i++) hp.alpha[i] = d.fade;
-    if (d.fade <= 0) { hp.show = false; diss = null; }
+    if (d.fade <= 0) { hp.show = false; diss = null; syncRoute(); } // (Back may have been pressed mid-dissolve)
   } else if (arrived === N && load.state === 'ready') heroHandoff(); // (until the resume has loaded, the galaxy just keeps swirling)
 }
 // ---- Handoff: the resume's stardust takes over exactly where the hero sparks are (k → k mod H), then the entrance prints the page ----
@@ -2337,7 +2342,7 @@ function updateClosing(dt) {
 }
 function finishClose() {
   closing = null; hp.show = false; hp.cover = false; hp.alpha.fill(1); hp.heat.fill(0); hp.age.fill(9); hp.dirtyAttr = true;
-  resetView(); setEntrance();
+  resetView(); setEntrance(); syncRoute();
   if (siteEl.contains(document.activeElement) || document.activeElement === document.body) document.getElementById('siteResume').focus({ preventScroll: true });
 }
 
@@ -3118,7 +3123,7 @@ function setEntrance() {
   if (hero) measureSite(); else loadResume();
 }
 document.getElementById('btnGo').onclick = () => {
-  SFX.init();
+  SFX.init(); pushRoute();
   loadResume().then(() => {
     startEl.classList.add('gone'); stage.classList.remove('prestart');
     startIntro();
@@ -3162,8 +3167,9 @@ heroBtn.addEventListener('pointerleave', () => { heroBtn.style.removeProperty('-
 ['pointerenter', 'focus'].forEach((ev) => heroBtn.addEventListener(ev, () => (site.hover = true)));
 ['pointerleave', 'blur'].forEach((ev) => heroBtn.addEventListener(ev, () => (site.hover = heroBtn.matches(':hover') || document.activeElement === heroBtn)));
 // Close (×, Esc): back to the site, in reverse (the "View Resume" start screen just comes back)
-function closeResume() {
+function closeResume({ fromRoute = false } = {}) {
   if (stage.classList.contains('prestart') || diss || closing) return false;
+  if (!fromRoute) leaveRoute();
   if (hole.on) releaseHole();
   findEl.value = ''; find(''); setMusicOpen(false);
   const cam0 = introCam(); // (before prestart, which would read as the pre-intro pose)
@@ -3176,6 +3182,33 @@ function closeResume() {
   return true;
 }
 document.getElementById('btnClose').onclick = () => closeResume();
+// ---- URL: #resume (or #resume?find=React) is the open resume. Back closes it (in reverse), Forward reopens it; loading the page
+// with it opens straight into a quick galaxy intro (no hero dissolve), still loading lazily. The real site will use /resume or this hash. ----
+let pendingFind = null;
+const routeFind = () => { const m = location.hash.match(/^#resume(?:\?find=([^&]*))?$/); return m ? { find: m[1] ? decodeURIComponent(m[1]) : '' } : null; };
+function pushRoute(q) { const h = '#resume' + (q ? '?find=' + encodeURIComponent(q) : ''); if (location.hash !== h) history.pushState({ jelly: 1 }, '', h); }
+function leaveRoute() {
+  if (!routeFind()) return;
+  if (history.state && history.state.jelly) history.back(); // we pushed it: go back to the entry before
+  else history.replaceState(null, '', location.pathname + location.search); // arrived by deep link: just drop the hash
+}
+function openDirect(q) {
+  if (q) pendingFind = q;
+  showSite(false); startEl.classList.add('gone');
+  loadResume().then(() => {
+    if (!stage.classList.contains('prestart') || !routeFind()) return;
+    stage.classList.remove('prestart');
+    startIntro(); // from the galaxy, so it's quick
+    ptAlpha.fill(0); // the stardust fades in as it streams to the page
+  });
+}
+function syncRoute() {
+  if (diss || closing) return; // reconciled when the transition ends
+  const r = routeFind(), isOpen = !stage.classList.contains('prestart');
+  if (r && !isOpen) { if (state.entrance === 'hero' && !siteEl.classList.contains('gone')) openResume({ find: r.find, fromRoute: true }); else openDirect(r.find); }
+  else if (!r && isOpen) closeResume({ fromRoute: true });
+}
+window.addEventListener('popstate', syncRoute);
 // hidden UI stays out of the tab order and the accessibility tree: the resume's controls while the site (or start screen) is up, and vice versa
 function syncInert() {
   const pre = stage.classList.contains('prestart');
@@ -3192,7 +3225,8 @@ syncControls();
 bakeSky(); buildStars(); resize();
 updateAll();
 setEntrance();
-if (state.entrance === 'button') { loadResume(); document.getElementById('btnGo').focus(); } // the start screen's galaxy is the resume itself
+if (routeFind()) openDirect(routeFind().find); // a deep link: straight into the resume
+else if (state.entrance === 'button') { loadResume(); document.getElementById('btnGo').focus(); } // the start screen's galaxy is the resume itself
 updateCamera(0);
 requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 window.__jelly = { state, rebuild, chaos, burstAll, healAll, clickAt, rayAt, toggleShroom, applyPreset, pickParticle, bodies: () => bodies, cam,

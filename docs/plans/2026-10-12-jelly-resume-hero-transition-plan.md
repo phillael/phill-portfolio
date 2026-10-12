@@ -86,7 +86,7 @@ Order matters: T0 first; T2 before T5; T3 → T4 → T5; T7 needs T3–T5; T8 ne
   - When they land, the DOM hero cross-fades in and the sparks fade out. The mock chrome fades back and the resume HUD hides.
   - Then reset the resume to its pre-state, so the next open replays.
   - Open → close works repeatedly.
-- [ ] **T8: URL.** `openResume` pushes `#resume` (or `#resume?find=X`), and `popstate` closes or opens to match. Loading with `#resume` skips the mock dissolve: it goes straight into a quick galaxy intro (no hero needed) and still loads lazily. `?find=` runs `find()` once the intro lands (the existing `intro.ended`).
+- [x] **T8: URL.** `openResume` pushes `#resume` (or `#resume?find=X`), and `popstate` closes or opens to match. Loading with `#resume` skips the mock dissolve: it goes straight into a quick galaxy intro (no hero needed) and still loads lazily. `?find=` runs `find()` once the intro lands (the existing `intro.ended`).
 - [ ] **T9: Skills chips deep-link.** A mock Skills chip calls `openResume({ origin: chip, find: name })`; the hash carries `find`, and the Finder runs after the landing. The chip names map to the existing `CHIPS`, so they must match.
 - [ ] **T10: guardrails.**
   - **Reduced motion:** the real media query, or the playground setting `simReduced` ("Simulate reduced motion"), makes every trigger open the plain HTML resume panel built from `DATA`. It's an accessible dialog: focus moves in, Esc closes, Tab can't leave it, and it has Download PDF.

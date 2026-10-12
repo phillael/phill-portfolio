@@ -1,8 +1,10 @@
 # Jelly Resume: design handoff
 
-**Status (2026-10-12, session 2):** design and workshop phase. Jazz, entrance, finder, black hole and tilt added (see below). Everything lives in one self-contained playground. Nothing is in the phillcodes.com app yet. Phill wants it fully dialed in before it goes on the site.
+**Status (2026-10-12, session 7):** design and workshop phase. The hero → resume integration is built **inside the playground** (a mock of the phillcodes.com hero dissolves into the resume; see "Session 7" below). Nothing is in the phillcodes.com app yet. Phill wants it fully dialed in before it goes on the site.
 
-**Open it:** `open ~/Desktop/dev/phill-portfolio/docs/design/jelly-resume/playground.html` (plain `file://`, no server).
+**Open it (needs the local server now):** `cd ~/Desktop/dev/phill-portfolio && python3 -m http.server 8765 --bind 127.0.0.1`, then http://127.0.0.1:8765/docs/design/jelly-resume/playground.html. Opened as a `file://` page, Chrome taints the hero canvas (no hero sparks) and silences the music analyser.
+
+**Git:** the playground, this handoff, `tools/snapshot.mjs` and the plan are committed on the local branch `feat/jelly-resume-playground` (never pushed). `rezmancer-snapshot.js` (phone + email) and the `playground-v*.html` backups are gitignored; the repo is **public**, so they must never be committed.
 
 ## The idea
 
@@ -21,7 +23,7 @@ Reference: [Jelly Mario](https://jellymar.io/). Its `build/main.js` shows a GPU 
 | File | What it is |
 |---|---|
 | `jelly-resume/playground.html` | **The current playground.** ~1,560 lines. Raw WebGL2, no dependencies. |
-| `jelly-resume/rezmancer-snapshot.js` | Generated (~1.5 MB). Exact layout of the Rezmancer resume: word boxes and styles, a text-layer PNG and a decorations PNG. Loaded by the playground with a `<script>` tag. |
+| `jelly-resume/rezmancer-snapshot.js` | Generated (~1.5 MB), **gitignored** (it has Phill's phone and email). Exact layout of the Rezmancer resume: word boxes and styles, a text-layer PNG and a decorations PNG. Lazy-loaded by the playground (`loadResume()` injects it when a trigger is hovered, focused or clicked). |
 | `jelly-resume/tools/snapshot.mjs` | Generates the snapshot from Rezmancer's printed HTML using headless Chrome (puppeteer-core). |
 | `jelly-resume/playground-v1..v11.html` | Earlier versions, kept for reference (v1: floor and gummy boxes; v2: before space; v3: before site colors; v4: before the snapshot; v5: before finishes and 3D text; v6: before jazz, entrance, finder, black hole; v7: before the jazz engine was removed; v8: before map-style navigation; v9: before rotate-by-default and the bending paper; v10: before the scroll-stability fix; v11: before comet sparks). |
 | `paper-shatters/playground.html` | Abandoned first concept: the page shatters into a neon "Career Skyline" of job towers. **Phill dropped the towers as too complicated.** Kept only for ideas, such as the glowing cracks and the shard shader. |
@@ -175,16 +177,39 @@ Phill picked "comet sparks" from the options; the other ideas were ink-to-ember,
 
 **Particle look (open, Phill asked for options):** he finds the cyan/purple/green dots "Easter colored" and likes the hero's Vortex. The hero uses about 200 comet streaks along a simplex-noise flow, hues 190–290 (cyan → blue → violet, no green), with additive "lighter" compositing and two blur passes for bloom.
 
-## Next: hero → resume transition (plan ready, 2026-10-12)
+## Session 7: hero → resume transition, built in the playground (2026-10-12)
 
-Phill approved this integration: the hero photo disintegrates into comet sparks that become the galaxy and print the resume.
-- **Triggers:** the nav Resume button is primary; hero click is a bonus.
-- **Loading:** the resume lazy-loads, and the dissolve hides the load.
-- **Links:** Skills chips deep-link into the Finder, and `#resume` is a real URL.
-- **Close:** a reverse transition re-forms the hero.
-- **Extras:** an optional Shroom summon, and a reduced-motion fallback.
+Plan: `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md` (T0–T12, one commit each on `feat/jelly-resume-playground`). Phill's approved idea: the hero photo disintegrates into comet sparks that become the galaxy and print the resume.
 
-The plan, with tasks T0–T12, is `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md`. Run it with the /loop prompt from that session.
+- **Site mock** (`#site`, setting `entrance: 'hero' | 'button'`): a copy of the phillcodes.com hero over the stage, checked side by side against the live site. Only the chrome is DOM (nav with logo, links, Resume button, GitHub/LinkedIn; the hero photo; the tagline; a Skills strip; 🍄 and ♫). The **canvas** draws the site background, the hero's pulsing GlowEffect (magenta → purple → cyan layers) and the vortex sparkles (desktop only, like the site), so the dissolve can fade them into the nebula. Layout uses container queries on the stage.
+- **Lazy load** (`loadResume()`, cached promise): no snapshot at page load. Every trigger prefetches on `pointerenter`/`focus`. Physics and the page/word/spark passes are skipped while `NP === 0`. `?slow=<ms>` delays the load for testing; `__jelly.loadState()` reports it. The page size starts at Letter (8.5 × 11) so the camera doesn't move when the snapshot lands.
+- **Hero spark pool** (`hp`, `buildHeroSparks`): the PNG is drawn at its displayed size and sampled on a stratified grid (~18K cells, ~6K on Low; `heroSparks` multiplies it), each colored by its cell's average. A spark keeps its pixel (relative to the photo, so the hover lift doesn't force a resample); at rest its world position is that pixel unprojected onto a plane in front of the camera (`heroHome`), re-derived whenever the camera moves. The comet program gained `aHeat` and a photo mode: heat 0 is an opaque dot in the photo's color, heat 1 the comet ramp. `__jelly.heroSparks(true)` swaps the `<img>` for the pool. While the mock is up, the camera is pinned to the pre-intro pose.
+- **Dissolve** (`openResume({ origin, find })`): a ragged front (distance from the photo point nearest the origin, plus value noise) sweeps the photo in `dissolveTime × 0.42`. Released sparks heat to white-hot and then the comet ramp over 0.25 s, kick outward, ride the swirl and ease into galaxy slots (`galaxySlots`, the same distribution as the resume's stardust) within `dissolveTime` (default 1.6 s, ×0.7 on Low). The chrome fades and blurs, the site background fades to the nebula, and the whoosh plays.
+- **Handoff** (`heroHandoff`): once loaded and every spark has arrived, resume particle k takes hero spark k mod H's position, slot, velocity and tail. Twins (k ≥ H) fade in instead of doubling, and covered hero slots switch off on the same frame. Then `startIntro()` runs from the pre-state. Verified frame by frame with `?slow=6000`: no visible pop.
+- **Triggers:** the Resume button (primary, opens from itself); the hero is a real `<button aria-label="Open the interactive resume">` (hover/focus: the canvas glow brightens, the photo lifts, a cursor-following "✨ click to open my resume" hint; a click opens from the cursor, Enter/Space from the center); Skills chips; 🍄 (T11). The resume HUD has **⤓ PDF** (`download`) and a top-right **×**. Hidden UI is `inert`.
+- **Close** (`closeResume`: ×, Esc, Back): every word bursts into the hero pool (spark i starts at resume glyph point i mod NPT, on its live lattice). The sheet un-prints bottom to top behind the scanline, and the camera swings back out. The sparks fly to their pixels over ~1.4 s, cooling from comet colors to the photo's. On landing, the `<img>` and chrome cross-fade back in, the view resets, and the resume waits as a galaxy again, so open → close repeats cleanly (tested 3× plus a close mid-Chaos).
+- **URL:** opening pushes `#resume` (or `#resume?find=React`); `popstate` reconciles (Back plays the reverse, Forward reopens), including after a transition ends. A deep link skips the hero and runs a quick galaxy intro once the load lands, then the Finder. × on a deep link drops the hash in place.
+- **Skills chips:** `openResume({ origin: chip, find })`; the names are checked against `CHIPS`.
+- **Reduced motion** (the media query, or the setting `simReduced`): every trigger opens a plain HTML resume dialog built from `DATA` (no phone or email). Focus moves in, Tab is trapped, Esc closes and focus returns to the trigger; it has Download PDF. No dissolve runs.
+- **Settings:** a "Site integration" group with `entrance`, `dissolveTime`, `heroSparks` and `simReduced`. Each adds a Copy-prompt line, and the brief now describes the integration.
+- **Debug hook:** `window.__jelly` adds `openResume, closeResume, loadResume, loadState, heroSparks, hp, diss(), closing(), openPanel, closePanel`.
+- **Measured:** desktop 120 fps throughout (the dissolve and the 18K-spark pool at rest). Emulated phone (390×844, 4× CPU, 6K sparks): 104 fps dissolve, 79 fps reverse.
+- **Bug fixed on the way:** with nothing loaded, the front mist drew opaque (blending was only re-enabled in the skipped block).
+- **Version bump:** none here (no PR). When the integration is ported in a PR, bump `package.json` minor.
+
+## Porting to the real site (later plan; not started)
+
+- **Trigger:** Nav's `ResumeDownloadButton` becomes the primary trigger (it downloads today), and the PDF moves into the resume's HUD.
+- **Hero:** `HeroImage` becomes the sampling source and a real button. Sample the `next/image` element at its rendered size; it's same-origin, so `getImageData` is fine. The `Vortex` and `GlowEffect` are what the canvas fades out.
+- **Skills chips:** the chips in `SkillsSection`/`SkillChip` get the Finder deep link.
+- **Route (Phill decides):** a `/resume` Next route vs a `#resume` hash. The playground uses a hash only.
+- **Contact details (Phill decides):** the public resume needs a Rezmancer "web" snapshot without phone and email.
+- **Music:** read the shared `useAudioPlayer` analyser instead of the playground's own.
+- **Performance rules:** follow CLAUDE.md's. Lazy-load Three/the resume via `next/dynamic` behind the triggers, use one canvas, and never setState per frame.
+
+## Earlier plan pointer
+
+The hero → resume plan (T0–T12) is `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md`.
 
 ## Next to workshop (after session 2)
 

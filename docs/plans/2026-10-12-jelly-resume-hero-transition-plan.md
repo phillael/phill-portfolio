@@ -93,7 +93,7 @@ Order matters: T0 first; T2 before T5; T3 → T4 → T5; T7 needs T3–T5; T8 ne
   - **Low quality / touch:** about 6K sparks and a shorter dissolve.
   - Check the emulated phone (390×844, 4× CPU) during the dissolve.
 - [ ] **T11 (optional, last): Shroom summon.** The mock 🍄 button opens a small speech bubble: "Shall I summon Phill's resume? ✨" with a [Summon] button, which calls `openResume` with the origin at the mushroom. The heat ramp starts violet-tinted for this trigger only, then follows the normal ramp. Mocked: **no network calls**.
-- [ ] **T12: settings, prompt and handoff.**
+- [x] **T12: settings, prompt and handoff.**
   - **Settings:** add a group "Site integration" with `entrance`, `dissolveTime`, `heroSparks` (count multiplier) and `simReduced`.
   - **Copy-prompt text:** describe the integration (triggers, dissolve, lazy load, URL, chips, reverse, reduced motion) and add `updatePrompt` lines for the new settings.
   - **`window.__jelly`:** expose `openResume`, `closeResume`, `loadState`, `heroSparks`.

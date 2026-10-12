@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jelly Resume Playground</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #07080c; --panel: #0d1017; --panel2: #121621; --line: #1e2431;
@@ -111,8 +111,55 @@
   .start .go:hover { background: rgba(10,20,36,.7); }
   .start .note { margin-top: 14px; color: #aab8cc; font-size: 12px; text-align: center; text-shadow: 0 1px 6px #000; }
   @keyframes pulse { 50% { box-shadow: 0 0 40px rgba(128,234,255,.7), 0 0 80px rgba(213,128,255,.3), inset 0 0 22px rgba(128,234,255,.35); } }
-  .prestart .hud, .prestart .finder { opacity: 0; pointer-events: none; }
-  .hud, .finder { transition: opacity .6s ease .4s; }
+  .prestart .hud, .prestart .finder, .prestart .nav { opacity: 0; pointer-events: none; }
+  .hud, .finder, .nav { transition: opacity .6s ease .4s; }
+  /* Site mock: a copy of the phillcodes.com hero over the stage (the default entrance). Only the chrome is DOM;
+     the canvas draws the site's background, the pulsing hero glow and the vortex sparkles, so the dissolve can reveal the nebula */
+  .site { position: absolute; inset: 0; z-index: 6; container-type: size; pointer-events: none; color: #f0ffff; font: 16px/1.5 "Nunito", system-ui, sans-serif; transition: opacity .5s ease; }
+  .site.gone { opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s .5s; }
+  .site a, .site button { pointer-events: auto; font-family: inherit; }
+  .site a:focus-visible, .site button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .snav { position: absolute; top: 0; left: 0; right: 0; height: 64px; max-width: 1280px; margin: 0 auto; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .slogo { display: flex; flex-direction: column; text-decoration: none; padding: 4px 8px; border-radius: 6px; flex: none; }
+  .slogo b { font: 400 20px/1.4 "Audiowide", system-ui, sans-serif; color: #80eaff; text-shadow: 0 0 3px #80eaff, 0 0 10px #80eaff, 0 0 15px #142052; }
+  .slogo i { font-style: normal; font-size: 14px; line-height: 1.3; color: rgba(240,255,255,.8); margin-top: -4px; }
+  .ng { text-shadow: 0 0 7px #00ff2b, 0 0 10px #142052, 0 0 20px #80eaff, 0 0 30px #142052, 0 0 50px #00ff2b; } /* globals.css neon-text-green */
+  .np { text-shadow: 0 0 7px #e9b3ff, 0 0 10px #e9b3ff, 0 0 20px #e9b3ff, 0 0 30px #142052, 0 0 40px #e9b3ff; } /* neon-text-purple */
+  .nb { text-shadow: 0 0 3px #80eaff, 0 0 10px #80eaff, 0 0 15px #142052; } /* neon-text-blue */
+  .sright { display: flex; align-items: center; gap: 24px; }
+  .slinks { display: flex; gap: 24px; list-style: none; margin: 0; padding: 0; }
+  .slinks a { color: #f0ffff; text-decoration: none; font-size: 18px; padding: 8px 16px; transition: color .15s ease, text-shadow .15s ease; }
+  .slinks a:hover { color: #80eaff; text-shadow: 0 0 8px #80eaff, 0 0 16px rgba(128,234,255,.5); }
+  .sresume { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #80eaff; background: transparent; border: 1px solid rgba(128,234,255,.5);
+    border-radius: 6px; padding: 8px 16px; min-height: 44px; cursor: pointer; transition: transform .2s ease, border-color .2s ease, background .2s ease, filter .2s ease; }
+  .sresume:hover { border-color: #80eaff; background: rgba(128,234,255,.1); transform: scale(1.05); filter: drop-shadow(0 0 8px #80eaff); }
+  .ssocial { display: flex; gap: 8px; }
+  .ssocial a { display: grid; place-items: center; width: 44px; height: 44px; color: rgba(240,255,255,.8); border-radius: 6px; transition: color .2s ease, transform .2s ease, filter .2s ease; }
+  .ssocial a:hover { color: #80eaff; transform: scale(1.1); filter: drop-shadow(0 0 8px #80eaff); }
+  .sburger { display: none; width: 44px; height: 44px; background: none; border: 0; color: #80eaff; font-size: 24px; cursor: default; }
+  .shero { position: absolute; inset: 64px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 0 16px 16px; }
+  .hbox { position: relative; flex: none; width: min(800px, 92cqw, calc((100cqh - 190px) * 4 / 3)); aspect-ratio: 4 / 3; min-height: 0; }
+  .hbox img { position: absolute; top: 0; bottom: 0; left: 0; right: 0; margin: auto; height: 100%; width: auto; aspect-ratio: 1; display: block; user-select: none; -webkit-user-drag: none; }
+  .stag { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 20px; }
+  .stag .sep { margin: 0 8px; color: rgba(240,255,255,.5); }
+  .sskills { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; max-width: 92cqw; }
+  .sskills .lbl { font: 400 12px "Audiowide", system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: rgba(240,255,255,.55); margin-right: 4px; }
+  .schip { font-size: 13px; font-weight: 600; color: #80eaff; background: rgba(128,234,255,.06); border: 1px solid rgba(128,234,255,.35); border-radius: 999px;
+    padding: 5px 14px; min-height: 34px; cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+  .schip:hover { border-color: #80eaff; background: rgba(128,234,255,.12); box-shadow: 0 0 12px rgba(128,234,255,.45); }
+  .sfab { position: absolute; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: hsl(220 20% 8%); display: grid; place-items: center; font-size: 24px; cursor: pointer; transition: transform .2s ease; }
+  .sfab:hover { transform: scale(1.1); }
+  .sfab.shroomfab { bottom: 96px; border: 2px solid rgba(233,179,255,.5); box-shadow: 0 0 8px rgba(233,179,255,.5), 0 0 15px rgba(233,179,255,.25), 0 0 22px rgba(233,179,255,.15); }
+  .sfab.musicfab { bottom: 24px; color: #80eaff; border: 2px solid rgba(128,234,255,.5); box-shadow: 0 0 8px rgba(128,234,255,.5), 0 0 15px rgba(128,234,255,.25); }
+  @media (pointer: coarse) { .schip { min-height: 44px; } }
+  @container (max-width: 1240px) { .slinks { gap: 4px; } .slinks a { font-size: 16px; padding: 8px 10px; } .sright { gap: 16px; } }
+  @container (max-width: 1023px) { .stag { font-size: 18px; } }
+  @container (max-width: 940px) { .slinks, .ssocial { display: none; } .sburger { display: grid; place-items: center; } .sright { gap: 8px; } }
+  @container (max-width: 767px) {
+    .snav { padding: 0 16px; } .slogo b { font-size: 18px; } .slogo i { font-size: 12px; }
+    .stag { flex-direction: column; gap: 4px; font-size: 16px; } .stag .sep { display: none; }
+    .sfab { right: 16px; width: 44px; height: 44px; font-size: 20px; } .sfab.shroomfab { bottom: 64px; } .sfab.musicfab { bottom: 16px; }
+  }
   @media (max-width: 820px) {
     .app { grid-template-columns: 1fr; }
     aside { position: fixed; inset: 0 auto 0 0; width: min(340px, 88vw); z-index: 20; transform: translateX(-100%); transition: transform .2s ease; box-shadow: 8px 0 30px rgba(0,0,0,.5); }
@@ -177,7 +224,28 @@
         <label for="mFile">or your own file <input type="file" accept="audio/*" id="mFile"></label>
         <div class="mwarn" id="mWarn" hidden>This page is open as a file, so the browser won't let it listen to these tracks (they play, but the words can't hear them). Open it from the local server instead: <code>http://127.0.0.1:8765/docs/design/jelly-resume/playground.html</code>, or pick your own file above.</div>
       </div>
-      <div class="start" id="start">
+      <div class="site" id="site" role="region" aria-label="phillcodes.com home page (mock)">
+        <header class="snav">
+          <a class="slogo" href="#hero"><b>Phill Aelony</b><i class="ng">Software Engineer</i></a>
+          <div class="sright">
+            <ul class="slinks"><li><a href="#hero">Home</a></li><li><a href="#about">About</a></li><li><a href="#experience">Experience</a></li><li><a href="#skills">Skills</a></li><li><a href="#projects">Projects</a></li><li><a href="#contact">Contact</a></li></ul>
+            <button class="sresume" id="siteResume" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Resume</span></button>
+            <div class="ssocial" role="group" aria-label="Social media links">
+              <a href="https://github.com/phillael" target="_blank" rel="noopener noreferrer" aria-label="Visit Phill's GitHub profile"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg></a>
+              <a href="https://www.linkedin.com/in/phill-aelony" target="_blank" rel="noopener noreferrer" aria-label="Visit Phill's LinkedIn profile"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg></a>
+            </div>
+            <button class="sburger" type="button" aria-label="Menu (not part of the mock)">☰</button>
+          </div>
+        </header>
+        <div class="shero">
+          <div class="hbox" id="heroBox"><img id="heroImg" src="../../../public/images/hero-image-phill-llamas.png" alt="Phill Aelony wearing a poncho and cowboy hat, throwing a rock hand sign, surrounded by three llamas" draggable="false"></div>
+          <div class="stag"><span class="ng">Legendary Code Sorcerer</span><span class="sep">|</span><span class="np">Vanquisher of Bugs</span><span class="sep">|</span><span class="nb">Builder of Dreams</span></div>
+          <div class="sskills" id="siteSkills" role="group" aria-label="Skills"><span class="lbl">Skills</span></div>
+        </div>
+        <button class="sfab shroomfab" id="siteShroom" type="button" aria-label="Summon the Shroom Wizard">🍄</button>
+        <button class="sfab musicfab" id="siteMusic" type="button" aria-label="Open the music player">♫</button>
+      </div>
+      <div class="start gone" id="start">
         <div>
           <button class="go" id="btnGo">View Resume</button>
           <div class="note">best with sound on</div>
@@ -296,9 +364,10 @@ const DEFAULTS = {
   soundOn: true, volume: 0.7,
   introTime: 3, holePull: 1, tiltForce: 12, shake: true,
   dance: 1, danceStyle: 'groove', mosh: 0, pulse: 0.6,
+  entrance: 'hero',
 };
 const state = { ...DEFAULTS };
-const VIEW_KEYS = ['tilt', 'yaw', 'zoom', 'quality', 'layoutSource', 'paper', 'soundOn', 'volume'];
+const VIEW_KEYS = ['tilt', 'yaw', 'zoom', 'quality', 'layoutSource', 'paper', 'soundOn', 'volume', 'entrance'];
 
 const PRESETS = [
   { name: 'Bumper Cars', note: 'Balanced default', values: {} },
@@ -319,6 +388,9 @@ const SCHEMA = [
     { k: 'layoutSource', label: 'Layout', type: 'select', rebuild: true,
       options: [...(SNAP ? [['rezmancer', 'Exact Rezmancer output (snapshot)']] : []), ['runtime', 'Reflow from resume data']],
       hint: SNAP ? `Snapshot of ${SNAP.source}, ${SNAP.words.length} words` : 'No rezmancer-snapshot.js found; run tools/snapshot.mjs' },
+  ] },
+  { group: 'Site integration', open: true, items: [
+    { k: 'entrance', label: 'Entrance', type: 'select', site: true, options: [['hero', 'The phillcodes.com hero (mock)'], ['button', '"View Resume" start screen']], hint: 'what you see before the resume opens' },
   ] },
   { group: 'Finish', open: true, items: [
     { k: 'pageFinish', label: 'Page', type: 'select', options: [['paper', 'Textured paper'], ['matte', 'Smooth (like the PDF)'], ['foil', 'Holographic foil'], ['metal', 'Brushed metal']] },
@@ -1245,6 +1317,9 @@ function buildTextures(list) {
 // WebGL
 // =====================================================================
 const canvas = document.getElementById('gl');
+// the site mock (wired up under Boot); declared here because resize() measures it
+const siteEl = document.getElementById('site'), heroBox = document.getElementById('heroBox'), heroImg = document.getElementById('heroImg');
+const site = { amt: 1, glow: new Float32Array([0, 0, 1, 1]) }; // amt: how much the mock covers the stage (the canvas draws its background)
 const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, premultipliedAlpha: true });
 const fail = (m) => { const e = document.getElementById('err'); e.style.display = 'grid'; e.textContent = m; throw new Error(m); };
 if (!gl) fail('WebGL2 is not available in this browser.');
@@ -1614,6 +1689,40 @@ void main(){
   o = vec4(lc*a, a);
 }`;
 
+// The site mock's background (phillcodes.com): near-black, the hero's pulsing glow (GlowEffect: magenta → purple → cyan radial
+// layers, blurred 60 px, staggered 6 s pulses) and, on desktop, faint vortex sparkles (hues 190–290, like the hero Vortex)
+const SITEBG_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform vec2 uRes; uniform vec4 uGlow; uniform float uTime, uAmt, uSpark, uPx;
+${HSV}
+float h2(vec2 p){ vec3 q = fract(vec3(p.xyx)*vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y)*q.z); }
+float layer(float r, float delay){
+  float k = 0.5 - 0.5*cos((uTime - delay)*1.0471976), R = uGlow.z*(1.0 + 0.1*k);
+  return 0.9*(0.4 + 0.6*k)*pow(clamp(1.0 - r/(R + 0.7*uGlow.w), 0.0, 1.0), 1.3);
+}
+void main(){
+  vec2 px = vUv*uRes;
+  vec3 c = mix(vec3(0.03, 0.045, 0.055), vec3(0.024, 0.027, 0.035), vUv.y);
+  float r = length(px - uGlow.xy);
+  c = mix(c, vec3(1.0, 0.2, 1.0), layer(r, 0.0));
+  c = mix(c, vec3(0.65, 0.3, 1.0), layer(r, 2.0));
+  c = mix(c, vec3(0.1, 0.91, 1.0), layer(r, 4.0));
+  if(uSpark > 0.5){
+    // ~200 short streaks drifting along a slow flow, fading in and out over their lives
+    float S = 92.0*uPx; vec2 cell = floor(px/S); vec3 acc = vec3(0.0);
+    for(int j = -1; j <= 1; j++) for(int i = -1; i <= 1; i++){
+      vec2 cc = cell + vec2(i, j); float a = h2(cc), b = h2(cc + 17.3), e = h2(cc + 41.7);
+      float life = 4.0 + 6.0*e, t = uTime + a*life, ph = fract(t/life), ang = 6.2831853*h2(cc + floor(t/life));
+      vec2 dir = vec2(cos(ang), sin(ang)), p = (cc + vec2(a, b))*S + dir*ph*S*0.5, d = px - p;
+      float along = max(abs(dot(d, dir)) - 0.8*uPx, 0.0), perp = dot(d, vec2(-dir.y, dir.x)), dd = length(vec2(along, perp)), rad = (0.7 + 0.8*b)*uPx;
+      acc += hsv((190.0 + 100.0*e)/360.0, 0.7, 1.0)*(exp(-dd*dd/(rad*rad)) + 0.35*exp(-dd/(3.0*uPx)))*sin(3.14159*ph);
+    }
+    c += acc*0.7;
+  }
+  o = vec4(c*uAmt, uAmt);
+}`;
+
 function compile(vs, fs) {
   const mk = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) fail('Shader error: ' + gl.getShaderInfoLog(s)); return s; };
@@ -1626,6 +1735,7 @@ function compile(vs, fs) {
 const BODY = compile(BODY_VS, BODY_FS), PAGE = compile(PAGE_VS, PAGE_FS), FLOOR = compile(FLOOR_VS, FLOOR_FS), PTS = compile(PT_VS, PT_FS);
 const SKYBAKE = compile(QUAD_VS, SKYBAKE_FS), CLOUDBAKE = compile(QUAD_VS, CLOUDBAKE_FS), SKY = compile(SKY_VS, SKY_FS), GRAINBAKE = compile(QUAD_VS, GRAINBAKE_FS);
 const STARS = compile(STAR_VS, STAR_FS), MIST = compile(MIST_VS, MIST_FS), LINK = compile(LINK_VS, LINK_FS), HOLE = compile(HOLE_VS, HOLE_FS);
+const SITEBG = compile(QUAD_VS, SITEBG_FS);
 
 function attr(prog, vao, name, size, data, usage = gl.STATIC_DRAW) {
   gl.bindVertexArray(vao);
@@ -1660,6 +1770,7 @@ const quality = () => (state.quality === 'auto' ? (IS_TOUCH ? 'low' : 'high') : 
 const TRI = new Float32Array([-1, -1, 3, -1, -1, 3]);
 const skyBakeVAO = gl.createVertexArray(), cloudBakeVAO = gl.createVertexArray(), skyVAO = gl.createVertexArray(), grainBakeVAO = gl.createVertexArray();
 attr(SKYBAKE, skyBakeVAO, 'aPos', 2, TRI); attr(CLOUDBAKE, cloudBakeVAO, 'aPos', 2, TRI); attr(SKY, skyVAO, 'aPos', 2, TRI); attr(GRAINBAKE, grainBakeVAO, 'aPos', 2, TRI);
+const siteVAO = gl.createVertexArray(); attr(SITEBG, siteVAO, 'aPos', 2, TRI);
 gl.bindVertexArray(null);
 let skyTex = null, cloudTex = null, grainTex = null;
 function bakeInto(tex, w, h, prog, vao, setUniforms, mips) {
@@ -2345,7 +2456,7 @@ document.getElementById('btnIntro').onclick = () => { SFX.init(); startIntro(); 
 window.addEventListener('keyup', (e) => { if (e.code === 'Space' && hole.on && holePointer === null) { e.preventDefault(); releaseHole(); } });
 window.addEventListener('keydown', (e) => {
   if (e.target.closest('aside') || e.target.closest('.finder')) return;
-  if (startEl && !startEl.classList.contains('gone')) return;
+  if (stage.classList.contains('prestart')) return; // the site mock or the start screen is up
   SFX.init();
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && !hole.on && lastRay) startHole(lastRay); return; }
   if (e.target.closest('button') && (e.key === 'Enter' || e.key === ' ')) return;
@@ -2381,7 +2492,8 @@ function resize() {
   measureUI();
   if (bodies.length && state.layoutSource === 'runtime' && pageWidthFor() !== PAGE_W) rebuild();
   const r = stage.getBoundingClientRect(), dpr = dprNow = Math.min(2, window.devicePixelRatio || 1);
-  canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr)); }
+  canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr));
+  measureSite(); }
 new ResizeObserver(resize).observe(stage); resize();
 const statsEl = document.getElementById('stats');
 let last = performance.now(), frames = 0, fpsT = 0, physMs = 0;
@@ -2418,6 +2530,19 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 function render() {
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  // while the site mock covers the stage, the canvas only draws its background (the resume behind it isn't visible)
+  if (site.amt < 0.999) renderScene(); else { gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); }
+  if (site.amt > 0.001) drawSiteBg();
+}
+function drawSiteBg() {
+  gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.useProgram(SITEBG.p); const u = SITEBG.u;
+  gl.uniform2f(u.uRes, canvas.width, canvas.height); gl.uniform4fv(u.uGlow, site.glow); gl.uniform1f(u.uTime, time); gl.uniform1f(u.uAmt, site.amt);
+  gl.uniform1f(u.uSpark, quality() === 'high' ? 1 : 0); gl.uniform1f(u.uPx, dprNow); // the site only runs the vortex on desktop
+  gl.bindVertexArray(siteVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.bindVertexArray(null); gl.depthMask(true);
+}
+function renderScene() {
   gl.viewport(0, 0, canvas.width, canvas.height);
   const space = state.backdrop !== 'void';
   const bg = space ? [0.004, 0.005, 0.012] : [0.027, 0.031, 0.047].map((v, i) => v + ([0.04, 0.0, 0.06][i]) * shroomAmt);
@@ -2569,6 +2694,7 @@ SCHEMA.forEach((grp) => {
     if (it.rebuild) el.addEventListener('change', () => rebuild());
     if (it.bake) el.addEventListener('change', () => bakeSky());
     if (it.stars) el.addEventListener('change', () => { buildStars(); resize(); });
+    if (it.site) el.addEventListener('change', () => setEntrance());
   });
 });
 const dataDet = document.createElement('details');
@@ -2687,6 +2813,26 @@ document.getElementById('copy').onclick = async (e) => {
 // =====================================================================
 let snapText = null, snapBack = null;
 const startEl = document.getElementById('start');
+// ---- Site mock: the phillcodes.com hero (nav, hero photo, tagline, a Skills strip, 🍄 / ♫), the default entrance ----
+const SITE_CHIPS = ['AI', 'React', 'TypeScript', 'AWS', 'Node', 'Data']; // must match CHIPS (the Finder)
+SITE_CHIPS.forEach((n) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'schip'; b.textContent = n; b.dataset.q = n; document.getElementById('siteSkills').appendChild(b); });
+siteEl.querySelectorAll('.slinks a, .slogo').forEach((a) => a.addEventListener('click', (e) => e.preventDefault())); // the mock's own links go nowhere
+// the site's glow box is the 4:3 hero box, 40 px taller each way (at 800 px wide); in canvas pixels, y up
+function measureSite() {
+  const rc = canvas.getBoundingClientRect(), b = heroBox.getBoundingClientRect(); if (rc.width < 1 || b.width < 1) return;
+  const k = canvas.width / rc.width, s = b.width / 800, hw = b.width / 2, hh = b.height / 2 + 40 * s;
+  site.glow[0] = (b.left + hw - rc.left) * k; site.glow[1] = (rc.bottom - b.top - b.height / 2) * k;
+  site.glow[2] = 0.55 * Math.hypot(hw, hh) * k; site.glow[3] = 60 * s * k;
+}
+heroImg.addEventListener('load', measureSite);
+function showSite(on) { siteEl.classList.toggle('gone', !on); siteEl.inert = !on; site.amt = on ? 1 : 0; }
+// 'hero': the site mock; 'button': the "View Resume" start screen (only while the resume isn't open)
+function setEntrance() {
+  if (!stage.classList.contains('prestart')) return;
+  const hero = state.entrance === 'hero';
+  showSite(hero); startEl.classList.toggle('gone', hero);
+  if (hero) measureSite();
+}
 document.getElementById('btnGo').onclick = () => {
   SFX.init();
   startEl.classList.add('gone'); stage.classList.remove('prestart');
@@ -2704,7 +2850,8 @@ Promise.all([
   bakeSky(); buildStars(); resize();
   startIntro(true); // the resume waits as a galaxy behind the "View Resume" button
   updateAll();
-  document.getElementById('btnGo').focus();
+  setEntrance();
+  if (state.entrance === 'button') document.getElementById('btnGo').focus();
   updateCamera(0);
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 });

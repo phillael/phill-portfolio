@@ -90,9 +90,11 @@ So port it as **plain TypeScript modules plus one WebGL2 canvas**, loaded with `
 
 Order matters: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7. T8–T11 need T7. T12 needs everything before it. T13, then T14 last.
 
-- [ ] **T0: branch + green baseline.**
+- [x] **T0: branch + green baseline.**
   - `git fetch origin && git switch -c feat/jelly-resume-site feat/jelly-resume-playground`. If `origin/master` has moved past the branch's base, rebase onto it first.
   - Run all four gates and record the results in the plan: `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`.
+  - **Baseline (2026-10-13, Next 16.4.0):** `origin/master` (f15f49d) is already an ancestor, so no rebase. `tsc` clean; `lint` zero warnings; `npm test` 41 suites / 395 tests passed (run as `npx jest --no-watchman`: plain `npm test` stalls on a missing watchman socket on this machine); `build` OK, all routes static except the two wizard APIs.
+  - **Home first-load JS** (Next 16 no longer prints sizes, so T11 compares this): the 12 unique `/_next/static/**/*.js` chunks referenced by `.next/server/app/index.html` total **864,657 B raw / 270,611 B gzip-9 (264 KiB)**. Method: `grep -oE '/_next/static/[^"]+\.js' .next/server/app/index.html | sort -u`, then sum `wc -c` and `gzip -9c | wc -c` of each `.next/static/...` file.
 - [ ] **T1: the web snapshot assets.**
   - Extend `docs/design/jelly-resume/tools/snapshot.mjs` with `--web`. Before measuring, it removes the phone and email items from Rezmancer's contact line together with their separators; the email is a `mailto:` link, so find the phone's node in the markup.
   - It writes `public/resume/snapshot.json` (words, page, content, dpr) plus `public/resume/text.webp` and `public/resume/decor.webp` (WebP, 2× instead of 3×, to cut the ~1 MB text layer).

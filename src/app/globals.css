@@ -287,6 +287,22 @@ a:active {
 /* Hero image animated glow effect - 3 layered approach for smooth morphing */
 /* Order: magenta → purple → cyan */
 /* Using high saturation colors for vibrant cyberpunk aesthetic */
+/* The Jelly Resume opening from the hero: the page fades and blurs away to reveal the
+   nebula on the canvas above it, then hides while the resume is open (out of the tab order
+   and the accessibility tree too). The overlay itself lives outside #shroom-target. */
+#shroom-target.jelly-dissolving {
+  opacity: 0;
+  filter: blur(6px);
+  transition: opacity 0.6s ease, filter 0.6s ease;
+}
+#shroom-target.jelly-gone {
+  opacity: 0;
+  visibility: hidden;
+}
+#shroom-target.jelly-returning {
+  transition: opacity 0.5s ease;
+}
+
 .glow-layer {
   position: absolute;
   inset: 0;

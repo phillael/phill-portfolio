@@ -11,7 +11,7 @@ import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
 import { createJellyEngine } from '@/lib/jelly/engine'
 
 const engine = {
-  openDirect: jest.fn(), load: jest.fn(), dispose: jest.fn(), find: jest.fn((q: string) => (q ? 27 : 0)),
+  openDirect: jest.fn(), openFromHero: jest.fn(() => false), load: jest.fn(), dispose: jest.fn(), find: jest.fn((q: string) => (q ? 27 : 0)),
   chaos: jest.fn(), burstAll: jest.fn(), healAll: jest.fn(), setShroom: jest.fn(), setSound: jest.fn(),
   setHoleMode: jest.fn(), setTilt: jest.fn((on: boolean) => Promise.resolve(on)), replayIntro: jest.fn(),
   resetView: jest.fn(), zoomBy: jest.fn(), setNavMode: jest.fn(), setUiInsets: jest.fn(), panKey: jest.fn(),
@@ -19,8 +19,14 @@ const engine = {
   drawMiniMap: jest.fn(), onFrame: jest.fn(() => () => {}), gesture: jest.fn(), holeAtCursor: jest.fn(),
   releaseHoleKey: jest.fn(),
 }
-jest.mock('@/lib/jelly/engine', () => ({ createJellyEngine: jest.fn(() => engine) }))
-jest.mock('@/lib/jelly/snapshot', () => ({ loadSnapshot: jest.fn(() => Promise.resolve('snapshot')) }))
+// the real engine reports onOpen once its entrance starts; the mock does it on openDirect
+jest.mock('@/lib/jelly/engine', () => ({
+  createJellyEngine: jest.fn((opts: { onOpen?: () => void }) => {
+    engine.openDirect.mockImplementation(() => opts.onOpen?.())
+    return engine
+  }),
+}))
+jest.mock('@/lib/jelly/snapshot', () => ({ loadSnapshotOnce: jest.fn(() => Promise.resolve('snapshot')) }))
 const push = jest.fn()
 const back = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push, back }) }))
@@ -84,8 +90,10 @@ describe('JellyResumeHost (the overlay, driven by the URL)', () => {
     mediaQuery(false)
     renderHost()
     const overlay = render(<JellyResumeRoute mode="overlay" />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Close the resume (Esc)' }))
-    expect(back).toHaveBeenCalled()
+    const x = await screen.findByRole('button', { name: 'Close the resume (Esc)' })
+    fireEvent.click(x)
+    fireEvent.click(x) // a second close before the route changes must not go back twice
+    expect(back).toHaveBeenCalledTimes(1)
     overlay.unmount()
 
     render(<JellyResumeRoute mode="direct" />)

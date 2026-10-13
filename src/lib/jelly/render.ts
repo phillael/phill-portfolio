@@ -9,7 +9,8 @@ import { camDist } from './camera'
 import {
   DRIP, FOV, INK_FINISH_INDEX, JELLY_COLORS, NEBULA, PAD_TOP, PAGE_FINISH_INDEX, PCOLOR_INDEX, ROWS, SITE,
 } from './config'
-import { attr, bakeInto, compile, texFrom, type Program } from './gl'
+import { attr, bakeInto, compile, texFrom } from './gl'
+import type { HeroPool } from './hero'
 import { hex } from './math'
 import * as SH from './shaders'
 import type { AtlasRect, World } from './world'
@@ -32,15 +33,6 @@ interface Mist {
   spin: number
   drift: number
   a: number
-}
-
-/** Hero sparks (the photo as comet sparks) draw with the same program; they arrive in T6. */
-export interface SparkPass {
-  vao: WebGLVertexArrayObject
-  count: number
-  dot: number
-  tint: number
-  dist: number
 }
 
 export function createRenderer(gl: WebGL2RenderingContext, w: World) {
@@ -255,7 +247,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
   }
 
   /** The comet program's uniforms, for the resume's sparks and the hero pool (photo colors heating into the comet ramp). */
-  function sparkUniforms(dist: number, hero: SparkPass | null) {
+  function sparkUniforms(dist: number, hero: HeroPool | null) {
     const s = w.s, u = PTS.u
     gl.useProgram(PTS.p)
     gl.uniformMatrix4fv(u.uMVP, false, w.cam.mvp); gl.uniform1f(u.uSize, 0.045 * s.pSize)
@@ -271,11 +263,43 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     gl.uniform3fv(u.uEye, w.cam.eye); gl.uniform1f(u.uFog, hero ? 0 : s.fog); gl.uniform1f(u.uFogStart, dist + 3); gl.uniform1f(u.uFogEnd, dist + 26)
   }
 
+  // ---- The hero pool: its own instanced buffers, uploaded only when something changed (at rest, nothing does) ----
+  let heroVAO: WebGLVertexArrayObject | null = null
+  let heroBuf: { pos: WebGLBuffer; tail: WebGLBuffer; alpha: WebGLBuffer; age: WebGLBuffer; heat: WebGLBuffer } | null = null
+  let heroOwn: WebGLBuffer[] = []
+  function buildHero(hp: HeroPool) {
+    if (heroVAO) gl.deleteVertexArray(heroVAO)
+    for (const b of heroOwn) gl.deleteBuffer(b)
+    heroVAO = gl.createVertexArray()!
+    const mk = (name: string, size: number, data: Float32Array, usage: number) => { const b = attr(gl, PTS, heroVAO!, name, size, data, usage, name === 'aCorner' ? 0 : 1); heroOwn.push(b); return b }
+    heroOwn = []
+    mk('aCorner', 2, CORNERS, gl.STATIC_DRAW)
+    heroBuf = {
+      pos: mk('aPos', 3, hp.pos, gl.DYNAMIC_DRAW), tail: mk('aTail', 3, hp.tail, gl.DYNAMIC_DRAW), alpha: mk('aAlpha', 1, hp.alpha, gl.DYNAMIC_DRAW),
+      age: mk('aAge', 1, hp.age, gl.DYNAMIC_DRAW), heat: mk('aHeat', 1, hp.heat, gl.DYNAMIC_DRAW),
+    }
+    mk('aCol', 3, hp.col, gl.STATIC_DRAW)
+    mk('aId', 1, Float32Array.from({ length: hp.N }, (_, i) => i), gl.STATIC_DRAW)
+    gl.bindVertexArray(null)
+  }
+
   /** The hero pool draws over everything (it starts as the photo in front of the page). */
-  function drawSparkPass(hero: SparkPass) {
+  function drawHero(hp: HeroPool) {
+    if (!heroVAO || !heroBuf || !hp.show || !hp.N) return
+    const b = heroBuf
+    if (hp.dirtyPos) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.pos); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.pos)
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.tail); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.tail)
+    }
+    if (hp.dirtyAttr) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.alpha); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.alpha)
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.age); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.age)
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.heat); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hp.heat)
+    }
+    hp.dirtyPos = hp.dirtyAttr = false
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
-    sparkUniforms(hero.dist, hero)
-    gl.bindVertexArray(hero.vao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, hero.count)
+    sparkUniforms(hp.dist, hp)
+    gl.bindVertexArray(heroVAO); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, hp.N)
     gl.bindVertexArray(null); gl.depthMask(true)
   }
 
@@ -283,7 +307,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
    * One frame. skyAmt fades the backdrop in over the page underneath; reveal is the
    * scanline (revealY); showSparks hides the resume's own sparks while the hero's stand in.
    */
-  function render(skyAmt: number, reveal: number, showSparks: boolean, hero: SparkPass | null) {
+  function render(skyAmt: number, reveal: number, showSparks: boolean, hero: HeroPool | null) {
     const s = w.s, cam = w.cam
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight)
     const space = s.backdrop !== 'void'
@@ -407,7 +431,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     }
     if (s.backdrop === 'nebula') { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); drawMist(true, skyAmt) }
     gl.bindVertexArray(null); gl.depthMask(true)
-    if (hero) drawSparkPass(hero)
+    if (hero) drawHero(hero)
   }
 
   let dpr = 1
@@ -417,12 +441,13 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
   function dispose() {
     for (const p of programs) gl.deleteProgram(p.p)
     for (const v of [...vaos, bodyVAO, ptVAO, pageVAO, starVAO, mistVAO]) if (v) gl.deleteVertexArray(v)
-    for (const b of buffers) gl.deleteBuffer(b)
+    for (const b of [...buffers, ...heroOwn]) gl.deleteBuffer(b)
+    if (heroVAO) gl.deleteVertexArray(heroVAO)
     gl.deleteBuffer(linkBuf)
     for (const t of [skyTex, cloudTex, grainTex, backTex, atlasTex]) if (t) gl.deleteTexture(t)
   }
 
-  return { bakeSky, buildStars, buildGPU, buildBacking, render, setDpr, dispose, programs: { PTS } as { PTS: Program } }
+  return { bakeSky, buildStars, buildGPU, buildBacking, buildHero, render, setDpr, dispose }
 }
 
 export type Renderer = ReturnType<typeof createRenderer>

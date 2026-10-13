@@ -21,6 +21,8 @@ import { createRenderer } from './render'
 import { createSfx } from './sfx'
 import { snapshotBodies, type LoadedSnapshot } from './snapshot'
 import { buildAtlas, buildPhysics, createWorld, hidden, type World } from './world'
+import { buildHeroSparks, containedRect, createHeroPool, heroHandoff, heroRest, idle, pageOrder, startDissolve, updateDissolve, type Dissolve } from './hero'
+import { smooth } from './math'
 
 export interface JellyEngineOptions {
   canvas: HTMLCanvasElement
@@ -28,6 +30,18 @@ export interface JellyEngineOptions {
   music?: () => MusicInput | null
   /** the Finder ran (on its own when a deep link's page lands) */
   onFind?: (query: string, matches: number) => void
+  /** the resume is open: the direct entrance started, or the hero handed off to the page */
+  onOpen?: () => void
+}
+
+export interface HeroOpen {
+  /** the hero photo (next/image, object-fit: contain); hidden while its sparks stand in */
+  img: HTMLImageElement
+  /** where it was clicked (client px); null: from its center (keyboard) */
+  origin: { x: number; y: number } | null
+  /** the 🍄 summon's blue-violet heat */
+  tint?: number
+  find?: string | null
 }
 
 /** The navigator's view box, as fractions of the page (fit: the whole page is in view). */
@@ -49,7 +63,7 @@ export interface JellyStats {
   loaded: boolean
 }
 
-export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions) {
+export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngineOptions) {
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true })
   if (!gl) throw new Error('WebGL2 is not available')
   const low = window.matchMedia('(pointer: coarse)').matches // Auto quality: low on touch devices
@@ -67,7 +81,10 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
   let open = false
   let pendingOpen = false
   let pendingFind: string | null = null
-  let skyAmt = 0, skyTarget = 0
+  let skyLin = 0, skyTarget = 0 // the backdrop fades in over 0.7 s (smoothstep)
+  const hp = createHeroPool()
+  let diss: Dissolve | null = null
+  let heroImg: HTMLImageElement | null = null
   let navMode: 'rotate' | 'pan' = 'rotate'
   let holeMode = false
   let lastRay: Ray | null = null
@@ -118,21 +135,48 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
     w.cam.scrollX = 0
     w.cam.x = null
     startIntro(w, true) // the resume waits as a galaxy
+    idle(() => pageOrder(w)) // ready for the hero handoff
     if (pendingOpen) { pendingOpen = false; directIntro() }
   }
 
   function directIntro() {
     startIntro(w) // from the galaxy, so it's quick
     w.ptAlpha.fill(0) // the stardust fades in as it streams to the page
+    onOpen?.()
   }
 
   /** A direct visit (or a shared link): the nebula fades in, then a quick galaxy intro prints the page. */
   function openDirect(find?: string | null) {
+    if (open || diss) return
     open = true
     skyTarget = 1
     if (find) pendingFind = find
     if (loaded) directIntro()
     else pendingOpen = true
+  }
+
+  /**
+   * From the hero: the photo becomes sparks exactly over its pixels, a front sweeps out
+   * from the click, and once the resume has loaded the photo reshapes straight into the
+   * page. Returns false if the photo can't be sampled (then open it directly).
+   */
+  function openFromHero({ img, origin, tint = 0, find }: HeroOpen) {
+    if (open || diss) return false
+    const rc = canvas.getBoundingClientRect()
+    // the pre-intro pose the sparks rest in front of
+    updateCamera(w, 0, canvas.width, canvas.height, ui, introCam(w, false, null))
+    if (!buildHeroSparks(w, hp, { img, canvas: rc, dpr, low }, () => renderer.buildHero(hp))) return false
+    if (find) pendingFind = find
+    sfx.init()
+    heroRest(w, hp, canvas.clientWidth, canvas.clientHeight, canvas.width, canvas.height)
+    const b = containedRect(img)
+    const ox = origin ? origin.x - rc.left : b.left + b.width / 2 - rc.left, oy = origin ? origin.y - rc.top : b.top + b.height / 2 - rc.top
+    diss = startDissolve(w, hp, ox, oy, low, tint)
+    heroImg = img
+    img.style.visibility = 'hidden' // the sparks match the photo, so the swap is invisible
+    skyTarget = 1
+    sfx.intro(2)
+    return true
   }
 
   function find(q: string) {
@@ -239,9 +283,10 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
 
   // ---- the loop: runs while the tab is visible ----
   let raf = 0, last = 0, frames = 0, fpsT = 0, fps = 0, physMs = 0
+  let timeScale = 1 // dev only: slow motion for frame-by-frame checks
   function frame(now: number) {
     raf = requestAnimationFrame(frame)
-    const dt = Math.min(0.033, (now - last) / 1000)
+    const dt = Math.min(0.033, (now - last) / 1000) * timeScale
     last = now
     w.time += dt
     w.shroomAmt += ((s.shroom ? 1 : 0) - w.shroomAmt) * Math.min(1, dt * 1.2)
@@ -270,13 +315,25 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
       updateStates(w, dt)
       updateParticles(w, dt)
     }
+    if (diss) {
+      const hot = updateDissolve(w, hp, diss, dt, canvas.clientWidth, canvas.clientHeight)
+      if (!diss.handed && hot && loaded) {
+        // the photo reshapes straight into the page
+        startIntro(w)
+        if (diss.direct && w.intro) w.intro.direct = true
+        heroHandoff(w, hp, diss)
+        open = true
+        onOpen?.()
+      }
+      if (diss.handed && diss.fade <= 0) { hp.show = false; diss = null }
+    } else if (hp.show) heroRest(w, hp, canvas.clientWidth, canvas.clientHeight, canvas.width, canvas.height)
     physMs = physMs * 0.9 + (performance.now() - t0) * 0.1
     if (w.hole.amt > 0 || w.hole.on) sfx.hole(w.hole.amt)
     frames++
     fpsT += dt
     if (fpsT > 0.5) { fps = Math.round(frames / fpsT); frames = 0; fpsT = 0 }
-    skyAmt = skyTarget > skyAmt ? Math.min(skyTarget, skyAmt + dt / 0.7) : Math.max(skyTarget, skyAmt - dt / 0.7)
-    renderer.render(skyAmt, revealY(w, null), true, null)
+    skyLin = skyTarget > skyLin ? Math.min(skyTarget, skyLin + dt / 0.7) : Math.max(skyTarget, skyLin - dt / 0.7)
+    renderer.render(smooth(skyLin), revealY(w, null), !hp.cover, hp.show ? hp : null)
   }
   function startLoop() {
     if (raf) return
@@ -307,12 +364,14 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
     frameListeners.clear()
     sfx.dispose()
     renderer.dispose()
+    if (heroImg) heroImg.style.visibility = '' // never leave the photo hidden
     if (debug && (window as unknown as { __jelly?: unknown }).__jelly === debug) delete (window as unknown as { __jelly?: unknown }).__jelly
   }
 
   const api = {
     load,
     openDirect,
+    openFromHero,
     find,
     chaos: () => chaos(w),
     burstAll: () => burstAll(w),
@@ -342,7 +401,7 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
   }
 
   // dev only: a handle for scripted checks in the browser, like the playground's
-  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, intro: () => w.intro, cam: w.cam } : null
+  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, diss: () => diss, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
   if (debug) (window as unknown as { __jelly?: unknown }).__jelly = debug
 
   return api

@@ -94,3 +94,11 @@ export async function loadSnapshot(base = '/resume/'): Promise<LoadedSnapshot> {
   const [text, decor] = await Promise.all([loadImage(base + snap.images.text), loadImage(base + snap.images.decor)])
   return { snap, text, decor }
 }
+
+let cached: Promise<LoadedSnapshot> | null = null
+
+/** loadSnapshot, once: a trigger's prefetch and the overlay share it (a failure can retry). */
+export function loadSnapshotOnce(base = '/resume/') {
+  if (!cached) cached = loadSnapshot(base).catch((err) => { cached = null; throw err })
+  return cached
+}

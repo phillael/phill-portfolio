@@ -2,9 +2,10 @@
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { resumeRoute, type ResumeMode } from '@/components/jelly/resumeRoute'
+import { registerNavigate } from '@/components/jelly/resumeTrigger'
 
 // The engine's chunk: fetched only when the resume opens (never for reduced motion)
 const JellyResumeCanvas = dynamic(() => import('@/components/jelly/JellyResumeCanvas'), { ssr: false })
@@ -23,10 +24,13 @@ const JellyResumeHost = () => {
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
   const [shown, setShown] = useState<{ mode: ResumeMode; find: string | null } | null>(null)
   const [fading, setFading] = useState(false)
+  // one close per open: a second × / Esc before the route changes would go back twice and leave the page
+  const closeRequested = useRef(false)
 
   useEffect(() => {
     if (reduced === undefined) return
     if (request) {
+      closeRequested.current = false
       if (reduced) {
         // the plain /resume page instead (the intercepted route would leave the home page up)
         if (request.mode === 'overlay') window.location.reload()
@@ -44,7 +48,8 @@ const JellyResumeHost = () => {
 
   // × or Esc: an overlay goes back to the page it covered; a direct visit fades out, then goes home
   const close = useCallback(() => {
-    if (!shown) return
+    if (!shown || closeRequested.current) return
+    closeRequested.current = true
     if (shown.mode === 'overlay') router.back()
     else {
       setFading(true)
@@ -52,7 +57,13 @@ const JellyResumeHost = () => {
     }
   }, [router, shown])
 
-  // dev only: open the overlay the way the hero will (a soft navigation from the home page)
+  // the triggers (hero, 🍄) open the resume through a soft navigation, so the home page stays mounted
+  useEffect(() => {
+    registerNavigate((url) => router.push(url, { scroll: false }))
+    return () => registerNavigate(null)
+  }, [router])
+
+  // dev only: open the overlay without a trigger
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return
     const w = window as unknown as { __jellyHost?: unknown }
@@ -61,7 +72,7 @@ const JellyResumeHost = () => {
   }, [router])
 
   if (!shown) return null
-  return <JellyResumeCanvas key={shown.mode} find={shown.find} fading={fading} onClose={close} />
+  return <JellyResumeCanvas key={shown.mode} mode={shown.mode} find={shown.find} fading={fading} onClose={close} />
 }
 
 export default JellyResumeHost

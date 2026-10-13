@@ -1,10 +1,10 @@
 # Jelly Resume: design handoff
 
-**Status (2026-10-12, session 7):** design and workshop phase. The hero → resume integration is built **inside the playground** (a mock of the phillcodes.com hero dissolves into the resume; see "Session 7" below). Nothing is in the phillcodes.com app yet. Phill wants it fully dialed in before it goes on the site.
+**Status (2026-10-13):** **ported to phillcodes.com** on the branch `feat/jelly-resume-site` (see "Ported to the site" below). The playground stays the design reference and the place to tune the look; the site's frozen copy of its defaults is `src/lib/jelly/config.ts`.
 
 **Open it (needs the local server now):** `cd ~/Desktop/dev/phill-portfolio && python3 -m http.server 8765 --bind 127.0.0.1`, then http://127.0.0.1:8765/docs/design/jelly-resume/playground.html. Opened as a `file://` page, Chrome taints the hero canvas (no hero sparks) and silences the music analyser.
 
-**Git:** the playground, this handoff, `tools/snapshot.mjs` and the plan are committed on the local branch `feat/jelly-resume-playground` (never pushed). `rezmancer-snapshot.js` (phone + email) and the `playground-v*.html` backups are gitignored; the repo is **public**, so they must never be committed.
+**Git:** the playground, this handoff, `tools/snapshot.mjs` and the plans are committed (first on `feat/jelly-resume-playground`, then carried into `feat/jelly-resume-site` with the port). `rezmancer-snapshot.js` (phone + email) and the `playground-v*.html` backups are gitignored; the repo is **public**, so they must never be committed.
 
 ## The idea
 
@@ -231,6 +231,40 @@ The plan is `docs/plans/2026-10-13-jelly-resume-site-integration-plan.md`. Phill
 - **Music:** read the shared `useAudioPlayer` analyser instead of the playground's own.
 - **Performance rules:** follow CLAUDE.md's. Lazy-load Three/the resume via `next/dynamic` behind the triggers, use one canvas, and never setState per frame.
 
+## Ported to the site (2026-10-13)
+
+The integration plan (T0–T14, with what was done and measured for each task) is `docs/plans/2026-10-13-jelly-resume-site-integration-plan.md`.
+
+- **Routes:**
+  - From the home page, `/resume` is an intercepting route (`src/app/@modal/(.)resume`): the overlay opens over the still-mounted home page, so the hero can dissolve and the reverse close can land on it.
+  - A direct visit or reload gets `src/app/resume/page.tsx`: the semantic resume (`src/data/resume.ts` + `ResumeContent`, the AI Engineer variant) with the overlay over it.
+  - `?find=React` runs the Finder once the page lands (the playground's `#resume?find=`).
+  - Back, × and Esc close it: in reverse onto the photo over the home page, else a fade home.
+- **Host and triggers:**
+  - `JellyResumeHost` is mounted in the root layout, outside the shroom wrappers, at z-50 above the page and Nav and below `MusicPlayer`. It follows the URL through `resumeRoute` and keeps the canvas alive for the close.
+  - The ways in are the hero photo (`HeroImage` is now a real button with a hover hint and a touch tag, and prefetches on hover, focus and touchstart) and the 🍄 wizard's `offer_resume` tool (Summon opens it from the photo's center with the blue-violet heat).
+  - The nav Resume button stays a plain PDF download.
+- **Engine:** `src/lib/jelly/*`, plain TS on one WebGL2 canvas (the R3F rule's one exception). The playground's code map above still applies module by module (`world`, `physics`, `render` + `shaders`, `hero`, `intro`, `camera`, `dance`, `music`, `sfx`, `finder`, `order`, `bend`, `galaxy`, `input`), behind `engine.ts`'s API. The HUD is React around it (`JellyFinder`, `JellyNavigator`, `JellyHudBar`, × in `JellyResumeCanvas`). Dev only: `window.__jelly` (w, hp, diss(), closing(), intro(), cam, setTimeScale) and `window.__jellyHost` (open, back).
+- **Not ported:**
+  - the settings sidebar, presets and Copy prompt;
+  - the runtime reflow layout;
+  - `SITEBG_FS` and the fall-mode floor;
+  - the resume's own music and the playground's mock hero, nav and wizard.
+- **Different from the playground, for the site:**
+  - **Snapshot:** `public/resume/` (the `--web` snapshot: no phone or email, 2×, WebP), loaded with `fetch` → `createImageBitmap`.
+  - **Load:** stepped one job per frame (physics, atlas and GPU in batches); shaders compile in one batch.
+  - **Hero:** the photo is decoded off the main thread and sampled at 1× on phones.
+  - **HUD:** it mounts once the resume has loaded, and the minimap draws the text layer.
+  - **Music:** one player. The resume taps the site's `MusicPlayer` (`src/lib/site-music.ts`); P plays and pauses it.
+  - **Shroom mode:** it follows the site's (the HUD's Shroom still toggles it for the resume alone).
+  - **Accessibility:** the overlay is a modal dialog with a screen-reader copy of the resume, and the page under it is `inert`. Reduced motion gets the plain page and never loads the engine.
+  - **No WebGL2, or a lost context:** the plain page for the rest of the session.
+- **Measured (production build):**
+  - **Emulated phone (390×844, 4× CPU), first visits in fresh browser contexts:** worst frame 74–83 ms, ~112 fps through the open. The playground's known cold-load hitch was a 257 ms frame; the site's first unoptimized port had a 400–500 ms one.
+  - **Desktop (1440×900):** open 118.7 fps, Chaos 120, close 120. The same holds with site shroom mode on.
+  - **Home first-load JS:** +2.3 KB gzip; the engine, HUD and snapshot load only behind a trigger.
+- **Changing the look:** tune in the playground, then copy the values into `JELLY_CONFIG` (`src/lib/jelly/config.ts`). Regenerate `public/resume/` after editing the resume in Rezmancer (command above).
+
 ## Earlier plan pointer
 
 The hero → resume plan (T0–T12) is `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md`.
@@ -273,7 +307,7 @@ The hero → resume plan (T0–T12) is `docs/plans/2026-10-12-jelly-resume-hero-
 9. **Sound.** Not explored. Pops on burst, or reacting to the site's music player (`useAudioPlayer` exposes live frequency data), could be fun.
 10. **Accessibility in the real build.** The semantic DOM resume stays the source of truth (SEO, screen readers); `prefers-reduced-motion` shows only the DOM resume.
 
-## When it's time to build it into the site (not yet)
+## Before the port (superseded 2026-10-13: see "Ported to the site")
 
 - **Location:** phillcodes.com is Next 16 + R3F, in `~/Desktop/dev/phill-portfolio`. Follow its CLAUDE.md Performance Rules: lazy-load Three via `next/dynamic` behind the button, use one canvas, never setState per frame, mutate refs inside `useFrame`.
 - **Physics:** port the CPU physics as plain TS modules driven from `useFrame`. Consider a Web Worker if mobile physics gets heavy.
@@ -282,4 +316,4 @@ The hero → resume plan (T0–T12) is `docs/plans/2026-10-12-jelly-resume-hero-
 
 ## Starter prompt for the next session
 
-> Read docs/design/jelly-resume/HANDOFF.md in ~/Desktop/dev/phill-portfolio, then open docs/design/jelly-resume/playground.html. We're still workshopping the Jelly Resume design (not building it into the site yet). Next I want to: …
+> Read docs/design/jelly-resume/HANDOFF.md in ~/Desktop/dev/phill-portfolio (the "Ported to the site" section first), then open docs/design/jelly-resume/playground.html. The Jelly Resume is on the site (`src/lib/jelly/`); tune in the playground and port values into `src/lib/jelly/config.ts`. Next I want to: …

@@ -1,6 +1,6 @@
 # CLAUDE.md — Phill Portfolio
 
-Cyberpunk-themed developer portfolio for Phill Aelony, live at https://www.phillcodes.com (Vercel). Next.js 16 (App Router, Turbopack) + React 19 + TypeScript + Tailwind 3 + Framer Motion + React Three Fiber, plus the "Shroom Wizard": a 3D character with an AI chat (Claude Haiku) backed by Upstash Redis rate limiting.
+Cyberpunk-themed developer portfolio for Phill Aelony, live at https://www.phillcodes.com (Vercel). Next.js 16 (App Router, Turbopack) + React 19 + TypeScript + Tailwind 3 + Framer Motion + React Three Fiber, plus the "Shroom Wizard": a 3D character with an AI chat (Claude Haiku) backed by Upstash Redis rate limiting, and the "Jelly Resume": the hero photo dissolves into a 3D, knock-apart copy of Phill's resume at `/resume`.
 
 ## Rules
 
@@ -9,6 +9,7 @@ Cyberpunk-themed developer portfolio for Phill Aelony, live at https://www.phill
 - **Accessibility is non-negotiable:** WCAG 2.1 AA, keyboard support on all interactive elements, 44×44px minimum touch targets (that includes `w-11 h-11` on mobile, not `w-10`), visible focus states, `prefers-reduced-motion` respected by every animation.
 - **No real Anthropic calls from tests or verification.** Jest mocks the SDK; in the browser, stub `/api/wizard/chat` (e.g. a `fetch` override via an init script).
 - **Use R3F + drei, not raw Three.js boilerplate.** Pull current Three.js / R3F / drei / Next APIs via context7 (`resolve-library-id` → `query-docs`) rather than from memory.
+  - **Exception (Phill, 2026-10-13): the Jelly Resume engine** (`src/lib/jelly/`) is plain TypeScript on one raw WebGL2 canvas, ported from its playground. The other rules still hold: it's lazy (`next/dynamic`, `ssr: false`), one canvas, no setState per frame, paused while hidden, never mounted for reduced motion.
 
 ## Commands
 
@@ -28,19 +29,23 @@ Gates before a PR: `npx tsc --noEmit`, `npm run lint` (zero warnings), `npm test
 ```
 src/
 ├── app/
-│   ├── layout.tsx            # Fonts, Nav, MusicPlayer, ShroomMode, #shroom-target/#shroom-warp wrappers
+│   ├── layout.tsx            # Fonts, Nav, MusicPlayer, ShroomMode, #shroom-target/#shroom-warp wrappers, JellyResumeHost + @modal
 │   ├── page.tsx              # Section composition
+│   ├── resume/page.tsx       # /resume: the semantic resume (+ the 3D overlay on a direct visit)
+│   ├── @modal/(.)resume/     # /resume from the home page: the 3D overlay over the still-mounted home page
 │   └── api/wizard/
 │       ├── chat/route.ts     # POST: origin check → validate → reserve → Claude Haiku → settle usage
 │       └── keepalive/route.ts# Daily Vercel cron (CRON_SECRET) so free-tier Upstash isn't deleted
-├── components/               # PascalCase, one per file; ui/ = primitives, music/ = player
+├── components/               # PascalCase, one per file; ui/ = primitives, music/ = player, jelly/ = 3D resume host/overlay/HUD
 ├── context/                  # ShroomModeContext (global shroom-mode on/off)
 ├── data/                     # Content source of truth: *.json, testimonials.ts, wizard.json
 ├── hooks/                    # useAudioPlayer, useMediaQuery
-├── lib/                      # rate-limit, wizard-prompt, wizard-tools, canvas/audio utils
+├── lib/                      # rate-limit, wizard-prompt, wizard-tools, canvas/audio utils, site-music
+│   └── jelly/                # the 3D resume engine (plain TS + WebGL2)
 ├── types/
 └── __tests__/                # Jest + Testing Library
 public/models/                # Wizard GLB (meshopt + WebP textures)
+public/resume/                # The 3D resume's snapshot: snapshot.json + text.webp + decor.webp (no phone or email)
 ```
 
 ## Key Files
@@ -51,6 +56,10 @@ public/models/                # Wizard GLB (meshopt + WebP textures)
 - `src/components/WizardChat.tsx` — chat dialog; session history cached at module scope.
 - `src/lib/rate-limit.ts` — `checkAndReserve` (atomic INCR + budget reservation, refunds rejects) and `settleUsage`.
 - `tailwind.config.ts` — color tokens; `src/app/globals.css` — effects and keyframes.
+- `src/lib/jelly/` — the Jelly Resume engine. `engine.ts` is the API (`createJellyEngine`: load, openFromHero/openDirect, close, find, chaos, …); `config.ts` holds the frozen look (`JELLY_CONFIG`, tuned in `docs/design/jelly-resume/playground.html`); `world.ts` (bodies, atlas, sparks), `physics.ts`, `render.ts` + `shaders.ts`, `hero.ts` (the dissolve and the reverse close), `snapshot.ts`. Design notes: `docs/design/jelly-resume/HANDOFF.md`.
+- `src/components/jelly/JellyResumeHost.tsx` — the overlay host in the layout; it follows the URL through `resumeRoute` (set by `JellyResumeRoute` in both `/resume` routes) and keeps the canvas alive for the close. `JellyResumeCanvas.tsx` is the overlay (engine, HUD, keys, a11y); `resumeTrigger.ts` is the first-load side (hero/🍄 intent, prefetch, the plain-page fallback).
+- `src/data/resume.ts` + `src/components/ResumeContent.tsx` — the semantic resume: the `/resume` page and the overlay's screen-reader copy.
+- `public/resume/` — regenerate after changing the resume in Rezmancer: `node docs/design/jelly-resume/tools/snapshot.mjs --web ~/Desktop/dev/rezmancer/out/Phill_Aelony_Resume_AI_Engineer.html public/resume` (it strips the phone and email and refuses to write if any survive; never commit `docs/design/jelly-resume/rezmancer-snapshot.js`, which has them).
 
 ## Environment
 
@@ -79,7 +88,11 @@ This site is animation-heavy; these are the patterns that keep it fast.
 ## Gotchas
 
 - **Shroom mode wrappers:** `#shroom-target` gets the hue cycle (a Web Animation on desktop, CSS classes on mobile); the inner `#shroom-warp` gets the SVG displacement filter (desktop only, updated ≤30×/s). `MusicPlayer` and `ShroomMode` sit outside both on purpose; don't move them inside. Fixed overlays inside the wrappers (MobileMenu, SkillScore) portal to `<body>`, because a filter or transform on an ancestor breaks `position: fixed`.
-- **Escape layering:** WizardChat handles Escape in the capture phase and stops propagation so the chat closes without also dismissing the wizard.
+- **Escape layering:** WizardChat handles Escape in the capture phase and stops propagation so the chat closes without also dismissing the wizard. The 3D resume does the same (its Esc mustn't also end site shroom mode).
+- **3D resume z-order:** `JellyResumeHost` sits in the layout outside `#shroom-target`/`#shroom-warp` (their filters break `position: fixed`). At z-50, DOM order puts it above the page and Nav and below `MusicPlayer` (the site's ♫ stays usable; there is one music player). While it's up, the page, the skip link and `#shroom-ui` are `inert`, and `#shroom-ui` (the wizard sits above it) fades out. Keep `#shroom-ui` a plain wrapper: no filter or transform.
+- **The intercepting route:** a soft navigation from `/` to `/resume` renders `@modal/(.)resume` (the overlay over the home page, which stays mounted so the hero can dissolve and the close can land on it); a direct visit or reload renders `app/resume/page.tsx`. `@modal/default.tsx` must exist (returns null). To get the plain page from the home page, hard-navigate or reload (reduced motion and the no-WebGL fallback do).
+- **Shared analyser:** the resume dances to the site's player through `src/lib/site-music.ts` (the player registers itself) and taps its `MediaElementAudioSourceNode` with its own 2048-point analyser (`createMusicTap`). Never call `createMediaElementSource` again on that element (it throws), and don't add a second player.
+- **Measuring the 3D resume's cold open:** use a fresh isolated browser context per run (empty caches and a new renderer, so the engine's code runs in the interpreter, as on a first visit) and close other tabs that run the resume. Same-tab reloads keep V8's compiled code and decoded images and look ~2× better. Deferred engine work goes through `nextTask()` (one heavy job per frame); add new load steps there, not in a timeout.
 - **Upstash free tier deletes a database after 14 days without commands.** The keepalive cron in `vercel.json` prevents that. If the wizard chat ever shows the farewell line on every message, check that the DB still exists first.
 - **jsdom gaps** (`matchMedia`, `IntersectionObserver`, `scrollTo`) are stubbed in `jest.setup.ts`. Components loaded with `next/dynamic` render asynchronously in tests, so use `findBy*`.
 - **Next 16 + React 19:** verify library compatibility and current APIs before assuming a pattern works.

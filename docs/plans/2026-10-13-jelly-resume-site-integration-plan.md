@@ -204,10 +204,15 @@ Order matters: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7. T8–T11 nee
     - **Perf (prod):** desktop with site shroom mode on: open 118.8 fps (worst 41.6 ms), Chaos 120, close 120. Phone (4× CPU) with the resume's shroom look: 119.8 fps (worst 16.6 ms).
     - **Jest:** 5 new overlay tests (site shroom drives the look and the HUD toggles it alone; Esc doesn't reach a window listener; the shroom UI fades and goes inert; no WebGL2 → plain page and hard-navigating triggers; a lost context → plain page, dispose, snapshot released). 52 tests pass across the overlay, a11y, hero-trigger, ShroomMode and helpers files. `tsc` and lint clean; `npm run build` OK.
   - **Note for Phill** (not a stop; it matches the playground): a phone in landscape (844×390) is wider than the 820 px phone breakpoint, so it gets the desktop HUD (two rows plus the mouse hints) and the page is small between the bars. If that matters, the fix is to switch the HUD on `(pointer: coarse) and (max-height: 500px)` too.
-- [ ] **T13: docs + version.**
+- [x] **T13: docs + version.**
   - CLAUDE.md: the engine exception to the R3F rule, the Key Files entries (`src/lib/jelly/`, `JellyResumeHost`, `public/resume/`, the snapshot regenerate command) and gotchas (the z-order, the intercepting route, the shared analyser).
   - HANDOFF.md: a "Ported to the site" section.
   - `package.json` version: minor bump (1.2.0 → 1.3.0, or the next minor if master has moved).
+  - **Done 2026-10-13.**
+    - **CLAUDE.md:** the intro mentions the Jelly Resume. The R3F rule gets its one exception (with the rules that still hold). Directory Structure lists `resume/`, `@modal/(.)resume/`, `components/jelly/`, `lib/jelly/` and `public/resume/`. Key Files cover the engine, the host/overlay/trigger, the semantic resume and `public/resume/` with its regenerate command and the privacy note. Gotchas cover the Esc layering, the z-order (`#shroom-ui` stays a plain wrapper), the intercepting route, the shared analyser (no second `createMediaElementSource`) and measuring cold opens in fresh browser contexts.
+    - **HANDOFF.md:** the status says ported; a new "Ported to the site" section covers the routes, host and triggers, the engine and HUD, what isn't ported, what differs for the site, the measurements and how to change the look. The pre-port section is marked superseded and the starter prompt updated.
+    - **Version:** `package.json` and `package-lock.json` 1.2.0 → **1.3.0** (`origin/master` fetched: still 1.2.0 at f15f49d, which this branch contains).
+  - **Verified:** `npx tsc --noEmit` clean · `npm run lint` zero warnings · `npx jest --no-watchman` (full suite) **46 suites / 459 tests pass** · `npm run build` OK (`/`, `/(.)resume` and `/resume` static).
 - [ ] **T14: PR. STOP before pushing and ask Phill.**
   - Prepare the PR description (summary, screenshots, measurements, test plan) in the plan.
   - Pushing and opening the PR need Phill's explicit go, because the repo is public and he must confirm that nothing private is in `public/resume/`.

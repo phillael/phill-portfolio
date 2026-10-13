@@ -4,7 +4,10 @@
  */
 
 export interface Sfx {
+  /** the audio graph and the whoosh (on a gesture, or as the resume opens) */
   init(): void
+  /** the reverb's and the boom's buffers: the slow part, run as a step of its own */
+  prepare(): void
   setVolume(): void
   intro(lead: number): void
   hole(amt: number): void
@@ -21,7 +24,7 @@ interface Drone {
 
 export function createSfx(settings: () => { soundOn: boolean; volume: number }): Sfx {
   let ac: AudioContext | null = null
-  let out: GainNode, mix: GainNode, noiseBuf: AudioBuffer, swellBuf: AudioBuffer
+  let out: GainNode, mix: GainNode, verb: ConvolverNode, noiseBuf: AudioBuffer | null = null, swellBuf: AudioBuffer
   let drone: Drone | null = null
   const live = () => !!ac && ac.state === 'running' && settings().soundOn && settings().volume > 0
   const render = (len: number, fn: (d: Float32Array, sr: number, c: number) => void, ch = 1) => {
@@ -47,23 +50,12 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }):
     comp.connect(ac.destination)
     mix = ac.createGain()
     mix.connect(out)
-    const verb = ac.createConvolver()
-    verb.buffer = render(2.2, (d, sr) => {
-      let lp = 0
-      for (let i = 0; i < d.length; i++) {
-        const t = i / sr
-        lp += 0.4 * (Math.random() * 2 - 1 - lp)
-        d[i] = lp * Math.exp(-t * 3)
-      }
-    }, 2)
+    verb = ac.createConvolver() // silent until prepare() gives it its tail
     const wet = ac.createGain()
     wet.gain.value = 0.25
     mix.connect(wet)
     wet.connect(verb)
     verb.connect(out)
-    noiseBuf = render(1, (d) => {
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
-    })
     // a rising whoosh: band-limited noise that swells and cuts off
     swellBuf = render(2, (d) => {
       let lp = 0, hp = 0, pv = 0
@@ -74,6 +66,21 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }):
         pv = lp
         d[i] = hp * t ** 2.2 * 1.6
       }
+    })
+  }
+
+  function prepare() {
+    if (!ac || noiseBuf) return
+    verb.buffer = render(2.2, (d, sr) => {
+      let lp = 0
+      for (let i = 0; i < d.length; i++) {
+        const t = i / sr
+        lp += 0.4 * (Math.random() * 2 - 1 - lp)
+        d[i] = lp * Math.exp(-t * 3)
+      }
+    }, 2)
+    noiseBuf = render(1, (d) => {
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
     })
   }
 
@@ -148,6 +155,7 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }):
 
   function boom() {
     if (!live()) return
+    prepare()
     const t = ac!.currentTime, o = ac!.createOscillator(), g = ac!.createGain()
     o.frequency.setValueAtTime(90, t)
     o.frequency.exponentialRampToValueAtTime(32, t + 0.5)
@@ -174,7 +182,8 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }):
     drone = null
     if (ac) ac.close().catch(() => {})
     ac = null
+    noiseBuf = null
   }
 
-  return { init, setVolume, intro, hole, gulp, boom, dispose }
+  return { init, prepare, setVolume, intro, hole, gulp, boom, dispose }
 }

@@ -164,7 +164,11 @@ export function createWorld(s: JellyState, low: boolean, sfx: Sfx, music: MusicF
 export const hidden = (bd: Body) => bd.state >= 3
 
 /** Lattices and springs for every word. The page is `pageW` × `pageH`, centered on the origin. */
-export function buildPhysics(w: World, list: BodySpec[]) {
+/**
+ * The words' lattices and springs, a batch of bodies per step (a load yields between steps,
+ * so a cold phone, still running this in the interpreter, never blocks a frame for long).
+ */
+export function* physicsSteps(w: World, list: BodySpec[], batch = 160): Generator<void, void> {
   const bodies: Body[] = []
   let np = 0
   const quads = list.map((b) => {
@@ -181,8 +185,9 @@ export function buildPhysics(w: World, list: BodySpec[]) {
   const pos = new Float32Array(NP * 3), vel = new Float32Array(NP * 3), home = new Float32Array(NP * 3), off = new Float32Array(NP * 3)
   const frc = new Float32Array(NP * 3), inv = new Float32Array(NP), pBody = new Int32Array(NP), vis = new Float32Array(NP).fill(1)
   const A: number[] = [], B: number[] = [], RL: number[] = [], KM: number[] = []
-  list.forEach((b, bi) => {
-    const q = quads[bi], kind = b.st.kind
+  for (let bi = 0; bi < list.length; bi++) {
+    if (bi && bi % batch === 0) yield
+    const b = list[bi], q = quads[bi], kind = b.st.kind
     const kMul = kind === 'heading' ? 1.8 : kind === 'bold' ? 1 / w.s.boldSoft : 1
     const im = kind === 'heading' ? 0.6 : 1
     const idx = (i: number, j: number) => q.p0 + j * q.cols + i
@@ -215,7 +220,7 @@ export function buildPhysics(w: World, list: BodySpec[]) {
       ...q, b, state: HOME, strength: 1, timer: 0, jig: 0, seed: w.rnd(), escaped: false, reform: 0, pt0: 0, ptN: 0,
       hcx: hx / (q.p1 - q.p0), hcy: hy / (q.p1 - q.p0), tok, parts, hl: 0, hlT: 0, rt: 0,
     })
-  })
+  }
   Object.assign(w, {
     bodies, NP, NS: A.length, pos, vel, home, off, frc, inv, pBody, vis,
     sa: Int32Array.from(A), sb: Int32Array.from(B), srest: Float32Array.from(RL), sk: Float32Array.from(KM),
@@ -236,9 +241,11 @@ export interface AtlasRect {
 
 /**
  * The text atlas (every word's glyphs cropped from the snapshot's text layer, with room
- * for drips) and the comet sparks: points sampled where each word has ink.
+ * for drips) and the comet sparks: points sampled where each word has ink. A generator,
+ * one batch of words per step, so a cold load never blocks a frame for long; the seeded
+ * random numbers are drawn in the same order as building it in one go.
  */
-export function buildAtlas(w: World, list: BodySpec[], snapText: CanvasImageSource) {
+export function* atlasSteps(w: World, list: BodySpec[], snapText: CanvasImageSource, batch = 120): Generator<void, { atlas: HTMLCanvasElement; rects: AtlasRect[] }> {
   const AW = 4096
   let ppu = 230, ok = false, AH = 4096
   let rects: AtlasRect[] = []
@@ -261,28 +268,35 @@ export function buildAtlas(w: World, list: BodySpec[], snapText: CanvasImageSour
   atlas.width = AW
   atlas.height = AH
   const g = atlas.getContext('2d', { willReadFrequently: true })!
-  list.forEach((b, i) => {
-    const r = rects[i]
-    g.drawImage(snapText, b.crop.x, b.crop.y, b.crop.w, b.crop.h, r.x + 2 + PAD_X * ppu, r.y + 2 + PAD_TOP * ppu, b.w * ppu, b.line.lh * ppu)
-    r.u0 = (r.x + 1) / AW; r.v0 = (r.y + 1) / AH; r.u1 = (r.x + r.w - 1) / AW; r.v1 = (r.y + r.h - 1) / AH
-  })
-  // Glyph samples: where the ink is in each word, as local lattice coordinates
-  const img = g.getImageData(0, 0, AW, AH).data
   const LU: number[] = [], LV: number[] = [], COL: number[] = []
-  list.forEach((b, bi) => {
-    const r = rects[bi], ink: number[] = []
-    for (let y = r.y + 1; y < r.y + r.h - 1; y += 2) for (let x = r.x + 1; x < r.x + r.w - 1; x += 2) if (img[(y * AW + x) * 4 + 3] > 120) ink.push(x, y)
-    const bd = w.bodies[bi]
-    bd.pt0 = LU.length
-    bd.ptN = ink.length ? Math.max(6, Math.min(Math.round(90 * w.s.pDensity), Math.round((ink.length / 2 / 7) * w.s.pDensity))) : 0
-    const c = hex(b.st.color)
-    for (let k = 0; k < bd.ptN; k++) {
-      const j = Math.floor((w.rnd() * ink.length) / 2) * 2
-      LU.push((ink[j] - r.x - 1) / (r.w - 2))
-      LV.push((ink[j + 1] - r.y - 1) / (r.h - 2))
-      COL.push(c[0], c[1], c[2])
+  for (let s0 = 0; s0 < list.length; s0 += batch) {
+    const s1 = Math.min(list.length, s0 + batch)
+    let top = Infinity, bottom = 0
+    for (let i = s0; i < s1; i++) {
+      const b = list[i], r = rects[i]
+      g.drawImage(snapText, b.crop.x, b.crop.y, b.crop.w, b.crop.h, r.x + 2 + PAD_X * ppu, r.y + 2 + PAD_TOP * ppu, b.w * ppu, b.line.lh * ppu)
+      r.u0 = (r.x + 1) / AW; r.v0 = (r.y + 1) / AH; r.u1 = (r.x + r.w - 1) / AW; r.v1 = (r.y + r.h - 1) / AH
+      top = Math.min(top, r.y)
+      bottom = Math.max(bottom, r.y + r.h)
     }
-  })
+    // Glyph samples: where the ink is in each word, as local lattice coordinates (read back only this batch's rows)
+    const img = g.getImageData(0, top, AW, bottom - top).data
+    for (let bi = s0; bi < s1; bi++) {
+      const b = list[bi], r = rects[bi], ink: number[] = []
+      for (let y = r.y + 1; y < r.y + r.h - 1; y += 2) for (let x = r.x + 1; x < r.x + r.w - 1; x += 2) if (img[((y - top) * AW + x) * 4 + 3] > 120) ink.push(x, y)
+      const bd = w.bodies[bi]
+      bd.pt0 = LU.length
+      bd.ptN = ink.length ? Math.max(6, Math.min(Math.round(90 * w.s.pDensity), Math.round((ink.length / 2 / 7) * w.s.pDensity))) : 0
+      const c = hex(b.st.color)
+      for (let k = 0; k < bd.ptN; k++) {
+        const j = Math.floor((w.rnd() * ink.length) / 2) * 2
+        LU.push((ink[j] - r.x - 1) / (r.w - 2))
+        LV.push((ink[j + 1] - r.y - 1) / (r.h - 2))
+        COL.push(c[0], c[1], c[2])
+      }
+    }
+    yield
+  }
   const NPT = LU.length
   Object.assign(w, {
     NPT, ptLu: Float32Array.from(LU), ptLv: Float32Array.from(LV), ptCol: Float32Array.from(COL),

@@ -75,15 +75,25 @@ export function snapshotBodies(snap: Snapshot): BodySpec[] {
 
 export interface LoadedSnapshot {
   snap: Snapshot
-  text: HTMLImageElement
-  decor: HTMLImageElement
+  text: ImageBitmap | HTMLImageElement
+  decor: ImageBitmap | HTMLImageElement
 }
 
-const loadImage = (src: string) => {
+/**
+ * A layer decoded off the main thread: drawing an ImageBitmap never decodes, while drawing
+ * an <img> into a canvas decodes it on the main thread (~50 ms each on a throttled phone).
+ */
+const loadImage = async (src: string): Promise<ImageBitmap | HTMLImageElement> => {
+  if (typeof createImageBitmap === 'function') {
+    const res = await fetch(src)
+    if (!res.ok) throw new Error(`Image request failed: ${res.status}`)
+    return createImageBitmap(await res.blob())
+  }
   const img = new Image()
   img.decoding = 'async'
   img.src = src
-  return img.decode().then(() => img)
+  await img.decode()
+  return img
 }
 
 /** Fetch the snapshot and decode both layers. `base` is the folder they're served from. */

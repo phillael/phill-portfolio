@@ -5,29 +5,42 @@ export interface Program {
   u: Record<string, WebGLUniformLocation | null>
 }
 
-export function compile(gl: WebGL2RenderingContext, vs: string, fs: string): Program {
+/**
+ * Compile and link every program before asking how any of them went: the GPU process can
+ * then build them in parallel (KHR_parallel_shader_compile), so the wait is about the
+ * slowest one rather than the sum.
+ */
+export function compileAll(gl: WebGL2RenderingContext, sources: [vs: string, fs: string][]): Program[] {
+  gl.getExtension('KHR_parallel_shader_compile')
   const mk = (type: number, src: string) => {
-    const s = gl.createShader(type)!
-    gl.shaderSource(s, src)
-    gl.compileShader(s)
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS) && !gl.isContextLost()) throw new Error('Shader error: ' + gl.getShaderInfoLog(s))
-    return s
+    const sh = gl.createShader(type)!
+    gl.shaderSource(sh, src)
+    gl.compileShader(sh)
+    return sh
   }
-  const p = gl.createProgram()!
-  const v = mk(gl.VERTEX_SHADER, vs), f = mk(gl.FRAGMENT_SHADER, fs)
-  gl.attachShader(p, v)
-  gl.attachShader(p, f)
-  gl.linkProgram(p)
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS) && !gl.isContextLost()) throw new Error('Link error: ' + gl.getProgramInfoLog(p))
-  gl.deleteShader(v)
-  gl.deleteShader(f)
-  const u: Program['u'] = {}
-  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS) as number
-  for (let i = 0; i < n; i++) {
-    const info = gl.getActiveUniform(p, i)
-    if (info) u[info.name] = gl.getUniformLocation(p, info.name)
-  }
-  return { p, u }
+  const built = sources.map(([vs, fs]) => {
+    const p = gl.createProgram()!
+    const v = mk(gl.VERTEX_SHADER, vs), f = mk(gl.FRAGMENT_SHADER, fs)
+    gl.attachShader(p, v)
+    gl.attachShader(p, f)
+    gl.linkProgram(p)
+    return { p, v, f }
+  })
+  return built.map(({ p, v, f }) => {
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS) && !gl.isContextLost()) {
+      const log = [v, f].map((sh) => gl.getShaderInfoLog(sh)).filter(Boolean).join('\n')
+      throw new Error('Shader error: ' + (log || gl.getProgramInfoLog(p)))
+    }
+    gl.deleteShader(v)
+    gl.deleteShader(f)
+    const u: Program['u'] = {}
+    const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS) as number
+    for (let i = 0; i < n; i++) {
+      const info = gl.getActiveUniform(p, i)
+      if (info) u[info.name] = gl.getUniformLocation(p, info.name)
+    }
+    return { p, u }
+  })
 }
 
 /** A float attribute buffer bound into `vao` (instanced when `divisor` is 1). */

@@ -9,7 +9,7 @@ import { camDist } from './camera'
 import {
   DRIP, FOV, INK_FINISH_INDEX, JELLY_COLORS, NEBULA, PAD_TOP, PAGE_FINISH_INDEX, PCOLOR_INDEX, ROWS, SITE,
 } from './config'
-import { attr, bakeInto, compile, texFrom } from './gl'
+import { attr, bakeInto, compileAll, texFrom } from './gl'
 import type { HeroPool } from './hero'
 import { hex } from './math'
 import * as SH from './shaders'
@@ -36,11 +36,11 @@ interface Mist {
 }
 
 export function createRenderer(gl: WebGL2RenderingContext, w: World) {
-  const BODY = compile(gl, SH.BODY_VS, SH.BODY_FS), PAGE = compile(gl, SH.PAGE_VS, SH.PAGE_FS), PTS = compile(gl, SH.PT_VS, SH.PT_FS)
-  const SKYBAKE = compile(gl, SH.QUAD_VS, SH.SKYBAKE_FS), CLOUDBAKE = compile(gl, SH.QUAD_VS, SH.CLOUDBAKE_FS)
-  const GRAINBAKE = compile(gl, SH.QUAD_VS, SH.GRAINBAKE_FS), SKY = compile(gl, SH.SKY_VS, SH.SKY_FS)
-  const STARS = compile(gl, SH.STAR_VS, SH.STAR_FS), MIST = compile(gl, SH.MIST_VS, SH.MIST_FS)
-  const LINK = compile(gl, SH.LINK_VS, SH.LINK_FS), HOLE = compile(gl, SH.HOLE_VS, SH.HOLE_FS)
+  const [BODY, PAGE, PTS, SKYBAKE, CLOUDBAKE, GRAINBAKE, SKY, STARS, MIST, LINK, HOLE] = compileAll(gl, [
+    [SH.BODY_VS, SH.BODY_FS], [SH.PAGE_VS, SH.PAGE_FS], [SH.PT_VS, SH.PT_FS],
+    [SH.QUAD_VS, SH.SKYBAKE_FS], [SH.QUAD_VS, SH.CLOUDBAKE_FS], [SH.QUAD_VS, SH.GRAINBAKE_FS], [SH.SKY_VS, SH.SKY_FS],
+    [SH.STAR_VS, SH.STAR_FS], [SH.MIST_VS, SH.MIST_FS], [SH.LINK_VS, SH.LINK_FS], [SH.HOLE_VS, SH.HOLE_FS],
+  ])
   const programs = [BODY, PAGE, PTS, SKYBAKE, CLOUDBAKE, GRAINBAKE, SKY, STARS, MIST, LINK, HOLE]
 
   const vaos: WebGLVertexArrayObject[] = []
@@ -307,7 +307,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
    * One frame. skyAmt fades the backdrop in over the page underneath; reveal is the
    * scanline (revealY); showSparks hides the resume's own sparks while the hero's stand in.
    */
-  function render(skyAmt: number, reveal: number, showSparks: boolean, hero: HeroPool | null) {
+  function render(skyAmt: number, reveal: number, showSparks: boolean, hero: HeroPool | null, drawResume = true) {
     const s = w.s, cam = w.cam
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight)
     const space = s.backdrop !== 'void'
@@ -336,7 +336,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     if (s.backdrop === 'nebula') drawMist(false, skyAmt)
     gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND)
     const dist = camDist(w)
-    if (w.NP && bodyVAO && pageVAO && ptVAO) { // the page, the words, the sparks and the Finder links (none until the resume loads)
+    if (drawResume && w.NP && bodyVAO && pageVAO && ptVAO) { // the page, the words, the sparks and the Finder links (none until the resume loads)
       gl.useProgram(PAGE.p)
       const pu = PAGE.u, bend = w.bend.p
       gl.uniformMatrix4fv(pu.uMVP, false, cam.mvp); gl.uniform1f(pu.uTime, w.time); gl.uniform1f(pu.uShroom, w.shroomAmt)

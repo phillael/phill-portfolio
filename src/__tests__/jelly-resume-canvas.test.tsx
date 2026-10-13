@@ -82,8 +82,9 @@ describe('JellyResumeHost (the overlay, driven by the URL)', () => {
     await waitFor(() => expect(container.querySelector('canvas')).not.toBeNull())
     const canvas = container.querySelector('canvas')!
     expect(canvas).toHaveAttribute('aria-hidden', 'true')
-    expect(createJellyEngine).toHaveBeenCalledWith(expect.objectContaining({ canvas }))
-    expect(engine.openDirect).toHaveBeenCalledWith('React')
+    // created a task after mount, opened the task after that (short frames on slow phones)
+    await waitFor(() => expect(createJellyEngine).toHaveBeenCalledWith(expect.objectContaining({ canvas })))
+    await waitFor(() => expect(engine.openDirect).toHaveBeenCalledWith('React'))
     await waitFor(() => expect(engine.load).toHaveBeenCalledWith('snapshot'))
 
     // leaving the route fades the overlay out, then disposes the engine
@@ -124,6 +125,7 @@ describe('the resume HUD', () => {
     render(<JellyResumeCanvas onClose={onClose} />)
     const region = await screen.findByRole('dialog', { name: 'Interactive resume' })
     await waitFor(() => expect(engine.load).toHaveBeenCalled())
+    await screen.findByRole('button', { name: 'Close the resume (Esc)' }) // the HUD mounts once the resume has loaded
     return { region, onClose }
   }
 
@@ -206,12 +208,24 @@ describe('the resume HUD', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('mounts only once the resume has loaded (it opens after that), keeping its first layout out of the busy first frames', async () => {
+    let finish: () => void = () => {}
+    engine.load.mockImplementationOnce(() => new Promise<void>((r) => (finish = r)))
+    mediaQuery(false)
+    render(<JellyResumeCanvas onClose={jest.fn()} />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
+    await new Promise((r) => setTimeout(r, 100))
+    expect(screen.queryByRole('button', { name: 'Close the resume (Esc)' })).toBeNull()
+    act(() => finish())
+    expect(await screen.findByRole('button', { name: 'Close the resume (Esc)' })).toBeInTheDocument()
+  })
+
   it('× asks to close; while fading out the controls are off', async () => {
     const onClose = jest.fn()
     mediaQuery(false)
     const { rerender } = render(<JellyResumeCanvas onClose={onClose} />)
     await waitFor(() => expect(engine.load).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole('button', { name: 'Close the resume (Esc)' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close the resume (Esc)' }))
     expect(onClose).toHaveBeenCalledTimes(1)
 
     rerender(<JellyResumeCanvas onClose={onClose} closing />)

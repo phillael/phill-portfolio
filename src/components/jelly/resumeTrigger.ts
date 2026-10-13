@@ -41,7 +41,7 @@ export const clearIntent = () => {
   intent = null
 }
 
-/** Warm the engine chunk and the snapshot (hover, focus or touchstart on a trigger). */
+/** Warm the engine chunk, the snapshot and the decoded photo (hover, focus or touchstart on a trigger). */
 export function prefetchResume() {
   if (prefetched || reducedMotion()) return // reduced motion never loads the engine
   prefetched = true
@@ -49,6 +49,12 @@ export function prefetchResume() {
   import('@/lib/jelly/snapshot')
     .then((m) => m.loadSnapshotOnce())
     .catch(() => (prefetched = false))
+  import('@/lib/jelly/hero')
+    .then((m) => {
+      const img = getHeroImg()
+      if (img) m.decodePhoto(img)
+    })
+    .catch(() => {})
 }
 
 /** Open the 3D resume (with reduced motion, the plain /resume page). */

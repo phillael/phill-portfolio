@@ -67,6 +67,31 @@ export function containedRect(img: HTMLImageElement) {
   return { left: b.left + (b.width - w) / 2, top: b.top + (b.height - h) / 2, width: w, height: h }
 }
 
+let photo: { src: string; bitmap: Promise<ImageBitmap | null>; ready: ImageBitmap | null } | null = null
+
+/**
+ * The photo, decoded off the main thread (sampling an <img> decodes it on the main thread:
+ * ~50 ms on a throttled phone, in the open's busiest frame). Cached per source; null where
+ * it can't (no createImageBitmap, or the fetch fails), and then the <img> itself is drawn.
+ */
+export function decodePhoto(img: HTMLImageElement): Promise<ImageBitmap | null> {
+  const src = img.currentSrc || img.src
+  if (photo?.src !== src) {
+    const entry: NonNullable<typeof photo> = { src, bitmap: Promise.resolve(null), ready: null }
+    if (src && typeof createImageBitmap === 'function') {
+      entry.bitmap = fetch(src)
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`Photo request failed: ${r.status}`))))
+        .then((b) => createImageBitmap(b))
+        .then((bm) => (entry.ready = bm))
+        .catch(() => null)
+    }
+    photo = entry
+  }
+  return photo.bitmap
+}
+
+const decoded = (img: HTMLImageElement) => (photo && photo.src === (img.currentSrc || img.src) ? photo.ready : null)
+
 export interface HeroSource {
   img: HTMLImageElement
   /** the canvas's client rect */
@@ -88,13 +113,14 @@ export function buildHeroSparks(w: World, hp: HeroPool, src: HeroSource, rebuilt
   const want = Math.round((low ? 6000 : 18000) * w.s.heroSparks)
   const key = [b.width, b.height, want, dpr].map((v) => Math.round(v)).join(',')
   if (key === hp.key) { placeHeroSparks(hp, b, rc); return true } // same size: just follow the photo (the hover lift moves it)
-  const k = Math.min(dpr, 1400 / b.width), W = Math.round(b.width * k), H = Math.round(b.height * k)
+  // the grid is in CSS px, so low quality samples at 1× (a quarter of the pixels; each spark is a cell's average anyway)
+  const k = Math.min(low ? 1 : dpr, 1400 / b.width), W = Math.round(b.width * k), H = Math.round(b.height * k)
   const cv = document.createElement('canvas')
   cv.width = W
   cv.height = H
   const g = cv.getContext('2d', { willReadFrequently: true })
   if (!g) return false
-  g.drawImage(img, 0, 0, W, H)
+  g.drawImage(decoded(img) ?? img, 0, 0, W, H)
   let px: Uint8ClampedArray
   try {
     px = g.getImageData(0, 0, W, H).data
@@ -282,10 +308,11 @@ export function updateDissolve(w: World, hp: HeroPool, d: Dissolve, dt: number, 
 // ---- Reading order, sorted ahead of time in idle moments (cached per build) so the handoff frame stays cheap ----
 const order: { hero: Int32Array | null; heroSrc: Float32Array | null; page: Int32Array | null; pageSrc: Float32Array | null } = { hero: null, heroSrc: null, page: null, pageSrc: null }
 
+/** Soon, in an idle moment if there is one (a busy, throttled phone may have none before the handoff). */
 export const idle = (f: () => void) => {
   const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o: { timeout: number }) => number }).requestIdleCallback
-  if (ric) ric(f, { timeout: 2000 })
-  else setTimeout(f, 200)
+  if (ric) ric(f, { timeout: 250 })
+  else setTimeout(f, 50)
 }
 
 export function heroOrder(hp: HeroPool) {

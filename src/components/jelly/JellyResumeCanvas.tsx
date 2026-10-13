@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createJellyEngine, type JellyEngine } from '@/lib/jelly/engine'
 import { loadSnapshotOnce } from '@/lib/jelly/snapshot'
+import { decodePhoto } from '@/lib/jelly/hero'
 import { createMusicTap } from '@/lib/jelly/music'
 import { getSiteMusic } from '@/lib/site-music'
 import type { ResumeMode } from '@/components/jelly/resumeRoute'
@@ -46,6 +47,24 @@ const pageInert = (on: boolean) => {
   }
 }
 
+/** The HUD's emoji and symbols (keep in step with its labels). */
+const HUD_GLYPHS = '🍄📱🔇🔊🕳⌕▶♫✥⟲⟳⤓'
+
+/**
+ * Lay the HUD's glyphs out once, off screen: their fallback fonts' first use costs ~45 ms
+ * on a throttled phone, too much on top of the HUD's own first layout in the same frame.
+ */
+const warmGlyphs = (host: HTMLElement | null) => {
+  if (!host) return
+  const s = document.createElement('span')
+  s.setAttribute('aria-hidden', 'true')
+  s.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none'
+  s.textContent = HUD_GLYPHS
+  host.appendChild(s)
+  s.getBoundingClientRect()
+  s.remove()
+}
+
 /** Whatever opened the resume (the hero, or the 🍄), so focus can go back to it. */
 const openerFor = (el: HTMLElement | null | undefined) =>
   el && el.isConnected ? el : (getHeroImg()?.closest('button') as HTMLElement | null) ?? null
@@ -84,51 +103,64 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     const intent = peekIntent()
     openerRef.current = intent?.opener ?? null
     const tap = createMusicTap(getSiteMusic) // dance to the site's player (one player for the site and the resume)
-    let e: JellyEngine
-    try {
-      e = createJellyEngine({
-        canvas,
-        music: tap.get,
-        onFind: (q, n) => { setQuery(q); setMatches(n) }, // a deep link's Finder, once the page lands
-        onOpen: () => {
-          clearIntent()
-          setOpened(true)
-          if (modeRef.current === 'overlay') pageClasses('jelly-gone')
-          // the trigger is hidden now: bring focus into the resume
-          const a = document.activeElement
-          if (!a || a === document.body || document.getElementById('shroom-target')?.contains(a)) sectionRef.current?.focus({ preventScroll: true })
-        },
-        // closing in reverse: the sparks are home on the photo, so the page comes back under them
-        onLanded: () => {
-          pageInert(false)
-          pageClasses('jelly-returning')
-        },
-        onClosed: () => {
-          openerFor(openerRef.current)?.focus({ preventScroll: true })
-          onClosedRef.current?.()
-        },
-      })
-    } catch (err) {
-      console.error('The 3D resume needs WebGL2', err)
-      return
-    }
+    let e: JellyEngine | null = null
     let alive = true
-    setEngine(e)
-    pageInert(true)
-    // over the home page the hero dissolves into the resume (from the click; Forward replays it from the photo's center)
-    const img = modeRef.current === 'overlay' ? getHeroImg() : null
-    if (img && e.openFromHero({ img, origin: intent?.origin ?? null, tint: intent?.tint ?? 0, find: findRef.current })) pageClasses('jelly-dissolving')
-    else e.openDirect(findRef.current)
-    loadSnapshotOnce()
-      .then((snapshot) => {
-        if (!alive) return
-        e.load(snapshot)
-        setLoaded(true)
-      })
-      .catch((err) => console.error('The resume failed to load', err))
+    const timers: ReturnType<typeof setTimeout>[] = []
+    const frames: number[] = []
+    // A step per frame, so a slow phone never blocks a frame for long: the browser lays out and paints the
+    // overlay first, then the engine is created (shaders, the nebula), then it opens (sampling the photo).
+    const later = (f: () => void) => frames.push(requestAnimationFrame(() => timers.push(setTimeout(() => alive && f(), 0))))
+    later(() => {
+      try {
+        e = createJellyEngine({
+          canvas,
+          music: tap.get,
+          onFind: (q, n) => { setQuery(q); setMatches(n) }, // a deep link's Finder, once the page lands
+          onOpen: () => {
+            clearIntent()
+            setOpened(true)
+            if (modeRef.current === 'overlay') pageClasses('jelly-gone')
+            // the trigger is hidden now: bring focus into the resume
+            const a = document.activeElement
+            if (!a || a === document.body || document.getElementById('shroom-target')?.contains(a)) sectionRef.current?.focus({ preventScroll: true })
+          },
+          // closing in reverse: the sparks are home on the photo, so the page comes back under them
+          onLanded: () => {
+            pageInert(false)
+            pageClasses('jelly-returning')
+          },
+          onClosed: () => {
+            openerFor(openerRef.current)?.focus({ preventScroll: true })
+            onClosedRef.current?.()
+          },
+        })
+      } catch (err) {
+        console.error('The 3D resume needs WebGL2', err)
+        return
+      }
+      const engine = e
+      setEngine(engine)
+      pageInert(true)
+      // over the home page the hero dissolves into the resume (from the click; Forward replays it from the photo's center),
+      // once the photo is decoded (off the main thread; the prefetch usually has it already)
+      const img = modeRef.current === 'overlay' ? getHeroImg() : null
+      const open = () => {
+        if (img && engine.openFromHero({ img, origin: intent?.origin ?? null, tint: intent?.tint ?? 0, find: findRef.current })) pageClasses('jelly-dissolving')
+        else engine.openDirect(findRef.current)
+        loadSnapshotOnce()
+          .then((snapshot) => (alive ? engine.load(snapshot) : undefined))
+          // then the HUD, a frame after its glyphs: two first layouts, a frame each
+          .then(() => later(() => { warmGlyphs(sectionRef.current); later(() => setLoaded(true)) }))
+          .catch((err) => console.error('The resume failed to load', err))
+      }
+      if (img) decodePhoto(img).then(() => later(open))
+      else later(open)
+    })
     return () => {
       alive = false
-      e.dispose()
+      frames.forEach(cancelAnimationFrame)
+      timers.forEach(clearTimeout)
+      e?.dispose()
       tap.dispose()
       pageClasses()
       pageInert(false)
@@ -277,7 +309,8 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
         <p>A 3D, animated version of Phill&apos;s resume. Its text follows.</p>
         <ResumeContent idPrefix="jelly-resume-" links={false} />
       </div>
-      {engine && (
+      {/* mounted once the resume has loaded (it opens after that): its first layout stays out of the busy first frames */}
+      {engine && loaded && (
         <div inert={!uiOn} className={fadeIn}>
           <JellyFinder
             query={query}

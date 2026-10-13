@@ -20,9 +20,9 @@ import { burstAll, chaos, collide, healAll, releaseHole, shakeIt, startHole, ste
 import { createRenderer } from './render'
 import { createSfx } from './sfx'
 import { snapshotBodies, type LoadedSnapshot } from './snapshot'
-import { buildAtlas, buildPhysics, createWorld, hidden, type World } from './world'
+import { atlasSteps, createWorld, hidden, physicsSteps, type World } from './world'
 import {
-  buildHeroSparks, containedRect, createHeroPool, heroHandoff, heroRest, idle, pageOrder, startClosing, startDissolve, updateClosing, updateDissolve,
+  buildHeroSparks, containedRect, createHeroPool, heroHandoff, heroRest, pageOrder, startClosing, startDissolve, updateClosing, updateDissolve,
   type Closing, type Dissolve,
 } from './hero'
 import { smooth } from './math'
@@ -98,8 +98,6 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   let holeMode = false
   let lastRay: Ray | null = null
   let back: HTMLCanvasElement | null = null
-  let atlasCanvas: HTMLCanvasElement | null = null
-  let atlasRects: { x: number; y: number; w: number; h: number }[] = []
   const frameListeners = new Set<() => void>()
 
   // ---- size: device pixels, DPR capped at 2 ----
@@ -115,20 +113,44 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   ro.observe(canvas)
   resize()
 
-  /** Build the bodies, sparks, atlas and sheet from the snapshot; the resume then waits as a galaxy. */
-  function load(snapshot: LoadedSnapshot) {
-    loaded = snapshot
+  // Deferred work takes turns, one job per frame: each waits for the frame after the previous
+  // job's, then runs in the task after it (back-to-back timeouts would let two heavy steps
+  // land before the browser draws)
+  let turn = Promise.resolve()
+  const nextTask = () => (turn = turn.then(() => new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)))))
+  let disposed = false
+
+  /**
+   * Build the bodies, sparks, atlas and sheet from the snapshot, a step per task so a cold
+   * load never blocks a frame for long (the resume stays hidden until it's all built);
+   * the resume then waits as a galaxy.
+   */
+  async function load(snapshot: LoadedSnapshot) {
+    await nextTask()
+    if (disposed) return
     const snap = snapshot.snap
     w.rnd = lcg(7)
     w.pageW = snap.page.w
     w.pageH = snap.page.h
     w.pageBottom = -w.pageH / 2
     const list = snapshotBodies(snap)
-    buildPhysics(w, list)
-    const { atlas, rects } = buildAtlas(w, list, snapshot.text)
+    for (const _ of physicsSteps(w, list)) {
+      await nextTask()
+      if (disposed) return
+    }
+    const steps = atlasSteps(w, list, snapshot.text)
+    let step: ReturnType<typeof steps.next>
+    do {
+      await nextTask()
+      if (disposed) return
+      step = steps.next()
+    } while (!step.done)
+    const { atlas, rects } = step.value
+    await nextTask()
+    if (disposed) return
     renderer.buildGPU(atlas, rects)
-    atlasCanvas = atlas
-    atlasRects = rects
+    await nextTask()
+    if (disposed) return
     // the page's backing: white paper plus the decorations at their place in the margins
     const PP = 220
     back = document.createElement('canvas')
@@ -144,8 +166,13 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     w.cam.scrollX = 0
     w.cam.x = null
     startIntro(w, true) // the resume waits as a galaxy
-    idle(() => pageOrder(w)) // ready for the hero handoff
+    loaded = snapshot
     if (pendingOpen) { pendingOpen = false; directIntro() }
+    await nextTask()
+    if (disposed) return
+    pageOrder(w) // sorted now, so the hero handoff frame stays cheap
+    await nextTask()
+    if (!disposed) sfx.prepare()
   }
 
   function directIntro() {
@@ -176,7 +203,6 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     updateCamera(w, 0, canvas.width, canvas.height, ui, introCam(w, false, null))
     if (!buildHeroSparks(w, hp, { img, canvas: rc, dpr, low }, () => renderer.buildHero(hp))) return false
     if (find) pendingFind = find
-    sfx.init()
     heroRest(w, hp, canvas.clientWidth, canvas.clientHeight, canvas.width, canvas.height)
     const b = containedRect(img)
     const ox = origin ? origin.x - rc.left : b.left + b.width / 2 - rc.left, oy = origin ? origin.y - rc.top : b.top + b.height / 2 - rc.top
@@ -184,7 +210,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     heroImg = img
     img.style.visibility = 'hidden' // the sparks match the photo, so the swap is invisible
     skyTarget = 1
-    sfx.intro(2)
+    // the whoosh (its buffer takes a moment to synthesize: not in this frame)
+    nextTask().then(() => { if (!disposed) { sfx.init(); sfx.intro(2) } })
     return true
   }
 
@@ -219,19 +246,17 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   }
 
   /** The navigator's thumbnail: the page backing plus every word from the atlas at its home position. */
+  /** The page at its home layout: the backing, then the text layer over the content box (the words' own home). */
   function drawMiniMap(cv: HTMLCanvasElement) {
-    if (!back || !atlasCanvas) return
+    if (!back || !loaded) return
     const W = 208, H = Math.round((W * w.pageH) / w.pageW)
     cv.width = W
     cv.height = H
     const g = cv.getContext('2d')
     if (!g) return
     g.drawImage(back, 0, 0, W, H)
-    const sx = W / w.pageW, sy = H / w.pageH
-    w.bodies.forEach((bd, i) => {
-      const r = atlasRects[i]
-      if (r) g.drawImage(atlasCanvas!, r.x, r.y, r.w, r.h, (bd.x0 + w.pageW / 2) * sx, (w.pageH / 2 - bd.yTop) * sy, (bd.x1 - bd.x0) * sx, (bd.yTop - bd.yBot) * sy)
-    })
+    const { page, content } = loaded.snap, sx = W / w.pageW, sy = H / w.pageH
+    g.drawImage(loaded.text, page.marginX * sx, page.marginY * sy, (content.w / 96) * sx, (content.h / 96) * sy)
   }
 
   function navView(): NavView {
@@ -304,13 +329,22 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     return on
   }
 
+  /** A user gesture unlocks audio; the reverb's buffers follow a frame later (the hero open makes them as its load's last step). */
+  let preparing = false
+  function unlockAudio() {
+    sfx.init()
+    if (preparing || !loaded) return
+    preparing = true
+    nextTask().then(() => { if (!disposed) sfx.prepare() })
+  }
+
   const enabled = () => open && !!loaded
   const input = attachInput({
     w, canvas, ui, enabled,
     navMode: () => navMode,
     holeMode: () => holeMode,
     setLastRay: (r) => { lastRay = r },
-    gesture: () => sfx.init(),
+    gesture: unlockAudio,
   })
 
   // ---- the loop: runs while the tab is visible ----
@@ -341,7 +375,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     updateTargets(w, dt)
     w.searchAmt += ((w.searchN ? 1 : 0) - w.searchAmt) * Math.min(1, dt * 4)
     const t0 = performance.now()
-    if (w.NP) { // no bodies until the resume loads
+    if (loaded) { // no bodies until the resume has loaded
       for (let k = 0; k < 4; k++) step(w, dt / 4)
       collide(w)
       updateStates(w, dt)
@@ -375,7 +409,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     skyLin = skyTarget > skyLin ? Math.min(skyTarget, skyLin + dt / 0.7) : Math.max(skyTarget, skyLin - dt / 0.7)
     // closing: the sky fades out with the sparks as the page comes back
     const sky = cl && cl.landed ? 1 - smooth(cl.fade) : smooth(skyLin)
-    renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null)
+    renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null, !!loaded)
   }
   function startLoop() {
     if (raf) return
@@ -397,6 +431,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   }
 
   function dispose() {
+    disposed = true
     stopLoop()
     document.removeEventListener('visibilitychange', onVisibility)
     ro.disconnect()
@@ -438,7 +473,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     setTilt,
     /** called every frame, right after the camera moves (mutate the DOM; never set React state) */
     onFrame: (f: () => void) => { frameListeners.add(f); return () => { frameListeners.delete(f) } },
-    gesture: () => sfx.init(),
+    gesture: unlockAudio,
     stats,
     dispose,
   }

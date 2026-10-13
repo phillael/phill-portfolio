@@ -17,6 +17,7 @@ import { attachInput } from './input'
 import { lcg } from './math'
 import { MusicFeatures, type MusicInput } from './music'
 import { burstAll, chaos, collide, healAll, releaseHole, shakeIt, startHole, step, updateParticles, updateStates } from './physics'
+import type { Cast } from './cast'
 import { createRenderer } from './render'
 import { createSfx } from './sfx'
 import { snapshotBodies, type LoadedSnapshot } from './snapshot'
@@ -82,6 +83,9 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   const renderer = createRenderer(gl, w)
   renderer.bakeSky()
   renderer.buildStars()
+  // the cast (Phill, the shrimp): its own chunk, fetched once the page has printed (the cold open never waits on it)
+  let cast: Cast | null = null
+  let castStarted = false
 
   const ui: UiInsets = { top: 0.1, bot: 0.1 }
   let loaded: LoadedSnapshot | null = null
@@ -349,6 +353,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     holeMode: () => holeMode,
     setLastRay: (r) => { lastRay = r },
     gesture: unlockAudio,
+    castHit: (r) => !!cast?.hit(r),
+    castClick: (r) => !!cast?.click(r),
   })
 
   // ---- the loop: runs while the tab is visible ----
@@ -413,7 +419,16 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     skyLin = skyTarget > skyLin ? Math.min(skyTarget, skyLin + dt / 0.7) : Math.max(skyTarget, skyLin - dt / 0.7)
     // closing: the sky fades out with the sparks as the page comes back
     const sky = cl && cl.landed ? 1 - smooth(cl.fade) : smooth(skyLin)
-    renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null, !!loaded)
+    // the cast: on stage once the page has printed (and off it while the resume closes or replays its intro)
+    const settled = open && !!loaded && !w.intro && !cl && !diss
+    if (settled && !castStarted) {
+      castStarted = true
+      import('./cast')
+        .then(({ createCast }) => { if (disposed) return; cast = createCast(gl!, w); return cast.load(nextTask) })
+        .catch((err) => console.warn('The resume cast failed to load', err))
+    }
+    cast?.update(dt, settled)
+    renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null, !!loaded, cast?.draw)
   }
   function startLoop() {
     if (raf) return
@@ -444,6 +459,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     window.removeEventListener('devicemotion', onMotion)
     frameListeners.clear()
     sfx.dispose()
+    cast?.dispose()
     renderer.dispose()
     gl?.getExtension('WEBGL_lose_context')?.loseContext() // give the context back now, not at GC (browsers cap live contexts)
     if (heroImg) heroImg.style.visibility = '' // never leave the photo hidden
@@ -456,7 +472,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     openFromHero,
     close,
     find,
-    chaos: () => chaos(w),
+    chaos: () => { chaos(w); cast?.kickAll() },
     burstAll: () => burstAll(w),
     healAll: () => healAll(w),
     setShroom: (on: boolean) => { s.shroom = on },
@@ -484,7 +500,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   }
 
   // dev only: a handle for scripted checks in the browser, like the playground's
-  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, diss: () => diss, closing: () => cl, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
+  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, get cast() { return cast }, diss: () => diss, closing: () => cl, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
   if (debug) (window as unknown as { __jelly?: unknown }).__jelly = debug
 
   return api

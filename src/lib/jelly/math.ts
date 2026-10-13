@@ -43,3 +43,64 @@ export const lcg = (seed: number) => {
     return s / 4294967296
   }
 }
+
+export type Quat = [number, number, number, number]
+
+/** Quaternions [x, y, z, w] and in-place 4×4 helpers for the cast (no allocation per frame). */
+export const Q = {
+  mul(a: ArrayLike<number>, b: ArrayLike<number>, o: Quat | Float32Array = [0, 0, 0, 1]) {
+    const ax = a[0], ay = a[1], az = a[2], aw = a[3], bx = b[0], by = b[1], bz = b[2], bw = b[3]
+    o[0] = aw * bx + ax * bw + ay * bz - az * by
+    o[1] = aw * by - ax * bz + ay * bw + az * bx
+    o[2] = aw * bz + ax * by - ay * bx + az * bw
+    o[3] = aw * bw - ax * bx - ay * by - az * bz
+    return o
+  },
+  /** rotation of `ang` radians about the unit axis */
+  axis(x: number, y: number, z: number, ang: number, o: Quat | Float32Array = [0, 0, 0, 1]) {
+    const s = Math.sin(ang / 2)
+    o[0] = x * s; o[1] = y * s; o[2] = z * s; o[3] = Math.cos(ang / 2)
+    return o
+  },
+  norm(q: Quat | Float32Array) {
+    const l = Math.hypot(q[0], q[1], q[2], q[3]) || 1
+    q[0] /= l; q[1] /= l; q[2] /= l; q[3] /= l
+    return q
+  },
+  slerp(a: ArrayLike<number>, b: ArrayLike<number>, t: number, o: Quat | Float32Array) {
+    let bx = b[0], by = b[1], bz = b[2], bw = b[3]
+    let d = a[0] * bx + a[1] * by + a[2] * bz + a[3] * bw
+    if (d < 0) { d = -d; bx = -bx; by = -by; bz = -bz; bw = -bw }
+    let ka = 1 - t, kb = t
+    if (d < 0.9995) { const th = Math.acos(d), s = Math.sin(th); ka = Math.sin(ka * th) / s; kb = Math.sin(kb * th) / s }
+    o[0] = a[0] * ka + bx * kb; o[1] = a[1] * ka + by * kb; o[2] = a[2] * ka + bz * kb; o[3] = a[3] * ka + bw * kb
+    return Q.norm(o)
+  },
+}
+
+export const M4x = {
+  /** o = a · b (column-major), written into o (which may not alias a or b) */
+  mulInto(o: Float32Array, a: ArrayLike<number>, b: ArrayLike<number>, oo = 0, ao = 0, bo = 0) {
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+      o[oo + i * 4 + j] = a[ao + j] * b[bo + i * 4] + a[ao + 4 + j] * b[bo + i * 4 + 1] + a[ao + 8 + j] * b[bo + i * 4 + 2] + a[ao + 12 + j] * b[bo + i * 4 + 3]
+    }
+    return o
+  },
+  /** translation · rotation · scale, written into o at offset oo */
+  compose(o: Float32Array, t: ArrayLike<number>, r: ArrayLike<number>, s: ArrayLike<number>, oo = 0) {
+    const x = r[0], y = r[1], z = r[2], w = r[3], x2 = x + x, y2 = y + y, z2 = z + z
+    const xx = x * x2, xy = x * y2, xz = x * z2, yy = y * y2, yz = y * z2, zz = z * z2, wx = w * x2, wy = w * y2, wz = w * z2
+    o[oo] = (1 - (yy + zz)) * s[0]; o[oo + 1] = (xy + wz) * s[0]; o[oo + 2] = (xz - wy) * s[0]; o[oo + 3] = 0
+    o[oo + 4] = (xy - wz) * s[1]; o[oo + 5] = (1 - (xx + zz)) * s[1]; o[oo + 6] = (yz + wx) * s[1]; o[oo + 7] = 0
+    o[oo + 8] = (xz + wy) * s[2]; o[oo + 9] = (yz - wx) * s[2]; o[oo + 10] = (1 - (xx + yy)) * s[2]; o[oo + 11] = 0
+    o[oo + 12] = t[0]; o[oo + 13] = t[1]; o[oo + 14] = t[2]; o[oo + 15] = 1
+    return o
+  },
+  /** p transformed by the matrix at offset mo (a point: w = 1) */
+  point(m: ArrayLike<number>, x: number, y: number, z: number, o: number[] = [0, 0, 0], mo = 0) {
+    o[0] = m[mo] * x + m[mo + 4] * y + m[mo + 8] * z + m[mo + 12]
+    o[1] = m[mo + 1] * x + m[mo + 5] * y + m[mo + 9] * z + m[mo + 13]
+    o[2] = m[mo + 2] * x + m[mo + 6] * y + m[mo + 10] * z + m[mo + 14]
+    return o
+  },
+}

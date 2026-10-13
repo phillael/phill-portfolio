@@ -356,3 +356,45 @@ export const MIST_FS = `#version 300 es
 precision highp float;
 in vec2 vUv; in vec3 vCol; in float vA; uniform sampler2D uCloud; out vec4 o;
 void main(){ float a = texture(uCloud, vUv).a*vA; if(a < 0.003) discard; o = vec4(vCol*a, a); }`
+// The cast (Phill, the shrimp): a skinned or static textured mesh, lit by the page's light,
+// with a neon rim from the nebula, the words' fog and the shroom hue
+export const CAST_VS = `#version 300 es
+in vec3 aPos; in vec3 aNormal; in vec2 aUv; in vec4 aJoints; in vec4 aWeights;
+uniform mat4 uMVP, uModel; uniform mat4 uJoints[32]; uniform bool uSkin;
+out vec2 vUv; out vec3 vN; out vec3 vWorld;
+void main(){
+  mat4 sk = mat4(1.0);
+  if(uSkin){
+    vec4 w = aWeights/max(1e-4, aWeights.x + aWeights.y + aWeights.z + aWeights.w);
+    sk = w.x*uJoints[int(aJoints.x)] + w.y*uJoints[int(aJoints.y)] + w.z*uJoints[int(aJoints.z)] + w.w*uJoints[int(aJoints.w)];
+  }
+  mat4 m = uModel*sk;
+  vec4 wp = m*vec4(aPos, 1.0);
+  vN = mat3(m)*aNormal; vUv = aUv; vWorld = wp.xyz;
+  gl_Position = uMVP*wp;
+}`
+export const CAST_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; in vec3 vN; in vec3 vWorld;
+uniform sampler2D uTex, uGlowTex; uniform bool uHasGlow;
+uniform vec3 uEye, uLight, uFogCol, uRimA, uRimB, uGlowCol;
+uniform float uFog, uFogStart, uFogEnd, uShroom, uTime, uHue, uAlpha, uFlash, uRim, uAmbient;
+out vec4 o;
+${HSV}
+void main(){
+  vec3 base = texture(uTex, vUv).rgb;
+  vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
+  vec3 V = normalize(uEye - vWorld);
+  float diff = max(dot(n, normalize(uLight)), 0.0);
+  float fres = pow(1.0 - max(dot(n, V), 0.0), 2.2);
+  vec3 c = base*(uAmbient + (1.0 - uAmbient)*diff);
+  c += mix(uRimB, uRimA, 0.5 + 0.5*n.y)*fres*uRim;
+  if(uHasGlow) c += texture(uGlowTex, vUv).rgb*uGlowCol;
+  vec3 neon = hsv(fract(uTime*uHue + vWorld.x*0.05 + vWorld.y*0.08), 0.8, 1.0);
+  c = mix(c, c*0.45 + neon*(0.35 + 0.65*fres), uShroom*0.65);
+  c += vec3(0.9, 0.95, 1.0)*uFlash;
+  float fd = smoothstep(uFogStart, uFogEnd, distance(vWorld, uEye))*uFog;
+  c = mix(c, uFogCol, fd);
+  float a = uAlpha*(1.0 - 0.85*fd);
+  o = vec4(c*a, a);
+}`

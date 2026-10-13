@@ -149,3 +149,48 @@ export const SLAB_MAX = 0.085
 export const FOV = (40 * Math.PI) / 180
 export const ZMIN = 0.15
 export const ZMAX = 1.6
+
+/**
+ * The cast: Phill (the Number Slayers model) dancing in an orbit around the page, and
+ * the odd shrimp drifting through the nebula. Sizes in page units (inches).
+ */
+export interface CastConfig {
+  phill: boolean
+  /** Phill's height */
+  size: number
+  /** on a phone (portrait) he dances above the page at this fraction of his size */
+  phoneScale: number
+  /** ...and this much higher */
+  phoneLift: number
+  /** how far the orbit reaches past the page's side edges */
+  orbitX: number
+  /** the orbit's depth: in front of the page, then behind it */
+  orbitZ: number
+  /** the orbit's tilt: higher behind the page, lower in front */
+  tilt: number
+  /** the orbit's center height */
+  lift: number
+  /** seconds per lap */
+  lap: number
+  /** 0: he faces you; 1: he faces where he's going */
+  face: number
+  /** his zero-g bob */
+  bob: number
+  danceRate: number
+  /** the light he gets that isn't from the page's light (Meshy textures are bright already) */
+  ambient: number
+  /** the nebula's neon on his edges */
+  rim: number
+  /** shrimp in the sky at once (phones get one fewer) */
+  shrimp: number
+  shrimpSize: number
+  /** seconds between shrimp, on average */
+  shrimpGap: number
+  /** world units per second */
+  shrimpSpeed: number
+}
+
+export const CAST_CONFIG: Readonly<CastConfig> = Object.freeze({
+  phill: true, size: 3.4, phoneScale: 0.55, phoneLift: 0, orbitX: 2.4, orbitZ: 4.2, tilt: 3.6, lift: 0.2, lap: 34, face: 0.3, bob: 0.25, danceRate: 1,
+  ambient: 0.62, rim: 0.7, shrimp: 3, shrimpSize: 2.6, shrimpGap: 9, shrimpSpeed: 0.75,
+})

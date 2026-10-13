@@ -50,4 +50,9 @@ describe('buildWizardSystemPrompt', () => {
     const b = buildWizardSystemPrompt()
     expect(a).toBe(b)
   })
+  it('tells the wizard when to offer the resume (a tool call, never described)', () => {
+    const prompt = buildWizardSystemPrompt()
+    expect(prompt).toContain('offer_resume')
+    expect(prompt).toMatch(/RESUME OFFERS/)
+  })
 })

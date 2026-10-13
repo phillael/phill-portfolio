@@ -66,6 +66,25 @@ describe('WizardChat', () => {
     })
   })
 
+  it('calls onOfferResume when the response carries action: offer_resume', async () => {
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      json: async () => ({ message: 'His deeds await, traveler.', action: 'offer_resume' }),
+    })
+    const onOfferMushroom = jest.fn()
+    const onOfferResume = jest.fn()
+
+    render(
+      <WizardChat onClose={() => {}} onFallback={() => {}} onOfferMushroom={onOfferMushroom} onOfferResume={onOfferResume} />,
+    )
+
+    const input = screen.getByLabelText(/ask the wizard/i)
+    fireEvent.change(input, { target: { value: 'show me his resume' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(onOfferResume).toHaveBeenCalledTimes(1))
+    expect(onOfferMushroom).not.toHaveBeenCalled()
+  })
+
   it('calls onFallback when the server returns rate_limiter_down', async () => {
     ;(global.fetch as jest.Mock).mockResolvedValue({
       json: async () => ({ error: 'rate_limiter_down', message: 'down' }),

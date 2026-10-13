@@ -21,6 +21,8 @@ const TIMEOUT_LINE = 'The spores drift slowly today… ask again.'
 const GENERIC_ERROR_LINE = "The grove's whispers are tangled. A moment, traveler."
 // Used when the model calls offer_mushroom without saying anything
 const OFFER_LINE = 'The spores stir, traveler… I have a gift for thee.'
+// Used when the model calls offer_resume without saying anything
+const RESUME_LINE = "Phill's deeds are written in a living scroll, traveler…"
 
 // Request limits. The client caps typed input at 200 chars and the model's
 // replies are bounded by max_tokens, so anything larger was not sent by the
@@ -136,16 +138,17 @@ export async function POST(request: Request): Promise<Response> {
 
   const textBlock = mainResponse.content.find((b) => b.type === 'text')
   const toolBlock = mainResponse.content.find(
-    (b) => b.type === 'tool_use' && b.name === 'offer_mushroom',
+    (b) => b.type === 'tool_use' && (b.name === 'offer_mushroom' || b.name === 'offer_resume'),
   )
+  const action = toolBlock?.type === 'tool_use' ? (toolBlock.name as 'offer_mushroom' | 'offer_resume') : null
   const text = textBlock?.type === 'text' ? textBlock.text.trim() : ''
 
-  if (!text && !toolBlock) {
+  if (!text && !action) {
     return Response.json(errorBody('server', GENERIC_ERROR_LINE), { status: 502 })
   }
 
   return Response.json({
-    message: text || OFFER_LINE,
-    ...(toolBlock ? { action: 'offer_mushroom' as const } : {}),
+    message: text || (action === 'offer_resume' ? RESUME_LINE : OFFER_LINE),
+    ...(action ? { action } : {}),
   })
 }

@@ -7,6 +7,8 @@ import { useShroomMode } from '@/context/ShroomModeContext'
 import { X } from 'lucide-react'
 import WizardChat, { pickRandom, TRIUMPH_LINES, DECLINE_LINES } from '@/components/WizardChat'
 import MushroomOfferBubble from '@/components/MushroomOfferBubble'
+import { openResume, prefetchResume } from '@/components/jelly/resumeTrigger'
+import wizardData from '@/data/wizard.json'
 
 // Dynamically import 3D component to avoid SSR issues with Three.js
 const loadShroomWizard3D = () => import('./ShroomWizard3D')
@@ -82,6 +84,7 @@ const ShroomMode = () => {
   // WizardChat state
   const [chatOpen, setChatOpen] = useState(false)
   const [ceremonyOpen, setCeremonyOpen] = useState(false)
+  const [resumeOfferOpen, setResumeOfferOpen] = useState(false)
   const [fallback, setFallback] = useState(false)
   const [injectedLine, setInjectedLine] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -323,9 +326,13 @@ const ShroomMode = () => {
             onClose={() => setChatOpen(false)}
             onFallback={() => setFallback(true)}
             onOfferMushroom={() => setCeremonyOpen(true)}
+            onOfferResume={() => {
+              prefetchResume()
+              setResumeOfferOpen(true)
+            }}
             injectedLine={injectedLine}
             onInjectedLineConsumed={() => setInjectedLine(null)}
-            offerOpen={ceremonyOpen}
+            offerOpen={ceremonyOpen || resumeOfferOpen}
           />
         )}
       </AnimatePresence>
@@ -344,6 +351,30 @@ const ShroomMode = () => {
             onCancel={() => {
               setInjectedLine(pickRandom(DECLINE_LINES))
               setCeremonyOpen(false)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* The wizard offers Phill's resume: Summon opens the 3D resume with the blue-violet heat */}
+      <AnimatePresence>
+        {resumeOfferOpen && (
+          <MushroomOfferBubble
+            position="centered"
+            text={wizardData.resumeOffer}
+            confirmLabel="Summon"
+            cancelLabel="Not now"
+            onConfirm={() => {
+              setResumeOfferOpen(false)
+              setChatOpen(false)
+              // the wizard has done its work: it walks off while the resume opens
+              setIsExiting(true)
+              setIsLoading(true)
+              openResume({ origin: null, tint: 1, opener: null })
+            }}
+            onCancel={() => {
+              setInjectedLine(wizardData.resumeDeclineLine)
+              setResumeOfferOpen(false)
             }}
           />
         )}

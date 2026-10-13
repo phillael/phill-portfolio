@@ -14,6 +14,9 @@ export interface MushroomOfferBubbleProps {
   text: string
   onConfirm: () => void
   onCancel: () => void
+  /** button labels (the mushroom ceremony's by default) */
+  confirmLabel?: string
+  cancelLabel?: string
 }
 
 export default function MushroomOfferBubble({
@@ -21,6 +24,8 @@ export default function MushroomOfferBubble({
   text,
   onConfirm,
   onCancel,
+  confirmLabel = 'Sure!',
+  cancelLabel = 'Ummm...no',
 }: MushroomOfferBubbleProps) {
   const backdropHandler = position === 'anchored' ? onCancel : undefined
   const isCentered = position === 'centered'
@@ -119,7 +124,7 @@ export default function MushroomOfferBubble({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              Ummm...no
+              {cancelLabel}
             </motion.button>
             <motion.button
               ref={confirmRef}
@@ -131,7 +136,7 @@ export default function MushroomOfferBubble({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              Sure!
+              {confirmLabel}
             </motion.button>
           </div>
         </div>

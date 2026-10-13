@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import ShroomMode from '../components/ShroomMode'
 import { ShroomModeProvider } from '../context/ShroomModeContext'
 import { __resetWizardChatSession, DECLINE_LINES } from '../components/WizardChat'
@@ -29,6 +29,12 @@ jest.mock('next/dynamic', () => () => {
     return <button aria-label="wizard model" data-exiting={String(!!isExiting)} onClick={onClick} />
   }
 })
+
+const mockOpenResume = jest.fn()
+jest.mock('../components/jelly/resumeTrigger', () => ({
+  openResume: (...args: unknown[]) => mockOpenResume(...args),
+  prefetchResume: () => {},
+}))
 
 function renderShroomMode() {
   return render(
@@ -145,5 +151,44 @@ describe('ShroomMode – dismissing the wizard', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /summon the shroom wizard/i })).toHaveFocus(),
     )
+  })
+})
+
+describe('ShroomMode – resume offer', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    __resetWizardChatSession()
+    global.fetch = jest.fn().mockResolvedValue({
+      json: async () => ({ message: 'His deeds are written in a living scroll.', action: 'offer_resume' }),
+    })
+  })
+
+  it('Summon opens the resume with the violet heat, closes the chat and sends the wizard off', async () => {
+    renderShroomMode()
+    await openChatAndSend('can I see his resume?')
+    const offer = await screen.findByRole('alertdialog', { name: "Shall I summon Phill's resume? ✨" })
+
+    fireEvent.click(within(offer).getByRole('button', { name: 'Summon' }))
+
+    expect(mockOpenResume).toHaveBeenCalledTimes(1)
+    expect(mockOpenResume.mock.calls[0][0]).toMatchObject({ tint: 1 })
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /shroom wizard chat/i })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('button', { name: /wizard model/i })).not.toBeInTheDocument())
+  })
+
+  it('Not now keeps the wizard and the chat', async () => {
+    renderShroomMode()
+    await openChatAndSend('resume?')
+    const offer = await screen.findByRole('alertdialog', { name: "Shall I summon Phill's resume? ✨" })
+
+    fireEvent.click(within(offer).getByRole('button', { name: 'Not now' }))
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(mockOpenResume).not.toHaveBeenCalled()
+    expect(screen.getByText(/scroll keeps its secrets/i)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /shroom wizard chat/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /wizard model/i })).toHaveAttribute('data-exiting', 'false')
+    await waitFor(() => expect(screen.getByLabelText(/ask the wizard/i)).toHaveFocus())
   })
 })

@@ -241,4 +241,40 @@ describe('POST /api/wizard/chat', () => {
     expect(body.message).toContain('sporefall')
     expect(body.action).toBe('offer_mushroom')
   })
+  it('returns action: offer_resume when the model offers the resume', async () => {
+    mockAnthropicCreate.mockResolvedValue({
+      content: [
+        { type: 'text', text: 'His deeds are written in a living scroll, traveler.' },
+        { type: 'tool_use', name: 'offer_resume', id: 'r', input: {} },
+      ],
+      usage: { input_tokens: 1000, output_tokens: 40 },
+    })
+
+    const res = await POST(makeRequest({ messages: [{ role: 'user', content: 'can I see his resume?' }] }))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.message).toContain('living scroll')
+    expect(body.action).toBe('offer_resume')
+  })
+
+  it('still offers the resume when the model replies with only that tool call', async () => {
+    mockAnthropicCreate.mockResolvedValue({
+      content: [{ type: 'tool_use', name: 'offer_resume', id: 'r', input: {} }],
+      usage: { input_tokens: 1000, output_tokens: 20 },
+    })
+
+    const res = await POST(makeRequest({ messages: [{ role: 'user', content: 'resume pls' }] }))
+    const body = await res.json()
+
+    expect(body.action).toBe('offer_resume')
+    expect(body.message.length).toBeGreaterThan(0)
+  })
+
+  it('gives the model both offers as tools', async () => {
+    mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 1, output_tokens: 1 } })
+    await POST(makeRequest({ messages: [{ role: 'user', content: 'hi' }] }))
+    const tools = mockAnthropicCreate.mock.calls[0][0].tools.map((t: { name: string }) => t.name)
+    expect(tools).toEqual(['offer_mushroom', 'offer_resume'])
+  })
 })

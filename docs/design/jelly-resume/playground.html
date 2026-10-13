@@ -415,7 +415,7 @@ const DEFAULTS = {
   soundOn: true, volume: 0.7,
   introTime: 3, holePull: 1, tiltForce: 12, shake: true,
   dance: 1, danceStyle: 'groove', mosh: 0, pulse: 0.6,
-  entrance: 'hero', dissolveTime: 1.6, heroSparks: 1, simReduced: false,
+  entrance: 'hero', heroPath: 'page', dissolveTime: 1.6, heroSparks: 1, simReduced: false,
 };
 const state = { ...DEFAULTS };
 const VIEW_KEYS = ['tilt', 'yaw', 'zoom', 'quality', 'layoutSource', 'paper', 'soundOn', 'volume'];
@@ -443,6 +443,7 @@ const SCHEMA = [
   ] },
   { group: 'Site integration', open: true, items: [
     { k: 'entrance', label: 'Entrance', type: 'select', site: true, options: [['hero', 'The phillcodes.com hero (mock)'], ['button', '"View Resume" start screen']], hint: 'what you see before the resume opens' },
+    { k: 'heroPath', label: 'Hero sparks go', type: 'select', options: [['page', 'Straight to the page (the photo reshapes into the resume)'], ['galaxy', 'Through a galaxy first']] },
     { k: 'dissolveTime', label: 'Dissolve length', type: 'range', min: 0.8, max: 3, step: 0.1, fmt: (v) => v.toFixed(1) + 's', hint: 'how long a hero spark takes to reach the galaxy (×0.7 on phones); the close is a little quicker' },
     { k: 'heroSparks', label: 'Hero sparks', type: 'range', min: 0.3, max: 2, step: 0.05, rebuildHero: true, fmt: (v) => '×' + v.toFixed(2) + ` (~${Math.round(18 * v)}K, phones ~${Math.round(6 * v)}K)` },
     { k: 'simReduced', label: 'Simulate reduced motion', type: 'toggle', hint: 'what prefers-reduced-motion visitors get: every trigger opens a plain HTML resume (no WebGL animation)' },
@@ -952,6 +953,18 @@ function updateParticles(dt) {
   const TX = tiltG.on ? tiltG.x * state.tiltForce * 0.4 : 0, TY = tiltG.on ? tiltG.y * state.tiltForce * 0.4 : 0, SW = state.swirl * 3;
   for (const bd of bodies) {
     if (!hidden(bd) || bd.state === EATEN) continue;
+    if (bd.state === INTRO && intro && intro.direct) {
+      // fresh from the hero: keep flying until this word's turn
+      const drag = Math.max(0, 1 - 1.1 * dt);
+      for (let k = bd.pt0; k < bd.pt0 + bd.ptN; k++) {
+        const o = k * 3;
+        if (SW > 0) { const a1 = 1.3 * ptPos[o] + 0.7 * time + ptPos[o + 2], b1 = 1.1 * ptPos[o + 1] - 0.6 * time;
+          ptVel[o] += -1.1 * Math.sin(a1) * Math.sin(b1) * SW * dt; ptVel[o + 1] += -1.3 * Math.cos(a1) * Math.cos(b1) * SW * dt; }
+        for (let a = 0; a < 3; a++) { ptVel[o + a] *= drag; ptPos[o + a] += ptVel[o + a] * dt; }
+        ptAlpha[k] = Math.min(1, ptAlpha[k] + dt * 3); ptAge[k] += dt;
+      }
+      continue;
+    }
     if (bd.state === INTRO) {
       const ease = 1 - Math.exp(-2.2 * dt);
       for (let k = bd.pt0; k < bd.pt0 + bd.ptN; k++) {
@@ -1027,7 +1040,7 @@ function updateStates(dt) {
       if (bd.timer <= 0) {
         // leave the galaxy on a curve, then swarm into the word
         bd.state = REFORM; bd.reform = 0;
-        for (let k = bd.pt0; k < bd.pt0 + bd.ptN; k++) { const o = k * 3, x = ptPos[o], y = ptPos[o + 1] - (cam.y ?? 0); ptVel[o] = -y * 0.9; ptVel[o + 1] = x * 0.9; ptVel[o + 2] = 2; }
+        if (!intro.direct) for (let k = bd.pt0; k < bd.pt0 + bd.ptN; k++) { const o = k * 3, x = ptPos[o], y = ptPos[o + 1] - (cam.y ?? 0); ptVel[o] = -y * 0.9; ptVel[o + 1] = x * 0.9; ptVel[o + 2] = 2; }
       }
       continue;
     }
@@ -2204,6 +2217,7 @@ function buildHeroSparks() {
   hp.buf = { pos: inst('aPos', 3, hp.pos, gl.DYNAMIC_DRAW), tail: inst('aTail', 3, hp.tail, gl.DYNAMIC_DRAW), alpha: inst('aAlpha', 1, hp.alpha, gl.DYNAMIC_DRAW),
     age: inst('aAge', 1, hp.age, gl.DYNAMIC_DRAW), heat: inst('aHeat', 1, hp.heat, gl.DYNAMIC_DRAW) };
   inst('aCol', 3, hp.col); inst('aId', 1, Float32Array.from({ length: N }, (_, i) => i));
+  idle(heroOrder);
   let gs = 23; hp.gal = galaxySlots(N, () => { gs = (gs * 1664525 + 1013904223) >>> 0; return gs / 4294967296; });
   gl.bindVertexArray(null);
   hp.camKey = ''; hp.dirtyAttr = true; heroRest();
@@ -2258,7 +2272,7 @@ function openResume({ origin, find: q, fromRoute = false, tint = 0 } = {}) {
   }
   heroRest();
   hp.vel.fill(0); hp.sv = new Float32Array(N * 3); hp.prev = hp.pos.slice();
-  diss = { t: 0, rel, travel: T, sweep, ox, oy }; hp.tint = tint;
+  diss = { t: 0, rel, travel: T, sweep, ox, oy, direct: state.heroPath !== 'galaxy' }; hp.tint = tint;
   if (!sBubble.hidden) setBubble(false);
   hp.show = true; hp.cover = true; heroImg.style.visibility = 'hidden'; // the sparks match the photo, so the swap is invisible
   siteEl.classList.add('dissolving'); siteEl.inert = true;
@@ -2282,6 +2296,17 @@ function updateDissolve(dt) {
       hp.age[i] = 0;
     }
     hp.heat[i] = Math.max(1e-4, Math.min(1, u / 0.25)); hp.age[i] = u;
+    if (d.direct) {
+      // straight to the page: kick, swirl and hover near the photo until the resume takes over (it waits here if loading is slow)
+      if (u >= 0.25) arrived++;
+      heroHome(i, gtmp);
+      if (SW > 0) {
+        const a1 = 1.3 * hp.pos[o] + 0.7 * time + hp.pos[o + 2], b1 = 1.1 * hp.pos[o + 1] - 0.6 * time;
+        hp.vel[o] += -1.1 * Math.sin(a1) * Math.sin(b1) * SW * dt; hp.vel[o + 1] += -1.3 * Math.cos(a1) * Math.cos(b1) * SW * dt;
+      }
+      const drag = Math.max(0, 1 - 1.1 * dt), pull = 1 - Math.exp(-0.5 * dt);
+      for (let a = 0; a < 3; a++) { hp.vel[o + a] *= drag; hp.pos[o + a] += hp.vel[o + a] * dt; hp.pos[o + a] += (gtmp[a] - hp.pos[o + a]) * pull; }
+    } else {
     galaxyAt(i, time, gtmp, hp.gal);
     const k = smooth(u / T);
     if (k >= 1) { for (let a = 0; a < 3; a++) hp.pos[o + a] = gtmp[a]; arrived++; }
@@ -2293,6 +2318,7 @@ function updateDissolve(dt) {
       const drag = Math.max(0, 1 - (1 + 4 * k) * dt), pull = 1 - Math.exp(-(1 + 22 * k * k) * dt);
       for (let a = 0; a < 3; a++) { hp.vel[o + a] *= drag; hp.pos[o + a] += hp.vel[o + a] * dt; hp.pos[o + a] += (gtmp[a] - hp.pos[o + a]) * pull; }
     }
+    }
     // comet tails from the smoothed recent motion
     for (let a = 0; a < 3; a++) { const v = (hp.pos[o + a] - hp.prev[o + a]) / Math.max(dt, 1e-3); hp.sv[o + a] += (v - hp.sv[o + a]) * 0.45; hp.tail[o + a] = hp.pos[o + a] - hp.sv[o + a] * tr; hp.prev[o + a] = hp.pos[o + a]; }
   }
@@ -2300,22 +2326,57 @@ function updateDissolve(dt) {
   hp.dirtyPos = hp.dirtyAttr = true;
   if (d.handed) { // after the handoff, the slots no resume particle took over fade out
     d.fade = Math.max(0, d.fade - dt / 0.3);
-    for (let i = NPT; i < N; i++) hp.alpha[i] = d.fade;
+    for (let i = 0; i < N; i++) if (!d.used[i]) hp.alpha[i] = d.fade;
     if (d.fade <= 0) { hp.show = false; diss = null; syncRoute(); } // (Back may have been pressed mid-dissolve)
   } else if (arrived === N && load.state === 'ready') heroHandoff(); // (until the resume has loaded, the galaxy just keeps swirling)
 }
+// Reading order (48 bands top to bottom, then left to right) of the hero sparks and of the resume's glyph sparks, for the
+// straight-to-the-page handoff. Sorted ahead of time in idle moments (cached per build), so the handoff frame doesn't pay for it.
+const BANDS = 48;
+const order = { hero: null, heroSrc: null, page: null, pageSrc: null };
+function heroOrder() {
+  if (order.heroSrc === hp.loc) return order.hero;
+  const H = hp.N, L = hp.loc; let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < H; i++) { x0 = Math.min(x0, L[i * 2]); x1 = Math.max(x1, L[i * 2]); y0 = Math.min(y0, L[i * 2 + 1]); y1 = Math.max(y1, L[i * 2 + 1]); }
+  const key = new Float32Array(H);
+  for (let i = 0; i < H; i++) key[i] = Math.floor((L[i * 2 + 1] - y0) / (y1 - y0 + 1e-3) * BANDS) + (L[i * 2] - x0) / (x1 - x0 + 1e-3);
+  order.hero = Int32Array.from({ length: H }, (_, i) => i).sort((a, b) => key[a] - key[b]); order.heroSrc = L;
+  return order.hero;
+}
+function pageOrder() {
+  if (order.pageSrc === ptLu) return order.page;
+  const key = new Float32Array(NPT);
+  for (const bd of bodies) for (let k = bd.pt0; k < bd.pt0 + bd.ptN; k++) { bilerp(home, bd, ptLu[k], ptLv[k], tmp); key[k] = Math.floor((pageH / 2 - tmp[1]) / pageH * BANDS) + (tmp[0] + PAGE_W / 2) / PAGE_W; }
+  order.page = Int32Array.from({ length: NPT }, (_, k) => k).sort((a, b) => key[a] - key[b]); order.pageSrc = ptLu;
+  return order.page;
+}
+const idle = (f) => (window.requestIdleCallback ? requestIdleCallback(f, { timeout: 2000 }) : setTimeout(f, 200));
 // ---- Handoff: the resume's stardust takes over exactly where the hero sparks are (k → k mod H), then the entrance prints the page ----
 function heroHandoff() {
   const d = diss, H = hp.N;
   siteEl.classList.add('gone'); site.amt = 0;
   stage.classList.remove('prestart');
-  startIntro(); // from the pre-state (it keeps the stardust where it is): its galaxy easing and swirl take over, then it prints the page
-  for (let k = 0; k < NPT; k++) {
-    const o = k * 3, h = (k % H) * 3;
-    for (let a = 0; a < 3; a++) { ptGal[o + a] = hp.gal[h + a]; ptPos[o + a] = ptPrev[o + a] = hp.pos[h + a]; ptSV[o + a] = hp.sv[h + a]; ptTail[o + a] = hp.tail[h + a]; }
-    ptAlpha[k] = k < H ? 1 : 0; ptAge[k] = 9; // a twin (k ≥ H) sits exactly on its hero spark, so it fades in rather than doubling it
+  startIntro(); // from the pre-state (it keeps the stardust where it is), then it prints the page
+  d.used = new Uint8Array(H);
+  if (d.direct) {
+    // straight to the page: glyph sparks take over hero sparks rank for rank, both read top to bottom then left to right
+    // (in 48 bands), so the photo's top becomes the page's header; they keep the hero sparks' flight and comet age
+    intro.direct = true;
+    const ho = heroOrder(), po = pageOrder();
+    for (let r = 0; r < NPT; r++) {
+      const k = po[r], i = ho[Math.min(H - 1, Math.floor(r * H / NPT))], o = k * 3, h = i * 3;
+      for (let a = 0; a < 3; a++) { ptPos[o + a] = ptPrev[o + a] = hp.pos[h + a]; ptVel[o + a] = hp.vel[h + a]; ptSV[o + a] = hp.sv[h + a]; ptTail[o + a] = hp.tail[h + a]; }
+      ptAlpha[k] = d.used[i] ? 0 : 1; ptAge[k] = hp.age[i]; d.used[i] = 1; // a twin sits exactly on its hero spark, so it fades in rather than doubling it
+    }
+  } else {
+    for (let k = 0; k < NPT; k++) {
+      const o = k * 3, h = (k % H) * 3;
+      for (let a = 0; a < 3; a++) { ptGal[o + a] = hp.gal[h + a]; ptPos[o + a] = ptPrev[o + a] = hp.pos[h + a]; ptSV[o + a] = hp.sv[h + a]; ptTail[o + a] = hp.tail[h + a]; }
+      ptAlpha[k] = k < H ? 1 : 0; ptAge[k] = 9; // a twin (k ≥ H) sits exactly on its hero spark, so it fades in rather than doubling it
+      d.used[k % H] = 1;
+    }
   }
-  for (let i = 0; i < Math.min(H, NPT); i++) hp.alpha[i] = 0; // covered slots switch over on the same frame (same place, same color)
+  for (let i = 0; i < H; i++) if (d.used[i]) hp.alpha[i] = 0; // covered slots switch over on the same frame (same place, same color)
   hp.cover = false; d.handed = true; d.fade = 1;
 }
 
@@ -3115,6 +3176,7 @@ function updatePrompt(match = -1) {
   if (c('tiltForce')) out.push(`Phone tilt gravity ${s.tiltForce.toFixed(1)}.`);
   if (c('shake')) out.push(s.shake ? 'Shaking the phone scrambles the page.' : 'No shake-to-scramble.');
   if (c('entrance')) out.push(s.entrance === 'button' ? 'Entrance: the "View Resume" start screen instead of the hero dissolve.' : 'Entrance: the hero dissolve.');
+  if (c('heroPath')) out.push(s.heroPath === 'galaxy' ? 'The hero sparks swirl into a two-armed galaxy first, which then prints the page.' : 'The hero sparks fly straight into the words.');
   if (c('dissolveTime')) out.push(`Hero dissolve ~${s.dissolveTime.toFixed(1)}s (×0.7 on phones).`);
   if (c('heroSparks')) out.push(`Hero sparks ×${s.heroSparks.toFixed(2)} (~${Math.round(18 * s.heroSparks)}K on desktop, ~${Math.round(6 * s.heroSparks)}K on phones).`);
   if (c('simReduced')) out.push(s.simReduced ? 'Preview: reduced motion (every trigger opens the plain HTML resume).' : 'No reduced-motion preview.');
@@ -3131,7 +3193,7 @@ function updatePrompt(match = -1) {
   if (c('paper')) out.push(`${PAPERS[s.paper][0]} paper.`);
   if (c('shroom') && s.shroom) out.push('Start in shroom mode.');
   ['melt', 'drip', 'dropRate', 'hueSpeed'].forEach((k) => { if (c(k)) out.push(`Shroom ${k} ${s[k].toFixed(2)}.`); });
-  const intro = 'Build the "Jelly Resume" for phillcodes.com in React Three Fiber: a "View Resume" button opens a full-screen 3D page that matches the Rezmancer PDF exactly. Rezmancer publishes a layout snapshot alongside the PDF (headless Chrome renders its own HTML at the Letter content width and records every word\'s box and style, a transparent text-layer image and a decorations image; see docs/design/jelly-resume/tools/snapshot.mjs), and each word\'s glyphs are cropped from the text layer. The whole page fits on screen by default; it is readable at rest. Navigation is map-style: pinch or Ctrl-scroll zooms toward the cursor; two-finger scroll or arrow keys pan in 2D; double-click zooms in there; a navigator (mini map with the view box, click or drag to jump, − / Fit / + buttons) sits in the corner; and dragging rotates the page in 3D by default (yaw ±1.25, tilt −0.6…1.1; one finger on phones). Words are not draggable; a click knocks them loose. A ✥ Pan / ⟳ Rotate toggle (O) switches drag to panning. The page is a real sheet: it has thickness (a back and edges) and it is never a stiff rectangle; slow waves run through it and its corners curl and breathe (one bend function in the page vertex shader, mirrored on the CPU through a small per-frame table so the words, loose words and particles all sit on the bent surface), the curves catch the light, and while a track plays the waves swell with the bass. By default the page is textured paper and the text is embossed with real thickness, no drop shadows (lighting from glyph-edge bevel normals; the face is lifted and the gap filled with darker stacked copies). Bursts flash, glow and send out a shockwave. Each word is a Jelly-Mario-style soft body (3-row particle lattice, structural/shear/bend springs, its text texture mapped onto the lattice) held in place by a home spring. Clicking knocks words loose: they float over the page and bump into each other and into the text still on the page (which can knock that text loose too), some escape toward the camera or into the distance, and they burst into comet sparks (sampled from their glyph pixels; each spark is a capsule streak stretched along its recent motion, white-hot at the burst and cooling cyan → electric blue → deep blue → indigo and dimming like embers (fast sparks stay cyan), like the hero vortex, drifting along a divergence-free swirl before streaming home; one premultiplied pass darkens a haze under each streak and adds its core, so they glow on white paper too) on hard impacts or after floating a while; the particles then swarm home and the word re-forms. **Bold** metrics are softer and jigglier. Shroom mode softens everything, drips the glyphs and cycles hue. The page floats in outer space in the site\'s cyberpunk palette (globals.css tokens: primary cyan #80eaff, secondary purple #d580ff/#c44dff, accent green #00ff2b, muted deep blue #141f52): a procedural nebula baked once at load into an equirectangular texture (no HDRI download), 3D star points with parallax, a few large soft mist sprites drifting at different depths (front ones disabled on phones), and distance fog so words flying away fade into the nebula. It dances to music: play a track in the site\'s music player and every word moves with it (read the player\'s AnalyserNode): Groove = a spectrum analyzer across the page (bass in the middle columns, treble at the edges, words jump toward the camera with their band\'s energy) plus rings that kick drums send across the page; Waveform = the live waveform runs across the page and the words ride it; the nebula breathes with the bass. Dance targets are per-particle offsets on the home springs, eased over ~50 ms, and the break-loose distance grows while dancing so the lag never tears words loose. Clicking words is silent (no musical notes); the only sound effects are the black hole\'s drone, gulps and boom and a whoosh before the entrance lands. The entrance: the resume starts as a two-armed spiral galaxy of glyph particles behind a neon "View Resume" button; pressing it swings the camera in while a cyan scanline prints the page top to bottom and the stardust streams into each word, which lands with a jelly splat. A finder (type, or tap chips like AI / React / AWS / Impact / Music) lifts matching words toward the camera, scales them up with a pulsing cyan/purple halo, dims the rest, and links matches in reading order with dots flowing along arcs ("Impact" finds the metrics). Hold Space (or toggle the black hole and press-and-hold) to open a black hole: a swirling accretion disk that pulls words loose, stretches them like spaghetti, swallows them with a gulp and drops the drone pitch as it grows; releasing it sprays everything back out as particles with a shockwave and a boom, and the words re-form. On phones, tilting slides loose words downhill and a hard shake scrambles the page. Mobile: one finger rotates (pans in Pan mode), tap knocks words loose, pinch zooms and pans; DPR capped at 1.5. The semantic DOM resume stays the source of truth for SEO, screen readers and prefers-reduced-motion.\n\nSite integration: the resume lives behind phillcodes.com\'s hero. The nav Resume button is the primary trigger; the hero photo is a bonus trigger (a real button with a hover/focus hint: the glow brightens, the photo lifts, a "✨ click to open my resume" tooltip), and the Skills chips and the 🍄 summon open it too. Clicking dissolves the hero: the photo is sampled into ~18K comet sparks (~6K on phones) that sit exactly on its pixels, a ragged front sweeps out from the click, and each spark heats from the photo\'s own color to white-hot and the comet ramp, swirls, and settles into the two-armed galaxy while the site chrome fades and blurs away to reveal the nebula. The resume\'s stardust then takes over the galaxy spark for spark (no pop) and the entrance prints the page. The resume (snapshot + textures) is lazy-loaded: prefetched on hover/focus of any trigger, and the dissolve hides the load (the galaxy keeps swirling while it\'s slow). Opening pushes #resume (or #resume?find=React): Back closes it, Forward reopens it, and a deep link opens straight into a quick galaxy intro, then runs the Finder; a Skills chip opens the resume with that skill lit up. Closing (×, Esc or Back) plays it in reverse: the words burst into sparks that fly home to their photo pixels, cooling back to the photo\'s colors, and the hero and chrome cross-fade back in. prefers-reduced-motion gets a plain, accessible HTML resume dialog with the PDF instead.';
+  const intro = 'Build the "Jelly Resume" for phillcodes.com in React Three Fiber: a "View Resume" button opens a full-screen 3D page that matches the Rezmancer PDF exactly. Rezmancer publishes a layout snapshot alongside the PDF (headless Chrome renders its own HTML at the Letter content width and records every word\'s box and style, a transparent text-layer image and a decorations image; see docs/design/jelly-resume/tools/snapshot.mjs), and each word\'s glyphs are cropped from the text layer. The whole page fits on screen by default; it is readable at rest. Navigation is map-style: pinch or Ctrl-scroll zooms toward the cursor; two-finger scroll or arrow keys pan in 2D; double-click zooms in there; a navigator (mini map with the view box, click or drag to jump, − / Fit / + buttons) sits in the corner; and dragging rotates the page in 3D by default (yaw ±1.25, tilt −0.6…1.1; one finger on phones). Words are not draggable; a click knocks them loose. A ✥ Pan / ⟳ Rotate toggle (O) switches drag to panning. The page is a real sheet: it has thickness (a back and edges) and it is never a stiff rectangle; slow waves run through it and its corners curl and breathe (one bend function in the page vertex shader, mirrored on the CPU through a small per-frame table so the words, loose words and particles all sit on the bent surface), the curves catch the light, and while a track plays the waves swell with the bass. By default the page is textured paper and the text is embossed with real thickness, no drop shadows (lighting from glyph-edge bevel normals; the face is lifted and the gap filled with darker stacked copies). Bursts flash, glow and send out a shockwave. Each word is a Jelly-Mario-style soft body (3-row particle lattice, structural/shear/bend springs, its text texture mapped onto the lattice) held in place by a home spring. Clicking knocks words loose: they float over the page and bump into each other and into the text still on the page (which can knock that text loose too), some escape toward the camera or into the distance, and they burst into comet sparks (sampled from their glyph pixels; each spark is a capsule streak stretched along its recent motion, white-hot at the burst and cooling cyan → electric blue → deep blue → indigo and dimming like embers (fast sparks stay cyan), like the hero vortex, drifting along a divergence-free swirl before streaming home; one premultiplied pass darkens a haze under each streak and adds its core, so they glow on white paper too) on hard impacts or after floating a while; the particles then swarm home and the word re-forms. **Bold** metrics are softer and jigglier. Shroom mode softens everything, drips the glyphs and cycles hue. The page floats in outer space in the site\'s cyberpunk palette (globals.css tokens: primary cyan #80eaff, secondary purple #d580ff/#c44dff, accent green #00ff2b, muted deep blue #141f52): a procedural nebula baked once at load into an equirectangular texture (no HDRI download), 3D star points with parallax, a few large soft mist sprites drifting at different depths (front ones disabled on phones), and distance fog so words flying away fade into the nebula. It dances to music: play a track in the site\'s music player and every word moves with it (read the player\'s AnalyserNode): Groove = a spectrum analyzer across the page (bass in the middle columns, treble at the edges, words jump toward the camera with their band\'s energy) plus rings that kick drums send across the page; Waveform = the live waveform runs across the page and the words ride it; the nebula breathes with the bass. Dance targets are per-particle offsets on the home springs, eased over ~50 ms, and the break-loose distance grows while dancing so the lag never tears words loose. Clicking words is silent (no musical notes); the only sound effects are the black hole\'s drone, gulps and boom and a whoosh before the entrance lands. The entrance: the resume starts as a two-armed spiral galaxy of glyph particles behind a neon "View Resume" button; pressing it swings the camera in while a cyan scanline prints the page top to bottom and the stardust streams into each word, which lands with a jelly splat. A finder (type, or tap chips like AI / React / AWS / Impact / Music) lifts matching words toward the camera, scales them up with a pulsing cyan/purple halo, dims the rest, and links matches in reading order with dots flowing along arcs ("Impact" finds the metrics). Hold Space (or toggle the black hole and press-and-hold) to open a black hole: a swirling accretion disk that pulls words loose, stretches them like spaghetti, swallows them with a gulp and drops the drone pitch as it grows; releasing it sprays everything back out as particles with a shockwave and a boom, and the words re-form. On phones, tilting slides loose words downhill and a hard shake scrambles the page. Mobile: one finger rotates (pans in Pan mode), tap knocks words loose, pinch zooms and pans; DPR capped at 1.5. The semantic DOM resume stays the source of truth for SEO, screen readers and prefers-reduced-motion.\n\nSite integration: the resume lives behind phillcodes.com\'s hero. The nav Resume button is the primary trigger; the hero photo is a bonus trigger (a real button with a hover/focus hint: the glow brightens, the photo lifts, a "✨ click to open my resume" tooltip), and the Skills chips and the 🍄 summon open it too. Clicking dissolves the hero: the photo is sampled into ~18K comet sparks (~6K on phones) that sit exactly on its pixels, a ragged front sweeps out from the click, and each spark heats from the photo\'s own color to white-hot and the comet ramp and swirls while the site chrome fades and blurs away to reveal the nebula. Then the photo reshapes straight into the page: the resume\'s glyph sparks take over the hero sparks rank for rank (top to bottom, left to right, so the photo\'s top becomes the page\'s header), no pop, and stream into their words top-first while the scanline prints the page. The resume (snapshot + textures) is lazy-loaded: prefetched on hover/focus of any trigger, and the dissolve hides the load (the galaxy keeps swirling while it\'s slow). Opening pushes #resume (or #resume?find=React): Back closes it, Forward reopens it, and a deep link opens straight into a quick galaxy intro, then runs the Finder; a Skills chip opens the resume with that skill lit up. Closing (×, Esc or Back) plays it in reverse: the words burst into sparks that fly home to their photo pixels, cooling back to the photo\'s colors, and the hero and chrome cross-fade back in. prefers-reduced-motion gets a plain, accessible HTML resume dialog with the PDF instead.';
   const base = 'Start from the defaults in docs/design/jelly-resume/playground.html';
   const presetNote = match > 0 ? ` (the "${PRESETS[match].name}" preset)` : '';
   const changed = Object.keys(DEFAULTS).filter(c).filter((k) => !VIEW_KEYS.includes(k));
@@ -3205,6 +3267,7 @@ function loadResume() {
     if (hint) hint.textContent = SNAP ? `Snapshot of ${SNAP.source}, ${SNAP.words.length} words` : 'No rezmancer-snapshot.js found; run tools/snapshot.mjs';
     syncControls(); updateAll();
     load.state = 'ready'; load.ms = Math.round(performance.now() - load.t0);
+    idle(pageOrder);
   }).catch((err) => { load.state = 'error'; console.error('Resume failed to load', err); });
   return load.p;
 }

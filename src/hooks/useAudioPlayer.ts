@@ -36,6 +36,8 @@ export interface AudioPlayerActions {
   setVolume: (volume: number) => void
   toggleMute: () => void
   getFrequencyData: () => Uint8Array<ArrayBuffer> | null
+  /** The audio source node (null until the first play), for other analysers to tap */
+  getSourceNode: () => MediaElementAudioSourceNode | null
 }
 
 /**
@@ -352,6 +354,8 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
     return frequencyArrayRef.current
   }, [])
 
+  const getSourceNode = useCallback(() => sourceRef.current, [])
+
   return {
     // State
     isPlaying,
@@ -371,7 +375,8 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
     seek,
     setVolume,
     toggleMute,
-    getFrequencyData
+    getFrequencyData,
+    getSourceNode
   }
 }
 

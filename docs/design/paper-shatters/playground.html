@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Shatters Playground</title>
+<style>
+  :root {
+    --bg: #07080c; --panel: #0d1017; --panel2: #121621; --line: #1e2431;
+    --text: #d7deea; --muted: #7c8798; --accent: #80eaff; --accent2: #ff4fd8;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-columns: 330px 1fr; height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 16px 16px 48px; }
+  aside h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .02em; }
+  aside .sub { color: var(--muted); margin: 0 0 14px; font-size: 12px; }
+  .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .presets button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 8px; text-align: left; cursor: pointer; font: inherit; }
+  .presets button small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .presets button:hover, .presets button.on { border-color: var(--accent); }
+  .presets button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  details { border-top: 1px solid var(--line); padding: 10px 0 4px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #aab4c4; margin-bottom: 8px; }
+  .row { margin: 0 0 11px; }
+  .row label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .row label span.v { font-family: var(--mono); color: var(--accent); font-size: 12px; }
+  .row .hint { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  select { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font: inherit; }
+  .toggle { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+  main { display: grid; grid-template-rows: 1fr auto; min-width: 0; min-height: 0; }
+  .stage { position: relative; overflow: hidden; background: #000; min-height: 0; }
+  #gl, #bloom { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #bloom { pointer-events: none; mix-blend-mode: screen; }
+  .scan { position: absolute; inset: 0; pointer-events: none; opacity: .22;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,.07) 0 1px, transparent 1px 3px); }
+  .vig { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.65) 100%); }
+  .hud { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 8px; align-items: center;
+    background: rgba(8,10,16,.72); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; backdrop-filter: blur(6px); }
+  .btn { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 7px 11px;
+    cursor: pointer; font: inherit; white-space: nowrap; min-height: 32px; }
+  .btn.primary { border-color: var(--accent); color: var(--accent); }
+  .btn:hover { border-color: var(--accent); }
+  .hud input[type=range] { flex: 1; }
+  .hud .pct { font-family: var(--mono); color: var(--muted); width: 44px; text-align: right; }
+  .hud .fps { font-family: var(--mono); color: var(--muted); font-size: 11px; width: 54px; text-align: right; }
+  .tip { position: absolute; pointer-events: none; padding: 3px 8px; border-radius: 6px; font-size: 12px;
+    background: rgba(0,0,0,.75); border: 1px solid var(--accent); color: var(--accent); display: none; white-space: nowrap; }
+  .holo { position: absolute; top: 16px; right: 16px; width: min(420px, 46%); max-height: calc(100% - 90px); overflow-y: auto;
+    background: rgba(6,14,22,.82); border: 1px solid var(--accent); border-radius: 10px; padding: 14px 16px;
+    box-shadow: 0 0 24px rgba(128,234,255,.25), inset 0 0 30px rgba(128,234,255,.06); display: none; backdrop-filter: blur(4px); }
+  .holo h2 { margin: 0 0 2px; font-size: 18px; color: var(--accent); text-shadow: 0 0 8px rgba(128,234,255,.6); }
+  .holo .meta { color: #b9c6d6; font-size: 12px; margin-bottom: 8px; }
+  .holo ul { margin: 0; padding-left: 18px; }
+  .holo li { margin: 0 0 6px; }
+  .holo strong { color: var(--accent2); text-shadow: 0 0 6px rgba(255,79,216,.5); font-weight: 600; }
+  .holo .x { position: absolute; top: 8px; right: 8px; }
+  .hint-overlay { position: absolute; top: 12px; left: 14px; color: var(--muted); font-size: 12px; pointer-events: none; }
+  .prompt { border-top: 1px solid var(--line); background: var(--panel); padding: 10px 14px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
+  .prompt pre { margin: 0; white-space: pre-wrap; font: 12px/1.5 var(--mono); color: #c9d3e1; max-height: 150px; overflow-y: auto; }
+  .prompt .btn { align-self: start; }
+  .err { position: absolute; inset: 0; display: none; place-items: center; color: #ffb4b4; padding: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="controls">
+    <h1>Paper Shatters</h1>
+    <p class="sub">Resume page → shards + glowing particles → neon Career Skyline. Drag to orbit, scroll to zoom, click a tower.</p>
+    <div class="presets" id="presets"></div>
+  </aside>
+  <main>
+    <div class="stage" id="stage">
+      <canvas id="gl"></canvas>
+      <canvas id="bloom"></canvas>
+      <div class="scan" id="scan"></div>
+      <div class="vig" id="vig"></div>
+      <div class="hint-overlay" id="hintOverlay">Space: shatter / reassemble · R: reset view</div>
+      <div class="tip" id="tip"></div>
+      <div class="holo" id="holo" role="dialog" aria-label="Job details">
+        <button class="btn x" id="holoClose" aria-label="Close">✕</button>
+        <h2 id="holoTitle"></h2>
+        <div class="meta" id="holoMeta"></div>
+        <ul id="holoList"></ul>
+      </div>
+      <div class="hud">
+        <button class="btn" id="btnPaper" title="Reassemble into paper">◀ Paper</button>
+        <button class="btn primary" id="btnShatter" title="Shatter into the skyline">Shatter ▶</button>
+        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Scrub progress">
+        <span class="pct" id="pct">0%</span>
+        <button class="btn" id="btnView" title="Reset camera">⟲ View</button>
+        <span class="fps" id="fps"></span>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+    <div class="prompt">
+      <pre id="prompt"></pre>
+      <button class="btn primary" id="copy">Copy prompt</button>
+    </div>
+  </main>
+</div>
+
+<script>
+'use strict';
+// =====================================================================
+// Resume content (from rezmancer/content/resume.yaml; phone + email left out)
+// =====================================================================
+const RESUME = {
+  name: 'Phill Aelony',
+  headline: 'Senior AI Engineer',
+  sub: 'Full-stack · Agentic systems · TypeScript, React, Node, AWS',
+  contact: 'Minneapolis, MN   ·   linkedin.com/in/phill-aelony   ·   github.com/phillael',
+  summary: 'AI engineer and full-stack builder with 8 years shipping production software across web, mobile, and cloud. I own greenfield platforms end to end, from stakeholder discovery to production, and build LLM features into them: agents, MCP servers, streaming chat.',
+  skills: [
+    { label: 'AI', items: 'Anthropic SDK · OpenAI Agents SDK · Vercel AI SDK · MCP servers · Structured outputs · Claude Code' },
+    { label: 'Frontend', items: 'TypeScript · React · Next.js · React Native/Expo · Vite · React Query · Tailwind · Three.js/R3F · Accessibility' },
+    { label: 'Backend & data', items: 'Node.js · Fastify · Express · tRPC · Postgres/Aurora · MySQL · MongoDB · Redis · Drizzle · BullMQ · Colyseus' },
+    { label: 'Cloud & DevOps', items: 'AWS (ECS, SES, SQS/SNS, S3/CloudFront, Lambda@Edge, RDS) · Terraform · GitHub Actions · Docker' },
+  ],
+  projects: [
+    { name: 'Quadzilla', blurb: 'AI strength coach for iOS and web', stack: 'Expo · Next.js · tRPC · Neon Postgres · Vercel AI SDK · Claude',
+      text: 'Coach agent holds your full training history and changes your program through typed tools with an auditable decision log. Voice logging, Apple Health sync, offline replay. Live on TestFlight.' },
+    { name: 'Number Slayers', blurb: 'multiplayer 3D math game', stack: 'React Three Fiber · Colyseus · Next.js · Convex · Railway',
+      text: 'Server-authoritative multiplayer with snapshot interpolation at 60fps, AI enemy bots, an adaptive Web Audio mixer, and an FBX→GLB asset pipeline that cut load size 88%.' },
+  ],
+};
+
+// Group ids: which part of the page a particle came from, and where it goes
+const G = { NAME: 1, SUMMARY: 2, SKILLS: 3, TIMELY: 4, PROJECTS: 5, SESSIONS: 6, DESIGNIT: 7, FREELANCE: 8, MUSIC: 9 };
+
+// One tower per job, left → right in career order
+const JOBS = [
+  { key: 'music', gid: G.MUSIC, label: 'FUNKY KNUCKLES', company: 'The Funky Knuckles · Strange Loop Games', title: 'Guitarist & Composer',
+    dates: '1998 – Present', years: 28.8, impact: 4, x: -8.6, z: -1.6, w: 1.7,
+    bullets: ['Adaptive score for the award-winning game **ECO** (314K units sold)', '**#1 iTunes jazz album**', '15+ years teaching', 'B.A. Jazz Studies, University of North Texas'] },
+  { key: 'freelance', gid: G.FREELANCE, label: 'PHILLCODES', company: 'phillcodes.com', title: 'Freelance Developer',
+    dates: 'Dec 2018 – Dec 2020', years: 2.0, impact: 1, x: -4.6, z: 0.9, w: 1.3, bullets: [] },
+  { key: 'designit', gid: G.DESIGNIT, label: 'DESIGNIT × MSFT', company: 'Designit for Microsoft', title: 'Front End Developer',
+    dates: 'Mar 2021 – Jul 2022', years: 1.33, impact: 1, x: -0.9, z: -2.3, w: 1.45,
+    bullets: ['Accessible Azure product pages (C#, ASP.NET MVC) during 50% YoY growth; raised team velocity 25%.'] },
+  { key: 'sessions', gid: G.SESSIONS, label: 'SESSIONS', company: 'Sessions', title: 'Software Engineer',
+    dates: 'Jul 2022 – Dec 2022', years: 0.5, impact: 1, x: 2.7, z: 0.5, w: 1.2,
+    bullets: ['Features and a React/React Native component library for a platform connecting 130K musicians with 1.7M fans.'] },
+  { key: 'timely', gid: G.TIMELY, label: 'TIMELYCARE', company: 'TimelyCare', title: 'Generative AI Engineer · Senior Software Engineer II',
+    blurb: 'virtual health platform for colleges and universities',
+    dates: 'Feb 2023 – Present', years: 3.7, impact: 10, x: 7.0, z: -0.7, w: 2.4,
+    roles: 'Generative AI Engineer (Apr 2026 – Present)  ·  Senior Software Engineer II (Feb 2023 – Apr 2026)',
+    bullets: [
+      'Took a dormant in-house marketing platform that had **never sent a message** to production in **~4 weeks (40 merged PRs)** to replace Customer.io for ~1.4M students, adding SSO, AWS Terraform, SES, segmentation, broadcasts, and automations.',
+      'Made the platform **agent-operable**. Built an **MCP server** and an in-app assistant (Anthropic SDK, prompt caching) so marketers create segments, draft emails, and submit broadcasts in natural language, with scoped API keys and audit trails.',
+      'Built deliverability-safe sending with staged warm-up ramps, shared daily budgets, auto-pause on bounce/complaint thresholds, holdout groups for measuring lift, and a durable, resumable sender.',
+      'Designed, built, and launched a **provider payment platform** that Finance uses to audit and publish monthly payouts for **~750 clinicians and 50K+ visits/month**. In production since June 2026.',
+      'Cut the full-month payout audit from **~44 to ~3 minutes**, and moved payment rules out of SQL stored functions into effective-dated decision tables, resolving six code-vs-policy discrepancies with Finance and Care Ops.',
+      'Found and fixed payout-correctness bugs, including a no-show overpayment regression (30 items/month → 0), a cron/ETL race that underpaid late-month visits, and a vocabulary mismatch that left **363 coaching sessions unpaid**.',
+      'Shipped an **AI Resource Finder** for care coordinators (OpenAI Agents SDK, web search, structured outputs, SSE streaming), backed by a ~71K-resource directory I built to replace a six-figure vendor contract.',
+      'Ran an abandoned-signup email pilot across a 33-school university system with **7.1% registration vs ~3%** for a comparison group (**~2.7× lift**) and 0 spam complaints, and removed ~919K billable profiles from the vendor workspace.',
+      'Built PHI-gated permission management (legal attestation and clinical countersignature) and Faculty/Staff PHI redaction across the campus admin portal.',
+      'Earlier, built an event-driven reporting dashboard (SNS/SQS, SQL, Node, React) that helped sales close several large clients, and **cut post-release bugs 50%** with Vitest, Playwright, and Detox.',
+    ] },
+];
+const jobBy = Object.fromEntries(JOBS.map((j) => [j.key, j]));
+
+// =====================================================================
+// Palettes (Phil Codes uses the site's tokens: primary, secondary, accent)
+// =====================================================================
+const hex = (h) => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
+const PALETTES = {
+  philCodes: { name: 'Phil Codes neon', bg: '#05070b', edge: '#80eaff', window: '#ffd36b', window2: '#80eaff',
+    signs: ['#ff4fd8', '#80eaff', '#00ff2b', '#e6b3ff'], grid: '#ff4fd8', stars: '#a9c1ff', crack: '#80eaff', hero: '#ff4fd8', heroSub: '#80eaff', heat: '#ff9a3c' },
+  synthwave: { name: 'Synthwave sunset', bg: '#12041f', edge: '#ff7edb', window: '#ffb86b', window2: '#36f9f6',
+    signs: ['#ff2fb3', '#ffb000', '#36f9f6', '#ff7edb'], grid: '#ff2fb3', stars: '#ffd1f3', crack: '#ffb000', hero: '#ffb000', heroSub: '#36f9f6', heat: '#ff5e3a' },
+  matrix: { name: 'Matrix', bg: '#000903', edge: '#3dff7a', window: '#b6ff9e', window2: '#3dff7a',
+    signs: ['#3dff7a', '#00ff9c', '#a6ff00', '#d4ffd4'], grid: '#0f8a35', stars: '#2bff88', crack: '#a6ff00', hero: '#3dff7a', heroSub: '#d4ffd4', heat: '#e8ffe0' },
+  vaporwave: { name: 'Vaporwave', bg: '#0d0a1f', edge: '#8be9fd', window: '#ff9ff3', window2: '#fffa9e',
+    signs: ['#ff6ac1', '#8be9fd', '#c3a6ff', '#fffa9e'], grid: '#c3a6ff', stars: '#ffd6f5', crack: '#ff6ac1', hero: '#ff6ac1', heroSub: '#8be9fd', heat: '#fffa9e' },
+  gold: { name: 'Executive gold', bg: '#070605', edge: '#f5c66b', window: '#fff1c4', window2: '#f5c66b',
+    signs: ['#f5c66b', '#ffe8a3', '#ffffff', '#d4a94a'], grid: '#5c4720', stars: '#fff1c4', crack: '#ffe8a3', hero: '#f5c66b', heroSub: '#ffffff', heat: '#ffffff' },
+};
+
+// =====================================================================
+// State, defaults, presets, control schema
+// =====================================================================
+const DEFAULTS = {
+  duration: 4.5, easing: 'inOutCubic', spread: 0.55, sweep: 'leftRight', loop: false, hold: 2.5,
+  crack: true, crackTime: 0.18, shards: 10, shardSpin: 0.6, gravity: 0.5,
+  explode: 4.0, arc: 2.5, swirl: 0.6, turbulence: 0.35, mapping: 'story',
+  count: 40000, size: 1.0, glow: 0.6, heat: 0.5,
+  palette: 'philCodes', heightBy: 'tenureSqrt', flicker: 0.5, bpm: 0, stars: true, grid: true, paper: 'white',
+  cameraMove: true, orbit: 0.25, bloom: 0.55, scanlines: true, vignette: true,
+};
+const state = { ...DEFAULTS };
+
+const PRESETS = [
+  { name: 'Phil Codes', note: 'Balanced default', values: {} },
+  { name: 'Gentle Drift', note: 'Slow, calm, elegant', values: { duration: 7.5, easing: 'inOutSine', spread: 0.75, sweep: 'topDown', explode: 1.2, arc: 1.0, swirl: 0.2, turbulence: 0.15, shardSpin: 0.2, gravity: 0.2, heat: 0.2, bloom: 0.4, crackTime: 0.25 } },
+  { name: 'Big Bang', note: 'Violent burst', values: { duration: 3.2, easing: 'outExpo', spread: 0.15, sweep: 'centerOut', explode: 9, arc: 4, swirl: 1.4, turbulence: 0.8, shardSpin: 1.4, gravity: 0.9, heat: 1.0, bloom: 0.85, palette: 'synthwave', crackTime: 0.1, shards: 14 } },
+  { name: 'Matrix Rain', note: 'Falls, then rises', values: { duration: 5.5, easing: 'inOutQuint', spread: 0.8, sweep: 'topDown', explode: 0.8, arc: -3.5, swirl: 0, turbulence: 0.2, gravity: 1.1, heat: 0.1, palette: 'matrix', flicker: 0.8 } },
+  { name: 'Executive Gold', note: 'Restrained, classy', values: { duration: 5, easing: 'inOutQuint', spread: 0.5, explode: 2.5, swirl: 0.3, turbulence: 0.1, bloom: 0.35, scanlines: false, flicker: 0.15, palette: 'gold', heat: 0.3 } },
+  { name: 'Jazz Club', note: 'Pulses at 96 BPM', values: { palette: 'vaporwave', bpm: 96, swirl: 1.0, arc: 3.5, easing: 'inOutBack', heightBy: 'tenureSqrt', flicker: 0.7, bloom: 0.7 } },
+];
+
+const EASINGS = [['linear', 'Linear'], ['inOutSine', 'Ease in-out (sine)'], ['inOutCubic', 'Ease in-out (cubic)'], ['inOutQuint', 'Ease in-out (quint)'], ['outExpo', 'Burst (expo out)'], ['inOutBack', 'Overshoot (back)'], ['inCubic', 'Accelerate (cubic in)']];
+const SWEEPS = [['random', 'Random'], ['leftRight', 'Left → right'], ['centerOut', 'Center outward'], ['topDown', 'Top → bottom']];
+const MAPPINGS = [['story', 'By section (text flies to its tower)'], ['spatial', 'Spatial (left of page → left of city)'], ['random', 'Random chaos']];
+const HEIGHTS = [['tenureSqrt', 'Tenure (√, music tallest)'], ['tenureLinear', 'Tenure (linear)'], ['impact', 'Impact (bullet count)']];
+
+const SCHEMA = [
+  { group: 'Timing', open: true, items: [
+    { k: 'duration', label: 'Duration', type: 'range', min: 1, max: 10, step: 0.1, fmt: (v) => v.toFixed(1) + 's' },
+    { k: 'easing', label: 'Easing', type: 'select', options: EASINGS },
+    { k: 'spread', label: 'Stagger', type: 'range', min: 0, max: 0.9, step: 0.01, fmt: (v) => v.toFixed(2), hint: '0 = everything breaks at once' },
+    { k: 'sweep', label: 'Break order', type: 'select', options: SWEEPS },
+    { k: 'loop', label: 'Loop (shatter ↔ reassemble)', type: 'toggle' },
+    { k: 'hold', label: 'Hold between loops', type: 'range', min: 0.5, max: 6, step: 0.1, fmt: (v) => v.toFixed(1) + 's' },
+  ] },
+  { group: 'Shatter', open: true, items: [
+    { k: 'crack', label: 'Glowing cracks first', type: 'toggle' },
+    { k: 'crackTime', label: 'Crack phase', type: 'range', min: 0.05, max: 0.35, step: 0.01, fmt: (v) => Math.round(v * 100) + '%', hint: 'share of the timeline before shards fly' },
+    { k: 'shards', label: 'Shard grid', type: 'range', min: 4, max: 20, step: 1, fmt: (v) => `${v}×${shardRows(v)}`, rebuild: 'shards' },
+    { k: 'shardSpin', label: 'Shard spin', type: 'range', min: 0, max: 2, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'gravity', label: 'Shard gravity', type: 'range', min: 0, max: 1.5, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'explode', label: 'Explosion', type: 'range', min: 0, max: 10, step: 0.1, fmt: (v) => v.toFixed(1) },
+    { k: 'arc', label: 'Arc height', type: 'range', min: -4, max: 6, step: 0.1, fmt: (v) => v.toFixed(1), hint: 'negative = particles dip before rising' },
+    { k: 'swirl', label: 'Swirl', type: 'range', min: 0, max: 2, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'turbulence', label: 'Turbulence', type: 'range', min: 0, max: 1.2, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'mapping', label: 'Particle routing', type: 'select', options: MAPPINGS, rebuild: 'particles' },
+  ] },
+  { group: 'Particles', open: false, items: [
+    { k: 'count', label: 'Particle count', type: 'range', min: 10000, max: 100000, step: 5000, fmt: (v) => Math.round(v / 1000) + 'k', rebuild: 'particles' },
+    { k: 'size', label: 'Size', type: 'range', min: 0.4, max: 2.5, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'glow', label: 'Glow halo', type: 'range', min: 0, max: 1.5, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'heat', label: 'Flight heat', type: 'range', min: 0, max: 1.5, step: 0.05, fmt: (v) => v.toFixed(2), hint: 'ember glow while particles are in the air' },
+  ] },
+  { group: 'Skyline', open: false, items: [
+    { k: 'palette', label: 'Palette', type: 'select', options: Object.entries(PALETTES).map(([k, p]) => [k, p.name]), rebuild: 'particles' },
+    { k: 'heightBy', label: 'Tower height', type: 'select', options: HEIGHTS, rebuild: 'particles' },
+    { k: 'flicker', label: 'Window flicker', type: 'range', min: 0, max: 1, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'bpm', label: 'Sign pulse (BPM)', type: 'range', min: 0, max: 140, step: 1, fmt: (v) => (v ? v + ' bpm' : 'off'), hint: 'the real build can drive this from the music player' },
+    { k: 'stars', label: 'Stars', type: 'toggle' },
+    { k: 'grid', label: 'Ground grid', type: 'toggle' },
+    { k: 'paper', label: 'Paper style', type: 'select', options: [['white', 'White (real PDF)'], ['midnight', 'Midnight']], rebuild: 'paper' },
+  ] },
+  { group: 'Camera & post', open: false, items: [
+    { k: 'cameraMove', label: 'Camera pulls back during shatter', type: 'toggle' },
+    { k: 'orbit', label: 'Auto-orbit', type: 'range', min: 0, max: 1, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'bloom', label: 'Bloom', type: 'range', min: 0, max: 1.2, step: 0.05, fmt: (v) => v.toFixed(2) },
+    { k: 'scanlines', label: 'CRT scanlines', type: 'toggle' },
+    { k: 'vignette', label: 'Vignette', type: 'toggle' },
+  ] },
+];
+function shardRows(cols) { return Math.round(cols * 11 / 8.5); }
+
+// =====================================================================
+// Small helpers
+// =====================================================================
+let seed = 1337;
+const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const FONT = '"Inter", "Helvetica Neue", Helvetica, Arial, sans-serif';
+const PAPER_W = 8.5, PAPER_H = 11, GROUND = -5.5;
+const CW = 1700, CH = 2200; // paper canvas pixels (200 px per inch)
+const parseRich = (s) => s.split('**').map((t, i) => ({ t, b: i % 2 === 1 })).filter((r) => r.t);
+
+// =====================================================================
+// Paper: render the resume page to a canvas, plus a tag map (section + bold)
+// =====================================================================
+function renderPaper(style) {
+  const pal = style === 'white'
+    ? { bg: '#ffffff', ink: '#273142', head: '#0f172a', accent: '#0f766e', muted: '#55627a', rule: '#9fcfc8' }
+    : { bg: '#0b1020', ink: '#c9d4e3', head: '#f2f6fb', accent: '#5eead4', muted: '#93a2b8', rule: '#21514c' };
+  const full = document.createElement('canvas'); full.width = CW; full.height = CH;
+  const blank = document.createElement('canvas'); blank.width = CW; blank.height = CH;
+  const g = full.getContext('2d');
+  const bg = blank.getContext('2d'); bg.fillStyle = pal.bg; bg.fillRect(0, 0, CW, CH);
+  const tag = new Uint8Array(CW * CH);
+
+  const M = 118, W = CW - 2 * M;
+  const run = (k, draw) => {
+    let y = M;
+    const F = (w, s) => `${w} ${Math.round(s * k)}px ${FONT}`;
+    const tagRect = (x0, y0, x1, y1, gid, bold) => {
+      if (!draw) return;
+      const v = gid | (bold ? 128 : 0);
+      x0 = Math.max(0, Math.floor(x0)); x1 = Math.min(CW, Math.ceil(x1)); y0 = Math.max(0, Math.floor(y0)); y1 = Math.min(CH, Math.ceil(y1));
+      for (let yy = y0; yy < y1; yy++) tag.fill(v, yy * CW + x0, yy * CW + x1);
+    };
+    const line = (str, x, size, weight, color, gid, align = 'left') => {
+      g.font = F(weight, size);
+      const w = g.measureText(str).width; const x0 = align === 'right' ? x - w : x;
+      const base = y + size * k * 0.85;
+      if (draw) { g.fillStyle = color; g.fillText(str, x0, base); }
+      tagRect(x0 - 2, base - size * k * 0.95, x0 + w + 2, base + size * k * 0.32, gid, weight >= 700);
+      return w;
+    };
+    const para = (str, x, maxW, size, lh, color, boldColor, gid) => {
+      const toks = [];
+      parseRich(str).forEach((r) => r.t.split(/(\s+)/).forEach((p) => { if (p) toks.push({ t: p, b: r.b }); }));
+      const lines = []; let cur = []; let lw = 0;
+      for (const tk of toks) {
+        g.font = F(tk.b ? 700 : 400, size); const w = g.measureText(tk.t).width; const sp = /^\s+$/.test(tk.t);
+        if (!cur.length && sp) continue;
+        if (lw + w > maxW && cur.length && !sp) { lines.push(cur); cur = []; lw = 0; }
+        cur.push({ ...tk, w }); lw += w;
+      }
+      if (cur.length) lines.push(cur);
+      for (const ln of lines) {
+        const base = y + size * k * 0.85; let cx = x;
+        for (const tk of ln) {
+          if (/^\s+$/.test(tk.t)) { cx += tk.w; continue; }
+          g.font = F(tk.b ? 700 : 400, size);
+          if (draw) { g.fillStyle = tk.b ? boldColor : color; g.fillText(tk.t, cx, base); }
+          tagRect(cx - 1, base - size * k * 0.95, cx + tk.w + 1, base + size * k * 0.32, gid, tk.b);
+          cx += tk.w;
+        }
+        y += lh * k;
+      }
+    };
+    const bullet = (str, gid) => {
+      const size = 17.5, ind = 22 * k;
+      line('•', M + 4 * k, size, 400, pal.accent, gid);
+      para(str, M + ind, W - ind, size, 24.5, pal.ink, pal.head, gid);
+      y += 3 * k;
+    };
+    const heading = (str, gid) => {
+      y += 16 * k;
+      if (draw) g.letterSpacing = `${2 * k}px`;
+      line(str.toUpperCase(), M, 19, 700, pal.accent, gid);
+      if (draw) g.letterSpacing = '0px';
+      y += 27 * k;
+      if (draw) { g.fillStyle = pal.rule; g.fillRect(M, y, W, 2.5 * k); }
+      tagRect(M, y - 1, M + W, y + 3 * k, gid, false);
+      y += 12 * k;
+    };
+    const entryHead = (left, right, gid, sub) => {
+      const w = line(left, M, 18.5, 700, pal.head, gid);
+      if (sub) { const sx = M + w; g.font = F(400, 18.5); const sw = g.measureText(sub).width; const base = y + 18.5 * k * 0.85;
+        if (draw) { g.fillStyle = pal.muted; g.fillText(sub, sx, base); } tagRect(sx, base - 18.5 * k, sx + sw, base + 6 * k, gid, false); }
+      line(right, M + W, 16.5, 400, pal.muted, gid, 'right');
+      y += 26 * k;
+    };
+
+    // Header
+    line(RESUME.name, M, 60, 800, pal.head, G.NAME); y += 70 * k;
+    line(RESUME.headline, M, 28, 600, pal.accent, G.NAME); y += 36 * k;
+    line(RESUME.sub, M, 19, 400, pal.muted, G.NAME); y += 28 * k;
+    line(RESUME.contact, M, 16.5, 400, pal.muted, G.NAME); y += 30 * k;
+    if (draw) { g.fillStyle = pal.accent; g.fillRect(M, y, W, 4 * k); }
+    tagRect(M, y - 1, M + W, y + 5 * k, G.NAME, false); y += 22 * k;
+    para(RESUME.summary, M, W, 18.5, 26, pal.ink, pal.head, G.SUMMARY);
+
+    heading('Skills', G.SKILLS);
+    RESUME.skills.forEach((s) => { para(`**${s.label}:** ${s.items}`, M, W, 17.5, 24.5, pal.ink, pal.head, G.SKILLS); y += 2 * k; });
+
+    heading('Experience', G.TIMELY);
+    const t = jobBy.timely;
+    entryHead(t.company, t.dates, G.TIMELY, `  —  ${t.blurb}`);
+    line(t.roles, M, 16.5, 600, pal.accent, G.TIMELY); y += 26 * k;
+    t.bullets.forEach((b) => bullet(b, G.TIMELY));
+
+    heading('Projects', G.PROJECTS);
+    RESUME.projects.forEach((p) => {
+      entryHead(p.name, '', G.PROJECTS, `  —  ${p.blurb}`);
+      line(p.stack, M, 15.5, 600, pal.accent, G.PROJECTS); y += 23 * k;
+      para(p.text, M, W, 17.5, 24.5, pal.ink, pal.head, G.PROJECTS); y += 6 * k;
+    });
+
+    heading('Earlier', G.SESSIONS);
+    ['sessions', 'designit', 'freelance'].forEach((key) => {
+      const j = jobBy[key];
+      entryHead(`${j.title}, ${j.company}`, j.dates, j.gid);
+      if (j.bullets[0]) { para(j.bullets[0], M, W, 17.5, 24.5, pal.ink, pal.head, j.gid); y += 6 * k; }
+    });
+
+    heading('Music', G.MUSIC);
+    const m = jobBy.music;
+    entryHead(`${m.title}, ${m.company}`, m.dates, G.MUSIC);
+    para(m.bullets.slice(0, 3).join(' · '), M, W, 17.5, 24.5, pal.ink, pal.head, G.MUSIC);
+    heading('Education', G.MUSIC);
+    entryHead('B.A. Jazz Studies', 'University of North Texas', G.MUSIC);
+    return y;
+  };
+
+  // Fit the page: measure, scale, repeat
+  let k = 1;
+  for (let i = 0; i < 6; i++) {
+    const end = run(k, false);
+    const want = CH - M;
+    if (Math.abs(end - want) < 8) break;
+    k *= (want - M) / (end - M);
+    k = Math.min(k, 1.3);
+  }
+  g.fillStyle = pal.bg; g.fillRect(0, 0, CW, CH);
+  g.textBaseline = 'alphabetic';
+  run(k, true);
+  return { full, blank, tag, pal };
+}
+
+// Sample N ink pixels from the paper → particle start positions + colors + tags
+function samplePaper(paper, N) {
+  const g = paper.full.getContext('2d');
+  const data = g.getImageData(0, 0, CW, CH).data;
+  const bgc = hex(paper.pal.bg).map((v) => v * 255);
+  const cand = [];
+  for (let i = 0, p = 0; i < CW * CH; i++, p += 4) {
+    const d = Math.abs(data[p] - bgc[0]) + Math.abs(data[p + 1] - bgc[1]) + Math.abs(data[p + 2] - bgc[2]);
+    if (d > 150) cand.push(i);
+  }
+  const out = [];
+  for (let n = 0; n < N; n++) {
+    let idx;
+    if (n < cand.length) { const j = n + Math.floor(rnd() * (cand.length - n)); idx = cand[j]; cand[j] = cand[n]; cand[n] = idx; }
+    else idx = cand[Math.floor(rnd() * cand.length)];
+    const px = idx % CW, py = (idx / CW) | 0, p = idx * 4;
+    const tg = paper.tag[idx];
+    out.push({
+      p: [(px + rnd()) / CW * PAPER_W - PAPER_W / 2, PAPER_H / 2 - (py + rnd()) / CH * PAPER_H, 0],
+      ink: [data[p] / 255, data[p + 1] / 255, data[p + 2] / 255],
+      gid: (tg & 127) || G.SUMMARY,
+      bold: tg & 128 ? 1 : 0,
+    });
+  }
+  return out;
+}
+
+// =====================================================================
+// Skyline targets
+// =====================================================================
+const textCache = new Map();
+function textPixels(text, vertical) {
+  const key = text + '|' + vertical;
+  if (textCache.has(key)) return textCache.get(key);
+  const fs = 96, c = document.createElement('canvas'), x = c.getContext('2d');
+  const font = `800 ${fs}px ${FONT}`; x.font = font;
+  let w, h;
+  if (!vertical) { w = Math.ceil(x.measureText(text).width) + 16; h = Math.ceil(fs * 1.15); }
+  else { w = Math.ceil(fs * 1.15); h = Math.ceil(fs * 1.02 * text.length) + 12; }
+  c.width = w; c.height = h; x.font = font; x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  if (!vertical) x.fillText(text, w / 2, h / 2 + fs * 0.04);
+  else [...text].forEach((ch, i) => x.fillText(ch, w / 2, 6 + fs * 0.52 + i * fs * 1.02));
+  const d = x.getImageData(0, 0, w, h).data, pts = [];
+  for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (d[(yy * w + xx) * 4 + 3] > 140) pts.push(xx / w - 0.5, 0.5 - yy / h);
+  const r = { pts, aspect: w / h };
+  textCache.set(key, r);
+  return r;
+}
+function placeText(out, text, n, { center, width, height, vertical = false, color, bright = 1.4, size = 0.05, kind = 3 }) {
+  const tp = textPixels(text, vertical);
+  const W = width ?? height * tp.aspect, H = height ?? width / tp.aspect;
+  const m = tp.pts.length / 2;
+  for (let i = 0; i < n; i++) {
+    const j = Math.floor(rnd() * m) * 2;
+    out.push({ p: [center[0] + tp.pts[j] * W, center[1] + tp.pts[j + 1] * H, center[2] + (rnd() - 0.5) * 0.02], c: color, b: bright, s: size, k: kind });
+  }
+}
+function linePts(out, a, b, n, color, bright, size, kind) {
+  for (let i = 0; i < n; i++) { const t = rnd(); out.push({ p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t], c: color, b: bright, s: size, k: kind }); }
+}
+function frame(out, cx, cy, cz, w, h, n, color) {
+  const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2, per = Math.floor(n / 4);
+  linePts(out, [x0, y0, cz], [x1, y0, cz], per, color, 1.0, 0.04, 3);
+  linePts(out, [x0, y1, cz], [x1, y1, cz], per, color, 1.0, 0.04, 3);
+  linePts(out, [x0, y0, cz], [x0, y1, cz], per, color, 1.0, 0.04, 3);
+  linePts(out, [x1, y0, cz], [x1, y1, cz], n - 3 * per, color, 1.0, 0.04, 3);
+}
+function allocate(N, weights) {
+  const keys = Object.keys(weights), tot = keys.reduce((a, k) => a + weights[k], 0), out = {};
+  let used = 0;
+  keys.forEach((k, i) => { out[k] = i === keys.length - 1 ? N - used : Math.floor(N * weights[k] / tot); used += out[k]; });
+  return out;
+}
+function towerHeight(j) {
+  if (state.heightBy === 'tenureLinear') return 2.2 + 8.3 * j.years / 28.8;
+  if (state.heightBy === 'impact') return 2.2 + 8.3 * Math.min(1, j.impact / 10);
+  return 2.2 + 8.3 * Math.sqrt(j.years / 28.8);
+}
+
+let TOWERS = [];
+function buildTargets(N) {
+  const pal = PALETTES[state.palette];
+  const P = Object.fromEntries(Object.entries(pal).map(([k, v]) => [k, Array.isArray(v) ? v.map(hex) : typeof v === 'string' && v[0] === '#' ? hex(v) : v]));
+  TOWERS = JOBS.map((j) => ({ ...j, h: towerHeight(j) }));
+  const groups = {}; Object.values(G).forEach((g) => (groups[g] = []));
+  const budget = allocate(N, { hero: 9, stars: 5, grid: 10, skills: 10, boards: 8, towers: 58 });
+
+  // Towers
+  const tw = allocate(budget.towers, Object.fromEntries(TOWERS.map((t) => [t.key, t.h * t.w + 3])));
+  TOWERS.forEach((t, ti) => {
+    const out = groups[t.gid], n = tw[t.key];
+    const { x, z, w, h } = t, d = w, y0 = GROUND, y1 = GROUND + h;
+    const x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2;
+    const nEdge = Math.round(n * 0.2), nLabel = Math.round(n * 0.15), nBeacon = Math.max(8, Math.round(n * 0.02)), nAnt = Math.round(n * 0.02);
+    const nWin = n - nEdge - nLabel - nBeacon - nAnt;
+    const edges = [[x0, y0, z0, x0, y1, z0], [x1, y0, z0, x1, y1, z0], [x0, y0, z1, x0, y1, z1], [x1, y0, z1, x1, y1, z1],
+      [x0, y1, z0, x1, y1, z0], [x0, y1, z1, x1, y1, z1], [x0, y1, z0, x0, y1, z1], [x1, y1, z0, x1, y1, z1],
+      [x0, y0, z0, x1, y0, z0], [x0, y0, z1, x1, y0, z1], [x0, y0, z0, x0, y0, z1], [x1, y0, z0, x1, y0, z1]];
+    const lens = edges.map((e) => Math.hypot(e[3] - e[0], e[4] - e[1], e[5] - e[2])), tot = lens.reduce((a, b) => a + b, 0);
+    edges.forEach((e, i) => linePts(out, [e[0], e[1], e[2]], [e[3], e[4], e[5]], Math.round(nEdge * lens[i] / tot), P.edge, 1.25, 0.05, 0));
+    // Windows: lit share grows with the number of bullets (impact)
+    const floors = Math.max(3, Math.floor((h - 0.5) / 0.42)), cols = Math.max(2, Math.round(w / 0.34));
+    const pLit = Math.min(0.85, 0.28 + t.impact * 0.06);
+    const faces = [
+      (u, v) => [x0 + u * w, y0 + v, z1 + 0.01], (u, v) => [x1 - u * w, y0 + v, z0 - 0.01],
+      (u, v) => [x1 + 0.01, y0 + v, z1 - u * d], (u, v) => [x0 - 0.01, y0 + v, z0 + u * d],
+    ];
+    const wins = [];
+    faces.forEach((f) => { for (let fl = 0; fl < floors; fl++) for (let c = 0; c < cols; c++) wins.push({ f, u: (c + 0.5) / cols, v: 0.35 + fl * ((h - 0.6) / floors), lit: rnd() < pLit, warm: rnd() < 0.7 }); });
+    const hu = 0.3 / cols, hv = 0.12;
+    for (let i = 0; i < nWin; i++) {
+      const wd = wins[i % wins.length];
+      const p = wd.f(wd.u + (rnd() - 0.5) * 2 * hu, wd.v + (rnd() - 0.5) * 2 * hv);
+      out.push(wd.lit
+        ? { p, c: wd.warm ? P.window : P.window2, b: 1.0, s: 0.045, k: 1 }
+        : { p, c: P.edge, b: 0.22, s: 0.04, k: 0 });
+    }
+    placeText(out, t.label, nLabel, { center: [x, y1 + 0.5, z1 + 0.03], width: Math.min(w * 1.9, 0.3 * t.label.length + 0.4), color: P.signs[ti % 4] });
+    linePts(out, [x, y1, z], [x, y1 + 0.95, z], nAnt, P.edge, 0.9, 0.035, 0);
+    for (let i = 0; i < nBeacon; i++) out.push({ p: [x + (rnd() - 0.5) * 0.06, y1 + 1.0 + (rnd() - 0.5) * 0.06, z + (rnd() - 0.5) * 0.06], c: [1, 0.25, 0.35], b: 1.6, s: 0.13, k: 2 });
+  });
+
+  // Skill category signs: vertical, hung on tower corners
+  const SIGNS = [['AI', 'timely', -1], ['FRONTEND', 'designit', -1], ['BACKEND', 'freelance', 1], ['CLOUD', 'sessions', 1]];
+  const sk = allocate(budget.skills, Object.fromEntries(SIGNS.map(([s]) => [s, s.length + 2])));
+  SIGNS.forEach(([text, key, side], i) => {
+    const t = TOWERS.find((tt) => tt.key === key);
+    const letters = text.length, lh = Math.min(0.5, (t.h - 0.8) / letters), H = lh * letters;
+    const cx = t.x + side * (t.w / 2 + 0.3), cz = t.z + t.w / 2 - 0.05, cy = GROUND + t.h - 0.4 - H / 2;
+    const n = sk[text], nF = Math.round(n * 0.18);
+    placeText(groups[G.SKILLS], text, n - nF, { center: [cx, cy, cz], height: H, vertical: true, color: P.signs[(i + 1) % 4], bright: 1.5 });
+    frame(groups[G.SKILLS], cx, cy, cz - 0.02, H / letters * 1.05, H + 0.25, nF, P.signs[(i + 1) % 4].map((v) => v * 0.6));
+  });
+
+  // Project billboards floating behind the towers
+  const BOARDS = [['QUADZILLA', -3.0, 1.6, -5.5, 4.2], ['NUMBER SLAYERS', 4.6, 3.0, -6.2, 5.4]];
+  const bd = allocate(budget.boards, { a: 1, b: 1.2 });
+  BOARDS.forEach(([text, x, y, z, w], i) => {
+    const n = i ? bd.b : bd.a, nF = Math.round(n * 0.2), col = P.signs[(i + 2) % 4];
+    placeText(groups[G.PROJECTS], text, n - nF, { center: [x, y, z], width: w, color: col, bright: 1.5 });
+    frame(groups[G.PROJECTS], x, y, z - 0.03, w + 0.5, w / textPixels(text, false).aspect + 0.45, nF, col.map((v) => v * 0.55));
+  });
+
+  // Hero sign: the name, high over the city
+  const nh = budget.hero, nSub = Math.round(nh * 0.3), nBar = Math.round(nh * 0.08);
+  placeText(groups[G.NAME], 'PHILL AELONY', nh - nSub - nBar, { center: [0, 8.0, -8.5], width: 13, color: P.hero, bright: 1.6, size: 0.07 });
+  placeText(groups[G.NAME], 'SENIOR AI ENGINEER', nSub, { center: [0, 6.55, -8.5], width: 7.2, color: P.heroSub, bright: 1.4, size: 0.055 });
+  linePts(groups[G.NAME], [-6.8, 7.15, -8.5], [6.8, 7.15, -8.5], nBar, P.hero, 1.2, 0.05, 3);
+
+  // Summary text becomes the ground grid and the stars
+  const S = groups[G.SUMMARY], ng = budget.grid, ns = budget.stars;
+  const xs = [], zs = [];
+  for (let gx = -15; gx <= 15.01; gx += 1.5) xs.push(gx);
+  for (let gz = -14; gz <= 6.01; gz += 1.5) zs.push(gz);
+  const per = Math.floor(ng / (xs.length + zs.length));
+  xs.forEach((gx) => linePts(S, [gx, GROUND, -14], [gx, GROUND, 6], per, P.grid, 0.6, 0.04, 5));
+  zs.forEach((gz) => linePts(S, [-15, GROUND, gz], [15, GROUND, gz], per, P.grid, 0.6, 0.04, 5));
+  for (let i = S.length; i < ng; i++) S.push({ p: [(rnd() - 0.5) * 30, GROUND, -14 + rnd() * 20], c: P.grid, b: 0.6, s: 0.04, k: 5 });
+  for (let i = 0; i < ns; i++) {
+    const th = rnd() * Math.PI * 2, ph = 0.08 + rnd() * 1.3, r = 42 + rnd() * 10;
+    S.push({ p: [Math.cos(th) * Math.cos(ph) * r, Math.sin(ph) * r * 0.7 - 2, -Math.abs(Math.sin(th)) * Math.cos(ph) * r - 6], c: P.stars, b: 0.8, s: 0.12, k: 4 });
+  }
+  return { groups, P };
+}
+
+// Pair paper particles with skyline targets
+function pairUp(src, groups) {
+  const N = src.length, pairs = new Array(N);
+  const allT = [];
+  Object.entries(groups).forEach(([g, arr]) => arr.forEach((t) => { t.g = +g; allT.push(t); }));
+  if (allT.length !== N) console.warn('target count', allT.length, 'vs', N);
+  while (allT.length < N) allT.push(allT[Math.floor(rnd() * allT.length)]);
+  allT.length = N;
+  const idx = [...Array(N).keys()];
+  if (state.mapping === 'random') {
+    shuffle(allT); idx.forEach((i) => (pairs[i] = allT[i]));
+  } else if (state.mapping === 'spatial') {
+    const s = idx.slice().sort((a, b) => src[a].p[0] - src[b].p[0]);
+    const t = allT.slice().sort((a, b) => a.p[0] - b.p[0]);
+    s.forEach((si, i) => (pairs[si] = t[i]));
+  } else {
+    // By section: text from a job's section flies to that job's tower; overflow pools
+    const bySrc = {}, byTgt = {};
+    idx.forEach((i) => (bySrc[src[i].gid] ??= []).push(i));
+    allT.forEach((t) => (byTgt[t.g] ??= []).push(t));
+    const poolS = [], poolT = [];
+    Object.keys({ ...bySrc, ...byTgt }).forEach((g) => {
+      const S = shuffle(bySrc[g] || []), T = shuffle(byTgt[g] || []), k = Math.min(S.length, T.length);
+      for (let i = 0; i < k; i++) pairs[S[i]] = T[i];
+      for (let i = k; i < S.length; i++) poolS.push(S[i]);
+      for (let i = k; i < T.length; i++) poolT.push(T[i]);
+    });
+    shuffle(poolT); poolS.forEach((si, i) => (pairs[si] = poolT[i]));
+  }
+  return pairs;
+}
+
+// =====================================================================
+// WebGL
+// =====================================================================
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, premultipliedAlpha: true });
+if (!gl) { const e = document.getElementById('err'); e.style.display = 'grid'; e.textContent = 'WebGL2 is not available in this browser.'; throw new Error('no webgl2'); }
+
+const COMMON = `
+uniform int uEase; uniform int uSweep;
+float ease(float t){
+  if(uEase==0) return t;
+  if(uEase==1) return 0.5-0.5*cos(3.14159265*t);
+  if(uEase==2) return t<0.5?4.0*t*t*t:1.0-pow(-2.0*t+2.0,3.0)/2.0;
+  if(uEase==3) return t<0.5?16.0*t*t*t*t*t:1.0-pow(-2.0*t+2.0,5.0)/2.0;
+  if(uEase==4) return t>=1.0?1.0:1.0-pow(2.0,-10.0*t);
+  if(uEase==5){ float c1=1.70158; float c2=c1*1.525; return t<0.5?(pow(2.0*t,2.0)*((c2+1.0)*2.0*t-c2))/2.0:(pow(2.0*t-2.0,2.0)*((c2+1.0)*(t*2.0-2.0)+c2)+2.0)/2.0; }
+  return t*t*t;
+}
+float sweepDelay(vec3 s, float r){
+  if(uSweep==1) return clamp((s.x+4.25)/8.5,0.0,1.0)*0.85+r*0.15;
+  if(uSweep==2) return clamp(length(s.xy)/7.0,0.0,1.0)*0.85+r*0.15;
+  if(uSweep==3) return clamp((5.5-s.y)/11.0,0.0,1.0)*0.85+r*0.15;
+  return r;
+}`;
+
+const P_VS = `#version 300 es
+precision highp float;
+in vec3 aStart; in vec3 aEnd; in vec3 aInk; in vec3 aColor; in vec4 aRand; in vec4 aMeta;
+uniform mat4 uMVP; uniform mat4 uView;
+uniform float uP, uCrack, uSpread, uExplode, uArc, uSwirl, uTurb, uTime, uSize, uScale, uHeat, uFlicker, uBeat, uFogNear, uFogFar;
+uniform vec3 uHeatColor; uniform vec2 uKindMask;
+out vec3 vColor; out float vAlpha; out float vAdd;
+${COMMON}
+void main(){
+  float fp = clamp((uP-uCrack)/(1.0-uCrack),0.0,1.0);
+  float d = sweepDelay(aStart, aRand.x);
+  float t = clamp((fp-d*uSpread)/(1.0-uSpread),0.0,1.0);
+  float e = ease(t);
+  vec3 dir = normalize(aRand.yzw*2.0-1.0+vec3(0.0,0.0,0.7));
+  vec3 mid = mix(aStart,aEnd,0.5)+dir*uExplode+vec3(0.0,uArc,0.0);
+  float u = 1.0-e;
+  vec3 pos = u*u*aStart+2.0*u*e*mid+e*e*aEnd;
+  float bump = sin(3.14159265*clamp(e,0.0,1.0));
+  float ang = uSwirl*bump*(1.2+aRand.y);
+  float cs = cos(ang), sn = sin(ang);
+  pos.xz = mat2(cs,-sn,sn,cs)*pos.xz;
+  pos += uTurb*bump*0.9*vec3(sin(uTime*1.3+aRand.y*40.0+pos.y), sin(uTime*1.7+aRand.z*40.0+pos.x), sin(uTime*1.1+aRand.w*40.0));
+  float kind = aMeta.z, live = 1.0;
+  if(kind>0.5 && kind<1.5){
+    float ph = aRand.w*6.2831;
+    float off = step(1.0-0.2*uFlicker, fract(sin(floor(uTime*0.6+ph*3.0)*12.9898+ph)*43758.5453));
+    live = mix(1.0,0.12,off)*(1.0-0.3*uFlicker*(0.5+0.5*sin(uTime*(2.0+aRand.y*3.0)+ph)));
+  } else if(kind>1.5 && kind<2.5){
+    live = 0.25+0.75*pow(0.5+0.5*sin(uTime*3.0+aRand.y*6.28),4.0);
+  } else if(kind>2.5 && kind<3.5){
+    live = 1.0+uBeat*0.9;
+  } else if(kind>3.5 && kind<4.5){
+    live = (0.55+0.45*sin(uTime*(0.5+aRand.y*2.0)+aRand.z*20.0))*uKindMask.x;
+  } else if(kind>4.5){
+    live = uKindMask.y;
+  }
+  live = mix(1.0,live,smoothstep(0.85,1.0,e));
+  vec3 neon = aColor*aMeta.x*live*(1.0+aMeta.w*0.7);
+  vec3 col = mix(aInk, neon, smoothstep(0.0,0.35,e)) + uHeatColor*uHeat*bump*(0.8+aMeta.w*0.6);
+  vec4 vp = uView*vec4(pos,1.0);
+  gl_Position = uMVP*vec4(pos,1.0);
+  float fog = kind>3.5 && kind<4.5 ? 1.0 : 1.0-smoothstep(uFogNear,uFogFar,-vp.z)*0.85;
+  vAlpha = smoothstep(0.0,0.03,t)*mix(1.0,fog,e);
+  vColor = col;
+  vAdd = smoothstep(0.05,0.4,e);
+  float sz = mix(0.011, aMeta.y*uSize, smoothstep(0.0,0.3,e));
+  gl_PointSize = clamp(sz*uScale/max(0.1,-vp.z), 1.0, 64.0);
+}`;
+const P_FS = `#version 300 es
+precision highp float;
+in vec3 vColor; in float vAlpha; in float vAdd;
+uniform float uGlow;
+out vec4 o;
+void main(){
+  float d = length(gl_PointCoord-0.5)*2.0;
+  if(d>1.0) discard;
+  float core = 1.0-smoothstep(0.3,1.0,d);
+  float halo = exp(-d*d*3.5)*uGlow;
+  float a = clamp(mix(core, core*0.65+halo, vAdd),0.0,1.0)*vAlpha;
+  o = vec4(vColor*a, a*(1.0-vAdd));
+}`;
+
+const S_VS = `#version 300 es
+precision highp float;
+in vec2 aPos; in vec2 aCen; in vec4 aRand; in vec3 aBary;
+uniform mat4 uMVP; uniform float uP, uCrack, uSpread, uExplode, uSpin, uGravity;
+out vec2 vUv; out vec3 vBary; out float vT; out float vDelay;
+${COMMON}
+void main(){
+  float fp = clamp((uP-uCrack)/(1.0-uCrack),0.0,1.0);
+  float d = sweepDelay(vec3(aCen,0.0), aRand.x);
+  float t = clamp((fp-d*uSpread)/(1.0-uSpread),0.0,1.0);
+  float e = 1.0-(1.0-t)*(1.0-t);
+  vec3 axis = normalize(aRand.yzw*2.0-1.0+vec3(0.001));
+  float ang = e*uSpin*(aRand.y*2.0-1.0)*9.0;
+  vec3 l = vec3(aPos-aCen,0.0);
+  float c = cos(ang), s = sin(ang);
+  vec3 r = l*c+cross(axis,l)*s+axis*dot(axis,l)*(1.0-c);
+  vec3 dir = normalize(vec3(aCen*0.25+(aRand.zw*2.0-1.0), 0.8+aRand.y));
+  vec3 p = vec3(aCen,0.0)+r+dir*uExplode*1.2*e-vec3(0.0,uGravity*7.0*t*t,0.0);
+  gl_Position = uMVP*vec4(p,1.0);
+  vUv = vec2((aPos.x+4.25)/8.5, (5.5-aPos.y)/11.0);
+  vBary = aBary; vT = t; vDelay = d;
+}`;
+const S_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; in vec3 vBary; in float vT; in float vDelay;
+uniform sampler2D uFull; uniform sampler2D uBlank;
+uniform float uP, uCrack; uniform vec3 uCrackColor;
+out vec4 o;
+void main(){
+  float inkFade = smoothstep(0.0,0.04,vT);
+  vec3 tex = mix(texture(uFull,vUv).rgb, texture(uBlank,vUv).rgb, inkFade);
+  float m = min(min(vBary.x,vBary.y),vBary.z);
+  float rim = 1.0-smoothstep(0.0, fwidth(m)*1.8, m);
+  float glow = uCrack>0.001 ? smoothstep(vDelay*uCrack*0.75, vDelay*uCrack*0.75+uCrack*0.25, uP) : step(0.0001,uP);
+  float alpha = 1.0-smoothstep(0.05,0.55,vT);
+  vec3 col = mix(tex, uCrackColor*1.7, rim*glow);
+  col = mix(col, col*0.3+uCrackColor*0.25, smoothstep(0.0,0.4,vT));
+  o = vec4(col*alpha, alpha);
+}`;
+
+function compile(vs, fs) {
+  const mk = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+  const p = gl.createProgram(); gl.attachShader(p, mk(gl.VERTEX_SHADER, vs)); gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); u[info.name] = gl.getUniformLocation(p, info.name); }
+  return { p, u };
+}
+let PART, SHARD;
+try { PART = compile(P_VS, P_FS); SHARD = compile(S_VS, S_FS); }
+catch (e) { const el = document.getElementById('err'); el.style.display = 'grid'; el.textContent = 'Shader error: ' + e.message; throw e; }
+
+function attribs(prog, layout, data, vao) {
+  gl.bindVertexArray(vao);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  const stride = layout.reduce((a, [, n]) => a + n, 0) * 4; let off = 0;
+  layout.forEach(([name, n]) => { const loc = gl.getAttribLocation(prog.p, name);
+    if (loc >= 0) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, n, gl.FLOAT, false, stride, off); } off += n * 4; });
+  gl.bindVertexArray(null);
+  return buf;
+}
+
+const partVAO = gl.createVertexArray(), shardVAO = gl.createVertexArray();
+let partBuf = null, shardBuf = null, partCount = 0, shardVerts = 0, P = null, paper = null;
+const texFull = gl.createTexture(), texBlank = gl.createTexture();
+function upload(tex, cnv) {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cnv);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const ext = gl.getExtension('EXT_texture_filter_anisotropic');
+  if (ext) gl.texParameterf(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, 8);
+}
+
+function buildPaper() {
+  paper = renderPaper(state.paper);
+  upload(texFull, paper.full); upload(texBlank, paper.blank);
+}
+function buildParticles() {
+  seed = 1337;
+  const N = state.count;
+  const src = samplePaper(paper, N);
+  const { groups, P: pal } = buildTargets(N);
+  P = pal;
+  const pairs = pairUp(src, groups);
+  const data = new Float32Array(N * 20);
+  for (let i = 0; i < N; i++) {
+    const s = src[i], t = pairs[i], o = i * 20;
+    data.set(s.p, o); data.set(t.p, o + 3); data.set(s.ink, o + 6); data.set(t.c, o + 9);
+    data[o + 12] = rnd(); data[o + 13] = rnd(); data[o + 14] = rnd(); data[o + 15] = rnd();
+    data[o + 16] = t.b; data[o + 17] = t.s; data[o + 18] = t.k; data[o + 19] = s.bold;
+  }
+  if (partBuf) gl.deleteBuffer(partBuf);
+  partBuf = attribs(PART, [['aStart', 3], ['aEnd', 3], ['aInk', 3], ['aColor', 3], ['aRand', 4], ['aMeta', 4]], data, partVAO);
+  partCount = N;
+}
+function buildShards() {
+  const cols = state.shards, rows = shardRows(cols);
+  const vx = [];
+  for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) {
+    let x = -PAPER_W / 2 + PAPER_W * c / cols, y = PAPER_H / 2 - PAPER_H * r / rows;
+    if (c > 0 && c < cols) x += (rnd() - 0.5) * PAPER_W / cols * 0.7;
+    if (r > 0 && r < rows) y += (rnd() - 0.5) * PAPER_H / rows * 0.7;
+    vx.push([x, y]);
+  }
+  const V = (r, c) => vx[r * (cols + 1) + c];
+  const tris = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const a = V(r, c), b = V(r, c + 1), d = V(r + 1, c), e = V(r + 1, c + 1);
+    if ((r + c) % 2) { tris.push([a, b, e], [a, e, d]); } else { tris.push([a, b, d], [b, e, d]); }
+  }
+  const data = new Float32Array(tris.length * 3 * 11);
+  tris.forEach((tri, i) => {
+    const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
+    const rr = [rnd(), rnd(), rnd(), rnd()];
+    tri.forEach((v, j) => { const o = (i * 3 + j) * 11;
+      data.set([v[0], v[1], cx, cy, ...rr, j === 0 ? 1 : 0, j === 1 ? 1 : 0, j === 2 ? 1 : 0], o); });
+  });
+  if (shardBuf) gl.deleteBuffer(shardBuf);
+  shardBuf = attribs(SHARD, [['aPos', 2], ['aCen', 2], ['aRand', 4], ['aBary', 3]], data, shardVAO);
+  shardVerts = tris.length * 3;
+}
+
+// =====================================================================
+// Camera
+// =====================================================================
+const M4 = {
+  persp(fovy, asp, n, f) { const t = 1 / Math.tan(fovy / 2), nf = 1 / (n - f); return new Float32Array([t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) * nf, -1, 0, 0, 2 * f * n * nf, 0]); },
+  lookAt(e, c, u) {
+    let zx = e[0] - c[0], zy = e[1] - c[1], zz = e[2] - c[2], l = Math.hypot(zx, zy, zz); zx /= l; zy /= l; zz /= l;
+    let xx = u[1] * zz - u[2] * zy, xy = u[2] * zx - u[0] * zz, xz = u[0] * zy - u[1] * zx; l = Math.hypot(xx, xy, xz); xx /= l; xy /= l; xz /= l;
+    const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+    return new Float32Array([xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0, -(xx * e[0] + xy * e[1] + xz * e[2]), -(yx * e[0] + yy * e[1] + yz * e[2]), -(zx * e[0] + zy * e[1] + zz * e[2]), 1]);
+  },
+  mul(a, b) { const o = new Float32Array(16); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + j] * b[i * 4 + k]; o[i * 4 + j] = s; } return o; },
+};
+const FOV = 45 * Math.PI / 180;
+const CAM_PAPER = { az: 0, el: 0, dist: 15.8, target: [0, -0.55, 0] };
+const CAM_SKY = { az: 0.38, el: 0.2, dist: 24.5, target: [0, -0.3, -1.5] };
+const CAM_FIXED = { az: 0.2, el: 0.1, dist: 21, target: [0, -0.2, -0.8] };
+const user = { az: 0, el: 0, zoom: 1 };
+let mvp = null, view = null;
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (t) => t * t * (3 - 2 * t);
+
+// =====================================================================
+// Animation state
+// =====================================================================
+let p = 0, dir = 0, nextDir = 1, holdUntil = 0, time = 0, autoStarted = false;
+const crackFrac = () => (state.crack ? state.crackTime : 0);
+function play(d) { dir = d; holdUntil = 0; }
+
+const stage = document.getElementById('stage');
+const bloomC = document.getElementById('bloom'), bctx = bloomC.getContext('2d');
+let dpr = 1;
+function resize() {
+  const r = stage.getBoundingClientRect();
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr));
+  bloomC.width = Math.max(1, Math.round(r.width / 4)); bloomC.height = Math.max(1, Math.round(r.height / 4));
+}
+new ResizeObserver(resize).observe(stage); resize();
+
+const scrub = document.getElementById('scrub'), pct = document.getElementById('pct'), fpsEl = document.getElementById('fps');
+let last = performance.now(), frames = 0, fpsT = 0;
+function frame_(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; time += dt;
+  frames++; fpsT += dt; if (fpsT > 0.5) { fpsEl.textContent = Math.round(frames / fpsT) + ' fps'; frames = 0; fpsT = 0; }
+  if (dir !== 0) {
+    p += dir * dt / state.duration;
+    if (p >= 1 || p <= 0) {
+      p = Math.min(1, Math.max(0, p));
+      if (state.loop) { holdUntil = time + state.hold; nextDir = p >= 1 ? -1 : 1; }
+      dir = 0;
+    }
+  } else if (holdUntil && time >= holdUntil) {
+    holdUntil = 0;
+    if (state.loop) dir = nextDir;
+  }
+  scrub.value = Math.round(p * 1000); pct.textContent = Math.round(p * 100) + '%';
+  render();
+  requestAnimationFrame(frame_);
+}
+
+function render() {
+  const w = canvas.width, h = canvas.height;
+  gl.viewport(0, 0, w, h);
+  const bg = hex(PALETTES[state.palette].bg);
+  gl.clearColor(bg[0], bg[1], bg[2], 1); gl.clear(gl.COLOR_BUFFER_BIT);
+  const crack = crackFrac();
+  const fp = Math.min(1, Math.max(0, (p - crack) / (1 - crack)));
+  const camT = smooth(fp);
+  const A = state.cameraMove ? CAM_PAPER : CAM_FIXED, B = state.cameraMove ? CAM_SKY : CAM_FIXED;
+  const sway = Math.sin(time * 0.25) * state.orbit * 0.6 * camT;
+  const az = lerp(A.az, B.az, camT) + sway + user.az, el = Math.max(-0.2, Math.min(1.3, lerp(A.el, B.el, camT) + user.el));
+  const dist = lerp(A.dist, B.dist, camT) * user.zoom;
+  const tg = [0, 1, 2].map((i) => lerp(A.target[i], B.target[i], camT));
+  const eye = [tg[0] + dist * Math.sin(az) * Math.cos(el), tg[1] + dist * Math.sin(el), tg[2] + dist * Math.cos(az) * Math.cos(el)];
+  view = M4.lookAt(eye, tg, [0, 1, 0]);
+  mvp = M4.mul(M4.persp(FOV, w / h, 0.1, 300), view);
+  const ease = EASINGS.findIndex(([k]) => k === state.easing), sweep = SWEEPS.findIndex(([k]) => k === state.sweep);
+  const beat = state.bpm > 0 ? Math.pow(0.5 + 0.5 * Math.cos(2 * Math.PI * time * state.bpm / 60), 6) : 0;
+
+  gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+  if (p < 0.999) {
+    gl.useProgram(SHARD.p); const u = SHARD.u;
+    gl.uniformMatrix4fv(u.uMVP, false, mvp);
+    gl.uniform1f(u.uP, p); gl.uniform1f(u.uCrack, crack); gl.uniform1f(u.uSpread, state.spread);
+    gl.uniform1f(u.uExplode, state.explode); gl.uniform1f(u.uSpin, state.shardSpin); gl.uniform1f(u.uGravity, state.gravity);
+    gl.uniform1i(u.uEase, ease); gl.uniform1i(u.uSweep, sweep);
+    gl.uniform3fv(u.uCrackColor, P.crack);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texFull); gl.uniform1i(u.uFull, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texBlank); gl.uniform1i(u.uBlank, 1);
+    gl.bindVertexArray(shardVAO); gl.drawArrays(gl.TRIANGLES, 0, shardVerts);
+  }
+  if (p > crack + 0.0001) {
+    gl.useProgram(PART.p); const u = PART.u;
+    gl.uniformMatrix4fv(u.uMVP, false, mvp); gl.uniformMatrix4fv(u.uView, false, view);
+    gl.uniform1f(u.uP, p); gl.uniform1f(u.uCrack, crack); gl.uniform1f(u.uSpread, state.spread);
+    gl.uniform1f(u.uExplode, state.explode); gl.uniform1f(u.uArc, state.arc); gl.uniform1f(u.uSwirl, state.swirl);
+    gl.uniform1f(u.uTurb, state.turbulence); gl.uniform1f(u.uTime, time); gl.uniform1f(u.uSize, state.size);
+    gl.uniform1f(u.uScale, h / (2 * Math.tan(FOV / 2))); gl.uniform1f(u.uHeat, state.heat); gl.uniform1f(u.uFlicker, state.flicker);
+    gl.uniform1f(u.uBeat, beat); gl.uniform1f(u.uFogNear, dist * 0.9); gl.uniform1f(u.uFogFar, dist * 2.6);
+    gl.uniform3fv(u.uHeatColor, P.heat); gl.uniform2f(u.uKindMask, state.stars ? 1 : 0, state.grid ? 1 : 0);
+    gl.uniform1f(u.uGlow, state.glow); gl.uniform1i(u.uEase, ease); gl.uniform1i(u.uSweep, sweep);
+    gl.bindVertexArray(partVAO); gl.drawArrays(gl.POINTS, 0, partCount);
+  }
+  gl.bindVertexArray(null);
+
+  // Bloom ramps in with the city; on the white paper it would only wash out the text
+  const bloomAmt = state.bloom * smooth(Math.min(1, Math.max(0, (fp - 0.3) / 0.6)));
+  bloomC.style.opacity = Math.min(1, bloomAmt);
+  if (bloomAmt > 0.01) {
+    bctx.clearRect(0, 0, bloomC.width, bloomC.height);
+    bctx.drawImage(canvas, 0, 0, bloomC.width, bloomC.height);
+  }
+}
+
+// =====================================================================
+// Picking: click a tower for its holo panel
+// =====================================================================
+const tip = document.getElementById('tip'), holo = document.getElementById('holo');
+function towerAt(cx, cy) {
+  if (!mvp || p < 0.9) return null;
+  const r = stage.getBoundingClientRect(); let best = null, bestZ = Infinity;
+  for (const t of TOWERS) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, zMin = Infinity, ok = true;
+    for (const X of [t.x - t.w / 2, t.x + t.w / 2]) for (const Y of [GROUND, GROUND + t.h + 1]) for (const Z of [t.z - t.w / 2, t.z + t.w / 2]) {
+      const m = mvp, cw = m[3] * X + m[7] * Y + m[11] * Z + m[15];
+      if (cw <= 0) { ok = false; continue; }
+      const sx = ((m[0] * X + m[4] * Y + m[8] * Z + m[12]) / cw * 0.5 + 0.5) * r.width;
+      const sy = (1 - ((m[1] * X + m[5] * Y + m[9] * Z + m[13]) / cw * 0.5 + 0.5)) * r.height;
+      x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy); zMin = Math.min(zMin, cw);
+    }
+    if (ok && cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1 && zMin < bestZ) { best = t; bestZ = zMin; }
+  }
+  return best;
+}
+const rich = (s) => parseRich(s).map((r) => (r.b ? `<strong>${esc(r.t)}</strong>` : esc(r.t))).join('');
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+function openHolo(t) {
+  document.getElementById('holoTitle').textContent = t.company;
+  document.getElementById('holoMeta').textContent = `${t.title} · ${t.dates}`;
+  document.getElementById('holoList').innerHTML = (t.bullets.length ? t.bullets : ['Freelance web development.']).map((b) => `<li>${rich(b)}</li>`).join('');
+  holo.style.display = 'block';
+}
+document.getElementById('holoClose').onclick = () => (holo.style.display = 'none');
+
+let drag = null;
+canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: false }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', (e) => {
+  const r = stage.getBoundingClientRect();
+  if (drag) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    user.az -= dx * 0.005; user.el += dy * 0.004; drag.x = e.clientX; drag.y = e.clientY;
+    return;
+  }
+  const t = towerAt(e.clientX - r.left, e.clientY - r.top);
+  canvas.style.cursor = t ? 'pointer' : 'grab';
+  if (t) { tip.style.display = 'block'; tip.textContent = `${t.company} · ${t.dates}`; tip.style.left = (e.clientX - r.left + 14) + 'px'; tip.style.top = (e.clientY - r.top + 10) + 'px'; }
+  else tip.style.display = 'none';
+});
+canvas.addEventListener('pointerup', (e) => {
+  const r = stage.getBoundingClientRect();
+  if (drag && !drag.moved) { const t = towerAt(e.clientX - r.left, e.clientY - r.top); if (t) openHolo(t); }
+  drag = null;
+});
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); user.zoom = Math.max(0.35, Math.min(2.5, user.zoom * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+function resetView() { user.az = 0; user.el = 0; user.zoom = 1; }
+
+document.getElementById('btnShatter').onclick = () => { holo.style.display = 'none'; play(1); };
+document.getElementById('btnPaper').onclick = () => { holo.style.display = 'none'; play(-1); };
+document.getElementById('btnView').onclick = resetView;
+scrub.addEventListener('input', () => { dir = 0; holdUntil = 0; p = scrub.value / 1000; });
+window.addEventListener('keydown', (e) => {
+  if (e.target.closest('aside')) return;
+  if (e.code === 'Space') { e.preventDefault(); play(p > 0.5 ? -1 : 1); }
+  if (e.key === 'r' || e.key === 'R') resetView();
+  if (e.key === 'Escape') holo.style.display = 'none';
+});
+
+// =====================================================================
+// Controls UI
+// =====================================================================
+const aside = document.getElementById('controls'), inputs = {};
+const presetBox = document.getElementById('presets');
+PRESETS.forEach((pr, i) => {
+  const b = document.createElement('button'); b.innerHTML = `${pr.name}<small>${pr.note}</small>`;
+  b.onclick = () => applyPreset(i); presetBox.appendChild(b); pr.el = b;
+});
+SCHEMA.forEach((grp) => {
+  const det = document.createElement('details'); det.open = grp.open;
+  det.innerHTML = `<summary>${grp.group}</summary>`; aside.appendChild(det);
+  grp.items.forEach((it) => {
+    const row = document.createElement('div'); row.className = 'row';
+    const id = 'c_' + it.k;
+    if (it.type === 'toggle') {
+      row.innerHTML = `<label class="toggle" for="${id}"><span>${it.label}</span><input type="checkbox" id="${id}"></label>`;
+    } else if (it.type === 'select') {
+      row.innerHTML = `<label for="${id}"><span>${it.label}</span></label><select id="${id}">${it.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`;
+    } else {
+      row.innerHTML = `<label for="${id}"><span>${it.label}</span><span class="v" id="${id}_v"></span></label><input type="range" id="${id}" min="${it.min}" max="${it.max}" step="${it.step}">`;
+    }
+    if (it.hint) row.innerHTML += `<div class="hint">${it.hint}</div>`;
+    det.appendChild(row);
+    const el = row.querySelector('#' + id); inputs[it.k] = { el, it };
+    const read = () => (it.type === 'toggle' ? el.checked : it.type === 'select' ? el.value : parseFloat(el.value));
+    if (it.type === 'range') {
+      el.addEventListener('input', () => { state[it.k] = read(); syncLabel(it.k); if (!it.rebuild) updateAll(); });
+      el.addEventListener('change', () => { if (it.rebuild) { rebuild(it.rebuild); updateAll(); } });
+    } else {
+      el.addEventListener('change', () => {
+        state[it.k] = read(); if (it.rebuild) rebuild(it.rebuild);
+        if (it.k === 'loop' && state.loop && dir === 0) { holdUntil = time + 0.2; nextDir = p > 0.5 ? -1 : 1; }
+        updateAll();
+      });
+    }
+  });
+});
+function syncLabel(k) { const { it } = inputs[k]; const v = document.getElementById('c_' + k + '_v'); if (v) v.textContent = it.fmt ? it.fmt(state[k]) : state[k]; }
+function syncControls() {
+  Object.entries(inputs).forEach(([k, { el, it }]) => { if (it.type === 'toggle') el.checked = state[k]; else el.value = state[k]; syncLabel(k); });
+}
+function rebuild(what) {
+  if (what === 'paper') { buildPaper(); buildParticles(); }
+  else if (what === 'particles') buildParticles();
+  else if (what === 'shards') { seed = 99; buildShards(); }
+}
+function applyPreset(i) {
+  const before = { ...state };
+  Object.assign(state, DEFAULTS, PRESETS[i].values);
+  syncControls();
+  if (before.paper !== state.paper) rebuild('paper');
+  else if (['count', 'mapping', 'palette', 'heightBy'].some((k) => before[k] !== state[k])) rebuild('particles');
+  if (before.shards !== state.shards) rebuild('shards');
+  updateAll();
+  holo.style.display = 'none'; p = 0; play(1);
+}
+function updateAll() {
+  document.getElementById('scan').style.display = state.scanlines ? 'block' : 'none';
+  document.getElementById('vig').style.display = state.vignette ? 'block' : 'none';
+  bloomC.style.display = state.bloom > 0 ? 'block' : 'none';
+  bloomC.style.filter = `blur(${4 + state.bloom * 6}px) brightness(${1.2 + state.bloom}) saturate(1.3)`;
+  const match = PRESETS.findIndex((pr) => Object.keys(DEFAULTS).every((k) => state[k] === ({ ...DEFAULTS, ...pr.values })[k]));
+  PRESETS.forEach((pr, i) => pr.el.classList.toggle('on', i === match));
+  updatePrompt(match);
+}
+
+// =====================================================================
+// Prompt output
+// =====================================================================
+const label = (opts, v) => (opts.find(([k]) => k === v) || [, v])[1];
+function updatePrompt(match) {
+  const s = state, d = DEFAULTS, c = (k) => s[k] !== d[k], out = [];
+  if (c('duration')) out.push(`Run the whole transition over ${s.duration.toFixed(1)}s (${s.duration < 3 ? 'snappy' : s.duration > 6 ? 'slow and cinematic' : 'medium pace'}).`);
+  if (c('easing')) out.push(`Use ${label(EASINGS, s.easing).toLowerCase()} easing for particle flight.`);
+  if (c('spread')) out.push(s.spread < 0.2 ? `Break everything at once (stagger ${s.spread.toFixed(2)}).` : s.spread > 0.7 ? `Stagger heavily (${s.spread.toFixed(2)}) so the break ripples across the page.` : `Stagger the break by ${s.spread.toFixed(2)} of the timeline.`);
+  if (c('sweep')) out.push({ random: 'Break in random order.', leftRight: 'Sweep the break left to right.', centerOut: 'Radiate the break out from the center of the page.', topDown: 'Peel the page apart from top to bottom.' }[s.sweep]);
+  if (c('crack')) out.push(s.crack ? 'Lead in with glowing cracks.' : 'Skip the glowing-crack lead-in; the page breaks immediately.');
+  else if (s.crack && c('crackTime')) out.push(`Let glowing cracks spread across the page for the first ${Math.round(s.crackTime * 100)}% of the timeline before anything moves.`);
+  if (c('shards')) out.push(`Split the paper into a ${s.shards}×${shardRows(s.shards)} jittered triangle grid (${s.shards * shardRows(s.shards) * 2} shards).`);
+  if (c('shardSpin')) out.push(`Shard spin ${s.shardSpin.toFixed(2)} (${s.shardSpin < 0.3 ? 'shards barely tumble' : s.shardSpin > 1 ? 'shards tumble wildly' : 'moderate tumble'}).`);
+  if (c('gravity')) out.push(`Shard gravity ${s.gravity.toFixed(2)} (${s.gravity < 0.3 ? 'they float away' : s.gravity > 0.9 ? 'they drop hard' : 'gentle fall'}).`);
+  if (c('explode')) out.push(`Explosion strength ${s.explode.toFixed(1)} (${s.explode < 2 ? 'particles barely drift apart' : s.explode > 7 ? 'a violent outward blast' : 'a clear burst'}).`);
+  if (c('arc')) out.push(s.arc < 0 ? `Particles dip ${Math.abs(s.arc).toFixed(1)} units below their path before rising into the towers.` : `Loft particles on arcs ${s.arc.toFixed(1)} units high.`);
+  if (c('swirl')) out.push(s.swirl === 0 ? 'No swirl; particles fly straight.' : `Swirl particles around the vertical axis mid-flight (${s.swirl.toFixed(2)}).`);
+  if (c('turbulence')) out.push(`Turbulence ${s.turbulence.toFixed(2)} (${s.turbulence < 0.2 ? 'clean paths' : s.turbulence > 0.7 ? 'chaotic, jittery flight' : 'some organic wobble'}).`);
+  if (c('mapping')) out.push({ spatial: 'Route particles spatially (left of the page lands on the left of the city) instead of by section.', random: 'Route particles randomly (pure chaos) instead of by section.', story: 'Route particles by section: each job\'s text becomes that job\'s tower.' }[s.mapping]);
+  if (c('count')) out.push(`Use about ${Math.round(s.count / 1000)}k particles.`);
+  if (c('size')) out.push(`Particle size ×${s.size.toFixed(2)}.`);
+  if (c('glow')) out.push(`Glow halo ${s.glow.toFixed(2)}.`);
+  if (c('heat')) out.push(`Flight heat ${s.heat.toFixed(2)} (${s.heat < 0.3 ? 'little ember glow in the air' : 'particles burn ember-hot while flying'}).`);
+  if (c('palette')) { const pl = PALETTES[s.palette]; out.push(`Use the ${pl.name} palette: edges ${pl.edge}, windows ${pl.window}/${pl.window2}, signs ${pl.signs.join(' ')}, grid ${pl.grid}, background ${pl.bg}.`); }
+  if (c('heightBy')) out.push(`Set tower height by ${label(HEIGHTS, s.heightBy).toLowerCase()}.`);
+  if (c('flicker')) out.push(`Window flicker ${s.flicker.toFixed(2)}.`);
+  if (c('bpm')) out.push(s.bpm ? `Pulse the neon signs on the beat (${s.bpm} BPM in the playground; in the real build drive it from the music player's live frequency data).` : 'No sign pulse.');
+  if (c('stars')) out.push('No stars.');
+  if (c('grid')) out.push('No ground grid.');
+  if (c('paper')) out.push('Use a midnight (dark) paper instead of the white PDF look.');
+  if (c('cameraMove')) out.push('Keep the camera fixed at a three-quarter view instead of pulling back from the page.');
+  if (c('orbit')) out.push(`Auto-orbit sway ${s.orbit.toFixed(2)}.`);
+  if (c('bloom')) out.push(`Bloom ${s.bloom.toFixed(2)} (use @react-three/postprocessing Bloom).`);
+  if (c('scanlines')) out.push('No CRT scanlines.');
+  if (c('vignette')) out.push('No vignette.');
+
+  const changed = Object.keys(DEFAULTS).filter(c).filter((k) => !['loop', 'hold'].includes(k));
+  const intro = 'Build the "Paper Shatters" resume transition for phillcodes.com in React Three Fiber: the resume page cracks with glowing seams, breaks into tumbling shards, and its ink becomes glowing particles that fly into a neon Career Skyline (one tower per job, lit windows for bullets, vertical skill signs, project billboards, the name as a hero sign, summary text as the ground grid and stars). It reverses back to paper. Lazy-load it behind an "Enter the grid" button, keep the semantic DOM resume underneath for SEO and screen readers, and show only the DOM resume under prefers-reduced-motion.';
+  const base = 'Start from the defaults in docs/design/paper-shatters/playground.html';
+  const presetNote = match > 0 ? ` (the "${PRESETS[match].name}" preset)` : '';
+  const body = changed.length ? `${base}${presetNote} with these changes:\n- ${out.join('\n- ')}` : `${base} as they are (no changes).`;
+  const json = changed.length ? `\n\nExact settings: ${JSON.stringify(Object.fromEntries(changed.map((k) => [k, s[k]])))}` : '';
+  document.getElementById('prompt').textContent = `${intro}\n\n${body}${json}`;
+}
+document.getElementById('copy').onclick = async (e) => {
+  const t = document.getElementById('prompt').textContent;
+  try { await navigator.clipboard.writeText(t); } catch { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  e.target.textContent = 'Copied!'; setTimeout(() => (e.target.textContent = 'Copy prompt'), 1200);
+};
+
+// =====================================================================
+// Boot
+// =====================================================================
+syncControls();
+buildPaper();
+buildParticles();
+seed = 99; buildShards();
+updateAll();
+requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame_); });
+setTimeout(() => { if (!autoStarted && p === 0 && dir === 0) { autoStarted = true; play(1); } }, 1400);
+window.__pg = { state, setP: (v) => { dir = 0; p = v; }, play, rebuild, updateAll, syncControls, applyPreset };
+</script>
+</body>
+</html>

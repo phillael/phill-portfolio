@@ -45,3 +45,9 @@ coverage
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Jelly Resume playground: the Rezmancer snapshot contains phone + email (repo is public).
+# Regenerate locally with docs/design/jelly-resume/tools/snapshot.mjs (see HANDOFF.md).
+docs/design/jelly-resume/rezmancer-snapshot.js
+# Local playground backups
+docs/design/jelly-resume/playground-v*.html

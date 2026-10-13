@@ -22,6 +22,8 @@ interface WizardChatProps {
   onClose: () => void
   onFallback: () => void
   onOfferMushroom: () => void
+  /** The wizard offered Phill's resume (the offer_resume tool) */
+  onOfferResume?: () => void
   injectedLine?: string | null
   onInjectedLineConsumed?: () => void
   /** A mushroom offer is open over the chat; Escape belongs to it */
@@ -62,6 +64,7 @@ export default function WizardChat({
   onClose,
   onFallback,
   onOfferMushroom,
+  onOfferResume,
   injectedLine,
   onInjectedLineConsumed,
   offerOpen = false,
@@ -221,6 +224,9 @@ export default function WizardChat({
         if (body.action === 'offer_mushroom') {
           setPendingOffer(true)
           onOfferMushroom()
+        } else if (body.action === 'offer_resume' && onOfferResume) {
+          setPendingOffer(true)
+          onOfferResume()
         }
       }
     } catch (e) {
@@ -364,6 +370,7 @@ export default function WizardChat({
           <span className="text-primary font-mono text-sm">&gt;</span>
           <textarea
             ref={inputRef}
+            name="question"
             value={input}
             onChange={(e) => setInput(e.target.value.slice(0, 200))}
             onKeyDown={onInputKeyDown}

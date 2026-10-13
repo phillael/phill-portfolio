@@ -287,6 +287,40 @@ a:active {
 /* Hero image animated glow effect - 3 layered approach for smooth morphing */
 /* Order: magenta → purple → cyan */
 /* Using high saturation colors for vibrant cyberpunk aesthetic */
+/* The Jelly Resume opening from the hero: the page fades and blurs away to reveal the
+   nebula on the canvas above it, then hides while the resume is open (out of the tab order
+   and the accessibility tree too). The overlay itself lives outside #shroom-target. */
+#shroom-target.jelly-dissolving {
+  opacity: 0;
+  filter: blur(6px);
+  transition: opacity 0.6s ease, filter 0.6s ease;
+}
+#shroom-target.jelly-gone {
+  opacity: 0;
+  visibility: hidden;
+}
+#shroom-target.jelly-returning {
+  transition: opacity 0.5s ease;
+}
+/* The shroom UI (the wizard and 💊) stays above the overlay, so it fades out while the 3D resume is up
+   (opacity only: a filter or transform here would break its position: fixed children) */
+#shroom-ui {
+  transition: opacity 0.4s ease;
+}
+/* No page scrolling under the 3D resume (a class, not an inline style: the music panel sets and clears that) */
+html.jelly-lock,
+html.jelly-lock body {
+  overflow: hidden;
+}
+html.jelly-lock {
+  scrollbar-gutter: stable;
+}
+#shroom-ui.jelly-ui-off {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+}
+
 .glow-layer {
   position: absolute;
   inset: 0;

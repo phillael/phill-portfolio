@@ -5,6 +5,7 @@ import Nav from '@/components/Nav'
 import { MusicPlayer } from '@/components/music'
 import ScreenShakeWrapper from '@/components/ScreenShakeWrapper'
 import ShroomMode from '@/components/ShroomMode'
+import JellyResumeHost from '@/components/jelly/JellyResumeHost'
 import MotionProvider from '@/components/MotionProvider'
 import SkipLink from '@/components/SkipLink'
 import { ShroomModeProvider } from '@/context/ShroomModeContext'
@@ -74,7 +75,7 @@ export const metadata: Metadata = {
   },
 }
 
-const RootLayout = ({ children }: { children: React.ReactNode }) => {
+const RootLayout = ({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) => {
   return (
     <html lang="en" className={`${audiowide.variable} ${nunito.variable} ${pressStart2P.variable}`}>
       <body className="font-body text-foreground custom-scrollbar">
@@ -92,8 +93,14 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
               </div>
             </div>
             {/* These stay outside the filter */}
+            {/* The 3D resume: over the page and the Nav, under the music player (DOM order at z-50) */}
+            <JellyResumeHost />
+            {modal}
             <MusicPlayer />
-            <ShroomMode />
+            {/* (a plain wrapper, no filter or transform: the 3D resume makes it inert while it's open) */}
+            <div id="shroom-ui">
+              <ShroomMode />
+            </div>
           </ShroomModeProvider>
         </MotionProvider>
       </body>

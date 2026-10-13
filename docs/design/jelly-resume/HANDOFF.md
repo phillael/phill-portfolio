@@ -203,6 +203,8 @@ Plan: `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md` (T0–T12, on
 - **Straight to the page** (see the session 7 list above): no galaxy step by default.
 - **No Skills strip under the hero** (Phill: "I'd like to keep the page as it is because it looks really clean"). The chip deep-link trigger is gone; `#resume?find=X` deep links still work.
 - **The nav Resume button stays a plain PDF download** (Phill: no friction for people who just want the file). The hero photo (and the 🍄 summon) are the ways into the 3D resume, and focus returns to whichever opened it.
+- **Physics: "Into the Void" is how it runs** (Phill: "let's just set it to the into the void setting"): the defaults are now `space: 'fly'`, `floatTime: 3.5`, `burstForce: 4.5`. Clicked words fly off into 3D space, toward the camera or past the page edge, and burst into comet sparks that swarm home. The other feel presets keep their old float-over-the-page physics (`FLOAT`).
+- **The sidebar is a dev tool only.** The real site ships one fixed configuration (whatever the Copy prompt says at the time) and no settings panel. Visitors get the resume, its HUD (PDF, Chaos, Burst, Heal, Shroom, Black hole, Sound, Intro, View, ×) and the site's ♫ player.
 - **One music player:** the site's ♫ button now lives outside the mock and stays on screen when the resume opens (the HUD makes room for it), so a song started on the site keeps playing and the resume dances to it. The resume's own "♫ Music" HUD button is gone; P still plays/pauses. Closing the resume doesn't stop the song. On the real site, the overlay must not cover `MusicPlayer`/`MusicFAB` (they already sit outside the shroom wrappers), and the resume reads the shared `useAudioPlayer` analyser.
 
 ## Porting to the real site (later plan; not started)
@@ -245,7 +247,7 @@ The hero → resume plan (T0–T12) is `docs/plans/2026-10-12-jelly-resume-hero-
 
 ## Open items and ideas to workshop next
 
-1. **Feel tuning.** Phill hasn't settled the physics. Have him try presets (Bumper Cars default, Popcorn, Zero-G Drift, Domino Chaos, Gravity, Into the Void, Wobbly Jello, Total Melt) and copy the prompt when something feels right.
+1. **Feel tuning.** Settled 2026-10-13: Into the Void. (Was: Phill hasn't settled the physics.) Have him try presets (Bumper Cars default, Popcorn, Zero-G Drift, Domino Chaos, Gravity, Into the Void, Wobbly Jello, Total Melt) and copy the prompt when something feels right.
 2. **Real-phone test.** Publishing the playground as a private artifact link was offered so he can open it on his phone, but not done yet. If he wants it, the snapshot JS has to be inlined or published as a supporting file.
 3. **Phone readability.** The exact Letter page is small on a portrait phone until you pinch-zoom. Options: start phones zoomed to the top of the page, or fall back to the reflow layout on narrow screens.
 4. **Contact details.** The snapshot includes phone and email because the PDF does. The public site probably wants a Rezmancer "web" variant without them; ask Phill.

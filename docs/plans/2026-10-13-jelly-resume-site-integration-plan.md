@@ -213,9 +213,10 @@ Order matters: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7. T8–T11 nee
     - **HANDOFF.md:** the status says ported; a new "Ported to the site" section covers the routes, host and triggers, the engine and HUD, what isn't ported, what differs for the site, the measurements and how to change the look. The pre-port section is marked superseded and the starter prompt updated.
     - **Version:** `package.json` and `package-lock.json` 1.2.0 → **1.3.0** (`origin/master` fetched: still 1.2.0 at f15f49d, which this branch contains).
   - **Verified:** `npx tsc --noEmit` clean · `npm run lint` zero warnings · `npx jest --no-watchman` (full suite) **46 suites / 459 tests pass** · `npm run build` OK (`/`, `/(.)resume` and `/resume` static).
-- [ ] **T14: PR. STOP before pushing and ask Phill.**
+- [x] **T14: PR. STOP before pushing and ask Phill.**
   - Prepare the PR description (summary, screenshots, measurements, test plan) in the plan.
   - Pushing and opening the PR need Phill's explicit go, because the repo is public and he must confirm that nothing private is in `public/resume/`.
+  - **Opened 2026-10-13 on Phill's go ("go ahead and open the pr"): [PR #39](https://github.com/phillael/phill-portfolio/pull/39).**
   - **Prepared 2026-10-13: nothing pushed, waiting for Phill's go.** On the go: `git push -u origin feat/jelly-resume-site`, then `gh pr create --base master` with the title and body below. Attach screenshots in the PR UI.
   - **Title:** `feat: the Jelly Resume, the hero photo dissolves into a 3D resume at /resume (v1.3.0)`
   - **Body:**

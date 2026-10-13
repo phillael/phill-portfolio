@@ -23,6 +23,36 @@ let prefetched = false
 let hardNavigate = (url: string) => window.location.assign(url)
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+const PLAIN_KEY = 'jelly-resume-plain'
+let plain = false
+/**
+ * Set when the 3D resume can't run here (no WebGL2, or its context was lost): from then on
+ * this session gets the plain /resume page (kept in sessionStorage, so it survives the reload
+ * that swaps an overlay for the page).
+ */
+export const plainResume = {
+  get() {
+    if (plain) return true
+    try {
+      return (plain = window.sessionStorage.getItem(PLAIN_KEY) === '1')
+    } catch {
+      return false
+    }
+  },
+  set() {
+    plain = true
+    try {
+      window.sessionStorage.setItem(PLAIN_KEY, '1')
+    } catch {}
+  },
+  clear() {
+    plain = false
+    try {
+      window.sessionStorage.removeItem(PLAIN_KEY)
+    } catch {}
+  },
+}
+
 /** The hero <img> the dissolve samples (null when the home page isn't mounted). */
 export const registerHero = (img: HTMLImageElement | null) => {
   heroImg = img
@@ -43,7 +73,7 @@ export const clearIntent = () => {
 
 /** Warm the engine chunk, the snapshot and the decoded photo (hover, focus or touchstart on a trigger). */
 export function prefetchResume() {
-  if (prefetched || reducedMotion()) return // reduced motion never loads the engine
+  if (prefetched || reducedMotion() || plainResume.get()) return // reduced motion (or no WebGL) never loads the engine
   prefetched = true
   import('@/components/jelly/JellyResumeCanvas').catch(() => (prefetched = false))
   import('@/lib/jelly/snapshot')
@@ -57,10 +87,10 @@ export function prefetchResume() {
     .catch(() => {})
 }
 
-/** Open the 3D resume (with reduced motion, the plain /resume page). */
+/** Open the 3D resume (with reduced motion, or where it can't run, the plain /resume page). */
 export function openResume(i: OpenIntent, find?: string | null) {
   const url = '/resume' + (find ? `?find=${encodeURIComponent(find)}` : '')
-  if (reducedMotion() || !navigate) {
+  if (reducedMotion() || plainResume.get() || !navigate) {
     hardNavigate(url) // the plain page: no canvas, no engine
     return
   }

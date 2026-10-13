@@ -19,6 +19,9 @@ export const ShroomModeProvider = ({ children }: { children: ReactNode }) => {
   )
 }
 
+/** Whether site shroom mode is on, or false outside the provider (for components that only follow it). */
+export const useShroomActive = () => useContext(ShroomModeContext)?.isActive ?? false
+
 export const useShroomMode = () => {
   const context = useContext(ShroomModeContext)
   if (!context) {

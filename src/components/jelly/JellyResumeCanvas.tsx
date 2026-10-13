@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createJellyEngine, type JellyEngine } from '@/lib/jelly/engine'
-import { loadSnapshotOnce } from '@/lib/jelly/snapshot'
-import { decodePhoto } from '@/lib/jelly/hero'
+import { loadSnapshotOnce, releaseSnapshot } from '@/lib/jelly/snapshot'
+import { decodePhoto, releasePhoto } from '@/lib/jelly/hero'
+import { useShroomActive } from '@/context/ShroomModeContext'
 import { createMusicTap } from '@/lib/jelly/music'
 import { getSiteMusic } from '@/lib/site-music'
 import type { ResumeMode } from '@/components/jelly/resumeRoute'
@@ -25,6 +26,8 @@ interface JellyResumeCanvasProps {
   onClose: () => void
   /** the close has finished; the host unmounts it */
   onClosed?: () => void
+  /** the engine can't run (no WebGL2) or lost its context: the host shows the plain page */
+  onFail?: () => void
 }
 
 const FADE_MS = 400
@@ -40,11 +43,13 @@ const pageClasses = (...add: string[]) => {
 /**
  * Everything under the overlay (the page, the skip link, the shroom UI) is out of reach while
  * it's up: hidden UI is inert. The resume's text equivalent is inside the dialog instead.
+ * The shroom UI (the wizard and 💊 in shroom mode) sits above the overlay, so it also fades out.
  */
 const pageInert = (on: boolean) => {
   for (const el of [document.getElementById('shroom-target'), document.getElementById('shroom-ui'), document.querySelector('a[href="#main"]')]) {
     if (el instanceof HTMLElement) el.inert = on
   }
+  document.getElementById('shroom-ui')?.classList.toggle('jelly-ui-off', on)
 }
 
 /** The HUD's emoji and symbols (keep in step with its labels). */
@@ -76,7 +81,7 @@ const openerFor = (el: HTMLElement | null | undefined) =>
  * direct entrance) and closes (in reverse onto the hero, or a fade).
  * Load it with next/dynamic ({ ssr: false }); it's the engine's whole chunk.
  */
-const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onClose, onClosed }: JellyResumeCanvasProps) => {
+const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onClose, onClosed, onFail }: JellyResumeCanvasProps) => {
   const sectionRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const finderRef = useRef<HTMLDivElement>(null)
@@ -89,6 +94,8 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
   const [fadeOut, setFadeOut] = useState(false)
   const onClosedRef = useRef(onClosed)
   useEffect(() => { onClosedRef.current = onClosed }, [onClosed])
+  const onFailRef = useRef(onFail)
+  useEffect(() => { onFailRef.current = onFail }, [onFail])
   const openerRef = useRef<HTMLElement | null>(null)
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState<number | null>(null)
@@ -110,6 +117,13 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     // A step per frame, so a slow phone never blocks a frame for long: the browser lays out and paints the
     // overlay first, then the engine is created (shaders, the nebula), then it opens (sampling the photo).
     const later = (f: () => void) => frames.push(requestAnimationFrame(() => timers.push(setTimeout(() => alive && f(), 0))))
+    // a lost context (a GPU reset, or the browser reclaiming it) doesn't come back here: the plain page instead
+    const lost = () => {
+      if (!alive) return
+      console.warn('The 3D resume lost its WebGL context; showing the plain page')
+      onFailRef.current?.()
+    }
+    canvas.addEventListener('webglcontextlost', lost)
     later(() => {
       try {
         e = createJellyEngine({
@@ -135,7 +149,8 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
           },
         })
       } catch (err) {
-        console.error('The 3D resume needs WebGL2', err)
+        console.warn('The 3D resume needs WebGL2; showing the plain page', err)
+        onFailRef.current?.()
         return
       }
       const engine = e
@@ -158,10 +173,14 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     })
     return () => {
       alive = false
+      canvas.removeEventListener('webglcontextlost', lost) // dispose gives the context back on purpose
       frames.forEach(cancelAnimationFrame)
       timers.forEach(clearTimeout)
       e?.dispose()
       tap.dispose()
+      // the decoded layers and photo are ~25 MB: a reopen decodes them again (off the main thread)
+      releaseSnapshot()
+      releasePhoto()
       pageClasses()
       pageInert(false)
       setEngine(null)
@@ -188,6 +207,14 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     }, FADE_MS)
     return () => clearTimeout(t)
   }, [closing, engine])
+
+  // Site shroom mode drives the resume's shroom look (the HUD's Shroom toggles it for the resume alone)
+  const siteShroom = useShroomActive()
+  useEffect(() => {
+    if (!engine) return
+    engine.setShroom(siteShroom)
+    setToggles((s) => (s.shroom === siteShroom ? s : { ...s, shroom: siteShroom }))
+  }, [engine, siteShroom])
 
   const search = useCallback((q: string) => setMatches(engine ? engine.find(q) : null), [engine])
 
@@ -261,6 +288,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
       const k = e.key.toLowerCase()
       if (k === '/') { e.preventDefault(); finderInput.current?.focus(); finderInput.current?.select(); return }
       if (k === 'escape') {
+        e.stopPropagation() // the resume's Esc only: not also site shroom mode's (it listens on window too)
         if (queryRef.current) { setQuery(''); setMatches(engine.find('')) } else close()
         return
       }
@@ -283,10 +311,11 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
       e.preventDefault()
       engine.releaseHoleKey()
     }
-    window.addEventListener('keydown', down)
+    // keydown in the capture phase, ahead of the page's window listeners (as WizardChat does)
+    window.addEventListener('keydown', down, true)
     window.addEventListener('keyup', up)
     return () => {
-      window.removeEventListener('keydown', down)
+      window.removeEventListener('keydown', down, true)
       window.removeEventListener('keyup', up)
     }
   }, [engine, opened, closing, close, toggle, toggleNav, navMode])

@@ -90,6 +90,12 @@ export function decodePhoto(img: HTMLImageElement): Promise<ImageBitmap | null> 
   return photo.bitmap
 }
 
+/** Let the decoded photo go once the resume is closed (decodePhoto makes it again). */
+export function releasePhoto() {
+  photo?.ready?.close()
+  photo = null
+}
+
 const decoded = (img: HTMLImageElement) => (photo && photo.src === (img.currentSrc || img.src) ? photo.ready : null)
 
 export interface HeroSource {

@@ -10,8 +10,10 @@ import JellyResumeHost from '@/components/jelly/JellyResumeHost'
 import JellyResumeRoute from '@/components/jelly/JellyResumeRoute'
 import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
 import { createJellyEngine } from '@/lib/jelly/engine'
-import { registerHero } from '@/components/jelly/resumeTrigger'
+import { __setHardNavigate, openResume, plainResume, registerHero } from '@/components/jelly/resumeTrigger'
 import { registerSiteMusic } from '@/lib/site-music'
+import { releaseSnapshot } from '@/lib/jelly/snapshot'
+import { ShroomModeProvider, useShroomMode } from '@/context/ShroomModeContext'
 
 const engine = {
   openDirect: jest.fn(), openFromHero: jest.fn(() => false), close: jest.fn(() => false), load: jest.fn(), dispose: jest.fn(), find: jest.fn((q: string) => (q ? 27 : 0)),
@@ -32,7 +34,7 @@ jest.mock('@/lib/jelly/engine', () => ({
     return engine
   }),
 }))
-jest.mock('@/lib/jelly/snapshot', () => ({ loadSnapshotOnce: jest.fn(() => Promise.resolve('snapshot')) }))
+jest.mock('@/lib/jelly/snapshot', () => ({ loadSnapshotOnce: jest.fn(() => Promise.resolve('snapshot')), releaseSnapshot: jest.fn() }))
 const push = jest.fn()
 const back = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push, back }) }))
@@ -344,5 +346,96 @@ describe('the 3D resume is accessible', () => {
     expect(onClose).not.toHaveBeenCalled()
     expect(engine.chaos).not.toHaveBeenCalled()
     panel.remove()
+  })
+})
+
+describe('shroom mode and the edge cases', () => {
+  afterEach(() => plainResume.clear())
+
+  const ShroomSwitch = () => {
+    const { isActive, setIsActive } = useShroomMode()
+    return <button onClick={() => setIsActive(!isActive)}>site shroom mode</button>
+  }
+
+  it('site shroom mode drives the resume’s shroom look; the HUD’s Shroom toggles the resume alone', async () => {
+    mediaQuery(false)
+    render(
+      <ShroomModeProvider>
+        <ShroomSwitch />
+        <JellyResumeCanvas onClose={jest.fn()} />
+      </ShroomModeProvider>,
+    )
+    const shroom = await screen.findByRole('button', { name: /Shroom/ })
+    expect(shroom).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'site shroom mode' }))
+    expect(engine.setShroom).toHaveBeenLastCalledWith(true)
+    expect(shroom).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(shroom)
+    expect(engine.setShroom).toHaveBeenLastCalledWith(false)
+    expect(shroom).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'site shroom mode' })) // off: already off here
+    fireEvent.click(screen.getByRole('button', { name: 'site shroom mode' })) // on again
+    expect(engine.setShroom).toHaveBeenLastCalledWith(true)
+  })
+
+  it('Esc closes the resume without also reaching the page’s own Esc (site shroom mode listens on window)', async () => {
+    const pageKeys = jest.fn()
+    window.addEventListener('keydown', pageKeys)
+    mediaQuery(false)
+    const onClose = jest.fn()
+    render(<JellyResumeCanvas onClose={onClose} />)
+    await screen.findByRole('button', { name: 'Close the resume (Esc)' })
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(pageKeys).not.toHaveBeenCalled()
+    fireEvent.keyDown(document.body, { key: 'c' }) // its other shortcuts don't hide keys from the page
+    expect(engine.chaos).toHaveBeenCalled()
+    expect(pageKeys).toHaveBeenCalledTimes(1)
+    window.removeEventListener('keydown', pageKeys)
+  })
+
+  it('fades the shroom UI (the wizard sits above the overlay) while it is up', async () => {
+    const ui = document.createElement('div')
+    ui.id = 'shroom-ui'
+    document.body.appendChild(ui)
+    mediaQuery(false)
+    const { unmount } = render(<JellyResumeCanvas onClose={jest.fn()} />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
+    expect(ui).toHaveClass('jelly-ui-off')
+    expect(ui.inert).toBe(true)
+    unmount()
+    expect(ui).not.toHaveClass('jelly-ui-off')
+    expect(ui.inert).toBe(false)
+    ui.remove()
+  })
+
+  it('no WebGL2: the host shows the plain page, and the triggers go there for the rest of the session', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    ;(createJellyEngine as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('WebGL2 is not available')
+    })
+    mediaQuery(false)
+    const { container } = render(<JellyResumeHost />)
+    render(<JellyResumeRoute mode="direct" />)
+    await waitFor(() => expect(createJellyEngine).toHaveBeenCalled())
+    await waitFor(() => expect(container.querySelector('canvas')).toBeNull())
+    expect(plainResume.get()).toBe(true)
+    const hard = jest.fn()
+    __setHardNavigate(hard)
+    openResume({ origin: null, tint: 0, opener: null })
+    expect(hard).toHaveBeenCalledWith('/resume')
+  })
+
+  it('a lost WebGL context swaps in the plain page, and closing lets the decoded layers go', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    mediaQuery(false)
+    const { container } = render(<JellyResumeHost />)
+    render(<JellyResumeRoute mode="direct" />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
+    fireEvent(container.querySelector('canvas')!, new Event('webglcontextlost'))
+    await waitFor(() => expect(container.querySelector('canvas')).toBeNull())
+    expect(plainResume.get()).toBe(true)
+    expect(engine.dispose).toHaveBeenCalled()
+    expect(releaseSnapshot).toHaveBeenCalled()
   })
 })

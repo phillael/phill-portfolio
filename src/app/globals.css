@@ -302,6 +302,16 @@ a:active {
 #shroom-target.jelly-returning {
   transition: opacity 0.5s ease;
 }
+/* The shroom UI (the wizard and 💊) stays above the overlay, so it fades out while the 3D resume is up
+   (opacity only: a filter or transform here would break its position: fixed children) */
+#shroom-ui {
+  transition: opacity 0.4s ease;
+}
+#shroom-ui.jelly-ui-off {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+}
 
 .glow-layer {
   position: absolute;

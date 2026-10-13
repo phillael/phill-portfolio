@@ -441,6 +441,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     frameListeners.clear()
     sfx.dispose()
     renderer.dispose()
+    gl?.getExtension('WEBGL_lose_context')?.loseContext() // give the context back now, not at GC (browsers cap live contexts)
     if (heroImg) heroImg.style.visibility = '' // never leave the photo hidden
     if (debug && (window as unknown as { __jelly?: unknown }).__jelly === debug) delete (window as unknown as { __jelly?: unknown }).__jelly
   }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { resumeRoute, type ResumeMode } from '@/components/jelly/resumeRoute'
-import { registerNavigate } from '@/components/jelly/resumeTrigger'
+import { plainResume, registerNavigate } from '@/components/jelly/resumeTrigger'
 
 // The engine's chunk: fetched only when the resume opens (never for reduced motion)
 const JellyResumeCanvas = dynamic(() => import('@/components/jelly/JellyResumeCanvas'), { ssr: false })
@@ -22,7 +22,8 @@ interface Shown {
  * the music player. It follows the URL through `resumeRoute`: `/resume` opens the
  * overlay; leaving it closes it (in reverse onto the hero when it came from there, else
  * a fade). It keeps the canvas alive after the route segment unmounts so the close can
- * play. With reduced motion it never mounts the engine.
+ * play. With reduced motion it never mounts the engine, and where the engine can't run (no
+ * WebGL2, or a lost context) the session gets the plain page.
  */
 const JellyResumeHost = () => {
   const router = useRouter()
@@ -42,7 +43,7 @@ const JellyResumeHost = () => {
   useEffect(() => {
     if (reduced === undefined) return
     if (request) {
-      if (reduced) {
+      if (reduced || plainResume.get()) {
         // the plain /resume page instead (the intercepted route would leave the home page up)
         if (request.mode === 'overlay') window.location.reload()
         return
@@ -60,6 +61,13 @@ const JellyResumeHost = () => {
     closeRequested.current = false
     const r = resumeRoute.get() // Forward while it was closing: open again
     setShown(r ? { mode: r.mode, find: r.find, key: r.key } : null)
+  }, [])
+
+  // No WebGL2, or the context was lost: the plain page, for the rest of the session
+  const fail = useCallback(() => {
+    plainResume.set()
+    if (shownRef.current?.mode === 'overlay') window.location.reload() // the intercepted route would leave the home page up
+    else setShown(null) // the plain page is right underneath
   }, [])
 
   // × or Esc: an overlay goes back to the page it covered; a direct visit goes home
@@ -94,6 +102,7 @@ const JellyResumeHost = () => {
       closing={closing}
       onClose={close}
       onClosed={onClosed}
+      onFail={fail}
     />
   )
 }

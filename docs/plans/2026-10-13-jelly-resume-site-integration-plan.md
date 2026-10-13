@@ -183,11 +183,27 @@ Order matters: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7. T8–T11 nee
     - **Home first-load JS:** 13 chunks, 870,216 B raw / **272,937 B gzip** (T0: 270,611 B; +2.3 KB = the hero button, host, stores, music bridge, nav hook). No engine, HUD or snapshot code in any first-load chunk (grepped for `KHR_parallel_shader_compile`, `openFromHero`, `createImageBitmap`, the HUD's labels).
     - **Gates:** `tsc`, lint (zero warnings), jest on the overlay/a11y/hero-trigger/helpers/resume-page files (49 pass, incl. a new test that the HUD mounts only after the load), `npm run build`.
     - **Left as is:** the remaining first-visit peaks are the hero sampling loop (~65 ms traced, interpreted on a first run) and the HUD's first layout (~68 ms traced).
-- [ ] **T12: shroom mode + edge cases.**
+- [x] **T12: shroom mode + edge cases.**
   - Turning site shroom mode on or off (`ShroomModeContext`) drives the resume's shroom look.
   - Resizing or rotating a phone mid-dissolve doesn't break.
   - Losing the WebGL context shows the plain `/resume` page.
   - Dispose on route unmount where it matters.
+  - **Done 2026-10-13.**
+    - **Shroom mode:** the overlay follows the site's shroom mode (`useShroomActive`, a new hook that is safe outside the provider). Turning it on or off sets the engine's shroom look and the HUD's Shroom button. The HUD button and S still toggle the resume's look alone, so site mode isn't changed from inside the resume.
+    - **Wizard overlap:** while the resume is up, the site's shroom UI (the wizard and 💊, which sit above the overlay) fades out (`#shroom-ui.jelly-ui-off`: opacity and visibility only, since a filter or transform would break its fixed children) as well as going inert.
+    - **Esc:** the resume's keydown now runs in the capture phase, and Esc stops there, as WizardChat's does. Before, Esc to close the resume also ended site shroom mode, whose listener is on `window`.
+    - **No WebGL2, or a lost context** (`webglcontextlost` on the canvas): the host's `fail()` sets `plainResume` (sessionStorage, so it survives a reload) and shows the plain page. An overlay reloads `/resume` (the intercepted route would leave the home page up); a direct visit just unmounts the overlay (the page is underneath). From then on in the session the triggers hard-navigate to the plain page and don't prefetch. Before this, with no WebGL2, the empty dialog stayed over the page and blocked it.
+    - **Dispose:** the engine gives its WebGL context back on dispose (`WEBGL_lose_context`; browsers cap live contexts, and the canvas's loss listener is removed first). The overlay releases the decoded snapshot layers (2 × 1420×1906, ~22 MB) and the decoded photo on unmount; a reopen decodes them again off the main thread.
+  - **Verified (dev, 1440×900; the chat stubbed by an init-script `fetch` override, no real API calls):**
+    - **Shroom on → resume shroom:** "Can I have a mushroom?" → the stub's offer → Sure! → site shroom mode on. The hero opens the resume with `s.shroom` true, Shroom pressed (screenshot: the melting, hue-cycled page over the nebula, no wizard over it); `#shroom-ui` is `jelly-ui-off`, hidden, opacity 0, inert.
+    - **Toggles and Esc:** S → off and S → on (engine and `aria-pressed` follow). Esc → reverse close to `/`, site shroom mode still on, the wizard UI back (visible, not inert), focus on the hero.
+    - **Shroom off → resume off:** exited site shroom mode (Enter on the wizard) → reopened: `s.shroom` false, Shroom not pressed.
+    - **Forced `WEBGL_lose_context`, overlay:** our console warning only → a reload to the plain `/resume` (no dialog, no canvas, nothing inert, flag set). Then on `/`, hover and focus fetched nothing and the hero click was a hard navigation to the plain page.
+    - **Forced loss, direct visit (flag cleared):** the overlay unmounted in the same document, revealing the plain page; nothing inert; flag set.
+    - **Phone rotation mid-dissolve:** 390×844 touch, hero tapped, rotated to 844×390 landscape while dissolving → the dissolve finished, **631/631 HOME**, canvas 1688×780 (DPR cap 2) for 844×390, no NaN positions. Console clean.
+    - **Perf (prod):** desktop with site shroom mode on: open 118.8 fps (worst 41.6 ms), Chaos 120, close 120. Phone (4× CPU) with the resume's shroom look: 119.8 fps (worst 16.6 ms).
+    - **Jest:** 5 new overlay tests (site shroom drives the look and the HUD toggles it alone; Esc doesn't reach a window listener; the shroom UI fades and goes inert; no WebGL2 → plain page and hard-navigating triggers; a lost context → plain page, dispose, snapshot released). 52 tests pass across the overlay, a11y, hero-trigger, ShroomMode and helpers files. `tsc` and lint clean; `npm run build` OK.
+  - **Note for Phill** (not a stop; it matches the playground): a phone in landscape (844×390) is wider than the 820 px phone breakpoint, so it gets the desktop HUD (two rows plus the mouse hints) and the page is small between the bars. If that matters, the fix is to switch the HUD on `(pointer: coarse) and (max-height: 500px)` too.
 - [ ] **T13: docs + version.**
   - CLAUDE.md: the engine exception to the R3F rule, the Key Files entries (`src/lib/jelly/`, `JellyResumeHost`, `public/resume/`, the snapshot regenerate command) and gotchas (the z-order, the intercepting route, the shared analyser).
   - HANDOFF.md: a "Ported to the site" section.

@@ -112,3 +112,10 @@ export function loadSnapshotOnce(base = '/resume/') {
   if (!cached) cached = loadSnapshot(base).catch((err) => { cached = null; throw err })
   return cached
 }
+
+/** Let the decoded layers go (~22 MB) once the resume is closed; the next open loads them again. */
+export function releaseSnapshot() {
+  const c = cached
+  cached = null
+  c?.then((s) => [s.text, s.decor].forEach((im) => 'close' in im && im.close())).catch(() => {})
+}

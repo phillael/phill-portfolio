@@ -26,7 +26,7 @@ jest.mock('@/lib/jelly/engine', () => {
 })
 jest.mock('@/lib/jelly/snapshot', () => {
   mockLoaded('snapshot')
-  return { loadSnapshotOnce: jest.fn(() => Promise.resolve()) }
+  return { loadSnapshotOnce: jest.fn(() => Promise.resolve()), releaseSnapshot: jest.fn() }
 })
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn(), back: jest.fn() }), usePathname: () => '/' }))
 

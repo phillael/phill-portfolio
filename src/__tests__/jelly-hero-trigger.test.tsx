@@ -8,7 +8,7 @@ import HeroImage from '@/components/HeroImage'
 import { getHeroImg, peekIntent, registerNavigate, clearIntent } from '@/components/jelly/resumeTrigger'
 import { loadSnapshotOnce } from '@/lib/jelly/snapshot'
 
-jest.mock('@/lib/jelly/snapshot', () => ({ loadSnapshotOnce: jest.fn(() => Promise.resolve()) }))
+jest.mock('@/lib/jelly/snapshot', () => ({ loadSnapshotOnce: jest.fn(() => Promise.resolve()), releaseSnapshot: jest.fn() }))
 jest.mock('@/components/jelly/JellyResumeCanvas', () => ({ __esModule: true, default: () => null }))
 
 describe('the hero trigger', () => {

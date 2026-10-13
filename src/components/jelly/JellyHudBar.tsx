@@ -77,7 +77,7 @@ const JellyHudBar = ({ engine, toggles, onToggle, rootRef }: JellyHudBarProps) =
       onClick={() => onToggle('sound')}
       className={`${BTN} ${toggles.sound ? ON : ''}`}
     >
-      <span aria-hidden="true">{toggles.sound ? '🔊' : '🔇'}</span> {toggles.sound ? 'Sound' : 'Muted'}
+      <span aria-hidden="true">{toggles.sound ? '🔊' : '🔇'}</span> Sound
     </button>
     <button type="button" aria-keyshortcuts="I" title="Replay the entrance (I)" onClick={() => engine.replayIntro()} className={BTN}>
       <span aria-hidden="true">▶</span> Intro

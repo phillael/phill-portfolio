@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createJellyEngine, type JellyEngine } from '@/lib/jelly/engine'
 import { loadSnapshotOnce, releaseSnapshot } from '@/lib/jelly/snapshot'
-import { decodePhoto, releasePhoto } from '@/lib/jelly/hero'
+import { containedRect, decodePhoto, releasePhoto } from '@/lib/jelly/hero'
 import { useShroomActive } from '@/context/ShroomModeContext'
 import { createMusicTap } from '@/lib/jelly/music'
 import { getSiteMusic } from '@/lib/site-music'
@@ -26,11 +26,16 @@ interface JellyResumeCanvasProps {
   onClose: () => void
   /** the close has finished; the host unmounts it */
   onClosed?: () => void
-  /** the engine can't run (no WebGL2) or lost its context: the host shows the plain page */
-  onFail?: () => void
+  /**
+   * the engine can't run here (no WebGL2, a lost context, a load that threw: 'webgl', for the rest
+   * of the session) or the snapshot didn't arrive ('load', this time only): the host shows the plain page
+   */
+  onFail?: (reason: 'webgl' | 'load') => void
 }
 
 const FADE_MS = 400
+/** Still not open after this long (a slow connection): show × anyway */
+const SLOW_MS = 2500
 
 /** The home page under the overlay: it fades and blurs away as the hero dissolves, hides, then comes back. */
 const pageClasses = (...add: string[]) => {
@@ -50,6 +55,23 @@ const pageInert = (on: boolean) => {
     if (el instanceof HTMLElement) el.inert = on
   }
   document.getElementById('shroom-ui')?.classList.toggle('jelly-ui-off', on)
+  // and the page doesn't scroll under it (a wheel mid-dissolve would move the photo the close flies back to)
+  document.documentElement.classList.toggle('jelly-lock', on)
+}
+
+/** The dissolve and the reverse close fly from and to the photo: only when a good part of it is on screen. */
+const onScreen = (img: HTMLImageElement | null) => {
+  if (!img) return null
+  const r = containedRect(img)
+  const w = Math.min(r.left + r.width, window.innerWidth) - Math.max(r.left, 0)
+  const h = Math.min(r.top + r.height, window.innerHeight) - Math.max(r.top, 0)
+  return w > 0 && h > 0 && w * h >= 0.25 * r.width * r.height ? img : null
+}
+
+/** A key meant for the resume: focus is in it or nowhere (not, say, in the music player's panel). */
+const forResume = (e: KeyboardEvent, section: HTMLElement | null) => {
+  const t = e.target
+  return !(t instanceof Node) || t === document.body || !!section?.contains(t)
 }
 
 /** The HUD's emoji and symbols (keep in step with its labels). */
@@ -121,7 +143,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     const lost = () => {
       if (!alive) return
       console.warn('The 3D resume lost its WebGL context; showing the plain page')
-      onFailRef.current?.()
+      onFailRef.current?.('webgl')
     }
     canvas.addEventListener('webglcontextlost', lost)
     later(() => {
@@ -150,23 +172,37 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
         })
       } catch (err) {
         console.warn('The 3D resume needs WebGL2; showing the plain page', err)
-        onFailRef.current?.()
+        onFailRef.current?.('webgl')
         return
       }
       const engine = e
       setEngine(engine)
       pageInert(true)
       // over the home page the hero dissolves into the resume (from the click; Forward replays it from the photo's center),
-      // once the photo is decoded (off the main thread; the prefetch usually has it already)
-      const img = modeRef.current === 'overlay' ? getHeroImg() : null
+      // once the photo is decoded (off the main thread; the prefetch usually has it already). If the photo is off screen
+      // (the 🍄 can summon it from anywhere), the resume opens directly instead.
+      const img = modeRef.current === 'overlay' ? onScreen(getHeroImg()) : null
       const open = () => {
         if (img && engine.openFromHero({ img, origin: intent?.origin ?? null, tint: intent?.tint ?? 0, find: findRef.current })) pageClasses('jelly-dissolving')
         else engine.openDirect(findRef.current)
-        loadSnapshotOnce()
-          .then((snapshot) => (alive ? engine.load(snapshot) : undefined))
-          // then the HUD, a frame after its glyphs: two first layouts, a frame each
-          .then(() => later(() => { warmGlyphs(sectionRef.current); later(() => setLoaded(true)) }))
-          .catch((err) => console.error('The resume failed to load', err))
+        // a failed load must not strand anyone on an empty nebula: the plain page instead
+        loadSnapshotOnce().then(
+          (snapshot) => {
+            if (!alive) return
+            engine
+              .load(snapshot)
+              // then the HUD, a frame after its glyphs: two first layouts, a frame each
+              .then(() => later(() => { warmGlyphs(sectionRef.current); later(() => setLoaded(true)) }))
+              .catch((err) => {
+                console.warn('The 3D resume failed to build; showing the plain page', err)
+                if (alive) onFailRef.current?.('webgl')
+              })
+          },
+          (err) => {
+            console.warn('The resume snapshot failed to load; showing the plain page', err)
+            if (alive) onFailRef.current?.('load')
+          },
+        )
       }
       if (img) decodePhoto(img).then(() => later(open))
       else later(open)
@@ -194,7 +230,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
   useEffect(() => {
     if (!closing) return
     const img = modeRef.current === 'overlay' ? getHeroImg() : null
-    if (engine && img && engine.close(img)) return
+    if (engine && onScreen(img) && engine.close(img!)) return
     setFadeOut(true)
     pageInert(false)
     if (modeRef.current === 'overlay') {
@@ -221,6 +257,26 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
   const close = useCallback(() => {
     if (!closing) onClose()
   }, [closing, onClose])
+
+  // Esc works from the start: a slow (or failed) load must not trap anyone. The full shortcuts wait for the open.
+  useEffect(() => {
+    if (opened || closing) return
+    const down = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !forResume(e, sectionRef.current)) return
+      e.stopPropagation()
+      close()
+    }
+    window.addEventListener('keydown', down, true)
+    return () => window.removeEventListener('keydown', down, true)
+  }, [opened, closing, close])
+
+  // × shows up anyway if the resume is slow to open (a phone on a slow connection has no Esc)
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    if (opened) return
+    const t = setTimeout(() => setSlow(true), SLOW_MS)
+    return () => clearTimeout(t)
+  }, [opened])
 
   const toggle = useCallback(
     (k: keyof HudToggles) => {
@@ -274,10 +330,9 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     if (!engine || !opened || closing) return
     const ignore = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
-      // only for the resume: not while focus is elsewhere (the music player's panel); the Finder's
+      // only for the resume (not while focus is in, say, the music player's panel); the Finder's
       // input handles its own keys, its chips are buttons like the rest
-      const ours = !(t instanceof Node) || t === document.body || !!sectionRef.current?.contains(t)
-      return !ours || e.ctrlKey || e.metaKey || e.altKey || (!!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))
+      return !forResume(e, sectionRef.current) || e.ctrlKey || e.metaKey || e.altKey || (!!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))
     }
     const onButton = (e: KeyboardEvent) => !!(e.target as HTMLElement | null)?.closest?.('button, a')
     const down = (e: KeyboardEvent) => {
@@ -322,6 +377,8 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
 
   const uiOn = !!engine && opened && !closing
   const fadeIn = `transition-opacity duration-[600ms] ${uiOn ? 'opacity-100 delay-[400ms]' : 'pointer-events-none opacity-0'}`
+  // × comes in with the HUD, or on its own when the open is slow
+  const xOn = uiOn || (slow && !opened && !closing)
 
   return (
     <section
@@ -351,17 +408,18 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
           />
           <JellyNavigator engine={engine} loaded={loaded} navMode={navMode} onNavMode={toggleNav} rootRef={navRef} />
           <JellyHudBar engine={engine} toggles={toggles} onToggle={toggle} rootRef={hudRef} />
-          <button
-            type="button"
-            aria-label="Close the resume (Esc)"
-            title="Close (Esc)"
-            onClick={close}
-            className={`${PANEL} absolute right-3 top-2.5 z-[3] grid h-11 w-11 cursor-pointer place-items-center rounded-full p-0 text-[22px] leading-none text-[#d7deea] hover:border-[#80eaff] hover:text-[#80eaff] max-[820px]:right-2 max-[820px]:top-2 ${FOCUS}`}
-          >
-            ×
-          </button>
         </div>
       )}
+      <button
+        type="button"
+        aria-label="Close the resume (Esc)"
+        title="Close (Esc)"
+        inert={!xOn}
+        onClick={close}
+        className={`${PANEL} absolute right-3 top-2.5 z-[3] grid h-11 w-11 cursor-pointer place-items-center rounded-full p-0 text-[22px] leading-none text-[#d7deea] transition-opacity duration-[600ms] hover:border-[#80eaff] hover:text-[#80eaff] max-[820px]:right-2 max-[820px]:top-2 ${xOn ? `opacity-100 ${uiOn ? 'delay-[400ms]' : ''}` : 'pointer-events-none opacity-0'} ${FOCUS}`}
+      >
+        ×
+      </button>
     </section>
   )
 }

@@ -12,11 +12,11 @@ import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
 import { createJellyEngine } from '@/lib/jelly/engine'
 import { __setHardNavigate, openResume, plainResume, registerHero } from '@/components/jelly/resumeTrigger'
 import { registerSiteMusic } from '@/lib/site-music'
-import { releaseSnapshot } from '@/lib/jelly/snapshot'
+import { loadSnapshotOnce, releaseSnapshot } from '@/lib/jelly/snapshot'
 import { ShroomModeProvider, useShroomMode } from '@/context/ShroomModeContext'
 
 const engine = {
-  openDirect: jest.fn(), openFromHero: jest.fn(() => false), close: jest.fn(() => false), load: jest.fn(), dispose: jest.fn(), find: jest.fn((q: string) => (q ? 27 : 0)),
+  openDirect: jest.fn(), openFromHero: jest.fn(() => false), close: jest.fn(() => false), load: jest.fn(() => Promise.resolve()), dispose: jest.fn(), find: jest.fn((q: string) => (q ? 27 : 0)),
   chaos: jest.fn(), burstAll: jest.fn(), healAll: jest.fn(), setShroom: jest.fn(), setSound: jest.fn(),
   setHoleMode: jest.fn(), setTilt: jest.fn((on: boolean) => Promise.resolve(on)), replayIntro: jest.fn(),
   resetView: jest.fn(), zoomBy: jest.fn(), setNavMode: jest.fn(), setUiInsets: jest.fn(), panKey: jest.fn(),
@@ -127,7 +127,7 @@ describe('the resume HUD', () => {
     render(<JellyResumeCanvas onClose={onClose} />)
     const region = await screen.findByRole('dialog', { name: 'Interactive resume' })
     await waitFor(() => expect(engine.load).toHaveBeenCalled())
-    await screen.findByRole('button', { name: 'Close the resume (Esc)' }) // the HUD mounts once the resume has loaded
+    await screen.findByRole('button', { name: /^Chaos/ }) // the HUD mounts once the resume has loaded
     return { region, onClose }
   }
 
@@ -163,7 +163,8 @@ describe('the resume HUD', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Sound/ }))
     expect(engine.setSound).toHaveBeenCalledWith(false)
-    expect(screen.getByRole('button', { name: /^Muted/ })).toHaveAttribute('aria-pressed', 'false')
+    // the label stays "Sound" and aria-pressed carries the state (no "Muted, not pressed" double negative)
+    expect(screen.getByRole('button', { name: /^Sound/ })).toHaveAttribute('aria-pressed', 'false')
 
     fireEvent.click(screen.getByRole('button', { name: /^Black hole/ }))
     expect(engine.setHoleMode).toHaveBeenCalledWith(true)
@@ -217,9 +218,9 @@ describe('the resume HUD', () => {
     render(<JellyResumeCanvas onClose={jest.fn()} />)
     await waitFor(() => expect(engine.load).toHaveBeenCalled())
     await new Promise((r) => setTimeout(r, 100))
-    expect(screen.queryByRole('button', { name: 'Close the resume (Esc)' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Chaos/ })).toBeNull()
     act(() => finish())
-    expect(await screen.findByRole('button', { name: 'Close the resume (Esc)' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Chaos/ })).toBeInTheDocument()
   })
 
   it('× asks to close; while fading out the controls are off', async () => {
@@ -249,7 +250,10 @@ describe('closing over the home page', () => {
     page.id = 'shroom-target'
     document.body.appendChild(page)
     registerHero(img)
-    return { btn, img, page, cleanup: () => { registerHero(null); btn.remove(); page.remove() } }
+    // on screen (jsdom lays nothing out); `at(top)` moves it
+    const at = (top: number) => (img.getBoundingClientRect = () => ({ left: 100, top, width: 400, height: 300, right: 500, bottom: top + 300, x: 100, y: top, toJSON() {} }) as DOMRect)
+    at(100)
+    return { btn, img, page, at, cleanup: () => { registerHero(null); btn.remove(); page.remove() } }
   }
 
   it('plays the reverse onto the hero: the page returns when the sparks land, then focus goes back', async () => {
@@ -287,6 +291,22 @@ describe('closing over the home page', () => {
     await waitFor(() => expect(onClosed).toHaveBeenCalled(), { timeout: 1500 })
     cleanup()
   })
+
+  it('with the photo off screen (the 🍄 can summon from anywhere), opens directly and closes with a fade', async () => {
+    const { img, at, page, cleanup } = heroSetup()
+    at(-2000) // scrolled far past the hero
+    mediaQuery(false)
+    const onClosed = jest.fn()
+    const { rerender } = render(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} />)
+    await waitFor(() => expect(engine.openDirect).toHaveBeenCalled())
+    expect(engine.openFromHero).not.toHaveBeenCalled()
+    rerender(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} closing />)
+    expect(engine.close).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Interactive resume' })).toHaveClass('opacity-0')
+    expect(page).toHaveClass('jelly-returning')
+    expect(img.style.visibility).toBe('')
+    cleanup()
+  })
 })
 
 describe('the 3D resume is accessible', () => {
@@ -308,9 +328,11 @@ describe('the 3D resume is accessible', () => {
     await waitFor(() => expect(engine.load).toHaveBeenCalled())
     expect(main.inert).toBe(true)
     expect(link.inert).toBe(true)
+    expect(document.documentElement).toHaveClass('jelly-lock') // and the page doesn't scroll under it
     unmount()
     expect(main.inert).toBe(false)
     expect(link.inert).toBe(false)
+    expect(document.documentElement).not.toHaveClass('jelly-lock')
     cleanup()
   })
 
@@ -384,7 +406,7 @@ describe('shroom mode and the edge cases', () => {
     mediaQuery(false)
     const onClose = jest.fn()
     render(<JellyResumeCanvas onClose={onClose} />)
-    await screen.findByRole('button', { name: 'Close the resume (Esc)' })
+    await screen.findByRole('button', { name: /^Chaos/ })
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(pageKeys).not.toHaveBeenCalled()
@@ -424,6 +446,45 @@ describe('shroom mode and the edge cases', () => {
     __setHardNavigate(hard)
     openResume({ origin: null, tint: 0, opener: null })
     expect(hard).toHaveBeenCalledWith('/resume')
+  })
+
+  it('a snapshot that fails to load shows the plain page this time only (no session flag)', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    ;(loadSnapshotOnce as jest.Mock).mockImplementationOnce(() => Promise.reject(new Error('offline')))
+    mediaQuery(false)
+    const { container } = render(<JellyResumeHost />)
+    render(<JellyResumeRoute mode="direct" />)
+    await waitFor(() => expect(loadSnapshotOnce).toHaveBeenCalled())
+    await waitFor(() => expect(container.querySelector('canvas')).toBeNull())
+    expect(plainResume.get()).toBe(false)
+  })
+
+  it('a resume that fails to build shows the plain page for the session', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    engine.load.mockImplementationOnce(() => Promise.reject(new Error('texture too large')))
+    mediaQuery(false)
+    const { container } = render(<JellyResumeHost />)
+    render(<JellyResumeRoute mode="direct" />)
+    await waitFor(() => expect(container.querySelector('canvas')).toBeNull())
+    expect(plainResume.get()).toBe(true)
+  })
+
+  it('before it opens, Esc already closes it and × turns up if the open is slow', async () => {
+    // never opens (a slow connection): this engine's openDirect doesn't report onOpen
+    ;(createJellyEngine as jest.Mock).mockImplementationOnce((opts: Callbacks) => {
+      callbacks = opts
+      engine.openDirect.mockImplementation(() => {})
+      return engine
+    })
+    mediaQuery(false)
+    const onClose = jest.fn()
+    render(<JellyResumeCanvas onClose={onClose} />)
+    await waitFor(() => expect(engine.openDirect).toHaveBeenCalled())
+    const x = screen.getByRole('button', { name: 'Close the resume (Esc)' })
+    expect(x).toHaveClass('opacity-0')
+    await waitFor(() => expect(x).not.toHaveClass('opacity-0'), { timeout: 3500 })
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('a lost WebGL context swaps in the plain page, and closing lets the decoded layers go', async () => {

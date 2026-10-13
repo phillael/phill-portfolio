@@ -307,6 +307,14 @@ a:active {
 #shroom-ui {
   transition: opacity 0.4s ease;
 }
+/* No page scrolling under the 3D resume (a class, not an inline style: the music panel sets and clears that) */
+html.jelly-lock,
+html.jelly-lock body {
+  overflow: hidden;
+}
+html.jelly-lock {
+  scrollbar-gutter: stable;
+}
 #shroom-ui.jelly-ui-off {
   opacity: 0;
   visibility: hidden;

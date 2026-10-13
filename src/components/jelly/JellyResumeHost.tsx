@@ -63,9 +63,10 @@ const JellyResumeHost = () => {
     setShown(r ? { mode: r.mode, find: r.find, key: r.key } : null)
   }, [])
 
-  // No WebGL2, or the context was lost: the plain page, for the rest of the session
-  const fail = useCallback(() => {
-    plainResume.set()
+  // The engine can't run here (no WebGL2, a lost context): the plain page, for the rest of the session.
+  // The snapshot didn't arrive (a network blip): the plain page this time only.
+  const fail = useCallback((reason: 'webgl' | 'load') => {
+    if (reason === 'webgl') plainResume.set()
     if (shownRef.current?.mode === 'overlay') window.location.reload() // the intercepted route would leave the home page up
     else setShown(null) // the plain page is right underneath
   }, [])

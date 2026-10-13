@@ -222,7 +222,11 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
    */
   function close(img: HTMLImageElement) {
     if (cl) return true
-    if (diss) { pendingClose = img; return true }
+    if (diss) {
+      if (!loaded) return false // still waiting for the resume: fade out instead of waiting on the handoff
+      pendingClose = img
+      return true
+    }
     if (!open || !loaded) return false
     const cam0 = introCam(w, open, null)
     const rc = canvas.getBoundingClientRect()

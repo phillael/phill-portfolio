@@ -37,6 +37,16 @@ node ~/Desktop/dev/phill-portfolio/docs/design/jelly-resume/tools/snapshot.mjs \
   ~/Desktop/dev/phill-portfolio/docs/design/jelly-resume/rezmancer-snapshot.js
 ```
 
+Refresh the **site's** snapshot (`public/resume/`, committed, so it has no phone or email):
+
+```bash
+# in ~/Desktop/dev/phill-portfolio, after regenerating Rezmancer's out/*.html
+node docs/design/jelly-resume/tools/snapshot.mjs --web \
+  ~/Desktop/dev/rezmancer/out/Phill_Aelony_Resume_AI_Engineer.html public/resume
+```
+
+`--web` deletes the phone and email `<li>`s from `ul.contact` before measuring (their `·` separators are `li + li::before`, so they go too), renders at 2× instead of 3×, and writes `snapshot.json` (words, page, content, dpr, image names) plus `text.webp` (lossy color, lossless alpha) and `decor.webp`. It exits with code 2 and writes nothing if it can't find exactly those two items or if any phone number, email, `mailto:` or `tel:` survives. It needs `sharp`, which resolves from the portfolio's `node_modules`. First run (2026-10-13): 631 words (the playground's 634 minus the phone's two words and the email), `text.webp` 257 KB (was a 1,002 KB PNG), `decor.webp` 7 KB (was 26 KB), `snapshot.json` 76 KB.
+
 The tool lays the HTML out at 710 px (Letter 8.5in minus Rezmancer's 0.55in side margins, from `packages/render/src/resume.css` `@page`) at 3× resolution. It walks the text nodes with `Range.getClientRects()` to get one box per word and classifies each word as heading, bold or body. It takes two screenshots: text only on a transparent background, and decorations only (`color: transparent`, which keeps the bullets, tint bars, rules and separators). It hard-codes the puppeteer-core path from `~/.npm/_npx` and the system Chrome path; the env vars `PUPPETEER_CORE` and `CHROME` override them.
 
 ## How the playground works (map of the code)

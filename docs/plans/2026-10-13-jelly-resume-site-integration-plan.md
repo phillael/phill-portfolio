@@ -95,11 +95,12 @@ Order matters: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7. T8–T11 nee
   - Run all four gates and record the results in the plan: `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`.
   - **Baseline (2026-10-13, Next 16.4.0):** `origin/master` (f15f49d) is already an ancestor, so no rebase. `tsc` clean; `lint` zero warnings; `npm test` 41 suites / 395 tests passed (run as `npx jest --no-watchman`: plain `npm test` stalls on a missing watchman socket on this machine); `build` OK, all routes static except the two wizard APIs.
   - **Home first-load JS** (Next 16 no longer prints sizes, so T11 compares this): the 12 unique `/_next/static/**/*.js` chunks referenced by `.next/server/app/index.html` total **864,657 B raw / 270,611 B gzip-9 (264 KiB)**. Method: `grep -oE '/_next/static/[^"]+\.js' .next/server/app/index.html | sort -u`, then sum `wc -c` and `gzip -9c | wc -c` of each `.next/static/...` file.
-- [ ] **T1: the web snapshot assets.**
+- [x] **T1: the web snapshot assets.**
   - Extend `docs/design/jelly-resume/tools/snapshot.mjs` with `--web`. Before measuring, it removes the phone and email items from Rezmancer's contact line together with their separators; the email is a `mailto:` link, so find the phone's node in the markup.
   - It writes `public/resume/snapshot.json` (words, page, content, dpr) plus `public/resume/text.webp` and `public/resume/decor.webp` (WebP, 2× instead of 3×, to cut the ~1 MB text layer).
   - Source: `~/Desktop/dev/rezmancer/out/Phill_Aelony_Resume_AI_Engineer.html`.
   - Document the regenerate command in HANDOFF.
+  - **Done 2026-10-13:** the phone and email are each their own `ul.contact > li` (separators are `.contact li + li::before`), so `--web` removes those two `<li>`s and refuses to write if it doesn't remove exactly two or if a phone/email/`mailto:`/`tel:` survives. **631 words** (the playground's 634 minus `(612)`, the number and the email; every other word is identical), so read T3/T6's "634 words HOME" as 631. Sizes: `text.webp` 257 KB (playground PNG 1,002 KB), `decor.webp` 7 KB (26 KB), `snapshot.json` 76 KB. The contact line's `·` separators are missing in the images, the same as the playground (HANDOFF open item 6).
 - [ ] **T2: resume content + the semantic `/resume` page.**
   - `src/data/resume.ts`: the playground's `DATA` (already without phone and email), typed.
   - `src/app/resume/page.tsx`: a server-rendered, semantic, accessible resume built from it, with a Download PDF link (`/Phillip_Aelony_Resume_2025.pdf`), a link back home and the site's styling. Give it its own `metadata` (title, description, canonical `/resume`, OG) and add it to `sitemap.ts`.

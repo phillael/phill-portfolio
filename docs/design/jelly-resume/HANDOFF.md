@@ -209,7 +209,10 @@ Plan: `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md` (T0–T12, on
 - **The sidebar is a dev tool only.** The real site ships one fixed configuration (whatever the Copy prompt says at the time) and no settings panel. Visitors get the resume, its HUD (PDF, Chaos, Burst, Heal, Shroom, Black hole, Sound, Intro, View, ×) and the site's ♫ player.
 - **One music player:** the site's ♫ button now lives outside the mock and stays on screen when the resume opens (the HUD makes room for it), so a song started on the site keeps playing and the resume dances to it. The resume's own "♫ Music" HUD button is gone; P still plays/pauses. Closing the resume doesn't stop the song. On the real site, the overlay must not cover `MusicPlayer`/`MusicFAB` (they already sit outside the shroom wrappers), and the resume reads the shared `useAudioPlayer` analyser.
 
-## Porting to the real site (later plan; not started)
+## Porting to the real site: plan ready (2026-10-13)
+
+The plan is `docs/plans/2026-10-13-jelly-resume-site-integration-plan.md`. Phill decided: a `/resume` route (intercepting route over the home page), a web snapshot without phone or email, the engine ported as plain TS with its own canvas (an exception to the R3F rule), and a touch-only "tap to open" tag. The notes below are background.
+
 
 - **Trigger:** `HeroImage` (and the 🍄) open the resume. Nav's `ResumeDownloadButton` stays a plain download (Phill, 2026-10-13); the resume's HUD also has ⤓ PDF.
 - **Hero:** `HeroImage` becomes the sampling source and a real button. Sample the `next/image` element at its rendered size; it's same-origin, so `getImageData` is fine. The `Vortex` and `GlowEffect` are what the canvas fades out.

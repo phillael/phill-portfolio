@@ -9,7 +9,11 @@
  */
 
 import { render, screen, fireEvent } from '@testing-library/react'
+import { usePathname } from 'next/navigation'
 import Nav from '@/components/Nav'
+
+// No app router in jsdom: usePathname() is null there, which Nav treats as the home page
+jest.mock('next/navigation', () => ({ usePathname: jest.fn(() => null) }))
 
 // Helper to filter out framer-motion props
 const filterMotionProps = (props: Record<string, unknown>) => {
@@ -106,6 +110,18 @@ describe('Navigation', () => {
 
     expect(homeLink).toHaveAttribute('href', '#hero')
     expect(aboutLink).toHaveAttribute('href', '#about')
+  })
+
+  it('links back to the home page sections from another page (/resume)', () => {
+    jest.mocked(usePathname).mockReturnValue('/resume')
+    render(<Nav />)
+
+    expect(screen.getByRole('link', { name: /phill aelony/i })).toHaveAttribute('href', '/#hero')
+    const about = screen.getByRole('link', { name: /about/i })
+    expect(about).toHaveAttribute('href', '/#about')
+    // the browser follows the link (no smooth-scroll interception): the section isn't on this page
+    expect(fireEvent.click(about)).toBe(true)
+    jest.mocked(usePathname).mockReset() // back to "no app router" (home) for the other tests
   })
 
   it('header has sticky positioning and appropriate z-index', () => {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import NavLinks from '@/components/NavLinks'
+import NavLinks, { useHomeBase } from '@/components/NavLinks'
 import SocialLinks from '@/components/SocialLinks'
 import HamburgerButton from '@/components/HamburgerButton'
 import MobileMenu from '@/components/MobileMenu'
@@ -14,6 +14,7 @@ const Nav = () => {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const hamburgerButtonRef = useRef<HTMLButtonElement | null>(null)
+  const homeBase = useHomeBase()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -81,9 +82,10 @@ const Nav = () => {
           {/* Name/Title */}
           <div className="flex-shrink-0">
             <a
-              href="#hero"
+              href={`${homeBase}#hero`}
               className="group flex flex-col no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md px-2 py-1"
               onClick={(e) => {
+                if (homeBase) return
                 e.preventDefault()
                 const heroSection = document.getElementById('hero')
                 if (heroSection) {

@@ -31,11 +31,12 @@ describe('SEO metadata files', () => {
     })
   })
 
-  it('sitemap lists the single home URL', () => {
+  it('sitemap lists the home page and the resume', () => {
     const entries = sitemap()
-    expect(entries).toHaveLength(1)
+    expect(entries).toHaveLength(2)
     expect(entries[0]).toMatchObject({ url: SITE_URL, changeFrequency: 'monthly' })
-    expect(entries[0].lastModified).toBeInstanceOf(Date)
+    expect(entries[1]).toMatchObject({ url: `${SITE_URL}/resume`, changeFrequency: 'monthly' })
+    entries.forEach((e) => expect(e.lastModified).toBeInstanceOf(Date))
   })
 
   it('manifest names the site, uses the dark theme and existing icons', () => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { usePathname } from 'next/navigation'
 
 interface NavItem {
   label: string
@@ -34,7 +35,14 @@ interface NavLinksProps {
  * - Mobile variant with larger touch targets
  */
 const NavLinks = ({ onLinkClick, className = '', isMobile = false }: NavLinksProps) => {
+  // The sections live on the home page; elsewhere (e.g. /resume) link there instead
+  const base = useHomeBase()
+
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (base) {
+      onLinkClick?.()
+      return
+    }
     e.preventDefault()
     const targetId = href.replace('#', '')
     const targetElement = document.getElementById(targetId)
@@ -54,7 +62,7 @@ const NavLinks = ({ onLinkClick, className = '', isMobile = false }: NavLinksPro
       {navItems.map((item) => (
         <li key={item.href}>
           <motion.a
-            href={item.href}
+            href={base + item.href}
             onClick={(e) => handleClick(e, item.href)}
             className={`
               font-body text-foreground no-underline
@@ -79,6 +87,12 @@ const NavLinks = ({ onLinkClick, className = '', isMobile = false }: NavLinksPro
       ))}
     </ul>
   )
+}
+
+/** '' on the home page, '/' anywhere else. No app router (tests) counts as home. */
+export const useHomeBase = () => {
+  const pathname = usePathname()
+  return pathname && pathname !== '/' ? '/' : ''
 }
 
 export default NavLinks

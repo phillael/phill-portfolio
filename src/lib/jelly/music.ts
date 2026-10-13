@@ -4,6 +4,8 @@
  * over a running average). Fed by the site's music player through an AnalyserNode.
  */
 
+import type { SiteMusic } from '@/lib/site-music'
+
 export interface MusicInput {
   analyser: AnalyserNode | null
   playing: boolean
@@ -87,5 +89,43 @@ export class MusicFeatures {
   waveAt(u: number) {
     const f = (((u % 1) + 1) % 1) * (WN - 1), i = Math.floor(f), t = f - i
     return this.wave[i] * (1 - t) + this.wave[Math.min(WN - 1, i + 1)] * t
+  }
+}
+
+/**
+ * Tap the site player's audio source with our own analyser: fftSize 2048 for the 40 bands
+ * and the waveform (the site's visualizer keeps its own 256-point one, untouched). It
+ * attaches once the player has made its audio graph (on its first play), and lets go on dispose.
+ */
+export function createMusicTap(site: () => SiteMusic | null) {
+  let src: MediaElementAudioSourceNode | null = null
+  let an: AnalyserNode | null = null
+  const input: MusicInput = { analyser: null, playing: false }
+  const detach = () => {
+    if (src && an) {
+      try { src.disconnect(an) } catch {} // the player may have closed its context
+    }
+    src = an = null
+  }
+  return {
+    get(): MusicInput | null {
+      const m = site()
+      if (!m) return null
+      const s = m.getSource()
+      if (s !== src) {
+        detach()
+        if (s) {
+          an = s.context.createAnalyser()
+          an.fftSize = 2048
+          an.smoothingTimeConstant = 0.5
+          s.connect(an)
+          src = s
+        }
+      }
+      input.analyser = an
+      input.playing = m.isPlaying()
+      return input
+    },
+    dispose: detach,
   }
 }

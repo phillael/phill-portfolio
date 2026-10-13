@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createJellyEngine, type JellyEngine } from '@/lib/jelly/engine'
 import { loadSnapshotOnce } from '@/lib/jelly/snapshot'
+import { createMusicTap } from '@/lib/jelly/music'
+import { getSiteMusic } from '@/lib/site-music'
 import type { ResumeMode } from '@/components/jelly/resumeRoute'
 import { clearIntent, getHeroImg, peekIntent } from '@/components/jelly/resumeTrigger'
 import JellyFinder from '@/components/jelly/JellyFinder'
@@ -70,10 +72,12 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     if (!canvas) return
     const intent = peekIntent()
     openerRef.current = intent?.opener ?? null
+    const tap = createMusicTap(getSiteMusic) // dance to the site's player (one player for the site and the resume)
     let e: JellyEngine
     try {
       e = createJellyEngine({
         canvas,
+        music: tap.get,
         onFind: (q, n) => { setQuery(q); setMatches(n) }, // a deep link's Finder, once the page lands
         onOpen: () => {
           clearIntent()
@@ -110,6 +114,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     return () => {
       alive = false
       e.dispose()
+      tap.dispose()
       pageClasses()
       setEngine(null)
       setLoaded(false)
@@ -216,6 +221,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
       else if (k === 'g') toggle('hole')
       else if (k === 'm') toggle('sound')
       else if (k === 'i') engine.replayIntro()
+      else if (k === 'p') getSiteMusic()?.toggle() // the site's player
       else if (k === 'o') toggleNav(navMode === 'rotate' ? 'pan' : 'rotate')
       else if (e.key === '+' || e.key === '=') engine.zoomBy(0.75)
       else if (e.key === '-' || e.key === '_') engine.zoomBy(1 / 0.75)

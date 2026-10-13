@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useAudioPlayer } from '@/hooks/useAudioPlayer'
+import { registerSiteMusic } from '@/lib/site-music'
 import MusicFAB from './MusicFAB'
 import MusicPlayerPanel from './MusicPlayerPanel'
 import TrackInfo from './TrackInfo'
@@ -47,8 +48,25 @@ const MusicPlayer = () => {
     seek,
     setTrack,
     setVolume,
-    toggleMute
+    toggleMute,
+    getSourceNode
   } = useAudioPlayer(tracks)
+
+  // One player for the whole site: the 3D resume dances to it and P toggles it
+  const playingRef = useRef(isPlaying)
+  const toggleRef = useRef(toggle)
+  useEffect(() => {
+    playingRef.current = isPlaying
+    toggleRef.current = toggle
+  }, [isPlaying, toggle])
+  useEffect(() => {
+    registerSiteMusic({
+      getSource: () => getSourceNode(),
+      isPlaying: () => playingRef.current,
+      toggle: () => toggleRef.current(),
+    })
+    return () => registerSiteMusic(null)
+  }, [getSourceNode])
 
   // Toggle panel expansion
   const handleToggleExpand = useCallback(() => {

@@ -10,6 +10,7 @@ import JellyResumeRoute from '@/components/jelly/JellyResumeRoute'
 import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
 import { createJellyEngine } from '@/lib/jelly/engine'
 import { registerHero } from '@/components/jelly/resumeTrigger'
+import { registerSiteMusic } from '@/lib/site-music'
 
 const engine = {
   openDirect: jest.fn(), openFromHero: jest.fn(() => false), close: jest.fn(() => false), load: jest.fn(), dispose: jest.fn(), find: jest.fn((q: string) => (q ? 27 : 0)),
@@ -180,6 +181,11 @@ describe('the resume HUD', () => {
     expect(engine.chaos).toHaveBeenCalled()
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     expect(engine.panKey).toHaveBeenCalledWith('ArrowDown')
+    const toggleMusic = jest.fn()
+    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle: toggleMusic })
+    fireEvent.keyDown(window, { key: 'p' }) // P plays/pauses the site's player
+    expect(toggleMusic).toHaveBeenCalled()
+    registerSiteMusic(null)
     fireEvent.keyDown(window, { key: 'c', metaKey: true }) // ⌘C is copy, not chaos
     expect(engine.chaos).toHaveBeenCalledTimes(1)
 

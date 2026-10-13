@@ -15,19 +15,17 @@ interface JellyResumeCanvasProps {
   mode?: ResumeMode
   /** run the Finder once the page lands (/resume?find=React) */
   find?: string | null
-  /** the host is closing it: fade out, controls off */
-  fading?: boolean
-  /** × or Esc: ask the host to close (it plays the transition) */
+  /** the URL left /resume: play the close (in reverse onto the hero, or a fade), controls off */
+  closing?: boolean
+  /** × or Esc: ask the host to close (it changes the URL) */
   onClose: () => void
+  /** the close has finished; the host unmounts it */
+  onClosed?: () => void
 }
 
-/**
- * The 3D Jelly Resume: one WebGL2 canvas (aria-hidden; the semantic resume stays the
- * accessible content) with its HUD: the Finder, the navigator, the bottom bar and ×.
- * Mounts the engine, loads the snapshot and plays the direct-visit entrance.
- * Load it with next/dynamic ({ ssr: false }); it's the engine's whole chunk.
- */
-/** The home page under the overlay: it fades and blurs away as the hero dissolves, then hides. */
+const FADE_MS = 400
+
+/** The home page under the overlay: it fades and blurs away as the hero dissolves, hides, then comes back. */
 const pageClasses = (...add: string[]) => {
   const el = document.getElementById('shroom-target')
   if (!el) return
@@ -35,7 +33,18 @@ const pageClasses = (...add: string[]) => {
   el.classList.add(...add)
 }
 
-const JellyResumeCanvas = ({ mode = 'direct', find = null, fading = false, onClose }: JellyResumeCanvasProps) => {
+/** Whatever opened the resume (the hero, or the 🍄), so focus can go back to it. */
+const openerFor = (el: HTMLElement | null | undefined) =>
+  el && el.isConnected ? el : (getHeroImg()?.closest('button') as HTMLElement | null) ?? null
+
+/**
+ * The 3D Jelly Resume: one WebGL2 canvas (aria-hidden; the semantic resume stays the
+ * accessible content) with its HUD: the Finder, the navigator, the bottom bar and ×.
+ * Mounts the engine, loads the snapshot, opens (from the hero over the home page, or a
+ * direct entrance) and closes (in reverse onto the hero, or a fade).
+ * Load it with next/dynamic ({ ssr: false }); it's the engine's whole chunk.
+ */
+const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onClose, onClosed }: JellyResumeCanvasProps) => {
   const sectionRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const finderRef = useRef<HTMLDivElement>(null)
@@ -45,6 +54,10 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, fading = false, onClo
   const [engine, setEngine] = useState<JellyEngine | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [opened, setOpened] = useState(false)
+  const [fadeOut, setFadeOut] = useState(false)
+  const onClosedRef = useRef(onClosed)
+  useEffect(() => { onClosedRef.current = onClosed }, [onClosed])
+  const openerRef = useRef<HTMLElement | null>(null)
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState<number | null>(null)
   const [navMode, setNavMode] = useState<'rotate' | 'pan'>('rotate')
@@ -56,6 +69,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, fading = false, onClo
     const canvas = canvasRef.current
     if (!canvas) return
     const intent = peekIntent()
+    openerRef.current = intent?.opener ?? null
     let e: JellyEngine
     try {
       e = createJellyEngine({
@@ -68,6 +82,12 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, fading = false, onClo
           // the trigger is hidden now: bring focus into the resume
           const a = document.activeElement
           if (!a || a === document.body || document.getElementById('shroom-target')?.contains(a)) sectionRef.current?.focus({ preventScroll: true })
+        },
+        // closing in reverse: the sparks are home on the photo, so the page comes back under them
+        onLanded: () => pageClasses('jelly-returning'),
+        onClosed: () => {
+          openerFor(openerRef.current)?.focus({ preventScroll: true })
+          onClosedRef.current?.()
         },
       })
     } catch (err) {
@@ -97,19 +117,29 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, fading = false, onClo
     }
   }, [])
 
-  // closing (the simple fade; the reverse dissolve comes later): the page fades back in under the overlay
+  // The URL left /resume. Over the home page: the words burst into sparks that fly home to the hero photo
+  // (the engine calls onLanded, then onClosed). Otherwise, or if the photo can't be used: fade out.
   useEffect(() => {
-    if (!fading || modeRef.current !== 'overlay') return
-    pageClasses('jelly-returning')
-    const img = getHeroImg()
-    if (img) img.style.visibility = ''
-  }, [fading])
+    if (!closing) return
+    const img = modeRef.current === 'overlay' ? getHeroImg() : null
+    if (engine && img && engine.close(img)) return
+    setFadeOut(true)
+    if (modeRef.current === 'overlay') {
+      pageClasses('jelly-returning')
+      if (img) img.style.visibility = ''
+    }
+    const t = setTimeout(() => {
+      if (modeRef.current === 'overlay') openerFor(openerRef.current)?.focus({ preventScroll: true })
+      onClosedRef.current?.()
+    }, FADE_MS)
+    return () => clearTimeout(t)
+  }, [closing, engine])
 
   const search = useCallback((q: string) => setMatches(engine ? engine.find(q) : null), [engine])
 
   const close = useCallback(() => {
-    if (!fading) onClose()
-  }, [fading, onClose])
+    if (!closing) onClose()
+  }, [closing, onClose])
 
   const toggle = useCallback(
     (k: keyof HudToggles) => {
@@ -160,7 +190,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, fading = false, onClo
   const queryRef = useRef(query)
   useEffect(() => { queryRef.current = query }, [query])
   useEffect(() => {
-    if (!engine || !opened || fading) return
+    if (!engine || !opened || closing) return
     const ignore = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       // (the Finder's input handles its own keys; its chips are buttons like the rest)
@@ -202,9 +232,9 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, fading = false, onClo
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [engine, opened, fading, close, toggle, toggleNav, navMode])
+  }, [engine, opened, closing, close, toggle, toggleNav, navMode])
 
-  const uiOn = !!engine && opened && !fading
+  const uiOn = !!engine && opened && !closing
   const fadeIn = `transition-opacity duration-[600ms] ${uiOn ? 'opacity-100 delay-[400ms]' : 'pointer-events-none opacity-0'}`
 
   return (
@@ -212,7 +242,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, fading = false, onClo
       ref={sectionRef}
       tabIndex={-1}
       aria-label="Interactive resume"
-      className={`fixed inset-0 z-50 font-body outline-none text-[13px] leading-[1.4] text-[#d7deea] transition-opacity duration-[400ms] ${fading ? 'pointer-events-none opacity-0' : ''}`}
+      className={`fixed inset-0 z-50 font-body outline-none text-[13px] leading-[1.4] text-[#d7deea] transition-opacity duration-[400ms] ${fadeOut ? 'opacity-0' : ''} ${closing ? 'pointer-events-none' : ''}`}
     >
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 block h-full w-full touch-none" />
       {engine && (

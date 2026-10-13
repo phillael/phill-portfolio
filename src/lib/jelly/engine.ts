@@ -21,7 +21,10 @@ import { createRenderer } from './render'
 import { createSfx } from './sfx'
 import { snapshotBodies, type LoadedSnapshot } from './snapshot'
 import { buildAtlas, buildPhysics, createWorld, hidden, type World } from './world'
-import { buildHeroSparks, containedRect, createHeroPool, heroHandoff, heroRest, idle, pageOrder, startDissolve, updateDissolve, type Dissolve } from './hero'
+import {
+  buildHeroSparks, containedRect, createHeroPool, heroHandoff, heroRest, idle, pageOrder, startClosing, startDissolve, updateClosing, updateDissolve,
+  type Closing, type Dissolve,
+} from './hero'
 import { smooth } from './math'
 
 export interface JellyEngineOptions {
@@ -32,6 +35,10 @@ export interface JellyEngineOptions {
   onFind?: (query: string, matches: number) => void
   /** the resume is open: the direct entrance started, or the hero handed off to the page */
   onOpen?: () => void
+  /** closing in reverse: every spark is back on the photo (it's visible again; bring the page back) */
+  onLanded?: () => void
+  /** the reverse close has finished */
+  onClosed?: () => void
 }
 
 export interface HeroOpen {
@@ -63,7 +70,7 @@ export interface JellyStats {
   loaded: boolean
 }
 
-export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngineOptions) {
+export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onClosed }: JellyEngineOptions) {
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true })
   if (!gl) throw new Error('WebGL2 is not available')
   const low = window.matchMedia('(pointer: coarse)').matches // Auto quality: low on touch devices
@@ -84,6 +91,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngine
   let skyLin = 0, skyTarget = 0 // the backdrop fades in over 0.7 s (smoothstep)
   const hp = createHeroPool()
   let diss: Dissolve | null = null
+  let cl: Closing | null = null
+  let pendingClose: HTMLImageElement | null = null
   let heroImg: HTMLImageElement | null = null
   let navMode: 'rotate' | 'pan' = 'rotate'
   let holeMode = false
@@ -175,6 +184,29 @@ export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngine
     heroImg = img
     img.style.visibility = 'hidden' // the sparks match the photo, so the swap is invisible
     skyTarget = 1
+    sfx.intro(2)
+    return true
+  }
+
+  /**
+   * Close in reverse onto the hero photo: the words burst into sparks that fly home to its
+   * pixels, cooling to its colors, while the sheet un-prints and the camera swings out.
+   * Mid-dissolve it waits for the handoff. Returns false if it can't (then fade instead).
+   */
+  function close(img: HTMLImageElement) {
+    if (cl) return true
+    if (diss) { pendingClose = img; return true }
+    if (!open || !loaded) return false
+    const cam0 = introCam(w, open, null)
+    const rc = canvas.getBoundingClientRect()
+    if (!buildHeroSparks(w, hp, { img, canvas: rc, dpr, low }, () => renderer.buildHero(hp))) return false
+    open = false
+    find('')
+    if (w.hole.on) releaseHole(w)
+    cl = startClosing(w, hp, low, cam0)
+    heroImg = img
+    img.style.visibility = 'hidden'
+    startIntro(w, true) // every word hides at once: they're the sparks now
     sfx.intro(2)
     return true
   }
@@ -300,7 +332,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngine
     stepMomentum(w, dt)
     if (w.cam.mom) w.navCalm = 1
     w.navCalm = Math.max(0, w.navCalm - dt * 2)
-    updateCamera(w, dt, canvas.width, canvas.height, ui, introCam(w, open, null))
+    updateCamera(w, dt, canvas.width, canvas.height, ui, introCam(w, open, cl ? cl.cam : null))
     for (const f of frameListeners) f()
     w.hole.amt = w.hole.on ? w.hole.amt + (1 - w.hole.amt) * Math.min(1, dt * 0.9) : Math.max(0, w.hole.amt - dt * 5)
     for (const bd of w.bodies) { bd.hl += (bd.hlT - bd.hl) * Math.min(1, dt * 5); if (bd.hl < 1e-3 && !bd.hlT) bd.hl = 0 }
@@ -325,7 +357,15 @@ export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngine
         open = true
         onOpen?.()
       }
-      if (diss.handed && diss.fade <= 0) { hp.show = false; diss = null }
+      if (diss.handed && diss.fade <= 0) {
+        hp.show = false
+        diss = null
+        if (pendingClose) { const img = pendingClose; pendingClose = null; if (!close(img)) onClosed?.() } // Back during the dissolve
+      }
+    } else if (cl) {
+      const ev = updateClosing(w, hp, cl, dt, canvas.clientWidth, canvas.clientHeight)
+      if (ev === 'landed') { if (heroImg) heroImg.style.visibility = ''; onLanded?.() }
+      else if (ev === 'done') { cl = null; resetView(w); onClosed?.() }
     } else if (hp.show) heroRest(w, hp, canvas.clientWidth, canvas.clientHeight, canvas.width, canvas.height)
     physMs = physMs * 0.9 + (performance.now() - t0) * 0.1
     if (w.hole.amt > 0 || w.hole.on) sfx.hole(w.hole.amt)
@@ -333,7 +373,9 @@ export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngine
     fpsT += dt
     if (fpsT > 0.5) { fps = Math.round(frames / fpsT); frames = 0; fpsT = 0 }
     skyLin = skyTarget > skyLin ? Math.min(skyTarget, skyLin + dt / 0.7) : Math.max(skyTarget, skyLin - dt / 0.7)
-    renderer.render(smooth(skyLin), revealY(w, null), !hp.cover, hp.show ? hp : null)
+    // closing: the sky fades out with the sparks as the page comes back
+    const sky = cl && cl.landed ? 1 - smooth(cl.fade) : smooth(skyLin)
+    renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null)
   }
   function startLoop() {
     if (raf) return
@@ -372,6 +414,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngine
     load,
     openDirect,
     openFromHero,
+    close,
     find,
     chaos: () => chaos(w),
     burstAll: () => burstAll(w),
@@ -401,7 +444,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen }: JellyEngine
   }
 
   // dev only: a handle for scripted checks in the browser, like the playground's
-  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, diss: () => diss, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
+  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, diss: () => diss, closing: () => cl, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
   if (debug) (window as unknown as { __jelly?: unknown }).__jelly = debug
 
   return api

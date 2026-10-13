@@ -346,3 +346,107 @@ export function heroHandoff(w: World, hp: HeroPool, d: Dissolve) {
   d.handed = true
   d.fade = 1
 }
+
+// ---- Close, in reverse: the words burst into the hero pool, the sparks fly home to their pixels cooling from comet
+// colors back to the photo's, the camera swings back out, then the photo and the page cross-fade back in ----
+
+export interface Closing {
+  t: number
+  T: number
+  rel: Float32Array
+  /** how far out the camera has swung (only grows) */
+  cam: number
+  /** the scanline un-printing the sheet, bottom to top */
+  reveal: number
+  landed: boolean
+  fade: number
+}
+
+let ptBody: Int32Array | null = null, ptBodySrc: Float32Array | null = null
+
+/** Where resume spark k is right now: on its word's lattice if the word shows, else wherever it flies. */
+function particleAt(w: World, k: number, out: number[]) {
+  if (!ptBody || ptBodySrc !== w.ptLu) {
+    ptBody = new Int32Array(w.NPT)
+    ptBodySrc = w.ptLu
+    w.bodies.forEach((bd, bi) => ptBody!.fill(bi, bd.pt0, bd.pt0 + bd.ptN))
+  }
+  const bd = w.bodies[ptBody[k]]
+  if (bd.state >= 3) { out[0] = w.ptPos[k * 3]; out[1] = w.ptPos[k * 3 + 1]; out[2] = w.ptPos[k * 3 + 2] }
+  else bilerp(w.pos, bd, w.ptLu[k], w.ptLv[k], out)
+}
+
+/** Start the reverse (the pool must already sit on the photo: buildHeroSparks first). */
+export function startClosing(w: World, hp: HeroPool, low: boolean, cam0: number): Closing {
+  const N = hp.N, T = w.s.dissolveTime * (low ? 0.65 : 0.9)
+  hp.prev = new Float32Array(N * 3)
+  hp.sv = new Float32Array(N * 3)
+  const rel = new Float32Array(N)
+  for (let i = 0; i < N; i++) {
+    const o = i * 3
+    particleAt(w, i % w.NPT, tmp)
+    const th = Math.random() * 6.283, sp = 1.5 + Math.random() * 2.5
+    for (let a = 0; a < 3; a++) hp.pos[o + a] = hp.prev[o + a] = hp.tail[o + a] = tmp[a]
+    hp.vel[o] = Math.cos(th) * sp
+    hp.vel[o + 1] = Math.sin(th) * sp
+    hp.vel[o + 2] = 0.6 + Math.random() * 1.5
+    hp.heat[i] = 1
+    hp.age[i] = 0
+    hp.alpha[i] = 1
+    rel[i] = 0.22 * Math.random()
+  }
+  hp.tint = 0
+  hp.show = true
+  hp.cover = true
+  hp.dirtyPos = hp.dirtyAttr = true
+  return { t: 0, T, rel, cam: cam0, reveal: w.pageBottom - 0.3, landed: false, fade: 0 }
+}
+
+/**
+ * One frame of the reverse. Returns 'landed' the frame every spark is home (show the photo
+ * and the page again), 'done' once they've faded out over it, else null.
+ */
+export function updateClosing(w: World, hp: HeroPool, c: Closing, dt: number, cw: number, ch: number): 'landed' | 'done' | null {
+  const N = hp.N, SW = w.s.swirl * 3, tr = 0.05 * w.s.trail
+  c.t += dt
+  c.cam = Math.max(c.cam, smooth(c.t / (c.T + 0.3)))
+  c.reveal = w.pageBottom - 0.3 + (w.pageH + 0.6) * smooth(c.t / 0.6)
+  hp.dist = 0.85 * camDist(w)
+  let home = 0
+  for (let i = 0; i < N; i++) {
+    const o = i * 3, u = Math.max(0, c.t - c.rel[i]), k = smooth(u / c.T)
+    heroHome(w, hp, i, cw, ch, tmp) // its pixel on the photo, from wherever the camera is now
+    if (k >= 1) { for (let a = 0; a < 3; a++) hp.pos[o + a] = tmp[a]; home++ }
+    else {
+      if (SW > 0) swirlKick(hp.vel, hp.pos, o, w.time, SW * dt * (1 - k))
+      const drag = Math.max(0, 1 - (1 + 5 * k) * dt), pull = 1 - Math.exp(-(0.5 + 26 * k * k) * dt)
+      for (let a = 0; a < 3; a++) { hp.vel[o + a] *= drag; hp.pos[o + a] += hp.vel[o + a] * dt; hp.pos[o + a] += (tmp[a] - hp.pos[o + a]) * pull }
+    }
+    hp.heat[i] = 1 - smooth((u / c.T - 0.4) / 0.6) // cools back to the photo's colors as it lands
+    hp.age[i] = u
+    for (let a = 0; a < 3; a++) {
+      const v = (hp.pos[o + a] - hp.prev[o + a]) / Math.max(dt, 1e-3)
+      hp.sv[o + a] += (v - hp.sv[o + a]) * 0.45
+      hp.tail[o + a] = hp.pos[o + a] - hp.sv[o + a] * tr * (1 - k)
+      hp.prev[o + a] = hp.pos[o + a]
+    }
+  }
+  hp.dirtyPos = hp.dirtyAttr = true
+  let event: 'landed' | 'done' | null = null
+  if (!c.landed && home === N) { c.landed = true; event = 'landed' }
+  if (c.landed) {
+    // the real photo and the page fade back in under the sparks
+    c.fade = Math.min(1, c.fade + dt / 0.5)
+    const a = 1 - smooth(c.fade)
+    for (let i = 0; i < N; i++) hp.alpha[i] = a
+    if (c.fade >= 1) {
+      hp.show = false
+      hp.cover = false
+      hp.alpha.fill(1)
+      hp.heat.fill(0)
+      hp.age.fill(9)
+      event = 'done'
+    }
+  }
+  return event
+}

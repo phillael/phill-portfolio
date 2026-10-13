@@ -4,14 +4,15 @@
  * engine, and never mounts for reduced motion. The engine is mocked (jsdom has no WebGL2).
  */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import JellyResumeHost from '@/components/jelly/JellyResumeHost'
 import JellyResumeRoute from '@/components/jelly/JellyResumeRoute'
 import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
 import { createJellyEngine } from '@/lib/jelly/engine'
+import { registerHero } from '@/components/jelly/resumeTrigger'
 
 const engine = {
-  openDirect: jest.fn(), openFromHero: jest.fn(() => false), load: jest.fn(), dispose: jest.fn(), find: jest.fn((q: string) => (q ? 27 : 0)),
+  openDirect: jest.fn(), openFromHero: jest.fn(() => false), close: jest.fn(() => false), load: jest.fn(), dispose: jest.fn(), find: jest.fn((q: string) => (q ? 27 : 0)),
   chaos: jest.fn(), burstAll: jest.fn(), healAll: jest.fn(), setShroom: jest.fn(), setSound: jest.fn(),
   setHoleMode: jest.fn(), setTilt: jest.fn((on: boolean) => Promise.resolve(on)), replayIntro: jest.fn(),
   resetView: jest.fn(), zoomBy: jest.fn(), setNavMode: jest.fn(), setUiInsets: jest.fn(), panKey: jest.fn(),
@@ -20,8 +21,11 @@ const engine = {
   releaseHoleKey: jest.fn(),
 }
 // the real engine reports onOpen once its entrance starts; the mock does it on openDirect
+type Callbacks = { onOpen?: () => void; onLanded?: () => void; onClosed?: () => void }
+let callbacks: Callbacks = {}
 jest.mock('@/lib/jelly/engine', () => ({
-  createJellyEngine: jest.fn((opts: { onOpen?: () => void }) => {
+  createJellyEngine: jest.fn((opts: Callbacks) => {
+    callbacks = opts
     engine.openDirect.mockImplementation(() => opts.onOpen?.())
     return engine
   }),
@@ -94,13 +98,12 @@ describe('JellyResumeHost (the overlay, driven by the URL)', () => {
     fireEvent.click(x)
     fireEvent.click(x) // a second close before the route changes must not go back twice
     expect(back).toHaveBeenCalledTimes(1)
-    overlay.unmount()
+    overlay.unmount() // (what Back does) → it closes, then unmounts
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Interactive resume' })).toBeNull(), { timeout: 1500 })
 
     render(<JellyResumeRoute mode="direct" />)
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Interactive resume' })).not.toHaveClass('opacity-0'))
-    fireEvent.click(screen.getByRole('button', { name: 'Close the resume (Esc)' }))
-    expect(push).not.toHaveBeenCalled()
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/'), { timeout: 1500 })
+    fireEvent.click(await screen.findByRole('button', { name: 'Close the resume (Esc)' }))
+    expect(push).toHaveBeenCalledWith('/')
   })
 
   it('never mounts the engine for reduced motion', async () => {
@@ -204,11 +207,61 @@ describe('the resume HUD', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close the resume (Esc)' }))
     expect(onClose).toHaveBeenCalledTimes(1)
 
-    rerender(<JellyResumeCanvas onClose={onClose} fading />)
+    rerender(<JellyResumeCanvas onClose={onClose} closing />)
     expect(screen.getByRole('region', { name: 'Interactive resume' })).toHaveClass('opacity-0')
     fireEvent.keyDown(window, { key: 'Escape' })
     fireEvent.keyDown(window, { key: 'c' })
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(engine.chaos).not.toHaveBeenCalled()
+  })
+})
+
+describe('closing over the home page', () => {
+  const heroSetup = () => {
+    const btn = document.createElement('button')
+    const img = document.createElement('img')
+    btn.appendChild(img)
+    document.body.appendChild(btn)
+    const page = document.createElement('div')
+    page.id = 'shroom-target'
+    document.body.appendChild(page)
+    registerHero(img)
+    return { btn, img, page, cleanup: () => { registerHero(null); btn.remove(); page.remove() } }
+  }
+
+  it('plays the reverse onto the hero: the page returns when the sparks land, then focus goes back', async () => {
+    const { btn, img, page, cleanup } = heroSetup()
+    mediaQuery(false)
+    engine.close.mockReturnValue(true)
+    const onClosed = jest.fn()
+    const { rerender } = render(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
+
+    rerender(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} closing />)
+    expect(engine.close).toHaveBeenCalledWith(img)
+    expect(screen.getByRole('region', { name: 'Interactive resume' })).not.toHaveClass('opacity-0') // the canvas plays it, no fade
+    act(() => callbacks.onLanded?.())
+    expect(page).toHaveClass('jelly-returning')
+    expect(onClosed).not.toHaveBeenCalled()
+    act(() => callbacks.onClosed?.())
+    expect(onClosed).toHaveBeenCalled()
+    expect(btn).toHaveFocus()
+    cleanup()
+  })
+
+  it('fades out instead when the engine can’t close onto the photo', async () => {
+    const { img, page, cleanup } = heroSetup()
+    img.style.visibility = 'hidden'
+    mediaQuery(false)
+    engine.close.mockReturnValue(false)
+    const onClosed = jest.fn()
+    const { rerender } = render(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
+    rerender(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} closing />)
+    expect(screen.getByRole('region', { name: 'Interactive resume' })).toHaveClass('opacity-0')
+    expect(page).toHaveClass('jelly-returning')
+    expect(img.style.visibility).toBe('')
+    await waitFor(() => expect(onClosed).toHaveBeenCalled(), { timeout: 1500 })
+    cleanup()
   })
 })

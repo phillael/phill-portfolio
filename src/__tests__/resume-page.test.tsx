@@ -12,9 +12,6 @@ import { resume, richText } from '@/data/resume'
 import { socials } from '@/data/socials'
 import { SITE_URL } from '@/lib/site'
 
-// The 3D canvas over the page has its own test (jelly-resume-canvas.test.tsx); jsdom has no WebGL
-jest.mock('@/components/jelly/JellyResumeDirect', () => ({ __esModule: true, default: () => null }))
-
 // The public site never shows Phill's phone number or email (the repo is public)
 const PHONE = /\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}/
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+|mailto:|tel:/

@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import SiteFooter from '@/components/SiteFooter'
-import JellyResumeDirect from '@/components/jelly/JellyResumeDirect'
+import JellyResumeRoute from '@/components/jelly/JellyResumeRoute'
 import { resume, richText } from '@/data/resume'
 import { SITE_URL } from '@/lib/site'
 
@@ -227,8 +227,8 @@ const ResumePage = () => (
       </article>
     </main>
     <SiteFooter />
-    {/* the 3D resume over this page (not for reduced motion; the canvas is aria-hidden) */}
-    <JellyResumeDirect />
+    {/* the overlay host (root layout) opens the 3D resume over this page; not for reduced motion */}
+    <JellyResumeRoute mode="direct" />
   </>
 )
 

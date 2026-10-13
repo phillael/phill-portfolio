@@ -4,8 +4,9 @@
  * engine, and never mounts for reduced motion. The engine is mocked (jsdom has no WebGL2).
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import JellyResumeDirect from '@/components/jelly/JellyResumeDirect'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import JellyResumeHost from '@/components/jelly/JellyResumeHost'
+import JellyResumeRoute from '@/components/jelly/JellyResumeRoute'
 import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
 import { createJellyEngine } from '@/lib/jelly/engine'
 
@@ -21,7 +22,8 @@ const engine = {
 jest.mock('@/lib/jelly/engine', () => ({ createJellyEngine: jest.fn(() => engine) }))
 jest.mock('@/lib/jelly/snapshot', () => ({ loadSnapshot: jest.fn(() => Promise.resolve('snapshot')) }))
 const push = jest.fn()
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+const back = jest.fn()
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push, back }) }))
 
 beforeAll(() => {
   global.ResizeObserver ??= class {
@@ -48,11 +50,22 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
 })
 
-describe('JellyResumeDirect (a direct visit to /resume)', () => {
-  it('mounts the engine on an aria-hidden canvas and plays the direct entrance with ?find=', async () => {
+describe('JellyResumeHost (the overlay, driven by the URL)', () => {
+  const renderHost = () => render(<JellyResumeHost />)
+
+  it('stays empty (no engine) until a /resume route asks for it', async () => {
+    mediaQuery(false)
+    const { container } = renderHost()
+    await new Promise((r) => setTimeout(r, 50))
+    expect(container.querySelector('canvas')).toBeNull()
+    expect(createJellyEngine).not.toHaveBeenCalled()
+  })
+
+  it('a direct visit mounts the engine on an aria-hidden canvas and plays the entrance with ?find=', async () => {
     mediaQuery(false)
     window.history.replaceState(null, '', '/resume?find=React')
-    const { container, unmount } = render(<JellyResumeDirect />)
+    const { container } = renderHost()
+    const route = render(<JellyResumeRoute mode="direct" />)
 
     await waitFor(() => expect(container.querySelector('canvas')).not.toBeNull())
     const canvas = container.querySelector('canvas')!
@@ -61,13 +74,31 @@ describe('JellyResumeDirect (a direct visit to /resume)', () => {
     expect(engine.openDirect).toHaveBeenCalledWith('React')
     await waitFor(() => expect(engine.load).toHaveBeenCalledWith('snapshot'))
 
-    unmount()
+    // leaving the route fades the overlay out, then disposes the engine
+    route.unmount()
+    await waitFor(() => expect(container.querySelector('canvas')).toBeNull(), { timeout: 1500 })
     expect(engine.dispose).toHaveBeenCalled()
+  })
+
+  it('× closes an overlay with Back, and a direct visit by fading home', async () => {
+    mediaQuery(false)
+    renderHost()
+    const overlay = render(<JellyResumeRoute mode="overlay" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Close the resume (Esc)' }))
+    expect(back).toHaveBeenCalled()
+    overlay.unmount()
+
+    render(<JellyResumeRoute mode="direct" />)
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Interactive resume' })).not.toHaveClass('opacity-0'))
+    fireEvent.click(screen.getByRole('button', { name: 'Close the resume (Esc)' }))
+    expect(push).not.toHaveBeenCalled()
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'), { timeout: 1500 })
   })
 
   it('never mounts the engine for reduced motion', async () => {
     mediaQuery(true)
-    const { container } = render(<JellyResumeDirect />)
+    const { container } = renderHost()
+    render(<JellyResumeRoute mode="direct" />)
     await new Promise((r) => setTimeout(r, 50))
     expect(container.querySelector('canvas')).toBeNull()
     expect(createJellyEngine).not.toHaveBeenCalled()
@@ -153,20 +184,23 @@ describe('the resume HUD', () => {
     expect(box).toHaveValue('')
     expect(onClose).not.toHaveBeenCalled()
 
-    jest.useFakeTimers()
     fireEvent.keyDown(window, { key: 'Escape' })
-    act(() => jest.advanceTimersByTime(500))
-    jest.useRealTimers()
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('× fades out, then closes', async () => {
-    const { onClose } = await open()
-    jest.useFakeTimers()
+  it('× asks to close; while fading out the controls are off', async () => {
+    const onClose = jest.fn()
+    mediaQuery(false)
+    const { rerender } = render(<JellyResumeCanvas onClose={onClose} />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'Close the resume (Esc)' }))
-    expect(onClose).not.toHaveBeenCalled()
-    act(() => jest.advanceTimersByTime(500))
-    jest.useRealTimers()
-    expect(onClose).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    rerender(<JellyResumeCanvas onClose={onClose} fading />)
+    expect(screen.getByRole('region', { name: 'Interactive resume' })).toHaveClass('opacity-0')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.keyDown(window, { key: 'c' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(engine.chaos).not.toHaveBeenCalled()
   })
 })

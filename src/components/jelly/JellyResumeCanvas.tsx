@@ -11,11 +11,11 @@ import { FOCUS, PANEL } from '@/components/jelly/hudStyles'
 interface JellyResumeCanvasProps {
   /** run the Finder once the page lands (/resume?find=React) */
   find?: string | null
-  /** × or Esc, after the overlay has faded out */
+  /** the host is closing it: fade out, controls off */
+  fading?: boolean
+  /** × or Esc: ask the host to close (it plays the transition) */
   onClose: () => void
 }
-
-const FADE_MS = 400
 
 /**
  * The 3D Jelly Resume: one WebGL2 canvas (aria-hidden; the semantic resume stays the
@@ -23,7 +23,7 @@ const FADE_MS = 400
  * Mounts the engine, loads the snapshot and plays the direct-visit entrance.
  * Load it with next/dynamic ({ ssr: false }); it's the engine's whole chunk.
  */
-const JellyResumeCanvas = ({ find = null, onClose }: JellyResumeCanvasProps) => {
+const JellyResumeCanvas = ({ find = null, fading = false, onClose }: JellyResumeCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const finderRef = useRef<HTMLDivElement>(null)
   const finderInput = useRef<HTMLInputElement>(null)
@@ -31,12 +31,12 @@ const JellyResumeCanvas = ({ find = null, onClose }: JellyResumeCanvasProps) => 
   const hudRef = useRef<HTMLDivElement>(null)
   const [engine, setEngine] = useState<JellyEngine | null>(null)
   const [loaded, setLoaded] = useState(false)
-  const [closing, setClosing] = useState(false)
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState<number | null>(null)
   const [navMode, setNavMode] = useState<'rotate' | 'pan'>('rotate')
   const [toggles, setToggles] = useState<HudToggles>({ shroom: false, hole: false, sound: true, tilt: false })
 
+  const findRef = useRef(find)
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -52,7 +52,7 @@ const JellyResumeCanvas = ({ find = null, onClose }: JellyResumeCanvasProps) => 
     }
     let alive = true
     setEngine(e)
-    e.openDirect(find)
+    e.openDirect(findRef.current)
     loadSnapshot()
       .then((snapshot) => {
         if (!alive) return
@@ -66,15 +66,13 @@ const JellyResumeCanvas = ({ find = null, onClose }: JellyResumeCanvasProps) => 
       setEngine(null)
       setLoaded(false)
     }
-  }, [find])
+  }, [])
 
   const search = useCallback((q: string) => setMatches(engine ? engine.find(q) : null), [engine])
 
   const close = useCallback(() => {
-    if (closing) return
-    setClosing(true)
-    setTimeout(onClose, FADE_MS)
-  }, [closing, onClose])
+    if (!fading) onClose()
+  }, [fading, onClose])
 
   const toggle = useCallback(
     (k: keyof HudToggles) => {
@@ -125,7 +123,7 @@ const JellyResumeCanvas = ({ find = null, onClose }: JellyResumeCanvasProps) => 
   const queryRef = useRef(query)
   useEffect(() => { queryRef.current = query }, [query])
   useEffect(() => {
-    if (!engine || !loaded || closing) return
+    if (!engine || !loaded || fading) return
     const ignore = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       // (the Finder's input handles its own keys; its chips are buttons like the rest)
@@ -167,15 +165,15 @@ const JellyResumeCanvas = ({ find = null, onClose }: JellyResumeCanvasProps) => 
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [engine, loaded, closing, close, toggle, toggleNav, navMode])
+  }, [engine, loaded, fading, close, toggle, toggleNav, navMode])
 
-  const uiOn = !!engine && loaded && !closing
+  const uiOn = !!engine && loaded && !fading
   const fadeIn = `transition-opacity duration-[600ms] ${uiOn ? 'opacity-100 delay-[400ms]' : 'pointer-events-none opacity-0'}`
 
   return (
     <section
       aria-label="Interactive resume"
-      className={`fixed inset-0 z-50 font-body text-[13px] leading-[1.4] text-[#d7deea] transition-opacity duration-[400ms] ${closing ? 'opacity-0' : ''}`}
+      className={`fixed inset-0 z-50 font-body text-[13px] leading-[1.4] text-[#d7deea] transition-opacity duration-[400ms] ${fading ? 'pointer-events-none opacity-0' : ''}`}
     >
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 block h-full w-full touch-none" />
       {engine && (

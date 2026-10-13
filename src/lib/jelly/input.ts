@@ -187,7 +187,7 @@ export function attachInput(ctx: InputContext) {
   canvas.addEventListener('contextmenu', noMenu)
   canvas.addEventListener('dblclick', onDbl)
   canvas.addEventListener('wheel', onWheel, { passive: false })
-  return () => {
+  const detach = () => {
     canvas.removeEventListener('pointermove', onMove)
     canvas.removeEventListener('pointerleave', onLeave)
     canvas.removeEventListener('pointerdown', onDown)
@@ -197,4 +197,7 @@ export function attachInput(ctx: InputContext) {
     canvas.removeEventListener('dblclick', onDbl)
     canvas.removeEventListener('wheel', onWheel)
   }
+  /** true while a press-and-hold (not Space) is holding the black hole open */
+  const pointerHole = () => holePointer !== null
+  return { detach, pointerHole }
 }

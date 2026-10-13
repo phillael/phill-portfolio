@@ -172,9 +172,10 @@ const ResumePage = () => (
               {resume.projects.map((p) => (
                 <article key={p.name}>
                   <h3 className="text-base md:text-lg font-bold text-foreground">
-                    {p.name}{' '}
+                    {p.name}
                     <span className="font-normal text-sm text-muted-foreground">
-                      · {p.blurb}
+                      {' · '}
+                      {p.blurb}
                       {p.link && (
                         <>
                           {' · '}

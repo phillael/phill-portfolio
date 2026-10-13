@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 
@@ -13,6 +14,7 @@ const JellyResumeCanvas = dynamic(() => import('@/components/jelly/JellyResumeCa
  * page is the whole experience.
  */
 const JellyResumeDirect = () => {
+  const router = useRouter()
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
   const [find, setFind] = useState<string | null | undefined>(undefined)
 
@@ -22,7 +24,8 @@ const JellyResumeDirect = () => {
   }, [])
 
   if (reduced !== false || find === undefined) return null
-  return <JellyResumeCanvas find={find} />
+  // × / Esc on a direct visit: a simple fade, then home (the reverse dissolve needs the hero: T7)
+  return <JellyResumeCanvas find={find} onClose={() => router.push('/')} />
 }
 
 export default JellyResumeDirect

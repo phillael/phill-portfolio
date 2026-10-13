@@ -16,7 +16,7 @@ import { countMatches, findMatches } from './finder'
 import { attachInput } from './input'
 import { lcg } from './math'
 import { MusicFeatures, type MusicInput } from './music'
-import { burstAll, chaos, collide, healAll, releaseHole, startHole, step, updateParticles, updateStates } from './physics'
+import { burstAll, chaos, collide, healAll, releaseHole, shakeIt, startHole, step, updateParticles, updateStates } from './physics'
 import { createRenderer } from './render'
 import { createSfx } from './sfx'
 import { snapshotBodies, type LoadedSnapshot } from './snapshot'
@@ -28,6 +28,15 @@ export interface JellyEngineOptions {
   music?: () => MusicInput | null
   /** the Finder ran (on its own when a deep link's page lands) */
   onFind?: (query: string, matches: number) => void
+}
+
+/** The navigator's view box, as fractions of the page (fit: the whole page is in view). */
+export interface NavView {
+  fit: boolean
+  left: number
+  top: number
+  width: number
+  height: number
 }
 
 export interface JellyStats {
@@ -63,6 +72,9 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
   let holeMode = false
   let lastRay: Ray | null = null
   let back: HTMLCanvasElement | null = null
+  let atlasCanvas: HTMLCanvasElement | null = null
+  let atlasRects: { x: number; y: number; w: number; h: number }[] = []
+  const frameListeners = new Set<() => void>()
 
   // ---- size: device pixels, DPR capped at 2 ----
   let dpr = 1
@@ -89,6 +101,8 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
     buildPhysics(w, list)
     const { atlas, rects } = buildAtlas(w, list, snapshot.text)
     renderer.buildGPU(atlas, rects)
+    atlasCanvas = atlas
+    atlasRects = rects
     // the page's backing: white paper plus the decorations at their place in the margins
     const PP = 220
     back = document.createElement('canvas')
@@ -128,8 +142,94 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
     return w.searchN
   }
 
+  /** The navigator's thumbnail: the page backing plus every word from the atlas at its home position. */
+  function drawMiniMap(cv: HTMLCanvasElement) {
+    if (!back || !atlasCanvas) return
+    const W = 208, H = Math.round((W * w.pageH) / w.pageW)
+    cv.width = W
+    cv.height = H
+    const g = cv.getContext('2d')
+    if (!g) return
+    g.drawImage(back, 0, 0, W, H)
+    const sx = W / w.pageW, sy = H / w.pageH
+    w.bodies.forEach((bd, i) => {
+      const r = atlasRects[i]
+      if (r) g.drawImage(atlasCanvas!, r.x, r.y, r.w, r.h, (bd.x0 + w.pageW / 2) * sx, (w.pageH / 2 - bd.yTop) * sy, (bd.x1 - bd.x0) * sx, (bd.yTop - bd.yBot) * sy)
+    })
+  }
+
+  function navView(): NavView {
+    const cam = w.cam, fit = !cam.canPan && s.zoom >= 0.95
+    return {
+      fit,
+      left: ((cam.x ?? 0) - cam.halfW + w.pageW / 2) / w.pageW,
+      top: (w.pageH / 2 - (cam.y ?? 0) - cam.halfH) / w.pageH,
+      width: (2 * cam.halfW) / w.pageW,
+      height: (2 * cam.halfH) / w.pageH,
+    }
+  }
+
+  /** Jump the view to (u, v) on the page, as fractions from its top left. */
+  function navTo(u: number, v: number) {
+    w.cam.scrollX = (u - 0.5) * w.pageW
+    w.cam.scrollY = w.pageH / 2 - v * w.pageH
+    w.cam.mom = null
+  }
+
+  /** Arrows pan a third of the view, Page Up/Down a whole view, Home/End jump to the ends. */
+  function panKey(key: string) {
+    const cam = w.cam, big = key.startsWith('Page'), sx = cam.halfW * 0.6, sy = cam.halfH * (big ? 1.6 : 0.6)
+    if (key === 'ArrowLeft') cam.scrollX -= sx
+    else if (key === 'ArrowRight') cam.scrollX += sx
+    else if (key === 'ArrowUp' || key === 'PageUp') cam.scrollY += sy
+    else if (key === 'ArrowDown' || key === 'PageDown') cam.scrollY -= sy
+    else if (key === 'Home') cam.scrollY = Infinity
+    else if (key === 'End') cam.scrollY = -Infinity
+  }
+
+  // ---- Phone tilt: loose words slide downhill; a hard shake scrambles the page ----
+  let shakeLast = 0
+  let accPrev: { x: number; y: number; z: number } | null = null
+  function onOrient(e: DeviceOrientationEvent) {
+    if (!w.tiltG.on || e.gamma == null || e.beta == null) return
+    const ang = (screen.orientation && screen.orientation.angle) || 0, r = Math.PI / 180
+    let gx = Math.sin(e.gamma * r), gy = -Math.sin((e.beta - 40) * r)
+    if (ang === 90) [gx, gy] = [-gy, gx]
+    else if (ang === 270 || ang === -90) [gx, gy] = [gy, -gx]
+    w.tiltG.x = Math.max(-1, Math.min(1, gx * 1.3))
+    w.tiltG.y = Math.max(-1, Math.min(1, gy * 1.3))
+  }
+  function onMotion(e: DeviceMotionEvent) {
+    const a = e.accelerationIncludingGravity
+    if (!w.tiltG.on || !s.shake || !a || a.x == null || a.y == null || a.z == null) return
+    if (accPrev) {
+      const j = Math.hypot(a.x - accPrev.x, a.y - accPrev.y, a.z - accPrev.z), now = performance.now()
+      if (j > 18 && now - shakeLast > 700) { shakeLast = now; shakeIt(w, Math.min(1, (j - 18) / 20 + 0.4)) }
+    }
+    accPrev = { x: a.x, y: a.y, z: a.z }
+  }
+  window.addEventListener('deviceorientation', onOrient)
+  window.addEventListener('devicemotion', onMotion)
+  type PermissionApi = { requestPermission?: () => Promise<'granted' | 'denied'> }
+  /** Turn tilt on (asks iOS for permission; call it from a tap). Resolves to whether it's on. */
+  async function setTilt(on: boolean) {
+    if (on) {
+      try {
+        const DO = (typeof DeviceOrientationEvent !== 'undefined' ? DeviceOrientationEvent : undefined) as PermissionApi | undefined
+        const DM = (typeof DeviceMotionEvent !== 'undefined' ? DeviceMotionEvent : undefined) as PermissionApi | undefined
+        if (DO?.requestPermission && (await DO.requestPermission()) !== 'granted') on = false
+        if (on && DM?.requestPermission) await DM.requestPermission().catch(() => 'denied')
+      } catch {
+        on = false
+      }
+    }
+    w.tiltG.on = on
+    if (!on) w.tiltG.x = w.tiltG.y = 0
+    return on
+  }
+
   const enabled = () => open && !!loaded
-  const detachInput = attachInput({
+  const input = attachInput({
     w, canvas, ui, enabled,
     navMode: () => navMode,
     holeMode: () => holeMode,
@@ -156,6 +256,7 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
     if (w.cam.mom) w.navCalm = 1
     w.navCalm = Math.max(0, w.navCalm - dt * 2)
     updateCamera(w, dt, canvas.width, canvas.height, ui, introCam(w, open, null))
+    for (const f of frameListeners) f()
     w.hole.amt = w.hole.on ? w.hole.amt + (1 - w.hole.amt) * Math.min(1, dt * 0.9) : Math.max(0, w.hole.amt - dt * 5)
     for (const bd of w.bodies) { bd.hl += (bd.hlT - bd.hl) * Math.min(1, dt * 5); if (bd.hl < 1e-3 && !bd.hlT) bd.hl = 0 }
     features.update(dt, music?.() ?? null)
@@ -200,7 +301,10 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
     stopLoop()
     document.removeEventListener('visibilitychange', onVisibility)
     ro.disconnect()
-    detachInput()
+    input.detach()
+    window.removeEventListener('deviceorientation', onOrient)
+    window.removeEventListener('devicemotion', onMotion)
+    frameListeners.clear()
     sfx.dispose()
     renderer.dispose()
     if (debug && (window as unknown as { __jelly?: unknown }).__jelly === debug) delete (window as unknown as { __jelly?: unknown }).__jelly
@@ -217,13 +321,21 @@ export function createJellyEngine({ canvas, music, onFind }: JellyEngineOptions)
     setSound: (on: boolean) => { s.soundOn = on; sfx.setVolume() },
     setHoleMode: (on: boolean) => { holeMode = on },
     /** hold Space: the black hole opens at the mouse */
-    holeAtCursor: () => { if (lastRay && !w.hole.on) startHole(w, planeZ(lastRay, 0.25)) },
-    releaseHole: () => releaseHole(w),
+    holeAtCursor: () => { if (enabled() && lastRay && !w.hole.on) startHole(w, planeZ(lastRay, 0.25)) },
+    /** let go of Space (a press-and-hold on the page releases itself) */
+    releaseHoleKey: () => { if (w.hole.on && !input.pointerHole()) releaseHole(w) },
     replayIntro: () => { if (loaded) startIntro(w) },
     resetView: () => resetView(w),
     zoomBy: (f: number) => zoomCenter(w, canvas.getBoundingClientRect(), ui, f),
     setNavMode: (m: 'rotate' | 'pan') => { navMode = m },
     setUiInsets: (top: number, bot: number) => { ui.top = top; ui.bot = bot },
+    panKey,
+    navView,
+    navTo,
+    drawMiniMap,
+    setTilt,
+    /** called every frame, right after the camera moves (mutate the DOM; never set React state) */
+    onFrame: (f: () => void) => { frameListeners.add(f); return () => { frameListeners.delete(f) } },
     gesture: () => sfx.init(),
     stats,
     dispose,

@@ -216,6 +216,91 @@ Order matters: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7. T8–T11 nee
 - [ ] **T14: PR. STOP before pushing and ask Phill.**
   - Prepare the PR description (summary, screenshots, measurements, test plan) in the plan.
   - Pushing and opening the PR need Phill's explicit go, because the repo is public and he must confirm that nothing private is in `public/resume/`.
+  - **Prepared 2026-10-13: nothing pushed, waiting for Phill's go.** On the go: `git push -u origin feat/jelly-resume-site`, then `gh pr create --base master` with the title and body below. Attach screenshots in the PR UI.
+  - **Title:** `feat: the Jelly Resume, the hero photo dissolves into a 3D resume at /resume (v1.3.0)`
+  - **Body:**
+
+```markdown
+## Summary
+
+Clicking the hero photo on phillcodes.com dissolves it into sparks that reshape into a 3D, knock-apart copy of my Rezmancer resume at `/resume`, floating in a nebula. Click words to knock them loose; they burst into comet sparks and swarm home. Back, × or Esc plays it in reverse onto the photo. The 🍄 Shroom Wizard can offer it too.
+
+- `/resume` is also a real, server-rendered resume page: SEO, screen readers, `prefers-reduced-motion`, and a fallback when WebGL isn't available.
+- The nav's Resume button is unchanged (still a plain PDF download).
+- The engine is plain TypeScript on one WebGL2 canvas (`src/lib/jelly/`), ported from the design playground. It's the one exception to the R3F rule, and it loads only behind a trigger: the home page's first-load JS grows by 2.3 KB gzip.
+- The design playground and its tools come along in `docs/design/jelly-resume/`.
+
+## What's in it
+
+- **Routes:**
+  - From the home page, `/resume` is an intercepting route (`@modal/(.)resume`), so the overlay opens over the still-mounted home page. A direct visit gets `app/resume/page.tsx` (the semantic page) with the overlay on top.
+  - `?find=React` runs the Finder.
+  - `JellyResumeHost` in the layout follows the URL and plays the transitions.
+- **Triggers:**
+  - The hero photo is now a real button: a hover/focus hint that follows the cursor, and a "tap to open" tag on touch. It prefetches on hover, focus and touchstart.
+  - The wizard has an `offer_resume` tool: Summon opens the resume with a blue-violet heat.
+- **The resume:**
+  - The HUD: Finder with chips, navigator with minimap, ⤓ PDF, Chaos, Burst/Heal all, Shroom, Black hole, Tilt (phones), Sound, Intro, View and ×, plus keyboard shortcuts.
+  - Site shroom mode drives its shroom look.
+  - It dances to the site's music player (one player for the whole site).
+- **Data:** `public/resume/` is a web snapshot of the Rezmancer resume (AI Engineer variant, no phone or email). `src/data/resume.ts` + `ResumeContent` are the semantic version.
+- **Accessibility:**
+  - The overlay is a modal dialog with a screen-reader copy of the resume; the page under it is `inert`.
+  - Focus returns to whatever opened it.
+  - Reduced motion never loads the engine and goes to the plain page.
+- **Robustness:**
+  - With no WebGL2 or a lost context, the session gets the plain page.
+  - Dispose releases the WebGL context and the decoded images (~25 MB).
+  - Cold opens are spread one job per frame.
+
+## Privacy (the repo is public)
+
+`public/resume/` is generated with `snapshot.mjs --web`, which strips the phone and email and refuses to write if any survive. Checked before pushing:
+- the actual phone and email from the private snapshot appear in **no tracked file** and not in `snapshot.json`;
+- the text layer's contact line reads only "Minneapolis, MN · linkedin.com/in/phill-aelony · github.com/phillael";
+- `rezmancer-snapshot.js` (the one with them) is gitignored and untracked.
+
+## Measurements (production build, `next start`)
+
+| | open | Chaos | close |
+|---|---|---|---|
+| Desktop 1440×900, first visit | 118.8 fps (worst 33 ms) | 120 fps | 120 fps |
+| Emulated phone 390×844, 4× CPU, first visit (fresh browser context) | 111 fps (worst 74–83 ms over 5 runs) | 119.6 fps | 115.9 fps |
+
+The first unoptimized port spent 400–500 ms in one frame on a phone's cold open; it's now spread one job per frame with the heavy decoding off the main thread. Home first-load JS: 272,937 B gzip vs 270,611 on master; no engine, HUD or snapshot code in it.
+
+## Screenshots
+
+<!-- attach: hero hover hint · mid-dissolve · the landed resume · Finder "React" (14 words) · black hole · shroom mode · phone tap tag + landed page · the plain /resume page -->
+
+## Test plan
+
+- [x] `npx tsc --noEmit`, `npm run lint` (zero warnings), `npx jest` (46 suites / 459 tests), `npm run build`
+- [x] Production acceptance run:
+  - the home page matches master apart from the hint and the touch tag;
+  - the nav Resume button still downloads the PDF;
+  - hover prefetches; click dissolves from the click point and lands;
+  - the whole HUD works; ×, Esc and Back reverse onto the photo; Forward reopens;
+  - `/resume?find=React` → 14 matches, and the page works without JS;
+  - the stubbed 🍄 offer opens it with no API call;
+  - reduced motion gets the plain page and no engine;
+  - no console errors.
+- [ ] On a real phone: tilt, shake, audio unlock, GPU cost
+- [ ] On real speakers: the words dance to a song from the ♫ player (verified in dev earlier; the automation browser's audio output stalled during the final run)
+- [ ] On the Vercel preview: `/` → hero → `/resume`, a direct `/resume`, the OG card
+
+## Notes for review
+
+- `/Phillip_Aelony_Resume_2025.pdf` (nav button, ⤓ PDF) is still the 2025 resume. The 3D page shows the AI Engineer one, so swap the PDF when ready.
+- The semantic page follows the AI Engineer variant, so it matches what the 3D page shows.
+- Nav section links become `/#about` off the home page, so they work from `/resume`.
+- New wizard wording is in the plan (T9) for a read.
+- A landscape phone (844×390) gets the desktop HUD layout, as in the playground.
+
+Version 1.2.0 → 1.3.0.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
 
 ## Per-task verification
 
@@ -256,6 +341,33 @@ After all boxes up to T13 are ticked, on the **production build** (`npm run buil
 8. Reduced motion → the plain `/resume` page and no engine chunk.
 9. Desktop ≥ 110 fps; emulated phone ≥ 50 fps; no console errors; `public/resume/` and the repo hold no phone or email.
 10. The four gates are green, `git status` is clean, and nothing is pushed.
+
+**Results (2026-10-13, production build on :3005, fresh isolated tabs):**
+
+1. ✓ `origin/master` was built in a scratch worktree and served beside the branch build.
+   - 1440×900: identical apart from the animated star particles (0.15% of pixels differ).
+   - 390×844: identical apart from the "✨ tap to open my resume" tag (1.5%).
+2. ✓ The nav Resume button is `<a download href="/Phillip_Aelony_Resume_2025.pdf">`; a click leaves the URL on `/` with no dialog.
+3. ✓ A real hover fetched the three engine chunks, `snapshot.json`, `text.webp`, `decor.webp` and the photo, and showed the hint.
+   - Click → `/resume`, photo hidden under the sparks.
+   - Every HUD control is present: drag rotated the page, React gave "14 words", and Chaos, Burst all, Heal all, Shroom, the black hole (screenshot), Intro and View all worked; ⤓ PDF is a download link.
+   - A few words stayed squished after the black hole; that was the resting cursor's hover squish (18 words with the cursor alone, 0 once it left), as in the playground.
+4. ✓ ×, Esc and Back each land on `/` with the photo visible, focus on the hero and nothing inert. Forward reopens the overlay.
+5. ✓ `/resume?find=React` shows React with 14 matches ~3 s in, after the quick intro. Without JS, the server HTML has the h1, all five sections and no canvas.
+6. ✓ / ⚠
+   - ✓ A song started from the ♫ panel (real clicks) kept playing after the resume opened, and the ♫ button stayed on top and usable.
+   - ⚠ The dance couldn't be re-observed: this browser's audio rendering had stalled (a fresh `AudioContext`'s clock advanced 0.01 s per second). The resume's side was wired (analyser on the player's context, `danceMix` 1, `playing` true); T8 saw live bands with the same, unchanged code. To eyeball on real speakers.
+7. ✓ The stubbed chat answered `offer_resume` → "Summon" → `/resume` with the dissolve under way. No request reached `/api/wizard`.
+8. ✓ With reduced motion, hover and focus fetched nothing and the click was a hard navigation. `/resume` showed the plain page: no dialog, canvas, snapshot or engine chunks, nothing inert.
+9. ✓ Performance:
+   - **Desktop:** open 118.8 fps (worst 33 ms), Chaos 120, close 120.
+   - **Phone (4× CPU, first visit):** open 111.3 fps (worst 82.7 ms), Chaos 119.6, close 115.9. T11's five first visits peaked at 74–83 ms.
+   - **Console:** no errors (a hero-image preload warning seen once came from switching one tab between viewports; a clean phone load has none).
+   - **Privacy:** the private snapshot's phone and email are in no tracked file (295 scanned) and not in `public/resume/snapshot.json`; the `text.webp` contact line has only Minneapolis, LinkedIn and GitHub; `rezmancer-snapshot.js` is untracked.
+10. ✓ Gates and git:
+    - `tsc` clean, lint zero warnings, full Jest 46 suites / 459 tests (T13), build OK.
+    - `git status` shows only the build-touched `next-env.d.ts` and the dev-generated `AGENTS.md` (never committed, per the ground rules).
+    - No upstream, no remote branch: **nothing pushed**.
 
 ## Stop conditions / open questions (only Phill can decide)
 

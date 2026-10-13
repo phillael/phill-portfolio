@@ -11,6 +11,7 @@ import JellyFinder from '@/components/jelly/JellyFinder'
 import JellyHudBar, { type HudToggles } from '@/components/jelly/JellyHudBar'
 import JellyNavigator from '@/components/jelly/JellyNavigator'
 import { FOCUS, PANEL } from '@/components/jelly/hudStyles'
+import ResumeContent from '@/components/ResumeContent'
 
 interface JellyResumeCanvasProps {
   /** overlay: opened from the home page (the hero dissolves into it); direct: a visit to /resume */
@@ -33,6 +34,16 @@ const pageClasses = (...add: string[]) => {
   if (!el) return
   el.classList.remove('jelly-dissolving', 'jelly-gone', 'jelly-returning')
   el.classList.add(...add)
+}
+
+/**
+ * Everything under the overlay (the page, the skip link, the shroom UI) is out of reach while
+ * it's up: hidden UI is inert. The resume's text equivalent is inside the dialog instead.
+ */
+const pageInert = (on: boolean) => {
+  for (const el of [document.getElementById('shroom-target'), document.getElementById('shroom-ui'), document.querySelector('a[href="#main"]')]) {
+    if (el instanceof HTMLElement) el.inert = on
+  }
 }
 
 /** Whatever opened the resume (the hero, or the 🍄), so focus can go back to it. */
@@ -88,7 +99,10 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
           if (!a || a === document.body || document.getElementById('shroom-target')?.contains(a)) sectionRef.current?.focus({ preventScroll: true })
         },
         // closing in reverse: the sparks are home on the photo, so the page comes back under them
-        onLanded: () => pageClasses('jelly-returning'),
+        onLanded: () => {
+          pageInert(false)
+          pageClasses('jelly-returning')
+        },
         onClosed: () => {
           openerFor(openerRef.current)?.focus({ preventScroll: true })
           onClosedRef.current?.()
@@ -100,6 +114,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     }
     let alive = true
     setEngine(e)
+    pageInert(true)
     // over the home page the hero dissolves into the resume (from the click; Forward replays it from the photo's center)
     const img = modeRef.current === 'overlay' ? getHeroImg() : null
     if (img && e.openFromHero({ img, origin: intent?.origin ?? null, tint: intent?.tint ?? 0, find: findRef.current })) pageClasses('jelly-dissolving')
@@ -116,6 +131,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
       e.dispose()
       tap.dispose()
       pageClasses()
+      pageInert(false)
       setEngine(null)
       setLoaded(false)
       setOpened(false)
@@ -129,6 +145,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     const img = modeRef.current === 'overlay' ? getHeroImg() : null
     if (engine && img && engine.close(img)) return
     setFadeOut(true)
+    pageInert(false)
     if (modeRef.current === 'overlay') {
       pageClasses('jelly-returning')
       if (img) img.style.visibility = ''
@@ -198,8 +215,10 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     if (!engine || !opened || closing) return
     const ignore = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
-      // (the Finder's input handles its own keys; its chips are buttons like the rest)
-      return e.ctrlKey || e.metaKey || e.altKey || (!!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))
+      // only for the resume: not while focus is elsewhere (the music player's panel); the Finder's
+      // input handles its own keys, its chips are buttons like the rest
+      const ours = !(t instanceof Node) || t === document.body || !!sectionRef.current?.contains(t)
+      return !ours || e.ctrlKey || e.metaKey || e.altKey || (!!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))
     }
     const onButton = (e: KeyboardEvent) => !!(e.target as HTMLElement | null)?.closest?.('button, a')
     const down = (e: KeyboardEvent) => {
@@ -247,10 +266,17 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     <section
       ref={sectionRef}
       tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
       aria-label="Interactive resume"
       className={`fixed inset-0 z-50 font-body outline-none text-[13px] leading-[1.4] text-[#d7deea] transition-opacity duration-[400ms] ${fadeOut ? 'opacity-0' : ''} ${closing ? 'pointer-events-none' : ''}`}
     >
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 block h-full w-full touch-none" />
+      {/* the canvas is decoration: its words, as text, for screen readers */}
+      <div className="sr-only">
+        <p>A 3D, animated version of Phill&apos;s resume. Its text follows.</p>
+        <ResumeContent idPrefix="jelly-resume-" links={false} />
+      </div>
       {engine && (
         <div inert={!uiOn} className={fadeIn}>
           <JellyFinder

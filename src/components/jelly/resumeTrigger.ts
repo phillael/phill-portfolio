@@ -20,6 +20,8 @@ let intent: OpenIntent | null = null
 let heroImg: HTMLImageElement | null = null
 let navigate: ((url: string) => void) | null = null
 let prefetched = false
+let hardNavigate = (url: string) => window.location.assign(url)
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** The hero <img> the dissolve samples (null when the home page isn't mounted). */
 export const registerHero = (img: HTMLImageElement | null) => {
@@ -41,7 +43,7 @@ export const clearIntent = () => {
 
 /** Warm the engine chunk and the snapshot (hover, focus or touchstart on a trigger). */
 export function prefetchResume() {
-  if (prefetched) return
+  if (prefetched || reducedMotion()) return // reduced motion never loads the engine
   prefetched = true
   import('@/components/jelly/JellyResumeCanvas').catch(() => (prefetched = false))
   import('@/lib/jelly/snapshot')
@@ -52,11 +54,16 @@ export function prefetchResume() {
 /** Open the 3D resume (with reduced motion, the plain /resume page). */
 export function openResume(i: OpenIntent, find?: string | null) {
   const url = '/resume' + (find ? `?find=${encodeURIComponent(find)}` : '')
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !navigate) {
-    window.location.assign(url)
+  if (reducedMotion() || !navigate) {
+    hardNavigate(url) // the plain page: no canvas, no engine
     return
   }
   intent = i
   prefetchResume()
   navigate(url)
+}
+
+// Test helper: jsdom can't navigate
+export const __setHardNavigate = (f: (url: string) => void) => {
+  hardNavigate = f
 }

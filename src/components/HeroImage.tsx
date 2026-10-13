@@ -39,7 +39,7 @@ const HeroImage = () => {
       {/* Animated glow effect - extends vertically but contained horizontally; brighter while the photo is hovered or focused */}
       <GlowEffect
         inset="-inset-y-10 inset-x-0"
-        className="transition-[transform,filter] duration-300 group-hover/hero:scale-[1.12] group-hover/hero:brightness-150 group-focus-within/hero:scale-[1.12] group-focus-within/hero:brightness-150"
+        className="transition-[transform,filter] duration-300 group-hover/hero:brightness-150 group-focus-within/hero:brightness-150 motion-safe:group-hover/hero:scale-[1.12] motion-safe:group-focus-within/hero:scale-[1.12]"
       />
 
       <button

@@ -5,6 +5,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import JellyResumeHost from '@/components/jelly/JellyResumeHost'
 import JellyResumeRoute from '@/components/jelly/JellyResumeRoute'
 import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
@@ -100,7 +101,7 @@ describe('JellyResumeHost (the overlay, driven by the URL)', () => {
     fireEvent.click(x) // a second close before the route changes must not go back twice
     expect(back).toHaveBeenCalledTimes(1)
     overlay.unmount() // (what Back does) → it closes, then unmounts
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Interactive resume' })).toBeNull(), { timeout: 1500 })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Interactive resume' })).toBeNull(), { timeout: 1500 })
 
     render(<JellyResumeRoute mode="direct" />)
     fireEvent.click(await screen.findByRole('button', { name: 'Close the resume (Esc)' }))
@@ -121,7 +122,7 @@ describe('the resume HUD', () => {
   const open = async (onClose = jest.fn()) => {
     mediaQuery(false)
     render(<JellyResumeCanvas onClose={onClose} />)
-    const region = await screen.findByRole('region', { name: 'Interactive resume' })
+    const region = await screen.findByRole('dialog', { name: 'Interactive resume' })
     await waitFor(() => expect(engine.load).toHaveBeenCalled())
     return { region, onClose }
   }
@@ -214,7 +215,7 @@ describe('the resume HUD', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
 
     rerender(<JellyResumeCanvas onClose={onClose} closing />)
-    expect(screen.getByRole('region', { name: 'Interactive resume' })).toHaveClass('opacity-0')
+    expect(screen.getByRole('dialog', { name: 'Interactive resume' })).toHaveClass('opacity-0')
     fireEvent.keyDown(window, { key: 'Escape' })
     fireEvent.keyDown(window, { key: 'c' })
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -245,7 +246,7 @@ describe('closing over the home page', () => {
 
     rerender(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} closing />)
     expect(engine.close).toHaveBeenCalledWith(img)
-    expect(screen.getByRole('region', { name: 'Interactive resume' })).not.toHaveClass('opacity-0') // the canvas plays it, no fade
+    expect(screen.getByRole('dialog', { name: 'Interactive resume' })).not.toHaveClass('opacity-0') // the canvas plays it, no fade
     act(() => callbacks.onLanded?.())
     expect(page).toHaveClass('jelly-returning')
     expect(onClosed).not.toHaveBeenCalled()
@@ -264,10 +265,70 @@ describe('closing over the home page', () => {
     const { rerender } = render(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} />)
     await waitFor(() => expect(engine.load).toHaveBeenCalled())
     rerender(<JellyResumeCanvas mode="overlay" onClose={jest.fn()} onClosed={onClosed} closing />)
-    expect(screen.getByRole('region', { name: 'Interactive resume' })).toHaveClass('opacity-0')
+    expect(screen.getByRole('dialog', { name: 'Interactive resume' })).toHaveClass('opacity-0')
     expect(page).toHaveClass('jelly-returning')
     expect(img.style.visibility).toBe('')
     await waitFor(() => expect(onClosed).toHaveBeenCalled(), { timeout: 1500 })
     cleanup()
+  })
+})
+
+describe('the 3D resume is accessible', () => {
+  const page = () => {
+    const main = document.createElement('div')
+    main.id = 'shroom-target'
+    const link = document.createElement('a')
+    link.href = '#main'
+    link.textContent = 'Skip to main content'
+    document.body.prepend(link)
+    document.body.appendChild(main)
+    return { main, link, cleanup: () => { main.remove(); link.remove() } }
+  }
+
+  it('makes everything under it inert while it is up, and gives it back after', async () => {
+    const { main, link, cleanup } = page()
+    mediaQuery(false)
+    const { unmount } = render(<JellyResumeCanvas onClose={jest.fn()} />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
+    expect(main.inert).toBe(true)
+    expect(link.inert).toBe(true)
+    unmount()
+    expect(main.inert).toBe(false)
+    expect(link.inert).toBe(false)
+    cleanup()
+  })
+
+  it('is a modal dialog whose text equivalent is the resume (the canvas is aria-hidden)', async () => {
+    mediaQuery(false)
+    render(<JellyResumeCanvas onClose={jest.fn()} />)
+    const dialog = await screen.findByRole('dialog', { name: 'Interactive resume' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(within(dialog).getByRole('heading', { level: 1, name: 'Phill Aelony' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { level: 2, name: 'Experience' })).toBeInTheDocument()
+    // the copy has nothing to tab to: the HUD and × are the only stops
+    const copy = within(dialog).getByRole('heading', { level: 1 }).closest('.sr-only')!
+    expect(copy.querySelectorAll('a, button, input, [tabindex]')).toHaveLength(0)
+  })
+
+  it('has no axe violations', async () => {
+    mediaQuery(false)
+    const { container } = render(<JellyResumeCanvas onClose={jest.fn()} />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
+    const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } })
+    expect(results).toHaveNoViolations()
+  })
+
+  it('ignores its shortcuts while focus is elsewhere (e.g. the music player’s panel)', async () => {
+    mediaQuery(false)
+    const onClose = jest.fn()
+    render(<JellyResumeCanvas onClose={onClose} />)
+    await waitFor(() => expect(engine.load).toHaveBeenCalled())
+    const panel = document.createElement('button')
+    document.body.appendChild(panel)
+    fireEvent.keyDown(panel, { key: 'Escape' })
+    fireEvent.keyDown(panel, { key: 'c' })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(engine.chaos).not.toHaveBeenCalled()
+    panel.remove()
   })
 })

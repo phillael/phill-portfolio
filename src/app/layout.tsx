@@ -97,7 +97,10 @@ const RootLayout = ({ children, modal }: { children: React.ReactNode; modal: Rea
             <JellyResumeHost />
             {modal}
             <MusicPlayer />
-            <ShroomMode />
+            {/* (a plain wrapper, no filter or transform: the 3D resume makes it inert while it's open) */}
+            <div id="shroom-ui">
+              <ShroomMode />
+            </div>
           </ShroomModeProvider>
         </MotionProvider>
       </body>

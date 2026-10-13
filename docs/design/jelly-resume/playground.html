@@ -398,24 +398,25 @@ const BACKDROPS = [['nebula', 'Nebula + stars'], ['stars', 'Stars only'], ['void
 const QUALITIES = [['auto', 'Auto (low on touch devices)'], ['high', 'High'], ['low', 'Low (phones)']];
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
 
+// Phill's tuned look (2026-10-13, pasted from Copy prompt): Into the Void physics, chrome text, long swirly comet trails, dense stars + front mist
 const DEFAULTS = {
   granularity: 'word', space: 'fly', // Phill (2026-10-13): "Into the Void" is how it runs
   stiffness: 900, damping: 4, homePull: 60, breakDist: 0.45, boldSoft: 2.2,
   contagion: 0.35, escape: 0.15, airDrag: 0.35, gravity: 12, bounce: 0.5,
   autoBurst: true, floatTime: 3.5, burstSpeed: 7, clickBurst: true,
-  burstForce: 4.5, burstTime: 2.2, reformTime: 1.1, pSize: 1.25, pColor: 'comet', returnTime: 1.0, trail: 1, swirl: 1,
-  flash: 1, pGlow: 0.6, shockwave: 0.7, pDensity: 1.2,
-  pageFinish: 'paper', grain: 0.5, paperThick: 0.08, paperBend: 0.5, paperCurl: 0.5, inkFinish: 'emboss', shine: 0.5, textDepth: 0.35,
+  burstForce: 5.4, burstTime: 2.2, reformTime: 1.1, pSize: 0.75, pColor: 'comet', returnTime: 1.0, trail: 1.3, swirl: 1.4,
+  flash: 0.95, pGlow: 1.5, shockwave: 0.5, pDensity: 1.2,
+  pageFinish: 'paper', grain: 0.5, paperThick: 0.08, paperBend: 0.5, paperCurl: 0.55, inkFinish: 'chrome', shine: 0.75, textDepth: 0.5,
   fingerRadius: 0.7, fingerForce: 20, flick: 0.8, smack: 5, slosh: 0.4,
   gummy: 0, jelly: 'purple', paper: 'white', tilt: 0.05, yaw: 0, zoom: 1,
   layoutSource: 'rezmancer', // falls back to 'runtime' if rezmancer-snapshot.js is missing
   shroom: false, melt: 0.7, drip: 0.5, dropRate: 0.3, hueSpeed: 0.12,
-  backdrop: 'nebula', nebula: 'philcodes', nebulaSeed: 3, nebulaBright: 1, starDensity: 1,
-  mist: 0.6, fgMist: 0.2, mistDrift: 0.3, fog: 0.6, quality: 'auto',
+  backdrop: 'nebula', nebula: 'philcodes', nebulaSeed: 1, nebulaBright: 1, starDensity: 1.7,
+  mist: 0.6, fgMist: 1, mistDrift: 1.3, fog: 0.55, quality: 'auto',
   soundOn: true, volume: 0.7,
   introTime: 3, holePull: 1, tiltForce: 12, shake: true,
-  dance: 1, danceStyle: 'groove', mosh: 0, pulse: 0.6,
-  entrance: 'hero', heroPath: 'page', dissolveTime: 1.6, heroSparks: 1, simReduced: false,
+  dance: 1, danceStyle: 'groove', mosh: 0, pulse: 0.7,
+  entrance: 'hero', heroPath: 'page', dissolveTime: 2.1, heroSparks: 1, simReduced: false,
 };
 const state = { ...DEFAULTS };
 const VIEW_KEYS = ['tilt', 'yaw', 'zoom', 'quality', 'layoutSource', 'paper', 'soundOn', 'volume'];

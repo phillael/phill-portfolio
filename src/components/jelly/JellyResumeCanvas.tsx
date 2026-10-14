@@ -246,6 +246,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
   // (the engine calls onLanded, then onClosed). Otherwise, or if the photo can't be used: fade out.
   useEffect(() => {
     if (!closing) return
+    engine?.play.exit(true) // playing: leave Play first, instantly
     const img = modeRef.current === 'overlay' ? getHeroImg() : null
     if (engine && onScreen(img) && engine.close(img!)) return
     setFadeOut(true)

@@ -364,6 +364,9 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
 
   /** the resume is open, has printed and isn't mid-transition */
   const settledNow = () => open && !!loaded && !w.intro && !cl && !diss
+  /** Play pressed during the entrance waits for the page to settle (resolved by the frame loop, or by dispose) */
+  let settleWaiters: (() => void)[] = []
+  const whenSettled = () => (settledNow() ? Promise.resolve() : new Promise<void>((r) => settleWaiters.push(r)))
   /** page gestures (off while playing) */
   const enabled = () => open && !!loaded && !playing
   const input = attachInput({
@@ -446,6 +449,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     // the cast: on stage once the page has printed (and off it while the resume closes or replays its intro).
     // Its models are ~900 KB, so a visitor who asked to save data doesn't get them.
     const settled = settledNow()
+    if (settled && settleWaiters.length) { const ws = settleWaiters; settleWaiters = []; ws.forEach((f) => f()) }
     if (settled && !castStarted) {
       castStarted = true
       const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData
@@ -488,10 +492,11 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
    */
   async function enterPlay() {
     if (playing) return true
-    if (!settledNow()) return false
+    if (!open || cl) return false
     const [ok, mod] = await Promise.all([
       loadCast(),
       import('./play').catch((err) => { console.warn('Play mode failed to load', err); return null }),
+      whenSettled(), // (pressed during the entrance: once it has printed)
     ])
     if (disposed || !ok || !mod || !cast || !settledNow()) return false
     if (playing) return true
@@ -518,6 +523,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
 
   function dispose() {
     disposed = true
+    settleWaiters.forEach((f) => f())
+    settleWaiters = []
     stopLoop()
     document.removeEventListener('visibilitychange', onVisibility)
     ro.disconnect()

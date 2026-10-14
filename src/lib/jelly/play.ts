@@ -130,6 +130,8 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   let spawnLine = -1
   let prevSmash = false, smashT = -1, smashCd = 0, struck = false, hitStopT = 0, shakeT = 0, shakeClock = 0, shakePh = 0
   let pounding = false, splat = false, flailT = -1
+  /** standing still with the music on: after `idleDance` s he dances (one from his rotation, until any input) */
+  let stillT = 0, idleDance = ''
   /** how high his soles are above his model's origin now (model units): the planted foot stands on the line */
   let sole = rig.stand
   const coinSet = new Set(level.coins)
@@ -514,7 +516,12 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     } else if (Math.abs(vx) > 0.05) {
       pose.play('walk', 0.12)
       pose.update(dt, P.runRate * Math.max(0.35, Math.abs(vx) / P.runSpeed))
+    } else if (stillT > P.idleDance && w.danceMix > 0.5 && rig.dances.length) {
+      idleDance ||= rig.dances[Math.floor(Math.random() * rig.dances.length)]
+      pose.play(idleDance, 0.4)
+      pose.update(dt)
     } else {
+      idleDance = ''
       pose.play('idle', 0.2)
       pose.update(dt)
     }
@@ -615,6 +622,8 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
       run.begin() // the first move starts the clock
       emit({ type: 'start' })
     }
+    // any input (or moving, or the air) wakes him from an idle dance
+    stillT = input.left || input.right || input.jump || input.down || input.smash || tap.size || !grounded || smashT >= 0 ? 0 : stillT + dt
     const jumpPressed = live && ((input.jump && !prevJump) || tap.has('jump')), downPressed = live && ((input.down && !prevDown) || tap.has('down'))
     const smashPressed = live && ((input.smash && !prevSmash) || tap.has('smash'))
     tap.clear()

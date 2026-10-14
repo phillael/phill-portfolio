@@ -177,6 +177,10 @@ export interface CastConfig {
   /** his zero-g bob */
   bob: number
   danceRate: number
+  /** with music on he dances, and moves on to another dance after this many seconds (at the end of a loop) */
+  danceSwitch: number
+  /** his bounce and glow on the beat */
+  pump: number
   /** the light he gets that isn't from the page's light (Meshy textures are bright already) */
   ambient: number
   /** the nebula's neon on his edges */
@@ -188,9 +192,13 @@ export interface CastConfig {
   shrimpGap: number
   /** world units per second */
   shrimpSpeed: number
+  /** with music on: each shrimp swells and glows with its own slice of the spectrum */
+  shrimpPulse: number
+  /** ...and its body bends to the live waveform */
+  shrimpWiggle: number
 }
 
 export const CAST_CONFIG: Readonly<CastConfig> = Object.freeze({
   phill: true, size: 3.4, phoneScale: 0.55, phoneLift: 0, orbitX: 2.4, orbitZ: 4.2, tilt: 3.6, lift: 0.2, lap: 34, face: 0.3, bob: 0.25, danceRate: 1,
-  ambient: 0.62, rim: 0.7, shrimp: 3, shrimpSize: 2.6, shrimpGap: 9, shrimpSpeed: 0.75,
+  danceSwitch: 16, pump: 1, ambient: 0.62, rim: 0.7, shrimp: 3, shrimpSize: 2.6, shrimpGap: 9, shrimpSpeed: 0.75, shrimpPulse: 1, shrimpWiggle: 1,
 })

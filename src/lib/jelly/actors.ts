@@ -23,6 +23,8 @@ export interface ActorModel {
   center: Vec3
   height: number
   extent: number
+  /** for a wiggle, in the mesh's own space: its longest axis, its thinnest (the way it bends), and its span along the first */
+  bend: { along: Vec3; side: Vec3; lo: number; hi: number }
 }
 
 export interface CastFrame {
@@ -48,6 +50,9 @@ export interface DrawLook {
   glow: Vec3
   /** the fog for this one: far shrimp fade into the nebula more gently than the words */
   fog?: number
+  /** a wiggle along the body: sixteen samples (-1…1) and how far they bend it, as a share of its length */
+  wave?: Float32Array
+  waveAmp?: number
 }
 
 const ATTRS = { POSITION: 'aPos', NORMAL: 'aNormal', TEXCOORD_0: 'aUv', JOINTS_0: 'aJoints', WEIGHTS_0: 'aWeights' } as const
@@ -89,6 +94,7 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
       center: [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2],
       height: b.max[1] - b.min[1],
       extent: Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]),
+      bend: bendAxes(m.positions),
     }
     models.push(am)
     return am
@@ -117,6 +123,12 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.uniform1f(u.uAlpha, look.alpha); gl.uniform1f(u.uFlash, look.flash); gl.uniform1f(u.uRim, look.rim); gl.uniform1f(u.uAmbient, look.ambient)
     gl.uniform1f(u.uFog, look.fog ?? fogBase)
     gl.uniform1i(u.uHasGlow, a.glow ? 1 : 0); gl.uniform3fv(u.uGlowCol, look.glow)
+    const bd = a.bend, amp = look.wave ? (look.waveAmp ?? 0) * (bd.hi - bd.lo) : 0
+    gl.uniform1f(u.uWaveAmp, amp)
+    if (amp > 0) {
+      gl.uniform1fv(u['uWave[0]'], look.wave!)
+      gl.uniform3fv(u.uWaveAlong, bd.along); gl.uniform3fv(u.uWaveSide, bd.side); gl.uniform2f(u.uWaveSpan, bd.lo, bd.hi)
+    }
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a.tex)
     if (a.glow) { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, a.glow) }
     gl.bindVertexArray(a.vao)
@@ -139,6 +151,15 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
 }
 
 export type ActorRenderer = ReturnType<typeof createActorRenderer>
+
+/** A mesh's longest and thinnest axes (x, y or z) in its own space, and its span along the longest. */
+export function bendAxes(P: Float32Array): ActorModel['bend'] {
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity]
+  for (let v = 0; v < P.length; v += 3) for (let c = 0; c < 3; c++) { if (P[v + c] < mn[c]) mn[c] = P[v + c]; if (P[v + c] > mx[c]) mx[c] = P[v + c] }
+  const ext = [0, 1, 2].map((c) => mx[c] - mn[c]), byLen = [0, 1, 2].sort((a, b) => ext[b] - ext[a])
+  const unit = (c: number): Vec3 => [c === 0 ? 1 : 0, c === 1 ? 1 : 0, c === 2 ? 1 : 0]
+  return { along: unit(byLen[0]), side: unit(byLen[2]), lo: mn[byLen[0]], hi: mx[byLen[0]] }
+}
 
 /** joint matrix j = the joint's world matrix · its inverse bind matrix */
 export function jointMatrices(m: GltfModel, world: Float32Array, out: Float32Array) {
@@ -206,6 +227,11 @@ export class Pose {
 
   get clip() {
     return this.cur?.clip.name ?? null
+  }
+
+  /** how far through its clip the current one is (0…1; it drops back when a loop comes round) */
+  get phase() {
+    return this.cur && this.cur.clip.duration > 0 ? this.cur.t / this.cur.clip.duration : 0
   }
 
   /** Crossfade to a clip (no-op if it's already playing). */

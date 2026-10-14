@@ -1,8 +1,11 @@
 /**
- * The cast: Phill (from Number Slayers) dances in an orbit around the page, behind it
+ * The cast: Phill (from Number Slayers) floats in an orbit around the page, behind it
  * across the top and in front along the bottom, and now and then a shrimp drifts across
- * the nebula like a slow planet. Click one and it spins off (Phill flails), then drifts
- * back; the black hole eats them and spits them out; Chaos knocks them all.
+ * the nebula like a slow planet. With the site's music on he dances (the game's dances,
+ * a new one every so often) and bounces on the beat, and each shrimp swells and glows
+ * with its own slice of the spectrum while its body bends to the live waveform. Click one
+ * and it spins off (Phill flails), then drifts back; the black hole eats them and spits
+ * them out; Chaos knocks them all.
  *
  * It loads after the page has printed (so the cold open never waits on it) and draws in
  * the resume's pass, so the page hides whatever passes behind it.
@@ -15,8 +18,10 @@ import { hex, lcg, M4x, Q, type Quat, type Vec3 } from './math'
 import { LIGHT } from './render'
 import type { World } from './world'
 
-const DANCE = 'dance'
+const IDLE = 'idle'
 const KNOCKED = 'die'
+/** samples of the waveform along a shrimp's body */
+const WAVE = 16
 
 interface Body {
   pos: Vec3
@@ -37,6 +42,16 @@ interface PhillState extends Body {
   th: number
   /** seconds since he arrived (he flies in from deep in the nebula) */
   age: number
+  /** every clip but idle and the knock, and what's left of this round of them (shuffled) */
+  dances: Set<string>
+  bag: string[]
+  /** the music's on (with some hysteresis) */
+  groove: boolean
+  /** seconds into this dance, and how far through its loop it was last frame */
+  danceT: number
+  phase: number
+  /** this frame's beat bounce (0…1) */
+  pump: number
 }
 
 interface ShrimpState extends Body {
@@ -51,6 +66,14 @@ interface ShrimpState extends Body {
   ang: number
   base: Quat
   size: number
+  /** its slice of the spectrum (0 bass … 1 treble) and how loud that is now */
+  band: number
+  level: number
+  /** the bend along its body (sixteen samples), its swim's phase, how many of the music's 96 waveform points it spans, and their recent peak */
+  wave: Float32Array
+  ph: number
+  span: number
+  peak: number
 }
 
 const body = (pos: Vec3): Body => ({ pos, vel: [0, 0, 0], rot: [0, 0, 0, 1], spin: [0, 0, 0], free: 0, flash: 0, eaten: false, scale: 1 })
@@ -64,8 +87,11 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
   let shrimpWorld: Float32Array | null = null
   const shrimp: ShrimpState[] = Array.from({ length: 4 }, (_, i) => ({
     ...body([0, 0, -40]), on: false, wait: 3 + i * 6 + rnd() * 6, t: 0, dur: 1, from: [0, 0, 0], to: [0, 0, 0], axis: [0, 1, 0], rate: 0, ang: 0, base: [0, 0, 0, 1], size: 1,
+    band: 0, level: 0, wave: new Float32Array(WAVE), ph: 0, span: 32, peak: 0.2,
   }))
   let alpha = 0
+  /** the music's bass, smoothed (and zero while it's off) */
+  let energy = 0
   let disposed = false
 
   /** Fetch and build both models, a step per frame. Failures leave the stage empty (never the resume). */
@@ -82,8 +108,9 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
         const a = await R.load(pb, nextTask)
         if (disposed) return
         const pose = new Pose(a.m)
-        pose.play(pose.has(DANCE) ? DANCE : a.m.clips[0]?.name ?? '', 0)
-        phill = { ...body([0, params.lift + 3, -40]), a, pose, th: -Math.PI / 2, age: 0, scale: 0.4 }
+        pose.play(pose.has(IDLE) ? IDLE : a.m.clips[0]?.name ?? '', 0)
+        const dances = new Set(a.m.clips.map((c) => c.name).filter((n) => n !== IDLE && n !== KNOCKED))
+        phill = { ...body([0, params.lift + 3, -40]), a, pose, th: -Math.PI / 2, age: 0, scale: 0.4, dances, bag: [], groove: false, danceT: 0, phase: 0, pump: 0 }
       }
       await nextTask()
       if (disposed) return
@@ -188,7 +215,42 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     else { const s = b as ShrimpState; s.dur = Math.max(s.dur, s.t / 0.8) } // a shrimp near the end of its pass sticks around to come back
   }
 
+  /** On to the next dance: a shuffled round of them all, never the same one twice running. */
+  function nextDance(p: PhillState, fade: number) {
+    if (!p.bag.length) {
+      p.bag = [...p.dances].filter((d) => d !== p.pose.clip)
+      for (let i = p.bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p.bag[i], p.bag[j]] = [p.bag[j], p.bag[i]] }
+    }
+    const next = p.bag.pop()
+    if (next) p.pose.play(next, fade)
+    p.danceT = 0
+    p.phase = 0
+  }
+
   // ---- shrimp ----
+  /**
+   * The bend along a shrimp's body: a swim that runs down it, faster and bigger the louder
+   * its slice of the spectrum and kicked by the beat, with the live waveform rippling on top
+   * (a stretch of the music's 96 points from a rising zero crossing, so it holds still like a
+   * scope's, scaled by its recent peak). Its ends swing more than its middle.
+   */
+  function waveInto(s: ShrimpState, dt: number) {
+    const W = w.music.wave, n = W.length, span = Math.min(s.span, n - 1)
+    let start = 0
+    for (let k = 1; k < n - span; k++) if (W[k - 1] < 0 && W[k] >= 0) { start = k; break }
+    let peak = 0
+    for (let k = 0; k < span; k++) peak = Math.max(peak, Math.abs(W[start + k]))
+    s.peak = Math.max(0.05, peak, s.peak * Math.max(0, 1 - dt * 0.7))
+    s.ph += dt * (0.5 + 2 * s.level)
+    const swim = 0.45 * s.level + 0.6 * w.music.beat, e = Math.min(1, dt * 25)
+    for (let k = 0; k < WAVE; k++) {
+      const u = k / (WAVE - 1), f = start + u * (span - 1), i = Math.floor(f), t = f - i
+      const scope = (W[i] * (1 - t) + W[Math.min(n - 1, i + 1)] * t) / s.peak
+      const v = (swim * Math.sin(6.283 * (0.9 * u - s.ph)) + 0.35 * scope) * (0.4 + 0.6 * Math.abs(2 * u - 1))
+      s.wave[k] += (v - s.wave[k]) * e
+    }
+  }
+
   function spawn(s: ShrimpState) {
     const z = -(4 + rnd() * 20), d = fitDist() - z, tf = Math.tan(FOV / 2), hw = d * tf * w.cam.aspect, hh = d * tf
     const side = rnd() < 0.5 ? -1 : 1
@@ -202,6 +264,10 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     s.axis = [ax[0] / al, ax[1] / al, ax[2] / al]
     s.rate = (0.15 + rnd() * 0.35) * (rnd() < 0.5 ? -1 : 1)
     s.ang = rnd() * 6.28
+    s.band = 0.03 + rnd() * 0.6
+    s.span = 24 + Math.floor(rnd() * 24)
+    s.level = 0
+    s.wave.fill(0)
     Q.norm(Q.axis(s.axis[1], s.axis[2], s.axis[0], rnd() * 6.28, s.base))
     s.pos = [...s.from]
     s.vel = [0, 0, 0]
@@ -220,6 +286,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     alpha += ((show ? 1 : 0) - alpha) * Math.min(1, dt * (show ? 2.5 : 6))
     if (alpha < 0.002 && !show) return
     const t = w.time, music = w.music, dm = w.danceMix
+    energy += (music.bass * dm - energy) * Math.min(1, dt * 3)
 
     if (phill) {
       const p = phill, cam = w.cam
@@ -230,15 +297,29 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       // he faces you, turning a little toward where he's going
       const yawCam = Math.atan2(cam.eye[0] - target[0], cam.eye[2] - target[2])
       const yawGo = Math.atan2(ahead[0] - target[0], ahead[2] - target[2])
-      target[1] += params.bob * Math.sin(t * 1.1) + 0.12 * music.beat * dm
+      p.pump = Math.min(1, music.beat * dm * params.pump)
+      target[1] += params.bob * Math.sin(t * 1.1) + 0.3 * p.pump
       let dy = yawGo - yawCam
       dy = Math.atan2(Math.sin(dy), Math.cos(dy))
       Q.axis(0, 1, 0, yawCam + dy * params.face, tq)
       Q.mul(tq, Q.axis(0, 0, 1, 0.07 * Math.sin(t * 0.9), sq), tq)
       holeStep(p, dt)
       if (!p.eaten) stepBody(p, target, tq, dt, p.age < 4 ? 1.5 + p.age * 1.6 : 8) // he flies in slowly, then keeps close to his spot
-      if (p.free <= 0 && !p.eaten && p.pose.clip !== DANCE) p.pose.play(DANCE, 0.6)
-      p.pose.update(dt, p.pose.clip === DANCE ? params.danceRate * (1 + 0.15 * dm) : 1)
+      // music on: he dances, a new one every so often (at the end of a loop); off: he hangs about
+      if (dm > 0.5) p.groove = true
+      else if (dm < 0.3) p.groove = false
+      const dancing = p.dances.has(p.pose.clip ?? '')
+      if (p.free <= 0 && !p.eaten) {
+        if (!p.groove) p.pose.play(IDLE, 0.8)
+        else if (!dancing) nextDance(p, 0.6)
+        else {
+          p.danceT += dt
+          const ph = p.pose.phase
+          if (p.danceT > params.danceSwitch && ph < p.phase) nextDance(p, 0.5)
+          else p.phase = ph
+        }
+      }
+      p.pose.update(dt, dancing ? params.danceRate * (0.9 + 0.25 * energy) : 1)
     }
 
     if (shrimpModel) {
@@ -246,7 +327,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       let live = shrimp.filter((s) => s.on).length
       shrimp.forEach((s, i) => {
         if (!s.on) {
-          s.wait -= dt
+          s.wait -= dt * (1 + dm) // they come twice as often with the music on
           if (s.wait <= 0 && show && live < max && i < max) { spawn(s); live++ }
           return
         }
@@ -254,7 +335,9 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
         const u = s.t / s.dur
         if (u >= 1 && !s.eaten) { s.on = false; s.wait = params.shrimpGap * (0.5 + rnd()); return }
         for (let a = 0; a < 3; a++) target[a] = s.from[a] + (s.to[a] - s.from[a]) * Math.min(1, u)
-        s.ang += s.rate * dt
+        s.level += (music.bandAt(s.band) * dm - s.level) * Math.min(1, dt * 12)
+        if (dm > 0.01) waveInto(s, dt)
+        s.ang += s.rate * dt * (1 + 1.5 * s.level)
         Q.mul(Q.axis(s.axis[0], s.axis[1], s.axis[2], s.ang, tq), s.base, tq)
         holeStep(s, dt)
         if (!s.eaten) stepBody(s, target, tq, dt, 1.2)
@@ -264,21 +347,21 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
 
   // ---- drawing ----
   const place = new Float32Array(16), model = new Float32Array(16), rc = [0, 0, 0], tv: Vec3 = [0, 0, 0], kv: Vec3 = [1, 1, 1]
-  /** translate(pos) · rotate(rot) · scale(k) · translate(-center) */
-  function placement(pos: Vec3, rot: Quat, k: number, c: Vec3) {
-    // the center, scaled and rotated: R·(k·c)
-    const x = c[0] * k, y = c[1] * k, z = c[2] * k, qx = rot[0], qy = rot[1], qz = rot[2], qw = rot[3]
+  /** translate(pos) · rotate(rot) · scale(k; stretched by sy up its height, sx across) · translate(-center) */
+  function placement(pos: Vec3, rot: Quat, k: number, c: Vec3, sx = 1, sy = 1) {
+    // the center, scaled and rotated: R·(S·c)
+    const x = c[0] * k * sx, y = c[1] * k * sy, z = c[2] * k * sx, qx = rot[0], qy = rot[1], qz = rot[2], qw = rot[3]
     const ix = qw * x + qy * z - qz * y, iy = qw * y + qz * x - qx * z, iz = qw * z + qx * y - qy * x, iw = -qx * x - qy * y - qz * z
     rc[0] = ix * qw + iw * -qx + iy * -qz - iz * -qy
     rc[1] = iy * qw + iw * -qy + iz * -qx - ix * -qz
     rc[2] = iz * qw + iw * -qz + ix * -qy - iy * -qx
     tv[0] = pos[0] - rc[0]; tv[1] = pos[1] - rc[1]; tv[2] = pos[2] - rc[2]
-    kv[0] = kv[1] = kv[2] = k
+    kv[0] = kv[2] = k * sx; kv[1] = k * sy
     return M4x.compose(place, tv, rot, kv)
   }
 
   const fogCol = hex(NEBULA.base).map((v) => v * 0.8) as Vec3, rimA = hex(SITE.cyan), rimB = hex(SITE.violet)
-  const glowShrimp: Vec3 = [1, 0.42, 0.24]
+  const glowShrimp: Vec3 = [1, 0.42, 0.24], glowNow: Vec3 = [0, 0, 0]
   const noGlow: Vec3 = [0, 0, 0]
   function draw() {
     if (!R || alpha < 0.002 || (!phill && !shrimpModel)) return
@@ -294,13 +377,22 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
         if (!sh.on || sh.scale <= 0.01) continue
         // fade in and out at the ends of the pass, as well as with the resume
         const u = sh.t / sh.dur, edge = Math.min(1, u * 8, (1 - u) * 8)
-        M4x.mulInto(model, placement(sh.pos, sh.rot, (sh.size / a.extent) * sh.scale, a.center), shrimpWorld)
-        R.draw(a, model, null, { alpha: alpha * Math.max(0, edge), flash: sh.flash, rim: params.rim * 0.8, ambient: 0.7, glow: glowShrimp, fog: f.fog * 0.6 })
+        // with the music: it swells and glows with its slice of the spectrum, and kicks on the beat
+        const lv = sh.level * params.shrimpPulse, kick = w.music.beat * w.danceMix * params.shrimpPulse
+        for (let c = 0; c < 3; c++) glowNow[c] = glowShrimp[c] * (1 + 2.2 * lv)
+        M4x.mulInto(model, placement(sh.pos, sh.rot, (sh.size / a.extent) * sh.scale * (1 + 0.18 * lv + 0.1 * kick), a.center), shrimpWorld)
+        R.draw(a, model, null, {
+          alpha: alpha * Math.max(0, edge), flash: sh.flash, rim: params.rim * 0.8, ambient: 0.7, glow: glowNow, fog: f.fog * 0.6,
+          wave: sh.wave, waveAmp: 0.14 * params.shrimpWiggle * w.danceMix,
+        })
       }
     }
     if (phill) {
       const p = phill, k = (sizeNow() / p.a.height) * p.scale
-      R.draw(p.a, placement(p.pos, p.rot, k, p.a.center), p.pose.joints, { alpha, flash: p.flash, rim: params.rim, ambient: params.ambient, glow: noGlow })
+      // a squash-and-stretch bounce on the beat, and the neon rim brightening with the bass
+      R.draw(p.a, placement(p.pos, p.rot, k, p.a.center, 1 - 0.04 * p.pump, 1 + 0.08 * p.pump), p.pose.joints, {
+        alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump), ambient: params.ambient, glow: noGlow,
+      })
     }
   }
 
@@ -361,8 +453,10 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     click,
     kickAll,
     dispose,
+    /** dev: skip to the next dance */
+    nextDance: () => { if (phill) nextDance(phill, 0.4) },
     /** dev: the state, for scripted checks */
-    debug: () => ({ alpha, phill, shrimp }),
+    debug: () => ({ alpha, energy, phill, shrimp }),
   }
 }
 

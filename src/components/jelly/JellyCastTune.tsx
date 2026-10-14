@@ -23,18 +23,22 @@ const SLIDERS: [NumKey, string, number, number, number][] = [
   ['face', 'Faces you → faces travel', 0, 1, 0.05],
   ['bob', 'Bob', 0, 1.5, 0.05],
   ['danceRate', 'Dance speed', 0.25, 2.5, 0.05],
+  ['danceSwitch', 'Seconds per dance (music on)', 4, 60, 1],
+  ['pump', 'Beat bounce + glow', 0, 3, 0.05],
   ['ambient', 'Ambient light', 0, 1, 0.02],
   ['rim', 'Neon rim', 0, 2, 0.05],
   ['shrimp', 'Shrimp at once', 0, 4, 1],
   ['shrimpSize', 'Shrimp size', 0.5, 10, 0.1],
   ['shrimpGap', 'Seconds between shrimp', 1, 60, 1],
   ['shrimpSpeed', 'Shrimp speed', 0.1, 4, 0.05],
+  ['shrimpPulse', 'Shrimp pulse (music)', 0, 3, 0.05],
+  ['shrimpWiggle', 'Shrimp waveform wiggle', 0, 4, 0.05],
 ]
 
 const KEY = 'jelly-cast-tune'
 
 interface Dev {
-  cast?: { params: CastConfig; kickAll: () => void; debug: () => { shrimp: { on: boolean; wait: number }[] } }
+  cast?: { params: CastConfig; kickAll: () => void; nextDance: () => void; debug: () => { phill: { pose: { clip: string | null } } | null; shrimp: { on: boolean; wait: number }[] } }
 }
 
 const dev = () => (window as unknown as { __jelly?: Dev }).__jelly?.cast
@@ -43,6 +47,7 @@ const JellyCastTune = () => {
   const [on, setOn] = useState(false)
   const [vals, setVals] = useState<CastConfig>({ ...CAST_CONFIG })
   const [copied, setCopied] = useState(false)
+  const [clip, setClip] = useState('')
 
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has('tune')) return
@@ -58,6 +63,13 @@ const JellyCastTune = () => {
     }, 300)
     return () => clearInterval(t)
   }, [])
+
+  // what he's doing, a few times a second (a dev panel; never per frame)
+  useEffect(() => {
+    if (!on) return
+    const t = setInterval(() => setClip(dev()?.debug().phill?.pose.clip ?? ''), 400)
+    return () => clearInterval(t)
+  }, [on])
 
   if (!on) return null
 
@@ -104,6 +116,11 @@ const JellyCastTune = () => {
         <button type="button" className="rounded border border-[#80eaff55] px-2 py-1" onClick={() => dev()?.kickAll()}>Knock all</button>
         <button type="button" className="rounded border border-[#80eaff55] px-2 py-1" onClick={shrimpNow}>Shrimp now</button>
       </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span>Now: <span className="text-[#80eaff]">{clip || '…'}</span></span>
+        <button type="button" className="rounded border border-[#80eaff55] px-2 py-1" onClick={() => dev()?.nextDance()}>Next dance</button>
+      </div>
+      <p className="mt-1 text-[11px] text-[#8a93a6]">He dances while the site&apos;s music plays (♫).</p>
     </div>
   )
 }

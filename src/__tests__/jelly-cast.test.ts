@@ -8,7 +8,7 @@
 
 import { readFileSync } from 'fs'
 import path from 'path'
-import { Pose, jointMatrices, sampleTrack } from '@/lib/jelly/actors'
+import { Pose, bendAxes, jointMatrices, sampleTrack } from '@/lib/jelly/actors'
 import { CAST_CONFIG } from '@/lib/jelly/config'
 import { bounds, parseGlb, readGltf, restLocals, worldMatrices, type GltfModel, type Track } from '@/lib/jelly/gltf'
 
@@ -34,13 +34,15 @@ describe('readGltf: Phill', () => {
   let m: GltfModel
   beforeAll(async () => { m = await readGltf(glb('phill.glb')) })
 
-  it('has his 24-bone skin and the game clips (dance, idle, and die for a knock)', () => {
+  it('has his 24-bone skin, his own clips and the dances borrowed from the other characters', () => {
     expect(m.joints).toHaveLength(24)
     expect(m.ibm).toHaveLength(24 * 16)
-    expect(m.clips.map((c) => c.name).sort()).toEqual(['dance', 'die', 'idle'])
+    expect(m.clips.map((c) => c.name).sort()).toEqual(['dance', 'die', 'garlic', 'human', 'idle', 'lasagna', 'moose', 'zombie'])
+    const own = new Set(['dance', 'die', 'idle'])
     for (const c of m.clips) {
       expect(c.duration).toBeGreaterThan(1)
-      expect(c.tracks.length).toBe(72) // translation, rotation and scale for each bone
+      // his own: translation, rotation and scale for each bone; the borrowed ones: each bone's rotation and the hips' height
+      expect(c.tracks.length).toBe(own.has(c.name) ? 72 : 25)
     }
   })
 
@@ -79,6 +81,14 @@ describe('readGltf: the shrimp', () => {
     const { world } = restPose(m)
     const b = bounds(m, world, null)
     expect(b.max[1] - b.min[1]).toBeCloseTo(0.12, 2)
+  })
+
+  it('bends along its length and sideways across its thinnest side (for the waveform wiggle)', async () => {
+    const m = await readGltf(glb('shrimp.glb'))
+    const { along, side, lo, hi } = bendAxes(m.positions)
+    expect(hi).toBeGreaterThan(lo)
+    expect(along).not.toEqual(side)
+    for (const v of [along, side]) expect(v.reduce((a, x) => a + x * x, 0)).toBe(1)
   })
 })
 
@@ -136,6 +146,16 @@ describe('Pose', () => {
     expect(p.joints.every(Number.isFinite)).toBe(true)
   })
 
+  it('reports how far through its loop a clip is, dropping back when it comes round', () => {
+    const p = new Pose(m)
+    p.play('human', 0)
+    const dur = m.clips.find((c) => c.name === 'human')!.duration
+    p.update(dur * 0.5)
+    expect(p.phase).toBeCloseTo(0.5, 2)
+    p.update(dur * 0.6)
+    expect(p.phase).toBeCloseTo(0.1, 2)
+  })
+
   it('keeps him dancing in place (the root bone never travels sideways)', () => {
     const p = new Pose(m)
     p.play('dance', 0)
@@ -154,5 +174,13 @@ describe('CAST_CONFIG', () => {
   it('is frozen, and the shrimp keep to a handful', () => {
     expect(Object.isFrozen(CAST_CONFIG)).toBe(true)
     expect(CAST_CONFIG.shrimp).toBeLessThanOrEqual(4) // the cast keeps four shrimp slots
+  })
+})
+
+describe('bendAxes', () => {
+  it('picks the longest axis to bend along and the thinnest to bend across', () => {
+    // a box 4 long (z), 2 tall (y), 1 wide (x)
+    const P = new Float32Array([-0.5, -1, -2, 0.5, 1, 2, 0, 0, 0])
+    expect(bendAxes(P)).toEqual({ along: [0, 0, 1], side: [1, 0, 0], lo: -2, hi: 2 })
   })
 })

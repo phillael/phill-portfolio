@@ -361,6 +361,7 @@ void main(){ float a = texture(uCloud, vUv).a*vA; if(a < 0.003) discard; o = vec
 export const CAST_VS = `#version 300 es
 in vec3 aPos; in vec3 aNormal; in vec2 aUv; in vec4 aJoints; in vec4 aWeights;
 uniform mat4 uMVP, uModel; uniform mat4 uJoints[32]; uniform bool uSkin;
+uniform float uWave[16]; uniform float uWaveAmp; uniform vec3 uWaveAlong, uWaveSide; uniform vec2 uWaveSpan;
 out vec2 vUv; out vec3 vN; out vec3 vWorld;
 void main(){
   mat4 sk = mat4(1.0);
@@ -368,8 +369,15 @@ void main(){
     vec4 w = aWeights/max(1e-4, aWeights.x + aWeights.y + aWeights.z + aWeights.w);
     sk = w.x*uJoints[int(aJoints.x)] + w.y*uJoints[int(aJoints.y)] + w.z*uJoints[int(aJoints.z)] + w.w*uJoints[int(aJoints.w)];
   }
+  vec3 p = aPos;
+  if(uWaveAmp > 0.0){
+    // the body bends along its length to the live waveform (sixteen samples, head to tail)
+    float f = clamp((dot(p, uWaveAlong) - uWaveSpan.x)/(uWaveSpan.y - uWaveSpan.x), 0.0, 1.0)*15.0;
+    int i = min(int(f), 14);
+    p += uWaveSide*mix(uWave[i], uWave[i + 1], f - float(i))*uWaveAmp;
+  }
   mat4 m = uModel*sk;
-  vec4 wp = m*vec4(aPos, 1.0);
+  vec4 wp = m*vec4(p, 1.0);
   vN = mat3(m)*aNormal; vUv = aUv; vWorld = wp.xyz;
   gl_Position = uMVP*wp;
 }`

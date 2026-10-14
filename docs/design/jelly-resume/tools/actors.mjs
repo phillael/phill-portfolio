@@ -1,31 +1,35 @@
 /**
  * Builds the Jelly Resume's cast from the Number Slayers models (~/Desktop/dev/number-slayers,
  * apps/web/public/models):
- *   - phill.glb: the game's Phill (mesh, WebP texture, idle/dance/die)
+ *   - phill.glb: the game's Phill (mesh, WebP texture, idle/dance/die) plus other characters' dances
  *   - shrimp.glb: the game's shrimp, Draco → meshopt, only its base color and glow maps
  *
- * --dances <wizard.glb> also retargets the shroom wizard's dances onto Phill (same 24 Meshy
- * bone names, different bind poses: Phill was rigged in the hero pose, the wizard in a
- * T-pose, so rotations go through each bone's direction rather than being copied). Off by
- * default: the game's Phill has the llamas welded to his mesh and skinned to his arms, so
- * the wizard's big arm moves swing them around. Worth it with a llama-free model.
+ * --dances <glb>,<glb>,… retargets other characters' dances onto Phill: the shroom wizard's
+ * six (named below) and any clip called "dance" (named after its file: zombie, garlic, …).
+ * Meshy rigs share Phill's 24 bone names; Mixamo rigs (human, mutant, zombie) are mapped
+ * onto them and are Z-up under their armature. Bind poses differ (Phill was rigged in the
+ * hero pose, the others in a T-pose), so rotations go through each bone's direction rather
+ * than being copied. The game's Phill has the llamas welded to his mesh and skinned to his
+ * arms, so big arm moves swing them around and tear his poncho: --arms 1 keeps his arms in
+ * his idle pose (the llamas tucked in) while the rest of him does the dance.
  *
  * Its deps aren't the site's, so run a copy from a scratch folder:
  *   mkdir /tmp/cast && cp docs/design/jelly-resume/tools/actors.mjs /tmp/cast && cd /tmp/cast && npm init -y
  *   npm i @gltf-transform/core@4 @gltf-transform/extensions@4 @gltf-transform/functions@4 meshoptimizer draco3dgltf sharp
  *   NS=~/Desktop/dev/number-slayers/apps/web/public/models
- *   node actors.mjs --phill $NS/glb/phill.glb --shrimp $NS/shrimp.glb --out <repo>/public/resume [--dances <repo>/public/models/shroom_wizard_merged_animations.glb]
+ *   G=$NS/glb; node actors.mjs --phill $G/phill.glb --shrimp $NS/shrimp.glb --out <repo>/public/resume \
+ *     --dances $G/zombie.glb,$G/human.glb,$G/garlic.glb,$G/lasagna.glb,$G/moose.glb --arms 1
  */
 import { NodeIO } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
-import { meshopt, prune, textureCompress } from '@gltf-transform/functions'
+import { meshopt, prune, resample, textureCompress } from '@gltf-transform/functions'
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer'
 import draco3d from 'draco3dgltf'
 import sharp from 'sharp'
 
 const arg = (k) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : null }
-const phillPath = arg('phill'), wizPath = arg('dances'), shrimpPath = arg('shrimp'), outDir = arg('out')
-if (!phillPath || !shrimpPath || !outDir) throw new Error('usage: node actors.mjs --phill <glb> --shrimp <glb> --out <dir> [--dances <wizard glb>]')
+const phillPath = arg('phill'), dancePaths = arg('dances'), armHold = +(arg('arms') ?? 0), shrimpPath = arg('shrimp'), outDir = arg('out')
+if (!phillPath || !shrimpPath || !outDir) throw new Error('usage: node actors.mjs --phill <glb> --shrimp <glb> --out <dir> [--dances <glb>,<glb>,… [--arms 0…1]]')
 await MeshoptDecoder.ready
 await MeshoptEncoder.ready
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
@@ -86,16 +90,27 @@ const inv4 = (a) => {
   ]
 }
 
-/** a rig: joints in parent-first order, each joint's parent index, rest TRS and bind-pose world rotation */
+/** Mixamo's bone names → Meshy's (the spine counts the other way) */
+const MIXAMO = { Spine: 'Spine02', Spine1: 'Spine01', Spine2: 'Spine', Neck: 'neck' }
+const canon = (n) => { const b = n.replace(/^mixamorig:/, ''); return n === b ? b : MIXAMO[b] ?? b }
+
+/**
+ * A rig: joints (by Meshy name) in parent-first order, each joint's parent, and its bind
+ * rotation in the scene's frame. `up` and `scale`: the armature above the skeleton (Mixamo's
+ * is turned Z-up), which the clips' local rotations and the hips' translation sit under.
+ */
 function rig(doc) {
   const skin = doc.getRoot().listSkins()[0], joints = skin.listJoints(), ibm = skin.getInverseBindMatrices().getArray()
   const order = [], seen = new Set()
   const visit = (j) => { if (seen.has(j)) return; const p = j.getParentNode(); if (p && joints.includes(p)) visit(p); seen.add(j); order.push(j) }
   joints.forEach(visit)
-  const byName = new Map(order.map((j) => [j.getName(), j]))
-  const parent = new Map(order.map((j) => { const p = j.getParentNode(); return [j.getName(), p && joints.includes(p) ? p.getName() : null] }))
-  const bind = new Map(joints.map((j, i) => [j.getName(), qFromMat(inv4(Array.from(ibm.slice(i * 16, i * 16 + 16))))]))
-  return { names: order.map((j) => j.getName()), byName, parent, bind }
+  const above = order[0].getParentNode()?.getWorldMatrix() ?? [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+  const up = qFromMat(above), scale = Math.hypot(above[0], above[1], above[2])
+  const byName = new Map(order.map((j) => [canon(j.getName()), j]))
+  const parent = new Map(order.map((j) => { const p = j.getParentNode(); return [canon(j.getName()), p && joints.includes(p) ? canon(p.getName()) : null] }))
+  // inverse binds already include the armature (world · inverse bind = a uniform scale), so they're in the scene's frame
+  const bind = new Map(joints.map((j, i) => [canon(j.getName()), qFromMat(inv4(Array.from(ibm.slice(i * 16, i * 16 + 16))))]))
+  return { names: order.map((j) => canon(j.getName())), byName, parent, bind, up, scale }
 }
 
 /** sample a channel's sampler at time t (LINEAR or STEP) */
@@ -116,24 +131,35 @@ function sampler(s, isRot) {
 /**
  * Retarget one clip: each target bone's world rotation is the source bone's world-space
  * change from its bind pose, applied to the target bone after its direction is turned to
- * match the source's bind direction (Meshy bones point along local +Y). Hips translation
- * moves by the source's offset from rest, scaled by the hip heights.
+ * match the source's bind direction (both rigs' bones point along local +Y). Bones the
+ * source lacks keep their rest pose. The hips move by the source's offset from rest, in
+ * the scene's frame, scaled by the hip heights.
  */
-function retarget(srcDoc, src, tgt, tgtDoc, clip, name, fps = 30) {
+const channels = (clip) => {
   const ch = new Map()
   for (const c of clip.listChannels()) {
     const node = c.getTargetNode(), path = c.getTargetPath()
     if (!node || (path !== 'rotation' && path !== 'translation')) continue
-    ch.set(node.getName() + ':' + path, sampler(c.getSampler(), path === 'rotation'))
+    ch.set(canon(node.getName()) + ':' + path, sampler(c.getSampler(), path === 'rotation'))
   }
-  const dur = Math.max(...clip.listSamplers().map((s) => { const a = s.getInput().getArray(); return a[a.length - 1] }))
+  return ch
+}
+const clipLength = (clip) => Math.max(...clip.listSamplers().map((s) => { const a = s.getInput().getArray(); return a[a.length - 1] }))
+const ARMS = new Set(['LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand'])
+
+function retarget(src, tgt, tgtDoc, clip, name, hold, fps = 30) {
+  const ch = channels(clip)
+  const dur = clipLength(clip)
   const frames = Math.max(2, Math.round(dur * fps) + 1)
   const Y = [0, 1, 0]
-  const C = new Map(src.names.map((n) => {
+  const C = new Map(tgt.names.filter((n) => src.bind.has(n)).map((n) => {
     const sb = src.bind.get(n), tb = tgt.bind.get(n), arc = qarc(qrot(tb, Y), qrot(sb, Y))
     return [n, qmul(qinv(sb), qmul(arc, tb))]
   }))
-  const hipsS = src.byName.get('Hips').getTranslation(), hipsT = tgt.byName.get('Hips').getTranslation(), k = hipsT[1] / hipsS[1]
+  // hips offsets in the scene's frame: (armature turn) · (local offset) · (armature scale)
+  const toScene = (r, v) => qrot(r.up, v).map((x) => x * r.scale)
+  const hipsS = src.byName.get('Hips').getTranslation(), hipsT = tgt.byName.get('Hips').getTranslation()
+  const k = toScene(tgt, hipsT)[1] / toScene(src, hipsS)[1]
   const times = new Float32Array(frames), rot = new Map(tgt.names.map((n) => [n, new Float32Array(frames * 4)])), hips = new Float32Array(frames * 3)
   for (let f = 0; f < frames; f++) {
     const t = (f / (frames - 1)) * dur
@@ -141,18 +167,21 @@ function retarget(srcDoc, src, tgt, tgtDoc, clip, name, fps = 30) {
     const sw = new Map(), tw = new Map()
     for (const n of src.names) {
       const local = ch.get(n + ':rotation')?.(t) ?? src.byName.get(n).getRotation(), p = src.parent.get(n)
-      sw.set(n, p ? qmul(sw.get(p), local) : local)
+      sw.set(n, qmul(p ? sw.get(p) : src.up, local))
     }
     for (const n of tgt.names) {
-      const w = qnorm(qmul(sw.get(n), C.get(n))), p = tgt.parent.get(n)
+      const p = tgt.parent.get(n), above = p ? tw.get(p) : tgt.up
+      const w = C.has(n) ? qnorm(qmul(sw.get(n), C.get(n))) : qmul(above, tgt.byName.get(n).getRotation())
       tw.set(n, w)
-      let local = p ? qmul(qinv(tw.get(p)), w) : w
+      let local = qmul(qinv(above), w)
+      if (hold && ARMS.has(n)) local = qslerp(local, hold.ch.get(n + ':rotation')?.(t % hold.dur) ?? tgt.byName.get(n).getRotation(), hold.k)
       const prev = f ? Array.from(rot.get(n).slice((f - 1) * 4, f * 4)) : null
       if (prev && prev[0] * local[0] + prev[1] * local[1] + prev[2] * local[2] + prev[3] * local[3] < 0) local = local.map((v) => -v) // keep the hemisphere (no flips when interpolating)
       rot.get(n).set(local, f * 4)
     }
     const ht = ch.get('Hips:translation')?.(t) ?? hipsS
-    hips.set([hipsT[0] + (ht[0] - hipsS[0]) * k, hipsT[1] + (ht[1] - hipsS[1]) * k, hipsT[2] + (ht[2] - hipsS[2]) * k], f * 3)
+    const d = toScene(src, [ht[0] - hipsS[0], ht[1] - hipsS[1], ht[2] - hipsS[2]]), dl = qrot(qinv(tgt.up), d).map((x) => (x * k) / tgt.scale)
+    hips.set([hipsT[0] + dl[0], hipsT[1] + dl[1], hipsT[2] + dl[2]], f * 3)
   }
   const buf = tgtDoc.getRoot().listBuffers()[0]
   const anim = tgtDoc.createAnimation(name)
@@ -171,20 +200,25 @@ const phill = await io.read(phillPath)
 const keep = new Set(['idle', 'dance', 'die'])
 for (const a of phill.getRoot().listAnimations()) if (!keep.has(a.getName())) a.dispose()
 for (const m of phill.getRoot().listMaterials()) m.setExtension('KHR_materials_specular', null)
-if (wizPath) {
-  const wiz = await io.read(wizPath), tgt = rig(phill), src = rig(wiz)
-  const DANCES = { All_Night_Dance: 'allnight', Boom_Dance: 'boom', Bubble_Dance: 'bubble', Hip_Hop_Dance_3: 'hiphop', Magic_Genie: 'genie', Proud_Strut: 'strut' }
-  for (const clip of wiz.getRoot().listAnimations()) {
-    const name = DANCES[clip.getName()]
-    if (!name) continue
-    const dur = retarget(wiz, src, tgt, phill, clip, name)
-    console.log('retargeted', clip.getName(), '→', name, dur.toFixed(2) + 's')
+if (dancePaths) {
+  const tgt = rig(phill), idle = phill.getRoot().listAnimations().find((a) => a.getName() === 'idle')
+  const hold = idle && armHold > 0 ? { ch: channels(idle), dur: clipLength(idle), k: armHold } : null
+  const WIZARD = { All_Night_Dance: 'allnight', Boom_Dance: 'boom', Bubble_Dance: 'bubble', Hip_Hop_Dance_3: 'hiphop', Magic_Genie: 'genie', Proud_Strut: 'strut' }
+  for (const path of dancePaths.split(',')) {
+    const doc = await io.read(path), src = rig(doc), file = path.split('/').pop().replace(/\.glb$/, '')
+    for (const clip of doc.getRoot().listAnimations()) {
+      const name = WIZARD[clip.getName()] ?? (clip.getName() === 'dance' ? file : null)
+      if (!name) continue
+      const dur = retarget(src, tgt, phill, clip, name, hold)
+      console.log('retargeted', file, clip.getName(), '→', name, dur.toFixed(2) + 's')
+    }
   }
 }
 await phill.transform(
+  resample(), // drops keys a straight line through their neighbors already gives
   prune(),
   textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 88 }),
-  meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
+  meshopt({ encoder: MeshoptEncoder, level: 'high' }), // 'high' also packs the clips (16-bit quaternions), half their size
 )
 await io.write(`${outDir}/phill.glb`, phill)
 

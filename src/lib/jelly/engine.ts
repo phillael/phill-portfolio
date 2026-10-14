@@ -121,9 +121,13 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
 
   // ---- size: device pixels, DPR capped at 2 ----
   let dpr = 1
+  /** the canvas's CSS size (kept here so per-frame code never reads layout) */
+  let cssW = 1, cssH = 1
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1)
     const r = canvas.getBoundingClientRect()
+    cssW = Math.max(1, r.width)
+    cssH = Math.max(1, r.height)
     canvas.width = Math.max(1, Math.round(r.width * dpr))
     canvas.height = Math.max(1, Math.round(r.height * dpr))
     renderer.setDpr(dpr)
@@ -499,8 +503,15 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
       whenSettled(), // (pressed during the entrance: once it has printed)
     ])
     if (disposed || !ok || !mod || !cast || !settledNow()) return false
+    // a frame each: build Play (the level, his rig), then start it (the Play HUD mounts and lays out after that)
+    if (!play) {
+      await nextTask()
+      if (disposed || !settledNow()) return false
+      play ??= mod.createPlay({ w, cast, params: playParams, input: playInput, viewH: () => cssH, ui, emit: emitPlay })
+      await nextTask()
+      if (disposed || !settledNow()) return false
+    }
     if (playing) return true
-    play ??= mod.createPlay({ w, cast, params: playParams, input: playInput, canvas, ui, emit: emitPlay })
     if (w.hole.on) releaseHole(w)
     find('')
     playing = true
@@ -573,8 +584,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
       const m = w.cam.mvp, ww = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15]
       if (ww <= 1e-6) return null
       return [
-        (((m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12]) / ww) * 0.5 + 0.5) * canvas.clientWidth,
-        (1 - (((m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]) / ww) * 0.5 + 0.5)) * canvas.clientHeight,
+        (((m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12]) / ww) * 0.5 + 0.5) * cssW,
+        (1 - (((m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]) / ww) * 0.5 + 0.5)) * cssH,
       ]
     },
     /**

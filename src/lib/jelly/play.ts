@@ -83,7 +83,8 @@ export interface PlayContext {
   cast: Cast
   params: PlayConfig
   input: PlayInput
-  canvas: HTMLCanvasElement
+  /** the canvas's CSS height (px), without reading layout */
+  viewH: () => number
   ui: UiInsets
   emit: (e: PlayEvent) => void
 }
@@ -113,7 +114,7 @@ const FIREWORK = 1.8
 /** the entrance: his dive from his orbit onto the name, and the camera's ease from the whole page (s) */
 const INTRO = 0.8
 
-export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: PlayContext) {
+export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayContext) {
   const level: Level = buildLevel(w)
   const found = cast.rig()
   if (!found) throw new Error('Play mode needs Phill')
@@ -529,7 +530,7 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
 
   // ---- the camera: Phill ~pxDesktop/pxPhone tall, leading the way he faces, moving up a line when he lands on it ----
   function frame(dt: number) {
-    const H = canvas.clientHeight || 1, asp = canvas.width / Math.max(1, canvas.height), tf = Math.tan(FOV / 2)
+    const H = viewH(), asp = w.cam.aspect || 1, tf = Math.tan(FOV / 2)
     const px = w.low ? P.pxPhone : P.pxDesktop
     const fitW = (w.pageW / 2 + 0.35) / (tf * asp), fitH = (w.pageH / 2 + 0.25) / (tf * Math.max(0.3, 1 - ui.top - ui.bot))
     const dist = (P.size * H) / (2 * tf * px) + z // (he stands z in front of the page, a little nearer the camera)

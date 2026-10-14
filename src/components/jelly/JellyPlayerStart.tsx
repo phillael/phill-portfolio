@@ -21,12 +21,14 @@ interface JellyPlayerStartProps {
 
 const JellyPlayerStart = ({ engine, visible, status, onStart }: JellyPlayerStartProps) => {
   const ref = useRef<HTMLButtonElement>(null)
+  const shown = useRef(visible)
+  useEffect(() => { shown.current = visible }, [visible])
 
   useEffect(() => {
     let spot: [number, number, number] | null = null
     return engine.onFrame(() => {
       const el = ref.current
-      if (!el) return
+      if (!el || !shown.current) return // (hidden while playing: no per-frame work)
       spot ??= engine.startSpot()
       const p = spot && engine.project(spot)
       if (!p) return

@@ -204,7 +204,9 @@ interface Playing {
 
 /**
  * A skinned model's animation: the current clip and the one fading out under it. The root
- * joint's sideways travel is held at rest (he dances in place; his orbit moves him).
+ * joint's sideways travel is held at rest (he dances in place; his orbit moves him). Clips
+ * named in `noLift` never raise the root above its standing height (idle's at t = 0): the
+ * jump clip lifts his hips itself, but in Play mode the physics lifts him (crouches still go down).
  */
 export class Pose {
   readonly local: Float32Array
@@ -221,8 +223,10 @@ export class Pose {
   private fade = 1
   private fadeDur = 0.25
   private root: number
+  private noLift: Set<string>
+  private standY: number
 
-  constructor(private m: GltfModel) {
+  constructor(private m: GltfModel, opts: { noLift?: string[] } = {}) {
     const n = m.nodes.length
     this.local = new Float32Array(n * 16)
     this.world = new Float32Array(n * 16)
@@ -231,6 +235,10 @@ export class Pose {
     this.T2 = new Float32Array(n * 3); this.R2 = new Float32Array(n * 4); this.S2 = new Float32Array(n * 3)
     const js = new Set(m.joints ?? [])
     this.root = m.joints?.find((j) => !js.has(m.nodes[j].parent)) ?? -1
+    this.noLift = new Set(opts.noLift)
+    const at = new Float32Array(3), idle = m.clips.find((c) => c.name === 'idle')?.tracks.find((tr) => tr.node === this.root && tr.path === 'translation')
+    if (idle) sampleTrack(idle, 0, at, 0)
+    this.standY = idle ? at[1] : this.root >= 0 ? m.nodes[this.root].t[1] : 0
     this.update(0)
   }
 
@@ -240,6 +248,16 @@ export class Pose {
 
   get clip() {
     return this.cur?.clip.name ?? null
+  }
+
+  /** the current clip's time (s) */
+  get time() {
+    return this.cur?.t ?? 0
+  }
+
+  /** Set the current clip's time (clamped to the clip): scrub with seek(t) then update(dt, 0). */
+  seek(t: number) {
+    if (this.cur) this.cur.t = Math.min(this.cur.clip.duration, Math.max(0, t))
   }
 
   /** how far through its clip the current one is (0…1; it drops back when a loop comes round) */
@@ -268,7 +286,12 @@ export class Pose {
       else if (tr.path === 'translation') sampleTrack(tr, p.t, T, tr.node * 3)
       else sampleTrack(tr, p.t, S, tr.node * 3)
     }
-    if (this.root >= 0) { const r = this.m.nodes[this.root].t; T[this.root * 3] = r[0]; T[this.root * 3 + 2] = r[2] }
+    if (this.root >= 0) {
+      const r = this.m.nodes[this.root].t, o = this.root * 3
+      T[o] = r[0]
+      T[o + 2] = r[2]
+      if (this.noLift.has(p.clip.name)) T[o + 1] = Math.min(T[o + 1], this.standY)
+    }
   }
 
   /** Advance the clips by dt (rate: playback speed) and rebuild the joint matrices. */

@@ -20,6 +20,11 @@ import type { World } from './world'
 
 const IDLE = 'idle'
 const KNOCKED = 'die'
+/** Play mode's run, smash and jump: never part of his dances */
+export const PLAY_CLIPS: readonly string[] = ['walk', 'attack', 'jumping']
+
+/** the clips he dances to the music: all but idle, the knock and Play mode's */
+export const danceSet = (clips: string[]) => new Set(clips.filter((n) => n !== IDLE && n !== KNOCKED && !PLAY_CLIPS.includes(n)))
 /** samples of the waveform along a shrimp's body */
 const WAVE = 16
 
@@ -42,7 +47,7 @@ interface PhillState extends Body {
   th: number
   /** seconds since he arrived (he flies in from deep in the nebula) */
   age: number
-  /** every clip but idle and the knock, and what's left of this round of them (shuffled) */
+  /** his dances (danceSet), and what's left of this round of them (shuffled) */
   dances: Set<string>
   bag: string[]
   /** the music's on (with some hysteresis) */
@@ -107,9 +112,9 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
         if (disposed) return
         const a = await R.load(pb, nextTask)
         if (disposed) return
-        const pose = new Pose(a.m)
+        const pose = new Pose(a.m, { noLift: ['jumping'] })
         pose.play(pose.has(IDLE) ? IDLE : a.m.clips[0]?.name ?? '', 0)
-        const dances = new Set(a.m.clips.map((c) => c.name).filter((n) => n !== IDLE && n !== KNOCKED))
+        const dances = danceSet(a.m.clips.map((c) => c.name))
         phill = { ...body([0, params.lift + 3, -40]), a, pose, th: -Math.PI / 2, age: 0, scale: 0.4, dances, bag: [], groove: false, danceT: 0, phase: 0, pump: 0 }
       }
       await nextTask()

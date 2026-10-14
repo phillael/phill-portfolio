@@ -9,7 +9,8 @@
 import { readFileSync } from 'fs'
 import path from 'path'
 import { Pose, bendAxes, jointMatrices, sampleTrack } from '@/lib/jelly/actors'
-import { CAST_CONFIG } from '@/lib/jelly/config'
+import { danceSet, PLAY_CLIPS } from '@/lib/jelly/cast'
+import { CAST_CONFIG, PLAY_CONFIG } from '@/lib/jelly/config'
 import { bounds, parseGlb, readGltf, restLocals, worldMatrices, type GltfModel, type Track } from '@/lib/jelly/gltf'
 
 const closed = jest.fn()
@@ -166,6 +167,75 @@ describe('Pose', () => {
       expect(x).toBeCloseTo(rest[0], 4)
       expect(z).toBeCloseTo(rest[2], 4)
     }
+  })
+})
+
+describe('Pose: scrubbing and the jump', () => {
+  let m: GltfModel
+  let hips: number
+  beforeAll(async () => {
+    m = await readGltf(glb('phill.glb'))
+    hips = m.joints!.find((j) => !m.joints!.includes(m.nodes[j].parent))!
+  })
+  const hipsY = (p: Pose) => p.world[hips * 16 + 13]
+  const at = (p: Pose, t: number) => { p.seek(t); p.update(0, 0); return hipsY(p) }
+
+  it('seeks the current clip to a time and holds it there at rate 0', () => {
+    const p = new Pose(m), q = new Pose(m)
+    p.play('jumping', 0)
+    q.play('jumping', 0)
+    p.seek(0.8)
+    expect(p.time).toBeCloseTo(0.8, 6)
+    p.update(0.5, 0) // rate 0: the clip doesn't advance
+    expect(p.time).toBeCloseTo(0.8, 6)
+    q.update(0.8)
+    for (let i = 0; i < p.joints.length; i++) expect(p.joints[i]).toBeCloseTo(q.joints[i], 4)
+    p.seek(99)
+    expect(p.time).toBeCloseTo(m.clips.find((c) => c.name === 'jumping')!.duration, 6)
+    p.seek(-1)
+    expect(p.time).toBe(0)
+  })
+
+  it("clamps the jump's hip lift to his standing height (physics lifts him), keeping the crouches", () => {
+    const stand = new Pose(m)
+    stand.play('idle', 0)
+    stand.update(0)
+    const standY = hipsY(stand)
+    const free = new Pose(m), clamped = new Pose(m, { noLift: ['jumping'] })
+    free.play('jumping', 0)
+    clamped.play('jumping', 0)
+    const dur = m.clips.find((c) => c.name === 'jumping')!.duration
+    let freeMax = -Infinity
+    for (let t = 0; t <= dur; t += 0.05) {
+      freeMax = Math.max(freeMax, at(free, t))
+      expect(at(clamped, t)).toBeLessThanOrEqual(standY + 1e-4)
+    }
+    expect(freeMax).toBeGreaterThan(standY + 0.3) // the clip lifts his hips about half a body
+    expect(at(clamped, 0.35)).toBeLessThan(standY - 0.2) // the wind-up crouch stays
+    expect(at(clamped, 1.35)).toBeLessThan(standY - 0.2) // and the landing one
+    // other clips aren't clamped
+    clamped.play('dance', 0)
+    expect(Number.isFinite(at(clamped, 1))).toBe(true)
+  })
+})
+
+describe('the dance rotation', () => {
+  it("leaves out idle, the knock and Play mode's clips (by name)", async () => {
+    const m = await readGltf(glb('phill.glb'))
+    const d = danceSet(m.clips.map((c) => c.name))
+    expect([...PLAY_CLIPS].sort()).toEqual(['attack', 'jumping', 'walk'])
+    for (const n of ['idle', 'die', 'walk', 'attack', 'jumping']) expect(d.has(n)).toBe(false)
+    expect([...d].sort()).toEqual(['dance', 'garlic', 'human', 'lasagna', 'moose', 'zombie'])
+  })
+})
+
+describe('PLAY_CONFIG', () => {
+  it("is frozen; the smash's strike sits inside the attack clip, the hit inside the strike", async () => {
+    const m = await readGltf(glb('phill.glb'))
+    expect(Object.isFrozen(PLAY_CONFIG)).toBe(true)
+    const [a, b] = PLAY_CONFIG.strike
+    expect(0 <= a && a < PLAY_CONFIG.hit && PLAY_CONFIG.hit < b).toBe(true)
+    expect(b).toBeLessThanOrEqual(m.clips.find((c) => c.name === 'attack')!.duration)
   })
 })
 

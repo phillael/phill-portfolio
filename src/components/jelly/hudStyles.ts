@@ -20,7 +20,7 @@ export const BTN_MUTED = `${BTN_SHAPE} border-[#2a3142] bg-[#121621] text-[#7c87
 /** A toggled-on button. */
 export const ON = 'border-[#80eaff] text-[#80eaff] shadow-[0_0_12px_rgba(128,234,255,0.3)]'
 
-/** The keyboard-shortcut part of a label: keys mean nothing on a phone. */
-export const KEY = 'max-[820px]:hidden'
+/** The keyboard-shortcut part of a label: keys mean nothing on a phone (narrow, or a touch screen). */
+export const KEY = 'max-[820px]:hidden [@media(pointer:coarse)]:hidden'
 
 export { FOCUS }

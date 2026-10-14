@@ -334,6 +334,11 @@ html.jelly-lock {
 .jelly-blink {
   animation: jelly-blink 1.1s steps(1) infinite;
 }
+/* playing on a touch screen, the site's ♫ would sit under the thumbs: it hides (the Play HUD has a ♫ remote) */
+html.jelly-play-touch .music-fab {
+  visibility: hidden;
+  pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .jelly-pop,
   .jelly-blink {

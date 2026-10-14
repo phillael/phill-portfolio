@@ -14,6 +14,8 @@ import type { RunResult } from '@/lib/jelly/playRun'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { BTN, FOCUS, KEY, PANEL, PLAY_BTN } from '@/components/jelly/hudStyles'
 import { RESUME_PDF } from '@/components/jelly/JellyHudBar'
+import JellyTouchPads from '@/components/jelly/JellyTouchPads'
+import { getSiteMusic } from '@/lib/site-music'
 
 /** 0:24.6 (— when there's none) */
 export const fmtTime = (ms: number | null | undefined) => {
@@ -44,6 +46,8 @@ interface JellyPlayHudProps {
 const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
   const short = useMediaQuery('(max-height: 559px)')
   const narrow = useMediaQuery('(max-width: 820px)')
+  const touch = useMediaQuery('(pointer: coarse)')
+  const [moved, setMoved] = useState(false)
   const mode = meterMode(!!short, !!narrow)
   const [toast, setToast] = useState<Toast | null>(null)
   const [pops, setPops] = useState<Pop[]>([])
@@ -84,6 +88,8 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
         setResult(e.result)
         const r = e.result
         setMessage(`The end. Your time: ${fmtTime(r.timeMs)}. Impact ${r.coins} of ${r.total}. Best ${fmtTime(r.bestMs)}.${r.newBest ? ' A new best!' : ''}`)
+      } else if (e.type === 'start') {
+        setMoved(true)
       } else if (e.type === 'again') {
         setResult(null)
         setFlags([])
@@ -127,39 +133,59 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
 
   const leave = () => engine.play.exit()
 
+  // on a touch screen the site's ♫ would sit under the thumbs: it hides while playing (a ♫ remote stands in)
+  useEffect(() => {
+    if (!touch) return
+    document.documentElement.classList.add('jelly-play-touch')
+    return () => document.documentElement.classList.remove('jelly-play-touch')
+  }, [touch])
+
   return (
     <>
       {/* stats: time and Impact, the best under them (on phones one 44 px row; short screens add the year) */}
       <div
         ref={topRef}
-        className={`${PANEL} pointer-events-none absolute left-3 top-2.5 z-[3] flex flex-col gap-[5px] rounded-[10px] px-3 pb-[7px] pt-2 max-[820px]:left-2 max-[820px]:top-2 max-[820px]:h-11 max-[820px]:justify-center max-[820px]:py-0`}
+        className={`${PANEL} pointer-events-none absolute left-3 top-2.5 z-[3] flex flex-col gap-[5px] rounded-[10px] px-3 pb-[7px] pt-2 max-[820px]:left-2 max-[820px]:top-2 max-[820px]:h-11 max-[820px]:justify-center max-[820px]:py-0 [@media(max-height:559px)]:left-2 [@media(max-height:559px)]:top-2 [@media(max-height:559px)]:h-11 [@media(max-height:559px)]:justify-center [@media(max-height:559px)]:py-0`}
       >
-        <div className="flex items-center gap-4 font-pixel text-[14px] leading-none max-[820px]:gap-3 max-[820px]:text-[11px]">
+        <div className="flex items-center gap-4 font-pixel text-[14px] leading-none max-[820px]:gap-3 max-[820px]:text-[11px] [@media(max-height:559px)]:gap-3 [@media(max-height:559px)]:text-[11px]">
           <span ref={timeRef}>⏱ 0:00.0</span>
           <span className="text-[#00ff2b] [text-shadow:0_0_8px_rgba(0,255,43,0.55)]">
             <span ref={coinsRef}>✦ 0/27</span>
-            <small className="ml-1 text-[9px] text-[#7fd98e] [text-shadow:none] max-[820px]:hidden">IMPACT</small>
+            <small className="ml-1 text-[9px] text-[#7fd98e] [text-shadow:none] max-[820px]:hidden [@media(max-height:559px)]:hidden">IMPACT</small>
           </span>
           <span ref={yearRef} className="hidden text-[11px] text-[#80eaff] [@media(max-height:559px)]:inline" />
         </div>
-        <div ref={bestRef} className="font-pixel text-[9px] tracking-[0.5px] text-[#7c8798] max-[820px]:hidden">BEST —</div>
+        <div ref={bestRef} className="font-pixel text-[9px] tracking-[0.5px] text-[#7c8798] max-[820px]:hidden [@media(max-height:559px)]:hidden">BEST —</div>
       </div>
 
-      <button
-        type="button"
-        onClick={leave}
-        aria-label="Leave Play mode (Esc)"
-        title="Leave Play (Esc)"
-        className={`${PANEL} absolute right-3 top-2.5 z-[3] inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-[#d7deea] hover:border-[#80eaff] hover:text-[#80eaff] max-[820px]:right-2 max-[820px]:top-2 ${FOCUS}`}
-      >
-        <span aria-hidden="true" className="text-[18px] leading-none">✕</span> Exit<span className={`${KEY} font-normal text-[#7c8798]`}> (Esc)</span>
-      </button>
+      <div className="absolute right-3 top-2.5 z-[3] flex gap-2 max-[820px]:right-2 max-[820px]:top-2 [@media(max-height:559px)]:right-2 [@media(max-height:559px)]:top-2">
+        {touch && (
+          <button
+            type="button"
+            onClick={() => getSiteMusic()?.toggle()}
+            aria-label="Play or pause the music"
+            title="Music"
+            className={`${PANEL} grid h-11 w-11 cursor-pointer place-items-center rounded-full text-[19px] text-[#80eaff] ${FOCUS}`}
+          >
+            <span aria-hidden="true">♫</span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={leave}
+          aria-label="Leave Play mode (Esc)"
+          title="Leave Play (Esc)"
+          className={`${PANEL} inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-[#d7deea] hover:border-[#80eaff] hover:text-[#80eaff] ${FOCUS}`}
+        >
+          <span aria-hidden="true" className="text-[18px] leading-none">✕</span> Exit<span className={`${KEY} font-normal text-[#7c8798]`}> (Esc)</span>
+        </button>
+      </div>
 
       {mode !== 'none' && <ClimbMeter engine={engine} slim={mode === 'slim'} />}
 
       {/* the keys, always up (desktop) */}
       <div
-        ref={bottomRef}
+        ref={touch ? undefined : bottomRef}
         className={`${PANEL} pointer-events-none absolute bottom-3.5 left-1/2 z-[3] flex -translate-x-1/2 items-center gap-3.5 whitespace-nowrap rounded-full px-4 py-2 text-[12.5px] text-[#b9c6da] [@media(pointer:coarse)]:hidden`}
       >
         <span><kbd className={KBD}>←</kbd> <kbd className={KBD}>→</kbd> run</span>
@@ -176,7 +202,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       {toast && (
         <div
           aria-hidden="true"
-          className={`${PANEL} pointer-events-none absolute left-1/2 top-3 z-[3] flex -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-[10px] border-[rgba(128,234,255,0.55)] px-3.5 py-2 shadow-[0_0_18px_rgba(128,234,255,0.25)] max-[820px]:top-[60px]`}
+          className={`${PANEL} pointer-events-none absolute left-1/2 top-3 z-[3] flex -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-[10px] border-[rgba(128,234,255,0.55)] px-3.5 py-2 shadow-[0_0_18px_rgba(128,234,255,0.25)] max-[820px]:top-[60px] [@media(max-height:559px)]:top-[60px]`}
         >
           <span className="rounded bg-[#00ff2b] px-1.5 py-1 font-pixel text-[9px] leading-none text-[#0b0d12]"><span className="font-body text-[10px] font-extrabold">✓</span> CHECKPOINT</span>
           <span className="text-[13px]"><b className="mr-1.5 font-pixel text-[11px] font-normal text-[#80eaff]">{toast.year}</b>{toast.title}</span>
@@ -208,6 +234,16 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
           +1 IMPACT
         </div>
       ))}
+
+      {touch && !result && <JellyTouchPads engine={engine} rootRef={bottomRef} />}
+      {touch && !result && (
+        <div
+          aria-hidden="true"
+          className={`${PANEL} pointer-events-none absolute bottom-[calc(166px+env(safe-area-inset-bottom))] left-1/2 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1.5 text-[11.5px] text-[#b9c6da] transition-opacity duration-700 ${moved ? 'opacity-0' : 'opacity-100'}`}
+        >
+          Hold ◀ ▶ to run · Ⓐ jump · Ⓑ smash · ▼ drop
+        </div>
+      )}
 
       {result && <FinishCard result={result} onAgain={() => engine.play.again()} onLeave={leave} />}
 

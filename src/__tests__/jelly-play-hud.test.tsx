@@ -8,6 +8,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
 import { fmtTime, meterMode } from '@/components/jelly/JellyPlayHud'
 import type { PlayEvent, PlayState } from '@/lib/jelly/play'
+import { registerSiteMusic } from '@/lib/site-music'
 
 const listeners = new Set<(e: PlayEvent) => void>()
 const fire = (e: PlayEvent) => listeners.forEach((f) => f(e))
@@ -46,6 +47,17 @@ jest.mock('@/lib/jelly/engine', () => ({
 jest.mock('@/lib/jelly/snapshot', () => ({ loadSnapshotOnce: jest.fn(() => Promise.resolve('snapshot')), releaseSnapshot: jest.fn() }))
 
 beforeAll(() => {
+  // jsdom has no PointerEvent: a MouseEvent (it has clientX) that carries a pointerId
+  if (!window.PointerEvent) {
+    class PointerEventPolyfill extends MouseEvent {
+      pointerId: number
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init)
+        this.pointerId = init.pointerId ?? 0
+      }
+    }
+    window.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent
+  }
   global.ResizeObserver ??= class {
     observe() {}
     unobserve() {}
@@ -194,6 +206,72 @@ describe('playing', () => {
     expect(play.again).toHaveBeenCalledTimes(2)
     fireEvent.click(screen.getByRole('button', { name: /Back to the resume/ }))
     expect(play.exit).toHaveBeenCalled()
+  })
+})
+
+describe('touch', () => {
+  const playOnTouch = async (...more: string[]) => {
+    await open('(pointer: coarse)', ...more)
+    fireEvent.click(screen.getByRole('button', { name: 'Play (J)' }))
+    await screen.findByRole('button', { name: 'Leave Play mode (Esc)' })
+  }
+
+  it('shows the pads only for coarse pointers', async () => {
+    await open()
+    fireEvent.keyDown(window, { key: 'j' })
+    await screen.findByRole('button', { name: 'Leave Play mode (Esc)' })
+    expect(screen.queryByTestId('jelly-pads')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Play or pause the music' })).toBeNull()
+  })
+
+  it('the action pads hold their input while a finger is down (a quick tap still counts)', async () => {
+    await playOnTouch()
+    const jump = screen.getByRole('button', { name: /^Jump/ })
+    fireEvent.pointerDown(jump, { pointerId: 2 })
+    expect(play.input.jump).toBe(true)
+    expect(play.input.pressed.has('jump')).toBe(true)
+    expect(jump).toHaveAttribute('data-pressed')
+    fireEvent.pointerUp(jump, { pointerId: 2 })
+    expect(play.input.jump).toBe(false)
+    expect(jump).not.toHaveAttribute('data-pressed')
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Smash (B)' }), { pointerId: 3 })
+    expect(play.input.smash).toBe(true)
+    fireEvent.pointerDown(screen.getByRole('button', { name: /^Drop through/ }), { pointerId: 4 })
+    expect(play.input.down).toBe(true)
+  })
+
+  it('the move pad steers by which half the finger is over, so a slide turns him', async () => {
+    await playOnTouch()
+    const left = screen.getByRole('button', { name: 'Run left' }), pad = left.parentElement!
+    jest.spyOn(pad, 'getBoundingClientRect').mockReturnValue({ left: 16, width: 136, top: 0, height: 64, right: 152, bottom: 64, x: 16, y: 0, toJSON: () => ({}) })
+    fireEvent.pointerDown(left, { pointerId: 1, clientX: 40 })
+    expect(play.input).toMatchObject({ left: true, right: false })
+    fireEvent.pointerMove(pad, { pointerId: 1, clientX: 130 })
+    expect(play.input).toMatchObject({ left: false, right: true })
+    expect(screen.getByRole('button', { name: 'Run right' })).toHaveAttribute('data-pressed')
+    fireEvent.pointerDown(pad, { pointerId: 5, clientX: 20 }) // a second finger doesn't take over
+    expect(play.input.right).toBe(true)
+    fireEvent.pointerUp(pad, { pointerId: 1, clientX: 130 })
+    expect(play.input).toMatchObject({ left: false, right: false })
+  })
+
+  it("hides the site's ♫ while playing (a ♫ remote stands in) and brings it back after", async () => {
+    await playOnTouch()
+    expect(document.documentElement).toHaveClass('jelly-play-touch')
+    const toggle = jest.fn()
+    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle })
+    fireEvent.click(screen.getByRole('button', { name: 'Play or pause the music' }))
+    expect(toggle).toHaveBeenCalled()
+    registerSiteMusic(null)
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Play mode (Esc)' }))
+    await waitFor(() => expect(document.documentElement).not.toHaveClass('jelly-play-touch'))
+  })
+
+  it('the pads give way to the finish card', async () => {
+    await playOnTouch()
+    expect(screen.getByTestId('jelly-pads')).toBeInTheDocument()
+    act(() => fire({ type: 'finish', result: { timeMs: 1000, bestMs: 900, newBest: false, coins: 0, total: 27 } }))
+    expect(screen.queryByTestId('jelly-pads')).toBeNull()
   })
 })
 

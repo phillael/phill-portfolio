@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Play Mode Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Nunito:wght@400;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+  Jelly Resume · Play mode: UI mockup, round 1 (2026-10-14).
+  The binding contract for the Play mode HUD, touch controls and summit card. The page in
+  each screen is the real snapshot (public/resume/text.webp + decor.webp, no phone or email);
+  word positions come from public/resume/snapshot.json. Phill is a placeholder silhouette
+  (the real one is the 3D model). Open it from the repo (file:// is fine).
+-->
+<style>
+  :root {
+    --bg: #05070c; --ink: #d7deea; --muted: #7c8798; --cyan: #80eaff; --electric: #00d4ff;
+    --purple: #d580ff; --violet: #c44dff; --green: #00ff2b; --deep: #141f52; --teal: #0e2525;
+    --panel: rgba(8, 10, 16, 0.72); --line: #1e2431; --btn: #121621; --anno: #ff4fd8; --paper: #f7f7f4;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 Nunito, system-ui, sans-serif; }
+  a { color: var(--cyan); }
+  header, main { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+  header { padding-top: 32px; }
+  h1 { font: 26px/1.2 Audiowide, sans-serif; margin: 0 0 6px; color: var(--cyan); text-shadow: 0 0 18px rgba(128, 234, 255, .35); }
+  h2 { font: 18px/1.3 Audiowide, sans-serif; margin: 0 0 14px; color: var(--ink); }
+  h2 .n { color: var(--anno); margin-right: 6px; }
+  .sub { color: var(--muted); margin: 0 0 22px; }
+  section.block { margin: 34px 0 48px; }
+  .card { background: #0b0e16; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .summary ul { margin: 0; padding-left: 18px; columns: 2 420px; column-gap: 36px; }
+  .summary li { break-inside: avoid; margin: 0 0 8px; }
+  .summary b { color: var(--cyan); font-weight: 700; }
+  .later { margin-top: 14px; color: var(--muted); font-size: 14px; }
+  .later b { color: var(--ink); }
+
+  /* a frame: a device screen (real CSS px, scaled to fit) and its contract notes */
+  .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .row.side { grid-template-columns: auto minmax(280px, 1fr); align-items: start; }
+  @media (max-width: 900px) { .row.side { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; overflow: hidden; border-radius: 14px; box-shadow: 0 0 0 1px #2a3142, 0 18px 50px rgba(0, 0, 0, .6); }
+  .stage.phone { border-radius: 30px; box-shadow: 0 0 0 7px #161a24, 0 0 0 8px #2a3142, 0 18px 50px rgba(0, 0, 0, .6); margin: 8px; }
+  .screen { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; font-family: Nunito, system-ui, sans-serif; font-size: 13px; line-height: 1.4; color: var(--ink); }
+  .notes { margin: 0; padding-left: 0; list-style: none; counter-reset: n; columns: 2 380px; column-gap: 28px; }
+  .row.side .notes { columns: 1; }
+  .notes li { break-inside: avoid; position: relative; padding-left: 32px; margin: 0 0 11px; font-size: 14px; }
+  .notes li::before { counter-increment: n; content: counter(n); position: absolute; left: 0; top: 1px; width: 22px; height: 22px; border-radius: 50%; background: var(--anno); color: #0b0d12; font: 700 12px/22px Nunito, sans-serif; text-align: center; }
+  .notes b { color: var(--ink); }
+  .notes code, .summary code { font-size: 12.5px; background: #141926; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: #b9c6da; }
+  .notes .k, .summary .k { color: var(--muted); }
+
+  /* ---- inside a screen: the 3D view ---- */
+  .sky { position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 60% 45% at 22% 18%, rgba(196, 77, 255, .28), transparent 70%),
+      radial-gradient(ellipse 55% 50% at 82% 78%, rgba(0, 212, 255, .16), transparent 70%),
+      radial-gradient(ellipse 70% 60% at 60% 30%, rgba(20, 31, 82, .9), transparent 75%),
+      radial-gradient(ellipse at 50% 50%, #0d1430 0%, #05070f 80%); }
+  .sky svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .paper { position: absolute; left: 0; top: 0; width: 816px; height: 1056px; transform-origin: 0 0; z-index: 1;
+    background: var(--paper); box-shadow: 0 0 0 1px rgba(255, 255, 255, .5), 0 30px 80px rgba(0, 0, 0, .55); }
+  .content { position: absolute; left: 52.8px; top: 38.4px; width: 710px; height: 953px;
+    background: url(../../../../public/resume/text.webp) 0 0 / 710px 953px no-repeat, url(../../../../public/resume/decor.webp) 0 0 / 710px 953px no-repeat; }
+  .ov { position: absolute; inset: 0; overflow: visible; }
+  .ov > svg.fx { position: absolute; left: 0; top: 0; width: 710px; height: 953px; overflow: visible; pointer-events: none; }
+  .coin { position: absolute; border-radius: 3px; background: rgba(0, 255, 43, .14); border: 1px solid rgba(0, 255, 43, .95);
+    box-shadow: 0 0 6px 1px rgba(0, 255, 43, .75), inset 0 0 4px rgba(0, 255, 43, .5); }
+  .hole { position: absolute; background: var(--paper); }
+  .lit { position: absolute; border-radius: 3px; background: rgba(128, 234, 255, .16); box-shadow: 0 0 8px 2px rgba(128, 234, 255, .55); }
+  .phill { position: absolute; filter: drop-shadow(0 0 1.6px rgba(128, 234, 255, .95)) drop-shadow(0 0 5px rgba(128, 234, 255, .35)); }
+  .phill.ghost { opacity: .22; filter: none; }
+  .phill svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .pop { position: absolute; font-family: 'Press Start 2P', monospace; color: var(--green); white-space: nowrap; text-shadow: 0 0 4px rgba(0, 255, 43, .9); transform: translate(-50%, -100%);
+    background: rgba(8, 10, 16, .82); border: 1px solid rgba(0, 255, 43, .6); border-radius: 3px; padding: .45em .6em .35em; line-height: 1; }
+
+  /* ---- inside a screen: the HUD (copies src/components/jelly/hudStyles.ts) ---- */
+  .ui { position: absolute; z-index: 5; }
+  .panel { background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--btn); padding: 7px 11px; min-height: 32px; font-size: 13px; line-height: 1.4; color: var(--ink); }
+  .btn.on { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 12px rgba(128, 234, 255, .3); }
+  .btn.play { border-color: var(--cyan); color: var(--cyan); background: rgba(128, 234, 255, .09); box-shadow: 0 0 14px rgba(128, 234, 255, .4); font-weight: 700; }
+  .btn.busy { color: var(--muted); border-color: #2a3142; }
+  .btn.off { opacity: .45; }
+  .btn .key { color: inherit; opacity: .85; font-weight: 400; }
+  .round { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; font-size: 22px; line-height: 1; color: var(--ink); }
+  .fab { position: absolute; z-index: 6; display: grid; place-items: center; border-radius: 50%; background: #0c1220; border: 2px solid rgba(128, 234, 255, .5);
+    box-shadow: 0 0 15px var(--cyan), 0 0 30px rgba(128, 234, 255, .5); color: var(--cyan); font-size: 22px; }
+  .hint { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 0; flex: 1 1 420px; order: 10; }
+  .finder { left: 12px; top: 10px; width: 520px; display: flex; flex-direction: column; gap: 6px; }
+  .finder .in { display: flex; align-items: center; gap: 8px; border-radius: 10px; padding: 4px 6px 4px 10px; }
+  .finder .in span { flex: 1; color: var(--muted); font-size: 14px; padding: 6px 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { min-height: 30px; border-radius: 999px; border: 1px solid var(--line); background: rgba(8, 10, 16, .6); padding: 4px 11px; font-size: 12px; color: var(--ink); }
+  .nav { right: 64px; top: 10px; border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .nav .mini { width: 104px; height: 134px; border-radius: 4px; background: #e9ebee; position: relative; }
+  .nav .mini::after { content: ''; position: absolute; inset: 10px 9px; background: repeating-linear-gradient(#9aa3b1 0 1px, transparent 1px 5px); opacity: .7; }
+  .nav .bts { display: flex; gap: 4px; }
+  .nav .bts .btn { padding: 4px 8px; min-height: 26px; font-size: 12px; flex: 1; }
+  .bar { left: 12px; right: 92px; bottom: 12px; border-radius: 10px; padding: 8px 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+  /* Play HUD */
+  .stats { left: 12px; top: 10px; border-radius: 10px; padding: 8px 12px 7px; display: flex; flex-direction: column; gap: 5px; }
+  .stats .r { display: flex; align-items: center; gap: 16px; font-family: 'Press Start 2P', monospace; font-size: 14px; line-height: 1; }
+  .stats .t { color: var(--ink); }
+  .stats .c { color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 43, .55); }
+  .stats .c small { font-size: 9px; color: #7fd98e; text-shadow: none; margin-left: 4px; }
+  .stats .y { color: var(--cyan); font-size: 11px; }
+  .stats .best { font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--muted); letter-spacing: .5px; }
+  .stats.phone { left: 8px; top: 8px; padding: 0 12px; height: 44px; justify-content: center; }
+  .stats.phone .r { font-size: 11px; gap: 12px; }
+  .tip { position: absolute; right: 52px; top: 12px; white-space: nowrap; font-size: 12px; padding: 4px 8px; border-radius: 6px; background: #0b0e16; border: 1px solid var(--line); color: var(--ink); }
+  .meter { position: absolute; z-index: 5; width: 54px; }
+  .meter::before { content: ''; position: absolute; inset: -12px -2px -12px -4px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .meter .track { position: absolute; right: 8px; top: 0; bottom: 0; width: 4px; border-radius: 2px; background: rgba(124, 135, 152, .35); }
+  .meter .fill { position: absolute; right: 8px; bottom: 0; width: 4px; border-radius: 2px; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .meter .tick { position: absolute; right: 5px; width: 10px; height: 2px; background: #5d6879; }
+  .meter .tick.on { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+  .meter .lab { position: absolute; right: 20px; font: 8px/1 'Press Start 2P', monospace; color: #7c8798; transform: translateY(-50%); white-space: nowrap; }
+  .meter .lab.on { color: var(--cyan); }
+  .meter .me { position: absolute; right: 1px; width: 18px; height: 18px; transform: translateY(-50%); border-radius: 50%; background: #0b0e16; border: 2px solid var(--cyan);
+    box-shadow: 0 0 10px var(--cyan); display: grid; place-items: center; font-size: 9px; }
+  .meter.slim { width: 20px; }
+  .meter.slim::before { inset: -10px 0; }
+  .meter.slim .lab { display: none; }
+  .meter.slim .lab.now { display: block; color: var(--cyan); right: 22px; font-size: 8px; background: rgba(8, 10, 16, .7); padding: 3px 4px; border-radius: 4px; }
+  .legend { left: 50%; bottom: 14px; transform: translateX(-50%); border-radius: 999px; padding: 8px 16px; display: flex; gap: 14px; align-items: center; white-space: nowrap; font-size: 12.5px; color: #b9c6da; }
+  kbd { display: inline-block; min-width: 20px; padding: 1px 5px; border-radius: 4px; border: 1px solid #39425a; border-bottom-width: 2px; background: #151a26;
+    font: 600 11px/16px Nunito, sans-serif; color: var(--ink); text-align: center; }
+  .legend .sep { color: #3a4356; }
+  .toast { left: 50%; top: 12px; transform: translateX(-50%); border-radius: 10px; padding: 8px 14px; display: flex; gap: 10px; align-items: center; white-space: nowrap;
+    border-color: rgba(128, 234, 255, .55); box-shadow: 0 0 18px rgba(128, 234, 255, .25); }
+  .toast .tag { font: 9px/1 'Press Start 2P', monospace; color: #0b0d12; background: var(--green); padding: 4px 6px; border-radius: 4px; }
+  .toast .what { font-size: 13px; }
+  .toast .what b { font-family: 'Press Start 2P', monospace; font-size: 11px; color: var(--cyan); margin-right: 6px; }
+  /* touch pads */
+  .pad { position: absolute; z-index: 5; display: grid; place-items: center; border-radius: 50%; background: rgba(8, 10, 16, .5); border: 1.5px solid rgba(215, 222, 234, .28);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: rgba(215, 222, 234, .9); font-size: 22px; user-select: none; }
+  .pad.sq { border-radius: 16px; }
+  .pad .lb { position: absolute; bottom: -15px; font: 700 9px/1 Nunito, sans-serif; letter-spacing: .5px; color: rgba(215, 222, 234, .6); text-transform: uppercase; white-space: nowrap; }
+  .pad.a { border-color: rgba(128, 234, 255, .7); color: var(--cyan); }
+  .pad.b { border-color: rgba(213, 128, 255, .7); color: var(--purple); }
+  .pad.down { border-radius: 12px; font-size: 16px; }
+  .pad.pressed { background: rgba(128, 234, 255, .3); border-color: var(--cyan); box-shadow: 0 0 16px rgba(128, 234, 255, .55); color: #fff; }
+  .tchint { left: 50%; transform: translateX(-50%); border-radius: 999px; padding: 6px 12px; font-size: 11.5px; white-space: nowrap; color: #b9c6da; }
+  /* summit card */
+  .summit { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 380px; border-radius: 14px; padding: 20px 22px 18px; text-align: center;
+    border-color: rgba(128, 234, 255, .5); box-shadow: 0 0 40px rgba(128, 234, 255, .18), 0 20px 60px rgba(0, 0, 0, .5); background: rgba(8, 10, 16, .82); }
+  .summit h3 { margin: 0; font: 30px/1.1 Audiowide, sans-serif; color: var(--cyan); letter-spacing: 2px; text-shadow: 0 0 16px rgba(128, 234, 255, .6); }
+  .summit p { margin: 6px 0 14px; color: #b9c6da; font-size: 13.5px; }
+  .summit .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .summit .cell { border: 1px solid var(--line); border-radius: 8px; padding: 9px 4px 8px; background: rgba(18, 22, 33, .7); }
+  .summit .cell .l { font: 8px/1 'Press Start 2P', monospace; color: var(--muted); letter-spacing: .5px; }
+  .summit .cell .v { font: 14px/1 'Press Start 2P', monospace; margin-top: 8px; }
+  .summit .cell .v.g { color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 43, .5); }
+  .summit .new { display: inline-block; margin-top: 6px; font: 7px/1 'Press Start 2P', monospace; color: #0b0d12; background: var(--green); padding: 3px 5px; border-radius: 3px; }
+  .summit .acts { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .summit .acts .btn { flex: 1 1 auto; }
+  .summit.phone { width: auto; left: 16px; right: 16px; transform: translateY(-50%); top: 62%; }
+  .summit.phone .acts { flex-direction: column; }
+  .summit.phone .acts .btn { min-height: 44px; }
+  .focusring { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  .badge { position: absolute; z-index: 20; width: 24px; height: 24px; border-radius: 50%; background: var(--anno); color: #0b0d12; font: 800 13px/24px Nunito, sans-serif;
+    text-align: center; box-shadow: 0 0 0 2px #0b0d12, 0 0 12px rgba(255, 79, 216, .8); }
+  .phone .badge, .stage.phone .badge { width: 22px; height: 22px; font-size: 12px; line-height: 22px; }
+
+  /* parts sheet */
+  .parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .part { background: #0b0e16; border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .part h4 { margin: 0 0 10px; font: 700 13px/1.3 Nunito, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .part .demo { position: relative; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; min-height: 54px; padding: 10px; border-radius: 8px;
+    background: radial-gradient(ellipse at 30% 30%, rgba(196, 77, 255, .18), transparent 70%), #080b14; }
+  .part p { margin: 10px 0 0; font-size: 13px; color: #b9c6da; }
+  .paperchip { position: relative; background: var(--paper); border-radius: 4px; padding: 10px 14px; color: #16181d; font: 600 15px/1 Nunito, sans-serif; }
+  .paperchip .coin { inset: 7px 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #39425a; border-top-color: var(--cyan); animation: spin .9s linear infinite; }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#80eaff"/></marker>
+  </defs>
+</svg>
+
+<header>
+  <h1>Play mode · UI mockup, round 1</h1>
+  <p class="sub">Jelly Resume, 2026-10-14. The binding contract for the Play HUD, the touch controls and the summit card. The page in each screen is the real snapshot at play zoom; Phill is a placeholder silhouette (in the build he's the 3D model, with the llamas). Pink numbers match the notes under each screen.</p>
+</header>
+
+<main>
+  <section class="block summary">
+    <h2>What we agreed</h2>
+    <div class="card">
+      <ul>
+        <li><b>Career Climb.</b> Start on the bottom line (Guitarist, 1998) and climb to your name. The resume is newest-first, so climbing it bottom-up walks the career in order. Dated job lines are checkpoints; the name is the summit (a dance and a spark firework, your time against your best).</li>
+        <li><b>Impact coins.</b> The 27 numbers the Finder's Impact chip finds (<code>#metrics</code>) glow green. Smash one: +1. A recruiter who plays reads the numbers.</li>
+        <li><b>Smash = instant burst</b> into comet sparks, sprayed the way he punches: the attack clip's strike, ~60 ms hit-stop, a small shake, and <code>burst()</code>'s shockwave knocks the neighbors loose.</li>
+        <li><b>Every line is a jump-through platform.</b> Jump up through lines, land on tops, <kbd>↓</kbd> drops through, <kbd>↓</kbd> in the air is a ground-pound. Smashed words leave holes that heal. Page edges drop into the void: he flails (die clip) and respawns at the last checkpoint. No lives, no game over.</li>
+        <li><b>Scale and camera.</b> He's ~0.5 units tall in Play (about 3 lines; 3.4 in orbit). Follow-cam: ~90 px tall on desktop, ~60 px on a phone, leading the way he faces, moving vertically when he lands on a new line. Yaw 0, a slight tilt.</li>
+        <li><b>Sound.</b> Small synthesized jump, smash, land, coin and summit sounds through <code>sfx.ts</code>, only while Sound is on (clicks outside Play stay silent).</li>
+        <li><b>Music.</b> Words keep dancing (the platforms bob to the beat). Standing still ~1.5 s with music on, he dances; any input stops it. <code>walk</code>, <code>attack</code> and <code>jumping</code> are excluded from the dance rotation by name.</li>
+        <li><b>Clips.</b> Run = the game's <code>walk</code> sped up. Jump = Mixamo <code>jumping</code>, scrubbed by the jump's state (wind-up skipped), its hip rise stripped (physics does the lifting). Smash = the strike window of the 2.87 s <code>attack</code>.</li>
+        <li><b>Off while playing.</b> Page gestures (rotate, pan, pinch, knock), the Finder, the navigator, the HUD bar, the black hole, Chaos/Burst/Heal. Shroom mode keeps working (it drops words: the floor crumbles). Shrimp stay in the backdrop.</li>
+      </ul>
+      <p class="later"><b>Later, not v1:</b> shrimp as stompable enemies · gamepad · a Mixamo “Running” clip (only if the sped-up walk looks like speed-walking) · leaderboards (need a backend).</p>
+    </div>
+  </section>
+
+  <!-- 1 ─────────────────────────────────────────────────────────── -->
+  <section class="block">
+    <h2><span class="n">1</span>Desktop · the resume, with Play</h2>
+    <div class="row">
+      <div class="stage" data-w="1280" data-h="800">
+        <div class="screen" data-w="1280" data-h="800" data-scene="fit">
+          <div class="ui finder">
+            <div class="in panel"><span>🔍 Find a skill… <span class="k" style="font-size:12px">(/)</span></span></div>
+            <div class="chips"><span class="chip">AI</span><span class="chip">React</span><span class="chip">TypeScript</span><span class="chip">AWS</span><span class="chip">Node</span><span class="chip">Data</span><span class="chip">Impact</span><span class="chip">Music</span></div>
+          </div>
+          <div class="ui nav panel"><div class="mini"></div><div class="bts"><span class="btn">−</span><span class="btn">Fit</span><span class="btn">+</span></div><div class="bts"><span class="btn on">⟳ Rotate</span><span class="btn">✥ Pan</span></div></div>
+          <div class="ui round panel" style="right:12px;top:10px">×</div>
+          <div class="ui bar panel">
+            <span class="btn play">🎮 Play<span class="key"> (J)</span></span>
+            <span class="btn">⤓ PDF</span><span class="btn">Chaos (C)</span><span class="btn">Burst all (B)</span><span class="btn">Heal all (H)</span>
+            <span class="btn">🍄 Shroom mode (S)</span><span class="btn">🕳 Black hole (G)</span><span class="btn on">🔊 Sound</span><span class="btn">▶ Intro</span><span class="btn">⟲ View</span>
+            <p class="hint">Click: knock loose · click loose word: burst · drag: rotate · hold Space: black hole · /: find<br>Scroll: pan (or ✥ Pan mode, O) · Ctrl-scroll / pinch: zoom at cursor · double-click: zoom in · 0: whole page</p>
+          </div>
+          <div class="fab" style="right:24px;bottom:24px;width:56px;height:56px">♫</div>
+          <div class="badge" style="left:6px;bottom:52px">1</div>
+          <div class="badge" style="left:1010px;top:520px">2</div>
+          <div class="badge" style="left:540px;top:12px">3</div>
+        </div>
+      </div>
+      <ol class="notes">
+        <li><b>🎮 Play (J)</b> goes first in the HUD bar (on phones too, where the bar wraps), in the cyan “try me” look: the <code>ON</code> border and text plus a soft glow and a faint fill. <span class="k"><code>aria-keyshortcuts="J"</code>, title “Play as Phill (J)”.</span> It's always there: if Phill or the Play code is still loading, pressing it shows <i>Loading…</i> (<code>aria-busy</code>) and Play starts when they're ready; if loading fails, it shows <i>Play unavailable</i> (disabled). With Save-Data on (the cast is skipped), pressing Play loads it on demand. <span class="k">States: see the parts sheet.</span></li>
+        <li><b>The entrance.</b> Pressing Play: Phill dives out of his orbit, shrinking from 3.4 to ~0.5 units on the way, and lands on the bottom line (Guitarist &amp; Composer, 1998) with a jelly splat (the words under him squash), while the camera eases from this view to the play view (~0.8 s). Clicking him outside Play still knocks him away.</li>
+        <li><b>The Finder, the navigator and the HUD bar</b> don't change here. While playing they fade out and go <code>inert</code>; leaving Play brings them back (and the camera eases back to this whole-page view).</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 2 ─────────────────────────────────────────────────────────── -->
+  <section class="block">
+    <h2><span class="n">2</span>Desktop · playing</h2>
+    <div class="row">
+      <div class="stage" data-w="1280" data-h="800">
+        <div class="screen" data-w="1280" data-h="800" data-scene="play">
+          <div class="ui stats panel">
+            <div class="r"><span class="t">⏱ 0:24.6</span><span class="c">✦ 7/27<small>IMPACT</small></span></div>
+            <div class="best">BEST 0:38.9</div>
+          </div>
+          <div class="ui round panel" style="right:12px;top:10px">×</div>
+          <div class="ui tip" style="right:62px;top:20px">Leave Play (Esc)</div>
+          <div class="meter" style="right:10px;top:76px;bottom:104px" data-me="436" data-mode="full"></div>
+          <div class="ui legend panel">
+            <span><kbd>←</kbd> <kbd>→</kbd> run</span><span class="sep">·</span>
+            <span><kbd>Space</kbd> jump <span class="k">(hold: higher)</span></span><span class="sep">·</span>
+            <span><kbd>↓</kbd> drop · in the air: pound</span><span class="sep">·</span>
+            <span><kbd>X</kbd> smash</span><span class="sep">·</span>
+            <span><kbd>Esc</kbd> leave</span>
+          </div>
+          <div class="fab" style="right:24px;bottom:24px;width:56px;height:56px">♫</div>
+          <div class="badge" style="left:274px;top:6px">1</div>
+          <div class="badge" style="right:4px;top:58px">2</div>
+          <div class="badge" style="right:66px;top:300px">3</div>
+          <div class="badge" style="left:316px;bottom:30px">4</div>
+          <div class="badge" style="left:412px;top:240px">5</div>
+          <div class="badge" style="left:318px;top:430px">6</div>
+          <div class="badge" style="left:628px;top:388px">7</div>
+          <div class="badge" style="right:84px;bottom:40px">8</div>
+          <div class="badge" style="left:826px;top:174px">9</div>
+        </div>
+      </div>
+      <ol class="notes">
+        <li><b>Stats</b> (top-left, where the Finder was): the time and the Impact count in Press Start 2P (the site's pixel accent), coins in the site green, the best time muted under them. The timer starts on the first move, not on entering. Updated through refs, never React state per frame; the best time lives in <code>localStorage</code> (wrapped in try/catch).</li>
+        <li><b>×</b> sits where the resume's × is, but while playing it leaves Play, not the resume. <span class="k"><code>aria-label="Leave Play mode (Esc)"</code>.</span> Esc works the same way: the first one leaves Play, the second closes the resume (like the Finder's Esc clearing the search first).</li>
+        <li><b>Climb meter</b> (right edge): the page's height, 1998 at the bottom to NOW at the top. Ticks sit at the dated job lines (true to their place on the page; labels nudge apart where they crowd), lit once reached; the marker is Phill's height. <span class="k"><code>aria-hidden</code> (the live region announces checkpoints). Shown when the viewport is at least 560 px tall.</span></li>
+        <li><b>Key legend</b> (bottom-center): visible on entering, fades ~4 s after the first move; <kbd>?</kbd> shows it again. Also <kbd>A</kbd>/<kbd>D</kbd> run, <kbd>↑</kbd>/<kbd>W</kbd> jump, <kbd>S</kbd> drop, <kbd>K</kbd> smash. The resume's other shortcuts are off while playing except <kbd>M</kbd> (sound) and <kbd>P</kbd> (music).</li>
+        <li><b>Coins:</b> the Impact numbers glow green and pulse gently (a shader tint, like the Finder's highlight). Smash one: “+1 IMPACT” pops, the count bumps, a polite live region says “Impact 8 of 27”. It re-forms as a plain word (collected: no glow).</li>
+        <li><b>Smash</b> (<kbd>X</kbd>): the strike of the attack clip. Words in front of him from hips to chest (about two lines), about one long word ahead, burst into comet sparks sprayed the way he punches; ~60 ms hit-stop, a small shake. The shockwave loosens the neighbors (chain reactions for free). Here: <i>~71K-resource</i> (a coin), <i>AI</i>, <i>an</i>, <i>a</i>.</li>
+        <li><b>Camera:</b> play zoom (Phill ≈ 90 px tall; about 25 lines and most of the width in view), leading ahead of the way he faces (he sits left of center facing right), moving vertically when he lands on a new line, not on every jump.</li>
+        <li><b>The site's ♫</b> stays on desktop (nothing's under it but the page). <kbd>P</kbd> still plays/pauses.</li>
+        <li><b>The level:</b> every line is a jump-through platform; ragged line ends are ledges; the gap before a right-aligned date is a pit; holes heal (2.2 s burst + 1.1 s re-form). Off the page edge: the void (flail, respawn at the last checkpoint). Only words at home (or springing back) hold him; loose words are debris he shoves.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 3 ─────────────────────────────────────────────────────────── -->
+  <section class="block">
+    <h2><span class="n">3</span>Desktop · the summit</h2>
+    <div class="row">
+      <div class="stage" data-w="1280" data-h="800">
+        <div class="screen" data-w="1280" data-h="800" data-scene="summit">
+          <div class="ui stats panel">
+            <div class="r"><span class="t" style="color:var(--green)">⏱ 0:42.3</span><span class="c">✦ 19/27<small>IMPACT</small></span></div>
+            <div class="best">BEST 0:38.9</div>
+          </div>
+          <div class="ui round panel" style="right:12px;top:10px">×</div>
+          <div class="meter" style="right:10px;top:76px;bottom:104px" data-me="-5" data-mode="full"></div>
+          <div class="ui summit panel" style="left:780px">
+            <h3>SUMMIT</h3>
+            <p>1998 → now. You climbed the whole career.</p>
+            <div class="grid">
+              <div class="cell"><div class="l">TIME</div><div class="v">0:42.3</div></div>
+              <div class="cell"><div class="l">IMPACT</div><div class="v g">19/27</div></div>
+              <div class="cell"><div class="l">BEST</div><div class="v">0:38.9</div></div>
+            </div>
+            <div class="acts">
+              <span class="btn play focusring">↻ Play again <span class="key">(Enter)</span></span>
+              <span class="btn">⤓ Resume PDF</span>
+              <span class="btn">Back to the resume <span class="key">(Esc)</span></span>
+            </div>
+          </div>
+          <div class="fab" style="right:24px;bottom:24px;width:56px;height:56px">♫</div>
+          <div class="badge" style="left:300px;top:150px">1</div>
+          <div class="badge" style="left:580px;top:268px">2</div>
+          <div class="badge" style="left:580px;top:470px">3</div>
+        </div>
+      </div>
+      <ol class="notes">
+        <li><b>The summit:</b> landing on <i>Phill Aelony</i> ends the run. The timer freezes (and turns green), the name lights up like a Finder match, comet sparks fire up from behind it, and he dances one from the rotation (with or without music). The camera holds on the name, offset so the card doesn't cover him.</li>
+        <li><b>Summit card</b> (a <code>PANEL</code>, beside the name): SUMMIT in Audiowide, “1998 → now. You climbed the whole career.”, then the time, Impact and best in pixel type; a beaten best gets a green <span style="font:7px 'Press Start 2P';background:var(--green);color:#0b0d12;padding:2px 4px;border-radius:3px">NEW BEST!</span> tag (see the phone summit). A polite live region reads the result; focus moves to Play again.</li>
+        <li><b>Actions:</b> <i>↻ Play again</i> (Enter; he drops back to the bottom line, the camera sweeps down the page, the timer and coins reset, the holes heal), <i>⤓ Resume PDF</i> (the HUD's download), <i>Back to the resume</i> (Esc; the same as leaving Play).</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 4 ─────────────────────────────────────────────────────────── -->
+  <section class="block">
+    <h2><span class="n">4</span>Phone · portrait, playing</h2>
+    <div class="row side">
+      <div class="stage phone" data-w="390" data-h="844" data-max="0.92">
+        <div class="screen" data-w="390" data-h="844" data-scene="portrait">
+          <div class="ui stats panel phone"><div class="r"><span class="t">⏱ 0:31.8</span><span class="c">✦ 9/27</span></div></div>
+          <div class="ui round panel" style="right:60px;top:8px;font-size:19px;color:var(--cyan)">♫</div>
+          <div class="ui round panel" style="right:8px;top:8px">×</div>
+          <div class="meter slim" style="right:6px;top:70px;bottom:206px" data-me="650" data-mode="slim"></div>
+          <div class="ui tchint panel" style="bottom:166px">Hold ◀ ▶ to run · Ⓐ jump · Ⓑ smash · ▼ drop</div>
+          <div class="pad sq" style="left:16px;bottom:32px;width:64px;height:64px">◀</div>
+          <div class="pad sq pressed" style="left:88px;bottom:32px;width:64px;height:64px">▶</div>
+          <div class="pad a pressed" style="right:16px;bottom:40px;width:72px;height:72px;font-weight:800">A<span class="lb">jump</span></div>
+          <div class="pad b" style="right:100px;bottom:24px;width:64px;height:64px;font-weight:800">B<span class="lb">smash</span></div>
+          <div class="pad down" style="right:104px;bottom:104px;width:56px;height:44px">▼</div>
+          <div class="badge" style="left:150px;top:46px">1</div>
+          <div class="badge" style="right:96px;top:2px">2</div>
+          <div class="badge" style="right:30px;top:300px">3</div>
+          <div class="badge" style="left:40px;bottom:100px">4</div>
+          <div class="badge" style="right:4px;bottom:118px">5</div>
+          <div class="badge" style="left:20px;bottom:186px">6</div>
+          <div class="badge" style="left:300px;top:390px">7</div>
+        </div>
+      </div>
+      <ol class="notes">
+        <li><b>Stats</b> in one 44 px row: time and coins. The best time shows only on the summit card.</li>
+        <li><b>♫ and ×</b> (44 × 44 each). On touch devices the site's ♫ button hides while playing (it sat right under the thumbs) and this ♫ plays/pauses the site's player instead, like <kbd>P</kbd>. It's a remote, not a second player. × leaves Play.</li>
+        <li><b>Climb meter</b> (slim): ticks without labels and the current era next to the marker. Shown at 560 px tall or more; shorter screens put the year in the stats (see landscape).</li>
+        <li><b>Move pad</b> (bottom-left): ◀ ▶, 64 × 64, 8 px apart, 16 px from the edge plus <code>env(safe-area-inset-*)</code>. Hold to run; sliding from one to the other without lifting switches direction (the pad tracks the pointer across both).</li>
+        <li><b>Action pad</b> (bottom-right): <b>A</b> jump 72 × 72 (hold: higher), <b>B</b> smash 64 × 64, <b>▼</b> drop 56 × 44 (standing: drop through; in the air: ground-pound). Multi-touch: run and jump at once. Glass, pressed = cyan. Each has an <code>aria-label</code>; keyboard players use the keys.</li>
+        <li><b>Touch hint</b> above the pads on entering; fades after the first moves.</li>
+        <li><b>Camera:</b> Phill ≈ 60 px tall. The text is bigger than at the whole-page view, so it's readable while you climb. It follows both ways (about 40% of a line's width is in view) and, on touch, keeps him in the upper two-thirds, clear of the pads. The dotted arc: a jump from <i>asset pipeline…</i> up to <i>offline replay</i> (he's at its top; the ghost is the takeoff). Page gestures are off, and the HUD bar, Finder and navigator are hidden.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 5 ─────────────────────────────────────────────────────────── -->
+  <section class="block">
+    <h2><span class="n">5</span>Phone · landscape, playing</h2>
+    <div class="row">
+      <div class="stage phone" data-w="844" data-h="390" data-max="0.92">
+        <div class="screen" data-w="844" data-h="390" data-scene="landscape">
+          <div class="ui stats panel phone"><div class="r"><span class="t">⏱ 0:14.2</span><span class="c">✦ 4/27</span><span class="y">2022</span></div></div>
+          <div class="ui round panel" style="right:60px;top:8px;font-size:19px;color:var(--cyan)">♫</div>
+          <div class="ui round panel" style="right:8px;top:8px">×</div>
+          <div class="ui toast panel" style="top:60px"><span class="tag"><span style="font:800 10px Nunito">✓</span> CHECKPOINT</span><span class="what"><b>2022</b>Software Engineer · Sessions</span></div>
+          <div class="pad sq" style="left:16px;bottom:24px;width:64px;height:64px">◀</div>
+          <div class="pad sq pressed" style="left:88px;bottom:24px;width:64px;height:64px">▶</div>
+          <div class="pad a" style="right:16px;bottom:40px;width:72px;height:72px;font-weight:800">A<span class="lb">jump</span></div>
+          <div class="pad b" style="right:100px;bottom:24px;width:64px;height:64px;font-weight:800">B<span class="lb">smash</span></div>
+          <div class="pad down" style="right:104px;bottom:104px;width:56px;height:44px">▼</div>
+          <div class="badge" style="left:232px;top:46px">1</div>
+          <div class="badge" style="left:620px;top:52px">2</div>
+          <div class="badge" style="left:262px;top:236px">3</div>
+        </div>
+      </div>
+      <ol class="notes">
+        <li><b>Under 560 px tall:</b> no climb meter; the stats show the current year instead (<span style="font:9px 'Press Start 2P';color:var(--cyan)">2022</span>). The pads are the same as in portrait.</li>
+        <li><b>Checkpoint toast</b> (top-center; under the top row on phones, so it never covers the stats): reaching a dated job line shows “✓ CHECKPOINT · 2022 · Software Engineer · Sessions” for ~2.5 s, and the polite live region says it. Respawns land here.</li>
+        <li><b>The checkpoint itself:</b> a small cyan flag plants at the end of that job title and the title glows briefly. Landscape shows nearly a whole line at once, so it's the best way to play on a phone; the entrance could suggest it once (“Turn your phone for a wider view”).</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 6 ─────────────────────────────────────────────────────────── -->
+  <section class="block">
+    <h2><span class="n">6</span>Phone · the summit</h2>
+    <div class="row side">
+      <div class="stage phone" data-w="390" data-h="844" data-max="0.92">
+        <div class="screen" data-w="390" data-h="844" data-scene="psummit">
+          <div class="ui stats panel phone"><div class="r"><span class="t" style="color:var(--green)">⏱ 0:36.5</span><span class="c">✦ 21/27</span></div></div>
+          <div class="ui round panel" style="right:60px;top:8px;font-size:19px;color:var(--cyan)">♫</div>
+          <div class="ui round panel" style="right:8px;top:8px">×</div>
+          <div class="ui summit panel phone">
+            <h3>SUMMIT</h3>
+            <p>1998 → now. You climbed the whole career.</p>
+            <div class="grid">
+              <div class="cell"><div class="l">TIME</div><div class="v">0:36.5</div></div>
+              <div class="cell"><div class="l">IMPACT</div><div class="v g">21/27</div></div>
+              <div class="cell"><div class="l">BEST</div><div class="v">0:36.5</div><div class="new">NEW BEST!</div></div>
+            </div>
+            <div class="acts">
+              <span class="btn play focusring">↻ Play again</span>
+              <span class="btn">⤓ Resume PDF</span>
+              <span class="btn">Back to the resume</span>
+            </div>
+          </div>
+          <div class="badge" style="left:24px;top:330px">1</div>
+        </div>
+      </div>
+      <ol class="notes">
+        <li><b>On phones</b> the card spans the width (16 px gutters) under the name, the buttons stack full-width at 44 px or more, and the pads hide while it's up. A beaten best shows <span style="font:7px 'Press Start 2P';background:var(--green);color:#0b0d12;padding:2px 4px;border-radius:3px">NEW BEST!</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- parts ─────────────────────────────────────────────────────── -->
+  <section class="block">
+    <h2><span class="n">7</span>Parts</h2>
+    <div class="parts">
+      <div class="part"><h4>Play button</h4>
+        <div class="demo"><span class="btn play">🎮 Play (J)</span><span class="btn busy"><span class="spinner"></span> Loading…</span><span class="btn off">🎮 Play unavailable</span></div>
+        <p>Ready · loading (<code>aria-busy</code>; Play starts when ready) · failed (disabled, title says why).</p></div>
+      <div class="part"><h4>Coin · collected</h4>
+        <div class="demo"><span class="paperchip"><span class="coin"></span>50K+</span><span class="paperchip">50K+</span><span class="pop" style="position:relative;transform:none;font-size:10px">+1 IMPACT</span></div>
+        <p>A glowing word (green, a gentle pulse) · after it's smashed and re-formed (plain) · the pop, rising and fading over ~0.8 s.</p></div>
+      <div class="part"><h4>Touch buttons</h4>
+        <div class="demo" style="min-height:96px"><span class="pad a" style="position:relative;width:64px;height:64px;font-weight:800">A</span><span class="pad a pressed" style="position:relative;width:64px;height:64px;font-weight:800">A</span><span class="pad sq" style="position:relative;width:56px;height:56px">▶</span><span class="pad sq pressed" style="position:relative;width:56px;height:56px">▶</span></div>
+        <p>Idle · pressed. Glass at 50% so the climb shows through; never under 44 px.</p></div>
+      <div class="part"><h4>Checkpoint toast</h4>
+        <div class="demo"><span class="panel" style="display:flex;flex-direction:column;align-items:flex-start;gap:8px;border-radius:10px;padding:9px 12px;border-color:rgba(128,234,255,.55)"><span style="font:9px/1 'Press Start 2P';color:#0b0d12;background:var(--green);padding:4px 6px;border-radius:4px"><span style="font:800 10px Nunito">✓</span> CHECKPOINT</span><span style="font-size:13px"><b style="font:11px 'Press Start 2P';color:var(--cyan);margin-right:6px">2021</b>Front End Developer · Designit for Microsoft</span></span></div>
+        <p>One per dated job line, in climb order: 1998, 2018, 2021, 2022, 2023, 2026. The summit replaces the last.</p></div>
+      <div class="part"><h4>Falling off</h4>
+        <div class="demo" style="color:#b9c6da;font-size:13px">Off a page edge → the die-clip flail into the nebula (~1 s) → he drops back in at the last checkpoint with a splat. The timer keeps running.</div>
+        <p>No lives, no game over: falling just costs time.</p></div>
+      <div class="part"><h4>Reduced motion</h4>
+        <div class="demo" style="color:#b9c6da;font-size:13px"><span>The engine never loads, so there's no Play mode: the plain <code>/resume</code> page as today.</span></div>
+        <p>Play adds no new reduced-motion path.</p></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- the scenes: the real page at play zoom, with overlays in snapshot (content) px ---------- */
+const PAGE = { mx: 52.8, my: 38.4 }
+const rng = (seed) => { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296) }
+const el = (tag, cls, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (parent) parent.append(e); return e }
+const SVGNS = 'http://www.w3.org/2000/svg'
+const sv = (tag, attrs, parent) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.append(e); return e }
+
+function stars(sky, W, H, seed) {
+  const r = rng(seed), svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none' }, sky)
+  for (let i = 0; i < W * H / 4200; i++) {
+    const b = r()
+    sv('circle', { cx: r() * W, cy: r() * H, r: b > .96 ? 1.3 : b > .8 ? .9 : .55, fill: b > .9 ? '#cfe9ff' : '#9fb3d9', opacity: .35 + r() * .6 }, svg)
+  }
+}
+
+/** The page at zoom k with content point (cx, cy) at the center of a W × H screen. */
+function scene(screen, { k, cx, cy, seed = 1 }) {
+  const W = +screen.dataset.w, H = +screen.dataset.h
+  const sky = el('div', 'sky'); screen.prepend(sky); stars(sky, W, H, seed)
+  const paper = el('div', 'paper'); sky.after(paper)
+  const tx = W / 2 - (PAGE.mx + cx) * k, ty = H / 2 - (PAGE.my + cy) * k
+  paper.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`
+  const content = el('div', 'content', paper), ov = el('div', 'ov', content)
+  const fx = sv('svg', { class: 'fx', viewBox: '0 0 710 953' }, ov)
+  return { k, ov, fx }
+}
+
+const box = (cls, ov, x, y, w, h, pad = 0) => { const d = el('div', cls, ov); Object.assign(d.style, { left: x - pad + 'px', top: y - pad / 2 + 'px', width: w + 2 * pad + 'px', height: h + pad + 'px' }); return d }
+const coin = (s, x, y, w, h) => box('coin', s.ov, x, y, w, h, 2)
+const hole = (s, x, y, w, h) => box('hole', s.ov, x - 1, y, w + 2, h)
+const lit = (s, x, y, w, h) => box('lit', s.ov, x, y, w, h, 3)
+function pop(s, x, y, text, px) { const d = el('div', 'pop', s.ov); Object.assign(d.style, { left: x + 'px', top: y + 'px', fontSize: px / s.k + 'px', borderWidth: 1 / s.k + 'px' }); d.textContent = text }
+
+/** Comet sparks: a white-hot head and a tail in the site's neon mix (≈45% cyan, 40% purple, 15% green). */
+function sparks(s, x, y, { n = 40, dir = 0, spread = Math.PI, rmin = 4, rmax = 40, len = 7, seed = 3, w = 1 } = {}) {
+  const r = rng(seed), g = sv('g', { filter: 'url(#glow)' }, s.fx)
+  for (let i = 0; i < n; i++) {
+    const a = dir + (r() - .5) * spread, d = rmin + Math.pow(r(), .7) * (rmax - rmin), px = x + Math.cos(a) * d, py = y + Math.sin(a) * d
+    const c = r(), col = c < .45 ? '#80eaff' : c < .85 ? '#d580ff' : '#00ff2b', L = len * (.5 + r())
+    sv('line', { x1: px - Math.cos(a) * L, y1: py - Math.sin(a) * L, x2: px, y2: py, stroke: col, 'stroke-width': w, 'stroke-linecap': 'round', opacity: .75 }, g)
+    sv('circle', { cx: px, cy: py, r: w * .75, fill: '#fff' }, g)
+  }
+}
+
+/** Placeholder Phill (facing right): poncho, two llamas in his arms, jeans. Feet at the bottom of a 60 × 100 box. */
+function phillSVG(pose) {
+  const lean = { idle: 0, run: 8, smash: 12, jump: -4, dance: -5 }[pose]
+  const legs = {
+    idle: [[0, 34], [0, 34]], run: [[30, 34], [-34, 34]], smash: [[26, 34], [-30, 34]], jump: [[-58, 24], [-18, 28]], dance: [[16, 34], [-16, 34]],
+  }[pose]
+  const llamas = {
+    idle: [[11, 44], [50, 44]], run: [[13, 46], [49, 40]], smash: [[16, 44], [64, 36]], jump: [[8, 30], [52, 27]], dance: [[4, 20], [56, 18]],
+  }[pose]
+  const leg = ([a, l], x) => `<g transform="rotate(${a} ${x + 3.5} 62)"><rect x="${x}" y="60" width="7" height="${l}" rx="3.2" fill="#2b3a5e"/><ellipse cx="${x + 4.5}" cy="${60 + l}" rx="5" ry="2.6" fill="#151a24"/></g>`
+  const llama = ([x, y], flip) => `<g transform="translate(${x} ${y}) scale(${flip ? -1 : 1} 1)">
+      <path d="M-2 4 Q-1 -6 2 -9" stroke="#f1ece2" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <ellipse cx="3" cy="-10" rx="3.6" ry="2.6" fill="#f1ece2"/><path d="M1 -12 l-1 -4 l2 3 z M4 -12 l0.5 -4 l1.2 3.4 z" fill="#f1ece2"/>
+      <circle cx="4.2" cy="-10.6" r=".6" fill="#222"/><ellipse cx="-1" cy="6" rx="5" ry="6" fill="#f1ece2"/></g>`
+  const arm = pose === 'smash' ? `<path d="M40 38 Q52 36 60 36" stroke="#6d3fa8" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <path d="M66 26 Q74 36 66 46 M70 22 Q81 36 70 50" stroke="#80eaff" stroke-width="1.2" fill="none" opacity=".8"/>` : ''
+  return `<svg viewBox="0 0 60 100" aria-hidden="true"><g transform="rotate(${lean} 30 96)">
+    ${leg(legs[1], 31)}${leg(legs[0], 22)}
+    <path d="M17 30 L45 30 L53 63 L8 63 Z" fill="#6d3fa8"/>
+    <path d="M10 52 L14 48 L18 52 L22 48 L26 52 L30 48 L34 52 L38 48 L42 52 L46 48 L51 52" stroke="#80eaff" stroke-width="1.6" fill="none"/>
+    <path d="M9 57 L51 57" stroke="#00ff2b" stroke-width="1.4"/>
+    ${arm}${llama(llamas[0], true)}${llama(llamas[1], false)}
+    <rect x="27.5" y="24" width="7" height="7" fill="#d6a07c"/>
+    <circle cx="31" cy="17" r="9" fill="#d6a07c"/>
+    <path d="M22 15 Q23 6 31 6 Q40 6 40 15 Q35 10 31 11 Q26 11 22 15 Z" fill="#3b2b24"/>
+    <path d="M24 21 Q31 29 38 21 Q37 26 31 27 Q25 26 24 21 Z" fill="#4a362c"/>
+  </g></svg>`
+}
+function phill(s, x, feetY, pose, { h = 48, flip = false, ghost = false } = {}) {
+  const d = el('div', 'phill' + (ghost ? ' ghost' : ''), s.ov), w = h * .6
+  Object.assign(d.style, { left: x - w / 2 + 'px', top: feetY - h + 'px', width: w + 'px', height: h + 'px', transform: flip ? 'scaleX(-1)' : '' })
+  d.innerHTML = phillSVG(pose)
+}
+
+/** A checkpoint flag planted on a line, just after its job title. */
+function flag(s, x, y) {
+  const g = sv('g', { filter: 'url(#glow)' }, s.fx)
+  sv('line', { x1: x, y1: y + 3, x2: x, y2: y - 18, stroke: '#5d6879', 'stroke-width': 1.4 }, g)
+  sv('path', { d: `M${x} ${y - 18} L${x + 11} ${y - 14} L${x} ${y - 10} Z`, fill: '#80eaff' }, g)
+}
+
+/* ---------- the climb meter ---------- */
+const TICKS = [{ y: 885, l: '1998' }, { y: 862, l: '2018' }, { y: 823, l: '2021' }, { y: 784, l: '2022' }, { y: 316, l: '2023' }, { y: 300, l: '2026' }, { y: -5, l: 'NOW' }]
+const TOP = -5, BOT = 935
+function meter(m) {
+  const me = +m.dataset.me, slim = m.dataset.mode === 'slim', H = m.clientHeight, at = (y) => ((y - TOP) / (BOT - TOP)) * H
+  el('div', 'track', m)
+  const f = el('div', 'fill', m); f.style.height = H - at(me) + 'px'
+  let last = Infinity
+  const reached = TICKS.filter((t) => t.y >= me)
+  const era = reached.length ? reached[reached.length - 1] : TICKS[0]
+  for (const t of TICKS) {
+    const on = t.y >= me, y = at(t.y)
+    const tk = el('div', 'tick' + (on ? ' on' : ''), m); tk.style.top = y - 1 + 'px'
+    const ly = Math.min(y, last - 11); last = ly
+    const lb = el('div', 'lab' + (on ? ' on' : '') + (slim && t === era ? ' now' : ''), m); lb.style.top = (slim && t === era ? at(me) : ly) + 'px'; lb.textContent = t.l
+  }
+  const d = el('div', 'me', m); d.style.top = at(me) + 'px'; d.textContent = '▲'; d.style.color = '#80eaff'
+}
+
+/* ---------- each screen ---------- */
+const SCENES = {
+  fit(screen) {
+    const s = scene(screen, { k: 0.56, cx: 355.2, cy: 520, seed: 11 })
+    phill(s, 655, 1000, 'idle', { h: 330 })
+  },
+  play(screen) {
+    const s = scene(screen, { k: 1.86, cx: 300, cy: 430, seed: 12 })
+    for (const c of [[140, 351, 34, 15], [509, 335, 14, 15], [564, 335, 18, 15], [647, 436, 28, 15], [92, 452, 29, 15], [480, 504, 18, 15], [586, 504, 14, 15], [384, 520, 21, 15]]) coin(s, ...c)
+    for (const h of [[79, 418, 80, 15], [76, 403, 13, 15], [60, 403, 13, 15], [70, 418, 6, 15]]) hole(s, ...h)
+    sparks(s, 112, 422, { n: 55, dir: -0.1, spread: 1.4, rmin: 6, rmax: 52, len: 7, seed: 5 })
+    sparks(s, 80, 410, { n: 16, dir: -0.3, spread: 1.2, rmin: 4, rmax: 26, len: 5, seed: 9 })
+    pop(s, 150, 384, '+1 IMPACT', 12)
+    phill(s, 46, 441, 'smash')
+  },
+  summit(screen) {
+    const s = scene(screen, { k: 1.86, cx: 330, cy: 110, seed: 13 })
+    lit(s, 0, -5, 74, 43); lit(s, 81, -5, 109, 43)
+    sparks(s, 95, -60, { n: 60, dir: 0, spread: Math.PI * 2, rmin: 8, rmax: 60, len: 7, seed: 21 })
+    sparks(s, 20, -40, { n: 30, dir: 0, spread: Math.PI * 2, rmin: 4, rmax: 34, len: 6, seed: 22 })
+    sparks(s, 175, -45, { n: 30, dir: 0, spread: Math.PI * 2, rmin: 4, rmax: 34, len: 6, seed: 23 })
+    phill(s, 96, 8, 'dance')
+  },
+  portrait(screen) {
+    const s = scene(screen, { k: 1.25, cx: 150, cy: 650, seed: 14 })
+    for (const c of [[170, 729, 28, 15], [135, 588, 26, 15], [17, 554, 32, 15], [276, 554, 36, 15], [97, 554, 7, 15]]) coin(s, ...c)
+    sv('path', { d: 'M62 729 Q118 566 172 674', fill: 'none', stroke: '#80eaff', 'stroke-width': 1.3, 'stroke-dasharray': '3 3', 'marker-end': 'url(#arrow)', opacity: .9 }, s.fx)
+    phill(s, 62, 734, 'idle', { ghost: true })
+    phill(s, 117, 650, 'jump')
+  },
+  landscape(screen) {
+    const s = scene(screen, { k: 1.25, cx: 330, cy: 785, seed: 15 })
+    for (const c of [[537, 800, 27, 15], [518, 839, 28, 15], [482, 901, 21, 15], [170, 729, 28, 15]]) coin(s, ...c)
+    lit(s, 0, 782, 167, 17)
+    flag(s, 176, 782)
+    phill(s, 128, 789, 'run')
+  },
+  psummit(screen) {
+    const s = scene(screen, { k: 1.25, cx: 150, cy: 230, seed: 16 })
+    lit(s, 0, -5, 74, 43); lit(s, 81, -5, 109, 43)
+    sparks(s, 95, -55, { n: 50, dir: 0, spread: Math.PI * 2, rmin: 8, rmax: 55, len: 7, seed: 31 })
+    sparks(s, 190, -30, { n: 26, dir: 0, spread: Math.PI * 2, rmin: 4, rmax: 30, len: 6, seed: 32 })
+    phill(s, 96, 8, 'dance')
+  },
+}
+
+for (const screen of document.querySelectorAll('.screen[data-scene]')) SCENES[screen.dataset.scene](screen)
+
+/* ---------- fit each screen into its stage ---------- */
+function fit() {
+  for (const stage of document.querySelectorAll('.stage')) {
+    const w = +stage.dataset.w, h = +stage.dataset.h, max = +(stage.dataset.max || 1)
+    const avail = stage.parentElement.clientWidth - (stage.classList.contains('phone') ? 16 : 0)
+    const k = Math.min(max, avail / w)
+    stage.style.width = w * k + 'px'
+    stage.style.height = h * k + 'px'
+    stage.querySelector('.screen').style.transform = `scale(${k})`
+    stage.querySelector('.screen').style.width = w + 'px'
+    stage.querySelector('.screen').style.height = h + 'px'
+  }
+}
+fit()
+for (const m of document.querySelectorAll('.meter')) meter(m) // (after fit: a meter reads its screen's height)
+addEventListener('resize', fit)
+</script>
+</body>
+</html>

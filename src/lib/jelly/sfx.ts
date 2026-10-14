@@ -1,6 +1,7 @@
 /**
  * Sound effects, all synthesized with Web Audio (no files): the black hole's drone,
- * gulps and boom, and the entrance whoosh. Clicks are silent (Phill: no musical notes).
+ * gulps and boom, the entrance whoosh, and Play mode's jump, land, smash, coin and finish.
+ * Clicks are silent (Phill: no musical notes); Play mode's sounds only come from playing.
  */
 
 export interface Sfx {
@@ -13,6 +14,12 @@ export interface Sfx {
   hole(amt: number): void
   gulp(): void
   boom(): void
+  /** Play mode: a jump, a landing (fall speed, units/s), a smash, a coin collected, the finish */
+  jump(): void
+  land(speed: number): void
+  smash(): void
+  coin(): void
+  finish(): void
   dispose(): void
 }
 
@@ -178,6 +185,74 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }):
     s.stop(t + 1)
   }
 
+  /** a tone: an oscillator from f0 to f1 over len s, gain g, starting at t */
+  function tone(type: OscillatorType, f0: number, f1: number, len: number, g: number, t = ac!.currentTime) {
+    const o = ac!.createOscillator(), a = ac!.createGain()
+    o.type = type
+    o.frequency.setValueAtTime(f0, t)
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + len)
+    a.gain.setValueAtTime(0.0001, t)
+    a.gain.exponentialRampToValueAtTime(g, t + 0.008)
+    a.gain.exponentialRampToValueAtTime(0.0001, t + len)
+    o.connect(a)
+    a.connect(mix)
+    o.start(t)
+    o.stop(t + len + 0.05)
+  }
+
+  /** a short noise burst through a filter */
+  function crunch(type: BiquadFilterType, f: number, len: number, g: number, t = ac!.currentTime) {
+    prepare()
+    const s = ac!.createBufferSource(), bp = ac!.createBiquadFilter(), a = ac!.createGain()
+    s.buffer = noiseBuf
+    bp.type = type
+    bp.frequency.setValueAtTime(f, t)
+    bp.frequency.exponentialRampToValueAtTime(f * 0.3, t + len)
+    a.gain.setValueAtTime(g, t)
+    a.gain.exponentialRampToValueAtTime(0.0001, t + len)
+    s.connect(bp)
+    bp.connect(a)
+    a.connect(mix)
+    s.start(t, Math.random() * 0.5)
+    s.stop(t + len + 0.05)
+  }
+
+  /** a short rising blip */
+  function jump() {
+    if (live()) tone('square', 310, 760, 0.1, 0.06)
+  }
+
+  /** a soft thud, louder the faster he fell (a gentle step makes none) */
+  function land(speed: number) {
+    const k = Math.min(1, (speed - 1.5) / 7)
+    if (!live() || k <= 0) return
+    tone('sine', 150, 55, 0.14, 0.28 * k)
+    crunch('lowpass', 700, 0.06, 0.12 * k)
+  }
+
+  /** a crunchy pop: a filtered noise crack over a falling punch */
+  function smash() {
+    if (!live()) return
+    crunch('bandpass', 2200, 0.13, 0.5)
+    tone('square', 240, 70, 0.12, 0.12)
+  }
+
+  /** a bright two-note chime */
+  function coin() {
+    if (!live()) return
+    const t = ac!.currentTime
+    tone('triangle', 988, 988, 0.22, 0.13, t)
+    tone('triangle', 1319, 1319, 0.34, 0.13, t + 0.075)
+  }
+
+  /** a short flourish up a major chord */
+  function finish() {
+    if (!live()) return
+    const t = ac!.currentTime
+    ;[523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone('triangle', f, f, i === 3 ? 0.7 : 0.18, 0.12, t + i * 0.085))
+    tone('sine', 1046.5, 1046.5, 0.9, 0.06, t + 0.255)
+  }
+
   function dispose() {
     drone = null
     if (ac) ac.close().catch(() => {})
@@ -185,5 +260,5 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }):
     noiseBuf = null
   }
 
-  return { init, prepare, setVolume, intro, hole, gulp, boom, dispose }
+  return { init, prepare, setVolume, intro, hole, gulp, boom, jump, land, smash, coin, finish, dispose }
 }

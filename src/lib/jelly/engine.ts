@@ -93,7 +93,14 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   let playing = false
   const playInput: PlayInput = { left: false, right: false, jump: false, down: false, smash: false, pressed: new Set() }
   const playParams: PlayConfig = { ...PLAY_CONFIG }
-  const playListeners = new Set<(e: PlayEvent) => void>()
+  // Play mode's sounds (silent unless Sound is on; the audio starts on the Play gesture)
+  const playListeners = new Set<(e: PlayEvent) => void>([(e) => {
+    if (e.type === 'jump') sfx.jump()
+    else if (e.type === 'land') sfx.land(e.speed)
+    else if (e.type === 'smash') { if (e.bodies.length) sfx.smash() }
+    else if (e.type === 'coin') sfx.coin()
+    else if (e.type === 'finish') sfx.finish()
+  }])
 
   const ui: UiInsets = { top: 0.1, bot: 0.1 }
   let loaded: LoadedSnapshot | null = null

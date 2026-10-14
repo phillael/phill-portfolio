@@ -22,16 +22,16 @@ export interface InputContext {
   setLastRay(ray: Ray): void
   /** a user gesture: unlock audio */
   gesture(): void
-  /** is the cast (Phill, a shrimp) under the ray? */
-  castHit?(ray: Ray): boolean
-  /** a click on the cast: true if it took it (the words don't get it) */
-  castClick?(ray: Ray): boolean
+  /** the cast member (Phill, a shrimp) under the ray, if any */
+  castHit?(ray: Ray): object | null
+  /** a click that started on that cast member (picked at pointerdown: it keeps moving) */
+  castClick?(target: object, ray: Ray): void
 }
 
 export function attachInput(ctx: InputContext) {
   const { w, canvas, ui } = ctx
   const cam = w.cam
-  let down: { x: number; y: number; moved: boolean; hit: number; cast: boolean; mode: 'orbit' | 'pan' } | null = null
+  let down: { x: number; y: number; moved: boolean; hit: number; cast: object | null; mode: 'orbit' | 'pan' } | null = null
   const touches = new Map<number, { x: number; y: number }>()
   let pinch: { d: number; mx: number; my: number } | null = null
   let holePointer: number | null = null
@@ -128,11 +128,11 @@ export function attachInput(ctx: InputContext) {
         pinch = { d: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }
         return
       }
-      const onCast = !!ctx.castHit?.(rayAt(w, rc, e.clientX, e.clientY))
+      const onCast = ctx.castHit?.(rayAt(w, rc, e.clientX, e.clientY)) ?? null
       down = { x: e.clientX, y: e.clientY, moved: false, hit: onCast ? -1 : pickParticle(w, sx, sy, rc, 28), cast: onCast, mode: ctx.navMode() === 'rotate' ? 'orbit' : 'pan' }
       return
     }
-    const onCast = e.button === 0 && !!ctx.castHit?.(rayAt(w, rc, e.clientX, e.clientY))
+    const onCast = e.button === 0 ? ctx.castHit?.(rayAt(w, rc, e.clientX, e.clientY)) ?? null : null
     down = { x: e.clientX, y: e.clientY, moved: false, hit: e.button === 0 && !onCast ? pickParticle(w, sx, sy, rc) : -1, cast: onCast, mode: dragMode(e) }
   }
 
@@ -143,7 +143,7 @@ export function attachInput(ctx: InputContext) {
       touches.delete(e.pointerId)
       if (touches.size < 2) pinch = null
       if (down && e.type === 'pointerup' && ctx.enabled()) {
-        if (!down.moved && down.cast) ctx.castClick?.(rayAt(w, rc, e.clientX, e.clientY))
+        if (!down.moved && down.cast) ctx.castClick?.(down.cast, rayAt(w, rc, e.clientX, e.clientY))
         else if (!down.moved && down.hit >= 0) clickAt(w, rayAt(w, rc, e.clientX, e.clientY), down.hit)
         else if (down.moved && down.mode === 'pan' && touches.size === 0) releaseFling()
       }
@@ -151,7 +151,7 @@ export function attachInput(ctx: InputContext) {
       return
     }
     if (down && e.type === 'pointerup' && ctx.enabled()) {
-      if (!down.moved && down.cast) ctx.castClick?.(rayAt(w, rc, e.clientX, e.clientY))
+      if (!down.moved && down.cast) ctx.castClick?.(down.cast, rayAt(w, rc, e.clientX, e.clientY))
       else if (!down.moved && down.hit >= 0) clickAt(w, rayAt(w, rc, e.clientX, e.clientY), down.hit)
       else if (down.moved && down.mode === 'pan') releaseFling()
     }

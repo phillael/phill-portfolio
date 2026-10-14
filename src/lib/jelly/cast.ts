@@ -115,6 +115,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       await nextTask()
       if (disposed) return
       shrimpModel = await R.load(sb, nextTask)
+      if (disposed) return
       const m = shrimpModel.m
       // the static mesh's own node transform (it carries the quantization scale)
       const local = new Float32Array(m.nodes.length * 16), world = new Float32Array(m.nodes.length * 16)
@@ -126,7 +127,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       }
       shrimpWorld = world.slice(m.meshNode * 16, m.meshNode * 16 + 16)
     } catch (err) {
-      console.warn('The resume cast failed to load', err)
+      if (!disposed) console.warn('The resume cast failed to load', err) // (closing mid-load stops the renderer's uploads with an error)
     }
   }
 
@@ -421,13 +422,16 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     return best
   }
 
-  /** A click: knock whatever's under the ray out into the nebula (away from the page, not through it). True if something was hit (the words don't get this click). */
-  function click(ray: Ray) {
-    const b = hit(ray)
-    if (!b) return false
+  /**
+   * A click that started on a body (picked at pointerdown, since it keeps moving): knock it
+   * out into the nebula, away from the page rather than through it. Unless it has left the
+   * stage since (eaten, or a shrimp whose pass ended).
+   */
+  function click(target: object, ray: Ray) {
+    const b: Body | undefined = target === phill ? phill : shrimp.find((s) => s === target && s.on)
+    if (!b || b.eaten) return
     const side = Math.abs(b.pos[0]) > 0.5 ? Math.sign(b.pos[0]) : rnd() < 0.5 ? -1 : 1
     knock(b, [side * 0.8 + ray.dir[0] * 0.3, b.pos[1] * 0.06 + 0.25, b.pos[2] > 0 ? 0.35 : -0.6])
-    return true
   }
 
   /** Chaos: everyone flies. */
@@ -449,7 +453,8 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     load,
     update,
     draw,
-    hit: (ray: Ray) => !!hit(ray),
+    /** the body under the ray (Phill or a shrimp), if any */
+    hit: (ray: Ray): object | null => hit(ray),
     click,
     kickAll,
     dispose,

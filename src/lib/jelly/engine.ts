@@ -353,8 +353,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     holeMode: () => holeMode,
     setLastRay: (r) => { lastRay = r },
     gesture: unlockAudio,
-    castHit: (r) => !!cast?.hit(r),
-    castClick: (r) => !!cast?.click(r),
+    castHit: (r) => cast?.hit(r) ?? null,
+    castClick: (target, r) => cast?.click(target, r),
   })
 
   // ---- the loop: runs while the tab is visible ----
@@ -419,13 +419,17 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     skyLin = skyTarget > skyLin ? Math.min(skyTarget, skyLin + dt / 0.7) : Math.max(skyTarget, skyLin - dt / 0.7)
     // closing: the sky fades out with the sparks as the page comes back
     const sky = cl && cl.landed ? 1 - smooth(cl.fade) : smooth(skyLin)
-    // the cast: on stage once the page has printed (and off it while the resume closes or replays its intro)
+    // the cast: on stage once the page has printed (and off it while the resume closes or replays its intro).
+    // Its models are ~900 KB, so a visitor who asked to save data doesn't get them.
     const settled = open && !!loaded && !w.intro && !cl && !diss
     if (settled && !castStarted) {
       castStarted = true
-      import('./cast')
-        .then(({ createCast }) => { if (disposed) return; cast = createCast(gl!, w); return cast.load(nextTask) })
-        .catch((err) => console.warn('The resume cast failed to load', err))
+      const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData
+      if (!saveData) {
+        import('./cast')
+          .then(({ createCast }) => { if (disposed) return; cast = createCast(gl!, w); return cast.load(nextTask) })
+          .catch((err) => console.warn('The resume cast failed to load', err))
+      }
     }
     cast?.update(dt, settled)
     renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null, !!loaded, cast?.draw)

@@ -12,9 +12,6 @@ import { Pose, bendAxes, jointMatrices, sampleTrack } from '@/lib/jelly/actors'
 import { CAST_CONFIG } from '@/lib/jelly/config'
 import { bounds, parseGlb, readGltf, restLocals, worldMatrices, type GltfModel, type Track } from '@/lib/jelly/gltf'
 
-// three ships the decoder as an ES module; the same decoder's CommonJS build reads the same files
-jest.mock('three/examples/jsm/libs/meshopt_decoder.module.js', () => ({ MeshoptDecoder: jest.requireActual('meshoptimizer/meshopt_decoder.js') }))
-
 const closed = jest.fn()
 beforeAll(() => {
   ;(globalThis as unknown as { createImageBitmap: unknown }).createImageBitmap = jest.fn(async () => ({ width: 1, height: 1, close: closed }))

@@ -60,11 +60,14 @@ const ATTRS = { POSITION: 'aPos', NORMAL: 'aNormal', TEXCOORD_0: 'aUv', JOINTS_0
 export function createActorRenderer(gl: WebGL2RenderingContext) {
   const [CAST] = compileAll(gl, [[SH.CAST_VS, SH.CAST_FS]])
   const models: ActorModel[] = []
+  let gone = false
 
   /** Read and upload a GLB; the slow parts (meshopt, image decode) don't block the main thread for long. */
   async function load(buf: ArrayBuffer, ready: () => Promise<void>): Promise<ActorModel> {
     const m = await readGltf(buf)
     await ready()
+    // closed while it decoded: don't upload into a context that's going away
+    if (gone) { m.baseColor?.close(); m.glow?.close(); throw new Error('The cast was disposed while loading') }
     const vao = gl.createVertexArray()!, bufs: WebGLBuffer[] = []
     gl.bindVertexArray(vao)
     for (const [name, attr] of Object.entries(ATTRS) as [keyof typeof ATTRS, string][]) {
@@ -132,11 +135,21 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a.tex)
     if (a.glow) { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, a.glow) }
     gl.bindVertexArray(a.vao)
+    // fading: lay down its depth first, so only its nearest surface blends (not its far side and insides)
+    const fading = look.alpha < 0.999
+    if (fading) {
+      gl.colorMask(false, false, false, false)
+      gl.drawElements(gl.TRIANGLES, a.count, a.itype, 0)
+      gl.colorMask(true, true, true, true)
+      gl.depthFunc(gl.LEQUAL)
+    }
     gl.drawElements(gl.TRIANGLES, a.count, a.itype, 0)
+    if (fading) gl.depthFunc(gl.LESS)
     gl.bindVertexArray(null)
   }
 
   function dispose() {
+    gone = true
     gl.deleteProgram(CAST.p)
     for (const a of models) {
       gl.deleteVertexArray(a.vao)

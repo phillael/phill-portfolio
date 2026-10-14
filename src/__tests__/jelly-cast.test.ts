@@ -31,11 +31,13 @@ describe('readGltf: Phill', () => {
   let m: GltfModel
   beforeAll(async () => { m = await readGltf(glb('phill.glb')) })
 
-  it('has his 24-bone skin, his own clips and the dances borrowed from the other characters', () => {
+  it('has his 24-bone skin, his own clips, the dances borrowed from the other characters and the jump', () => {
     expect(m.joints).toHaveLength(24)
     expect(m.ibm).toHaveLength(24 * 16)
-    expect(m.clips.map((c) => c.name).sort()).toEqual(['dance', 'die', 'garlic', 'human', 'idle', 'lasagna', 'moose', 'zombie'])
-    const own = new Set(['dance', 'die', 'idle'])
+    expect(m.clips.map((c) => c.name).sort()).toEqual(
+      ['attack', 'dance', 'die', 'garlic', 'human', 'idle', 'jumping', 'lasagna', 'moose', 'walk', 'zombie'],
+    )
+    const own = new Set(['attack', 'dance', 'die', 'idle', 'walk'])
     for (const c of m.clips) {
       expect(c.duration).toBeGreaterThan(1)
       // his own: translation, rotation and scale for each bone; the borrowed ones: each bone's rotation and the hips' height

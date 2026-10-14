@@ -1,11 +1,14 @@
 /**
  * Builds the Jelly Resume's cast from the Number Slayers models (~/Desktop/dev/number-slayers,
  * apps/web/public/models):
- *   - phill.glb: the game's Phill (mesh, WebP texture, idle/dance/die) plus other characters' dances
+ *   - phill.glb: the game's Phill (mesh, WebP texture, idle/walk/dance/attack/die) plus other characters'
+ *     dances and the Play mode's jump
  *   - shrimp.glb: the game's shrimp, Draco → meshopt, only its base color and glow maps
  *
  * --dances <glb>,<glb>,… retargets other characters' dances onto Phill: the shroom wizard's
- * six (named below) and any clip called "dance" (named after its file: zombie, garlic, …).
+ * six (named below), any clip called "dance" and a file's only clip (both named after the
+ * file: zombie, garlic, …, jumping). Mixamo FBX downloads become GLBs with fbx2glb.py (its
+ * header has the Blender command); the jump is ~/Downloads/Jumping.fbx → <scratch>/jumping.glb.
  * Meshy rigs share Phill's 24 bone names; Mixamo rigs (human, mutant, zombie) are mapped
  * onto them and are Z-up under their armature. Bind poses differ (Phill was rigged in the
  * hero pose, the others in a T-pose), so rotations go through each bone's direction rather
@@ -18,7 +21,7 @@
  *   npm i @gltf-transform/core@4 @gltf-transform/extensions@4 @gltf-transform/functions@4 meshoptimizer draco3dgltf sharp
  *   NS=~/Desktop/dev/number-slayers/apps/web/public/models
  *   G=$NS/glb; node actors.mjs --phill $G/phill.glb --shrimp $NS/shrimp.glb --out <repo>/public/resume \
- *     --dances $G/zombie.glb,$G/human.glb,$G/garlic.glb,$G/lasagna.glb,$G/moose.glb --arms 1
+ *     --dances $G/zombie.glb,$G/human.glb,$G/garlic.glb,$G/lasagna.glb,$G/moose.glb,<scratch>/jumping.glb --arms 1
  */
 import { NodeIO } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
@@ -195,19 +198,61 @@ function retarget(src, tgt, tgtDoc, clip, name, hold, fps = 30) {
   return dur
 }
 
+/**
+ * What he holds follows his hand: a mesh island (connected triangles, welded where seams split
+ * a position) skinned mostly to a hand also had a few vertices on that side's thigh and shin,
+ * so any clip that moves the leg against the hand stretched a long sliver between them (the
+ * jump's tuck: 1.1 units). Those leg weights go to the hand (44 on the game's Phill).
+ */
+function handHeld(doc) {
+  const skin = doc.getRoot().listSkins()[0], names = skin.listJoints().map((j) => j.getName())
+  for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) {
+    const pos = prim.getAttribute('POSITION'), J = prim.getAttribute('JOINTS_0'), W = prim.getAttribute('WEIGHTS_0'), idx = prim.getIndices()
+    if (!pos || !J || !W || !idx) continue
+    const n = pos.getCount(), par = Int32Array.from({ length: n }, (_, i) => i)
+    const find = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x] } return x }
+    const join = (a, b) => { a = find(a); b = find(b); if (a !== b) par[a] = b }
+    const ia = idx.getArray()
+    for (let f = 0; f < ia.length; f += 3) { join(ia[f], ia[f + 1]); join(ia[f + 1], ia[f + 2]) }
+    const at = new Map()
+    for (let v = 0, p = []; v < n; v++) { const k = pos.getElement(v, p).join(','), o = at.get(k); if (o === undefined) at.set(k, v); else join(v, o) }
+    const islands = new Map()
+    for (let v = 0; v < n; v++) { const r = find(v); if (!islands.has(r)) islands.set(r, []); islands.get(r).push(v) }
+    let moved = 0
+    for (const side of ['Left', 'Right']) {
+      const hand = names.indexOf(side + 'Hand'), legs = new Set([names.indexOf(side + 'UpLeg'), names.indexOf(side + 'Leg')])
+      for (const vs of islands.values()) {
+        if (vs.length > n / 4) continue // the body itself
+        let onHand = 0
+        for (const v of vs) { const j = J.getElement(v, []), w = W.getElement(v, []); for (let k = 0; k < 4; k++) if (j[k] === hand) onHand += w[k] }
+        if (onHand / vs.length < 0.4) continue
+        for (const v of vs) {
+          const j = J.getElement(v, []), w = W.getElement(v, [])
+          let hit = false
+          for (let k = 0; k < 4; k++) if (w[k] > 0 && legs.has(j[k])) { j[k] = hand; hit = true; moved++ }
+          if (hit) J.setElement(v, j)
+        }
+      }
+    }
+    console.log('hand-held: moved', moved, 'leg weights to the hands')
+  }
+}
+
 // ---- Phill ----
 const phill = await io.read(phillPath)
-const keep = new Set(['idle', 'dance', 'die'])
+const keep = new Set(['idle', 'dance', 'die', 'walk', 'attack']) // walk and attack: Play mode's run and smash
 for (const a of phill.getRoot().listAnimations()) if (!keep.has(a.getName())) a.dispose()
 for (const m of phill.getRoot().listMaterials()) m.setExtension('KHR_materials_specular', null)
+handHeld(phill)
 if (dancePaths) {
   const tgt = rig(phill), idle = phill.getRoot().listAnimations().find((a) => a.getName() === 'idle')
   const hold = idle && armHold > 0 ? { ch: channels(idle), dur: clipLength(idle), k: armHold } : null
   const WIZARD = { All_Night_Dance: 'allnight', Boom_Dance: 'boom', Bubble_Dance: 'bubble', Hip_Hop_Dance_3: 'hiphop', Magic_Genie: 'genie', Proud_Strut: 'strut' }
   for (const path of dancePaths.split(',')) {
     const doc = await io.read(path), src = rig(doc), file = path.split('/').pop().replace(/\.glb$/, '')
+    const only = doc.getRoot().listAnimations().length === 1
     for (const clip of doc.getRoot().listAnimations()) {
-      const name = WIZARD[clip.getName()] ?? (clip.getName() === 'dance' ? file : null)
+      const name = WIZARD[clip.getName()] ?? (clip.getName() === 'dance' || only ? file : null)
       if (!name) continue
       const dur = retarget(src, tgt, phill, clip, name, hold)
       console.log('retargeted', file, clip.getName(), '→', name, dur.toFixed(2) + 's')

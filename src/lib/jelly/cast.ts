@@ -81,6 +81,13 @@ interface ShrimpState extends Body {
   peak: number
 }
 
+/** Play mode drives Phill: where his feet are, which way he faces (yaw) and how tall he is (units). */
+export interface Drive {
+  feet: Vec3
+  yaw: number
+  size: number
+}
+
 const body = (pos: Vec3): Body => ({ pos, vel: [0, 0, 0], rot: [0, 0, 0, 1], spin: [0, 0, 0], free: 0, flash: 0, eaten: false, scale: 1 })
 
 export function createCast(gl: WebGL2RenderingContext, w: World) {
@@ -95,6 +102,8 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     band: 0, level: 0, wave: new Float32Array(WAVE), ph: 0, span: 32, peak: 0.2,
   }))
   let alpha = 0
+  /** Play mode owns his position, rotation, size and clip while this is set (the cast keeps drawing him) */
+  let drive: Drive | null = null
   /** the music's bass, smoothed (and zero while it's off) */
   let energy = 0
   let disposed = false
@@ -294,7 +303,21 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     const t = w.time, music = w.music, dm = w.danceMix
     energy += (music.bass * dm - energy) * Math.min(1, dt * 3)
 
-    if (phill) {
+    if (phill && drive) {
+      // Play mode has him: the model's origin (between his feet) at drive.feet, turned to drive.yaw
+      const p = phill, k = drive.size / p.a.height, c = p.a.center, cy = Math.cos(drive.yaw), sy = Math.sin(drive.yaw)
+      p.pos[0] = drive.feet[0] + (c[0] * cy + c[2] * sy) * k
+      p.pos[1] = drive.feet[1] + c[1] * k
+      p.pos[2] = drive.feet[2] + (-c[0] * sy + c[2] * cy) * k
+      Q.axis(0, 1, 0, drive.yaw, p.rot)
+      p.vel[0] = p.vel[1] = p.vel[2] = 0
+      p.spin[0] = p.spin[1] = p.spin[2] = 0
+      p.free = 0
+      p.eaten = false
+      p.scale = 1
+      p.pump = 0
+      p.flash = Math.max(0, p.flash - dt * 2.5)
+    } else if (phill) {
       const p = phill, cam = w.cam
       p.age += dt
       p.th += (dt * Math.PI * 2) / Math.max(4, params.lap)
@@ -394,7 +417,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       }
     }
     if (phill) {
-      const p = phill, k = (sizeNow() / p.a.height) * p.scale
+      const p = phill, k = drive ? drive.size / p.a.height : (sizeNow() / p.a.height) * p.scale
       // a squash-and-stretch bounce on the beat, and the neon rim brightening with the bass
       R.draw(p.a, placement(p.pos, p.rot, k, p.a.center, 1 - 0.04 * p.pump, 1 + 0.08 * p.pump), p.pose.joints, {
         alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump), ambient: params.ambient, glow: noGlow,
@@ -414,7 +437,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       if (tp > 0 && Math.abs(x) < w.pageW / 2 && Math.abs(y) < w.pageH / 2) tPage = tp
     }
     const cands: [Body, number][] = []
-    if (phill && !phill.eaten) cands.push([phill, sizeNow() * 0.42 * phill.scale])
+    if (phill && !phill.eaten && !drive) cands.push([phill, sizeNow() * 0.42 * phill.scale])
     for (const s of shrimp) if (s.on && !s.eaten) cands.push([s, s.size * 0.5])
     let best: Body | null = null, bt = Math.min(tPage, Infinity)
     for (const [b, r] of cands) {
@@ -433,7 +456,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
    * stage since (eaten, or a shrimp whose pass ended).
    */
   function click(target: object, ray: Ray) {
-    const b: Body | undefined = target === phill ? phill : shrimp.find((s) => s === target && s.on)
+    const b: Body | undefined = target === phill ? (drive ? undefined : phill) : shrimp.find((s) => s === target && s.on)
     if (!b || b.eaten) return
     const side = Math.abs(b.pos[0]) > 0.5 ? Math.sign(b.pos[0]) : rnd() < 0.5 ? -1 : 1
     knock(b, [side * 0.8 + ray.dir[0] * 0.3, b.pos[1] * 0.06 + 0.25, b.pos[2] > 0 ? 0.35 : -0.6])
@@ -441,7 +464,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
 
   /** Chaos: everyone flies. */
   function kickAll() {
-    const bodies: Body[] = [...(phill ? [phill] : []), ...shrimp.filter((s) => s.on)]
+    const bodies: Body[] = [...(phill && !drive ? [phill] : []), ...shrimp.filter((s) => s.on)]
     for (const b of bodies) knock(b, [b.pos[0] || rnd() - 0.5, b.pos[1] || rnd() - 0.5, 1], 0.9)
   }
 
@@ -463,6 +486,16 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     click,
     kickAll,
     dispose,
+    /** Phill's model and pose for Play mode (null until he's loaded) */
+    rig: () => (phill ? { pose: phill.pose, height: phill.a.height, dims: phill.a.dims } : null),
+    /**
+     * Play mode takes Phill (it moves, turns, sizes and poses him; the cast keeps drawing him, and
+     * clicks, Chaos and the black hole leave him be), or hands him back (null): he drifts back to his orbit.
+     */
+    drive: (d: Drive | null) => {
+      if (!d && drive && phill) phill.pose.play(IDLE, 0.3)
+      drive = d
+    },
     /** dev: skip to the next dance */
     nextDance: () => { if (phill) nextDance(phill, 0.4) },
     /** dev: the state, for scripted checks */

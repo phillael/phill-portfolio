@@ -11,7 +11,7 @@ import { getSiteMusic } from '@/lib/site-music'
 import type { ResumeMode } from '@/components/jelly/resumeRoute'
 import { clearIntent, getHeroImg, peekIntent } from '@/components/jelly/resumeTrigger'
 import JellyFinder from '@/components/jelly/JellyFinder'
-import JellyHudBar, { type HudToggles } from '@/components/jelly/JellyHudBar'
+import JellyHudBar, { type HudToggles, type PlayStatus } from '@/components/jelly/JellyHudBar'
 import JellyNavigator from '@/components/jelly/JellyNavigator'
 import { FOCUS, PANEL } from '@/components/jelly/hudStyles'
 import ResumeContent from '@/components/ResumeContent'
@@ -36,6 +36,8 @@ interface JellyResumeCanvasProps {
 
 /** dev only: the cast's sliders (?tune); compiled out of production builds */
 const JellyCastTune = process.env.NODE_ENV !== 'production' ? dynamic(() => import('@/components/jelly/JellyCastTune'), { ssr: false }) : null
+/** dev only: Play mode's sliders (?tune, while playing) */
+const JellyPlayTune = process.env.NODE_ENV !== 'production' ? dynamic(() => import('@/components/jelly/JellyPlayTune'), { ssr: false }) : null
 
 const FADE_MS = 400
 /** Still not open after this long (a slow connection): show × anyway */
@@ -79,7 +81,7 @@ const forResume = (e: KeyboardEvent, section: HTMLElement | null) => {
 }
 
 /** The HUD's emoji and symbols (keep in step with its labels). */
-const HUD_GLYPHS = '🍄📱🔇🔊🕳⌕▶♫✥⟲⟳⤓'
+const HUD_GLYPHS = '🎮🍄📱🔇🔊🕳⌕▶♫✥⟲⟳⤓'
 
 /**
  * Lay the HUD's glyphs out once, off screen: their fallback fonts' first use costs ~45 ms
@@ -94,6 +96,11 @@ const warmGlyphs = (host: HTMLElement | null) => {
   host.appendChild(s)
   s.getBoundingClientRect()
   s.remove()
+}
+
+/** Play mode's keys (by e.key, lower-cased) → the input they hold down */
+const PLAY_KEYS: Record<string, 'left' | 'right' | 'jump' | 'down' | 'smash'> = {
+  arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right', ' ': 'jump', arrowup: 'jump', w: 'jump', arrowdown: 'down', s: 'down', x: 'smash', k: 'smash',
 }
 
 /** Whatever opened the resume (the hero, or the 🍄), so focus can go back to it. */
@@ -127,6 +134,8 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
   const [matches, setMatches] = useState<number | null>(null)
   const [navMode, setNavMode] = useState<'rotate' | 'pan'>('rotate')
   const [toggles, setToggles] = useState<HudToggles>({ shroom: false, hole: false, sound: true, tilt: false })
+  const [playing, setPlaying] = useState(false)
+  const [playStatus, setPlayStatus] = useState<PlayStatus>('ready')
 
   const findRef = useRef(find)
   const modeRef = useRef(mode)
@@ -307,6 +316,38 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     [engine],
   )
 
+  // Play mode: its button (it loads Phill and the Play code if they aren't in yet), and its start and end
+  const startPlay = useCallback(() => {
+    if (!engine || playStatus !== 'ready' || engine.play.isOn()) return
+    engine.gesture()
+    setPlayStatus('loading')
+    engine.play.enter().then((ok) => setPlayStatus(ok ? 'ready' : 'unavailable'))
+  }, [engine, playStatus])
+  useEffect(() => {
+    if (!engine) return
+    return engine.play.onEvent((e) => {
+      if (e.type === 'enter') {
+        setPlaying(true)
+        setQuery('')
+        setMatches(0)
+        sectionRef.current?.focus({ preventScroll: true }) // the keys are his now (not the button's)
+      } else if (e.type === 'exit') setPlaying(false)
+    })
+  }, [engine])
+  // a key held when the window loses focus never gets its keyup: let go of everything
+  useEffect(() => {
+    if (!engine || !playing) return
+    const input = engine.play.input
+    const clear = () => { input.left = input.right = input.jump = input.down = input.smash = false }
+    const hidden = () => { if (document.hidden) clear() }
+    window.addEventListener('blur', clear)
+    document.addEventListener('visibilitychange', hidden)
+    return () => {
+      window.removeEventListener('blur', clear)
+      document.removeEventListener('visibilitychange', hidden)
+    }
+  }, [engine, playing])
+
   // The page fits between the Finder (top) and the bar (bottom); on phones the navigator sits under the Finder
   useEffect(() => {
     if (!engine) return
@@ -342,6 +383,15 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     const down = (e: KeyboardEvent) => {
       if (ignore(e)) return
       engine.gesture()
+      if (engine.play.isOn()) {
+        // playing: his keys, M (sound), P (music) and Esc (leaves Play, not the resume); nothing else
+        const k = e.key.toLowerCase(), a = PLAY_KEYS[k]
+        if (k === 'escape') { e.stopPropagation(); engine.play.exit() }
+        else if (a) { e.preventDefault(); engine.play.input[a] = true }
+        else if (k === 'm') toggle('sound')
+        else if (k === 'p') getSiteMusic()?.toggle()
+        return
+      }
       if ((e.key === 'Enter' || e.key === ' ') && onButton(e)) return // let the focused button work
       if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) engine.holeAtCursor(); return }
       const k = e.key.toLowerCase()
@@ -359,6 +409,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
       else if (k === 'g') toggle('hole')
       else if (k === 'm') toggle('sound')
       else if (k === 'i') engine.replayIntro()
+      else if (k === 'j') startPlay()
       else if (k === 'p') getSiteMusic()?.toggle() // the site's player
       else if (k === 'o') toggleNav(navMode === 'rotate' ? 'pan' : 'rotate')
       else if (e.key === '+' || e.key === '=') engine.zoomBy(0.75)
@@ -366,6 +417,8 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
       else if (/^(Arrow|Page)|^(Home|End)$/.test(e.key)) { e.preventDefault(); engine.panKey(e.key) }
     }
     const up = (e: KeyboardEvent) => {
+      const a = PLAY_KEYS[e.key.toLowerCase()]
+      if (a && engine.play.isOn()) { engine.play.input[a] = false; return } // (wherever focus went)
       if (e.code !== 'Space' || ignore(e) || onButton(e)) return
       e.preventDefault()
       engine.releaseHoleKey()
@@ -377,7 +430,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
       window.removeEventListener('keydown', down, true)
       window.removeEventListener('keyup', up)
     }
-  }, [engine, opened, closing, close, toggle, toggleNav, navMode])
+  }, [engine, opened, closing, close, toggle, toggleNav, navMode, startPlay])
 
   const uiOn = !!engine && opened && !closing
   const fadeIn = `transition-opacity duration-[600ms] ${uiOn ? 'opacity-100 delay-[400ms]' : 'pointer-events-none opacity-0'}`
@@ -411,10 +464,11 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
             rootRef={finderRef}
           />
           <JellyNavigator engine={engine} loaded={loaded} navMode={navMode} onNavMode={toggleNav} rootRef={navRef} />
-          <JellyHudBar engine={engine} toggles={toggles} onToggle={toggle} rootRef={hudRef} />
+          <JellyHudBar engine={engine} toggles={toggles} onToggle={toggle} play={playStatus} onPlay={startPlay} rootRef={hudRef} />
           {JellyCastTune && <JellyCastTune />}
         </div>
       )}
+      {JellyPlayTune && playing && <JellyPlayTune />}
       <button
         type="button"
         aria-label="Close the resume (Esc)"

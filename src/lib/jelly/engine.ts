@@ -10,7 +10,7 @@
 
 import { introCam, revealY, startIntro, updateIntro } from './intro'
 import { planeZ, resetView, stepMomentum, updateCamera, zoomCenter, type Ray, type UiInsets } from './camera'
-import { HOME, LOOSE, initialState } from './config'
+import { HOME, LOOSE, PLAY_CONFIG, initialState, type PlayConfig } from './config'
 import { onBeat, updateBend, updateTargets } from './dance'
 import { countMatches, findMatches } from './finder'
 import { attachInput } from './input'
@@ -18,6 +18,7 @@ import { lcg } from './math'
 import { MusicFeatures, type MusicInput } from './music'
 import { burstAll, chaos, collide, healAll, releaseHole, shakeIt, startHole, step, updateParticles, updateStates } from './physics'
 import type { Cast } from './cast'
+import type { Play, PlayEvent, PlayInput } from './play'
 import { createRenderer } from './render'
 import { createSfx } from './sfx'
 import { snapshotBodies, type LoadedSnapshot } from './snapshot'
@@ -86,6 +87,13 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   // the cast (Phill, the shrimp): its own chunk, fetched once the page has printed (the cold open never waits on it)
   let cast: Cast | null = null
   let castStarted = false
+  let castLoad: Promise<boolean> | null = null
+  // Play mode: its own chunk, loaded on the first Play. The keys (or the touch pads) write its input
+  let play: Play | null = null
+  let playing = false
+  const playInput: PlayInput = { left: false, right: false, jump: false, down: false, smash: false }
+  const playParams: PlayConfig = { ...PLAY_CONFIG }
+  const playListeners = new Set<(e: PlayEvent) => void>()
 
   const ui: UiInsets = { top: 0.1, bot: 0.1 }
   let loaded: LoadedSnapshot | null = null
@@ -226,6 +234,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
    */
   function close(img: HTMLImageElement) {
     if (cl) return true
+    exitPlay() // closing while playing: leave Play first, instantly
     if (diss) {
       if (!loaded) return false // still waiting for the resume: fade out instead of waiting on the handoff
       pendingClose = img
@@ -346,7 +355,10 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     nextTask().then(() => { if (!disposed) sfx.prepare() })
   }
 
-  const enabled = () => open && !!loaded
+  /** the resume is open, has printed and isn't mid-transition */
+  const settledNow = () => open && !!loaded && !w.intro && !cl && !diss
+  /** page gestures (off while playing) */
+  const enabled = () => open && !!loaded && !playing
   const input = attachInput({
     w, canvas, ui, enabled,
     navMode: () => navMode,
@@ -374,6 +386,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
       onFind?.(q, find(q)) // a deep link: light it up once the page has landed
     })
     stepMomentum(w, dt)
+    if (playing) play?.update(dt) // before the camera: Play steers it
     if (w.cam.mom) w.navCalm = 1
     w.navCalm = Math.max(0, w.navCalm - dt * 2)
     updateCamera(w, dt, canvas.width, canvas.height, ui, introCam(w, open, cl ? cl.cam : null))
@@ -421,15 +434,11 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     const sky = cl && cl.landed ? 1 - smooth(cl.fade) : smooth(skyLin)
     // the cast: on stage once the page has printed (and off it while the resume closes or replays its intro).
     // Its models are ~900 KB, so a visitor who asked to save data doesn't get them.
-    const settled = open && !!loaded && !w.intro && !cl && !diss
+    const settled = settledNow()
     if (settled && !castStarted) {
       castStarted = true
       const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData
-      if (!saveData) {
-        import('./cast')
-          .then(({ createCast }) => { if (disposed) return; cast = createCast(gl!, w); return cast.load(nextTask) })
-          .catch((err) => console.warn('The resume cast failed to load', err))
-      }
+      if (!saveData) loadCast()
     }
     cast?.update(dt, settled)
     renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null, !!loaded, cast?.draw)
@@ -446,6 +455,48 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   const onVisibility = () => (document.hidden ? stopLoop() : startLoop())
   document.addEventListener('visibilitychange', onVisibility)
   if (!document.hidden) startLoop()
+
+  /** The cast's chunk and models, once (Play asks for them even with Save-Data); false if Phill didn't load. */
+  function loadCast() {
+    castLoad ??= import('./cast')
+      .then(async ({ createCast }) => {
+        if (disposed) return false
+        cast = createCast(gl!, w)
+        await cast.load(nextTask)
+        return !disposed && !!cast.rig()
+      })
+      .catch((err) => { console.warn('The resume cast failed to load', err); return false })
+    return castLoad
+  }
+
+  const emitPlay = (e: PlayEvent) => playListeners.forEach((f) => f(e))
+
+  /**
+   * Play as Phill: loads the cast (if it hasn't yet) and Play's chunk, then he takes the bottom line.
+   * Resolves to whether Play started (false: the resume isn't settled, or loading failed).
+   */
+  async function enterPlay() {
+    if (playing) return true
+    if (!settledNow()) return false
+    const [ok, mod] = await Promise.all([
+      loadCast(),
+      import('./play').catch((err) => { console.warn('Play mode failed to load', err); return null }),
+    ])
+    if (disposed || !ok || !mod || !cast || !settledNow()) return false
+    if (playing) return true
+    play ??= mod.createPlay({ w, cast, params: playParams, input: playInput, canvas, ui, emit: emitPlay })
+    if (w.hole.on) releaseHole(w)
+    find('')
+    playing = true
+    play.enter()
+    return true
+  }
+
+  function exitPlay() {
+    if (!playing) return
+    playing = false
+    play?.exit()
+  }
 
   function stats(): JellyStats {
     let home = 0, loose = 0, bursting = 0
@@ -499,12 +550,25 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     /** called every frame, right after the camera moves (mutate the DOM; never set React state) */
     onFrame: (f: () => void) => { frameListeners.add(f); return () => { frameListeners.delete(f) } },
     gesture: unlockAudio,
+    /** Play mode (the Career Climb) */
+    play: {
+      enter: enterPlay,
+      exit: exitPlay,
+      /** written by the keys and the touch pads (a plain object: never React state) */
+      input: playInput,
+      /** the live tuning (dev: /resume?tune) */
+      params: playParams,
+      /** where he is (read it in onFrame; null when not playing) */
+      state: () => (playing && play ? play.state() : null),
+      onEvent: (f: (e: PlayEvent) => void) => { playListeners.add(f); return () => { playListeners.delete(f) } },
+      isOn: () => playing,
+    },
     stats,
     dispose,
   }
 
   // dev only: a handle for scripted checks in the browser, like the playground's
-  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, get cast() { return cast }, diss: () => diss, closing: () => cl, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
+  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, get cast() { return cast }, get playDev() { return play }, diss: () => diss, closing: () => cl, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
   if (debug) (window as unknown as { __jelly?: unknown }).__jelly = debug
 
   return api

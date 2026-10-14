@@ -2,7 +2,7 @@
 
 import type { RefObject } from 'react'
 import type { JellyEngine } from '@/lib/jelly/engine'
-import { BTN, KEY, ON, PANEL } from '@/components/jelly/hudStyles'
+import { BTN, BTN_MUTED, KEY, ON, PANEL, PLAY_BTN } from '@/components/jelly/hudStyles'
 
 export const RESUME_PDF = '/Phillip_Aelony_Resume_2025.pdf'
 
@@ -13,22 +13,38 @@ export interface HudToggles {
   tilt: boolean
 }
 
+/** Play mode's button: ready, loading (Phill or the Play code; Play starts when they're in), or failed */
+export type PlayStatus = 'ready' | 'loading' | 'unavailable'
+
 interface JellyHudBarProps {
   engine: JellyEngine
   toggles: HudToggles
   onToggle: (k: keyof HudToggles) => void
+  play: PlayStatus
+  onPlay: () => void
   rootRef: RefObject<HTMLDivElement | null>
 }
 
 /**
- * The bottom bar: ⤓ PDF, Chaos, Burst all, Heal all, Shroom, Black hole, Tilt (phones),
+ * The bottom bar: 🎮 Play, ⤓ PDF, Chaos, Burst all, Heal all, Shroom, Black hole, Tilt (phones),
  * Sound, Intro, View, and the hints. It leaves room on the right for the site's ♫ button.
  */
-const JellyHudBar = ({ engine, toggles, onToggle, rootRef }: JellyHudBarProps) => (
+const JellyHudBar = ({ engine, toggles, onToggle, play, onPlay, rootRef }: JellyHudBarProps) => (
   <div
     ref={rootRef}
     className={`${PANEL} absolute bottom-3 left-3 right-[92px] z-[2] flex flex-wrap items-center gap-2 rounded-[10px] px-2.5 py-2 max-md:right-[68px] max-[820px]:bottom-2 max-[820px]:left-2 max-[820px]:gap-1.5 max-[820px]:p-1.5`}
   >
+    <button
+      type="button"
+      aria-keyshortcuts="J"
+      aria-busy={play === 'loading'}
+      disabled={play === 'unavailable'}
+      title={play === 'unavailable' ? "Play mode couldn't load" : 'Play as Phill (J)'}
+      onClick={onPlay}
+      className={play === 'ready' ? PLAY_BTN : BTN_MUTED}
+    >
+      {play === 'loading' ? 'Loading…' : play === 'unavailable' ? 'Play unavailable' : <><span aria-hidden="true">🎮</span> Play<span className={KEY}> (J)</span></>}
+    </button>
     <a href={RESUME_PDF} download="Phillip_Aelony_Resume.pdf" aria-label="Download the PDF" title="Download the PDF" className={BTN}>
       <span aria-hidden="true">⤓</span> PDF
     </a>

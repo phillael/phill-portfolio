@@ -19,8 +19,9 @@ export interface ActorModel {
   itype: number
   tex: WebGLTexture
   glow: WebGLTexture | null
-  /** the rest pose's bounds center, height and largest extent, in model units */
+  /** the rest pose's bounds center, size (x, y, z), height and largest extent, in model units */
   center: Vec3
+  dims: Vec3
   height: number
   extent: number
   /** for a wiggle, in the mesh's own space: its longest axis, its thinnest (the way it bends), and its span along the first */
@@ -95,6 +96,7 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     const am: ActorModel = {
       m, vao, bufs, count: m.indices.length, itype: m.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, tex, glow,
       center: [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2],
+      dims: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]],
       height: b.max[1] - b.min[1],
       extent: Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]),
       bend: bendAxes(m.positions),

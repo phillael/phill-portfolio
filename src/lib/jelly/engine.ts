@@ -392,7 +392,11 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     updateCamera(w, dt, canvas.width, canvas.height, ui, introCam(w, open, cl ? cl.cam : null))
     for (const f of frameListeners) f()
     w.hole.amt = w.hole.on ? w.hole.amt + (1 - w.hole.amt) * Math.min(1, dt * 0.9) : Math.max(0, w.hole.amt - dt * 5)
-    for (const bd of w.bodies) { bd.hl += (bd.hlT - bd.hl) * Math.min(1, dt * 5); if (bd.hl < 1e-3 && !bd.hlT) bd.hl = 0 }
+    for (const bd of w.bodies) {
+      bd.hl += (bd.hlT - bd.hl) * Math.min(1, dt * 5); if (bd.hl < 1e-3 && !bd.hlT) bd.hl = 0
+      bd.coin += (bd.coinT - bd.coin) * Math.min(1, dt * 4); if (bd.coin < 1e-3 && !bd.coinT) bd.coin = 0
+      bd.lit += (bd.litT - bd.lit) * Math.min(1, dt * 5); if (bd.lit < 1e-3 && !bd.litT) bd.lit = 0
+    }
     features.update(dt, music?.() ?? null)
     updateBend(w)
     updateTargets(w, dt)
@@ -554,6 +558,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     play: {
       enter: enterPlay,
       exit: exitPlay,
+      /** after the finish: the page heals, the clock and coins reset, he drops back onto the name */
+      again: () => { if (playing) play?.again() },
       /** written by the keys and the touch pads (a plain object: never React state) */
       input: playInput,
       /** the live tuning (dev: /resume?tune) */

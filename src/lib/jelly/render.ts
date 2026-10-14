@@ -63,9 +63,10 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
   let mistVAO: WebGLVertexArrayObject | null = null, mistBuf: WebGLBuffer | null = null, mistData = new Float32Array(0)
   let mistInst: Mist[] = []
   let bodyVAO: WebGLVertexArrayObject | null = null, ptVAO: WebGLVertexArrayObject | null = null, pageVAO: WebGLVertexArrayObject | null = null
-  let posBuf: WebGLBuffer, jigBuf: WebGLBuffer, visBuf: WebGLBuffer, hlBuf: WebGLBuffer
+  let posBuf: WebGLBuffer, jigBuf: WebGLBuffer, visBuf: WebGLBuffer, hlBuf: WebGLBuffer, glowBuf: WebGLBuffer
   let ptPosBuf: WebGLBuffer, ptTailBuf: WebGLBuffer, ptAlphaBuf: WebGLBuffer, ptAgeBuf: WebGLBuffer
-  let jigData = new Float32Array(0), hlData = new Float32Array(0), idxCount = 0, pageCount = 0
+  let jigData = new Float32Array(0), hlData = new Float32Array(0), glowData = new Float32Array(0), idxCount = 0, pageCount = 0
+  let glowsShown = false
   const buffers: WebGLBuffer[] = []
   const track = (b: WebGLBuffer) => { buffers.push(b); return b }
 
@@ -175,6 +176,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     const uv = new Float32Array(NP * 2), local = new Float32Array(NP * 2), rect = new Float32Array(NP * 4), sd = new Float32Array(NP)
     jigData = new Float32Array(NP)
     hlData = new Float32Array(NP)
+    glowData = new Float32Array(NP * 2)
     const idx: number[] = []
     w.bodies.forEach((bd, bi) => {
       const r = rects[bi]
@@ -195,6 +197,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     jigBuf = track(attr(gl, BODY, bodyVAO, 'aJig', 1, jigData, gl.DYNAMIC_DRAW)); track(attr(gl, BODY, bodyVAO, 'aSeed', 1, sd))
     visBuf = track(attr(gl, BODY, bodyVAO, 'aVis', 1, w.vis, gl.DYNAMIC_DRAW))
     hlBuf = track(attr(gl, BODY, bodyVAO, 'aHl', 1, hlData, gl.DYNAMIC_DRAW))
+    glowBuf = track(attr(gl, BODY, bodyVAO, 'aGlow', 2, glowData, gl.DYNAMIC_DRAW))
     const ib = track(gl.createBuffer()!)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(idx), gl.STATIC_DRAW)
@@ -353,11 +356,18 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
       gl.uniform1f(pu.uReveal, reveal); gl.uniform1f(pu.uDim, w.searchAmt); gl.uniform3fv(pu.uScan, hex(SITE.cyan))
       gl.bindVertexArray(pageVAO); gl.drawElements(gl.TRIANGLES, pageCount, gl.UNSIGNED_INT, 0)
 
-      for (const bd of w.bodies) { const v = bd.jig, h = bd.hl; for (let i = bd.p0; i < bd.p1; i++) { jigData[i] = v; hlData[i] = h } }
+      let glows = false
+      for (const bd of w.bodies) {
+        const v = bd.jig, h = bd.hl, c = bd.coin, l = bd.lit
+        if (c || l) glows = true
+        for (let i = bd.p0; i < bd.p1; i++) { jigData[i] = v; hlData[i] = h; glowData[i * 2] = c; glowData[i * 2 + 1] = l }
+      }
       gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, w.pos)
       gl.bindBuffer(gl.ARRAY_BUFFER, jigBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, jigData)
       gl.bindBuffer(gl.ARRAY_BUFFER, visBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, w.vis)
       gl.bindBuffer(gl.ARRAY_BUFFER, hlBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hlData)
+      if (glows || glowsShown) { gl.bindBuffer(gl.ARRAY_BUFFER, glowBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, glowData) } // (all zero: no upload)
+      glowsShown = glows
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
       gl.useProgram(BODY.p)
       const u = BODY.u
@@ -372,6 +382,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
       gl.uniform1i(u.uInkMode, INK_FINISH_INDEX[s.inkFinish]); gl.uniform1f(u.uShine, s.shine)
       gl.uniform2f(u.uTexel, 1.5 / atlasW, 1.5 / atlasH); gl.uniform3fv(u.uLight, LIGHT); gl.uniform1f(u.uRot, skyRot)
       gl.uniform1f(u.uSearch, w.searchAmt); gl.uniform3fv(u.uGlowA, hex(SITE.cyan)); gl.uniform3fv(u.uGlowB, hex(SITE.purple))
+      gl.uniform3fv(u.uCoin, hex(SITE.green))
       // Raised letters: lift the face and fill the gap with darker stacked copies (fewer on phones)
       const thick = s.textDepth * 0.05, layers = s.textDepth > 0 ? Math.min(w.low ? 2 : 6, Math.max(1, Math.round(s.textDepth * 6))) : 0
       gl.uniform1f(u.uLift, thick)

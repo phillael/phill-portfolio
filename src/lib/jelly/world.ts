@@ -43,6 +43,11 @@ export interface Body {
   /** Finder highlight, eased toward hlT */
   hl: number
   hlT: number
+  /** Play mode's glows, eased toward their targets: an Impact coin (green, pulsing) and a lit line (cyan); neither lifts the word */
+  coin: number
+  coinT: number
+  lit: number
+  litT: number
   /** the entrance's own re-form time (0 = a normal re-form) */
   rt: number
 }
@@ -220,7 +225,7 @@ export function* physicsSteps(w: World, list: BodySpec[], batch = 160): Generato
     const { tok, parts } = wordToken(String(b.text))
     bodies.push({
       ...q, b, state: HOME, strength: 1, timer: 0, jig: 0, seed: w.rnd(), escaped: false, reform: 0, pt0: 0, ptN: 0,
-      hcx: hx / (q.p1 - q.p0), hcy: hy / (q.p1 - q.p0), tok, parts, hl: 0, hlT: 0, rt: 0,
+      hcx: hx / (q.p1 - q.p0), hcy: hy / (q.p1 - q.p0), tok, parts, hl: 0, hlT: 0, coin: 0, coinT: 0, lit: 0, litT: 0, rt: 0,
     })
   }
   Object.assign(w, {

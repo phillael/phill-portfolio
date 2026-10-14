@@ -1,18 +1,21 @@
 /**
- * Play mode (the Career Climb): Phill runs and jumps up his own resume, Mario style. Every
- * line is a one-way platform (platforms.ts); he lands only while falling with his feet above
- * it, ↓ drops through, and the words give under him like jelly. Its own chunk: the engine
- * imports it on the first Play. Each frame it reads the keys (a plain object the HUD writes;
- * never React state), moves and poses him (the cast keeps drawing him), pushes the jelly and
- * steers the camera.
+ * Play mode: Phill runs, jumps and smashes his way down his own resume, Mario style, from his
+ * name to the bottom line (you read it walking down it). Every line is a one-way platform
+ * (platforms.ts); he lands only while falling with his feet above it, ↓ drops through, and the
+ * words give under him like jelly. The rules (clock, coins, checkpoints, best) are playRun.ts.
+ * Its own chunk: the engine imports it on the first Play. Each frame it reads the keys (a plain
+ * object the HUD writes; never React state), moves and poses him (the cast keeps drawing him),
+ * pushes the jelly and steers the camera.
  */
 
 import type { Cast, Drive } from './cast'
 import { resetView, type UiInsets } from './camera'
 import { FOV, LOOSE, PAD_X, ZMAX, ZMIN, type PlayConfig } from './config'
-import { burst } from './physics'
+import type { Vec3 } from './math'
+import { burst, healAll } from './physics'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
-import { hidden, type World } from './world'
+import { bestStore, createRun, type RunResult } from './playRun'
+import { bilerp, hidden, type World } from './world'
 
 export interface PlayInput {
   left: boolean
@@ -43,6 +46,13 @@ export interface PlayState {
   falling: boolean
   /** the last checkpoint reached (index into level.checkpoints; -1: none yet) */
   checkpoint: number
+  /** the clock (ms; it starts on the first move), the coins collected of the total, the finish, the best time (ms) */
+  timeMs: number
+  started: boolean
+  coins: number
+  total: number
+  finished: boolean
+  bestMs: number | null
 }
 
 export type PlayEvent =
@@ -55,6 +65,16 @@ export type PlayEvent =
   /** off the page: the flail; then back in at the checkpoint (-1: the start) */
   | { type: 'fall' }
   | { type: 'respawn'; checkpoint: number }
+  /** the first move: the clock starts */
+  | { type: 'start' }
+  /** a coin collected: where it was (world), and the count */
+  | { type: 'coin'; body: number; at: Vec3; coins: number; total: number }
+  /** a checkpoint reached: its line and where its title ends (world, on the ink: the flag's spot) */
+  | { type: 'checkpoint'; index: number; year: number; title: string; line: number; at: Vec3 }
+  /** the bottom line: the run's over */
+  | { type: 'finish'; result: RunResult }
+  /** Play again: back on the name, the clock and coins reset */
+  | { type: 'again' }
 
 export interface PlayContext {
   w: World
@@ -85,6 +105,9 @@ const FLAIL = 1
 const DROP_IN = 0.9
 /** the camera shake's decay (s) */
 const SHAKE = 0.3
+/** a reached checkpoint's title glows this long (s); the finish's sparks fly this long (s) */
+const LIT = 1.6
+const FIREWORK = 1.8
 
 export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: PlayContext) {
   const level: Level = buildLevel(w)
@@ -102,10 +125,17 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   /** dropping back in after a fall: only this line (or one below it) catches him */
   let spawnLine = -1
   let prevSmash = false, smashT = -1, smashCd = 0, struck = false, hitStopT = 0, shakeT = 0, shakeClock = 0, shakePh = 0
-  let pounding = false, splat = false, flailT = -1, checkpoint = -1
+  let pounding = false, splat = false, flailT = -1
   /** how high his soles are above his model's origin now (model units): the planted foot stands on the line */
   let sole = rig.stand
   const coinSet = new Set(level.coins)
+  const run = createRun(level, bestStore())
+  /** lit checkpoint titles fading back (their bodies, seconds left) */
+  const lits: { bodies: number[]; t: number }[] = []
+  /** the finish's sparks in flight, and how long they've flown */
+  const fw: number[] = []
+  let fwT = 0
+  const tmp = [0, 0, 0]
 
   const foot = () => P.size * 0.12
   const halfDepth = () => (Math.max(rig.dims[0], rig.dims[2]) / 2) * (P.size / rig.height)
@@ -160,8 +190,8 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     prevSmash = input.smash
     smashCd = hitStopT = shakeT = 0
     splat = false
-    checkpoint = -1
     sole = rig.stand
+    startRun()
     lead = facing * P.lookAhead
     camX = x + lead
     camY = anchorY
@@ -171,10 +201,23 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     emit({ type: 'enter' })
   }
 
+  /** a fresh run: the clock and coins reset, the coins glowing, nothing lit */
+  function startRun() {
+    run.reset()
+    for (const bi of level.coins) w.bodies[bi].coinT = 1
+    for (const l of lits) for (const bi of l.bodies) w.bodies[bi].litT = 0
+    lits.length = 0
+    for (const bi of level.lines[level.finish].bodies) w.bodies[bi].litT = 0
+    stopFireworks()
+  }
+
   function exit() {
     if (!on) return
     on = false
     w.cam.shake.x = w.cam.shake.y = 0
+    for (const bd of w.bodies) bd.coinT = bd.litT = 0
+    lits.length = 0
+    stopFireworks()
     cast.drive(null)
     resetView(w)
     input.left = input.right = input.jump = input.down = input.smash = false
@@ -266,6 +309,14 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     })
     for (const bi of hit) {
       const bd = w.bodies[bi]
+      if (run.collect(bi)) {
+        // a coin: counted, and it re-forms plain
+        bd.coinT = 0
+        let cx = 0, cy = 0, cz = 0
+        for (let p = bd.p0; p < bd.p1; p++) { cx += w.pos[p * 3]; cy += w.pos[p * 3 + 1]; cz += w.pos[p * 3 + 2] }
+        const n = bd.p1 - bd.p0
+        emit({ type: 'coin', body: bi, at: [cx / n, cy / n, cz / n], coins: run.coins, total: run.total })
+      }
       for (let p = bd.p0; p < bd.p1; p++) {
         const o = p * 3
         if (pound) { w.vel[o + 1] -= 3; w.vel[o + 2] += 0.5 }
@@ -297,8 +348,8 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
 
   /** back in at the last checkpoint (or the start), dropping onto its line with a splat */
   function respawn() {
-    const line = checkpoint >= 0 ? level.checkpoints[checkpoint].line : level.start
-    place(line, checkpoint >= 0 ? lineStart(line) : startX())
+    const cp = run.checkpoint, line = cp >= 0 ? level.checkpoints[cp].line : level.start
+    place(line, cp >= 0 ? lineStart(line) : startX())
     spawnLine = line
     y = level.lines[line].inkTop + DROP_IN
     grounded = false
@@ -307,13 +358,104 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     yaw = facing * (Math.PI / 2 - P.face)
     anchorY = level.lines[line].inkTop
     splat = true
-    emit({ type: 'respawn', checkpoint })
+    emit({ type: 'respawn', checkpoint: cp })
+  }
+
+  // ---- checkpoints and the finish ----
+  /** a checkpoint reached: its title glows a moment; the HUD plants a flag where it ends */
+  function reached(index: number) {
+    const cp = level.checkpoints[index], l = level.lines[cp.line], bodies = l.bodies.slice(0, cp.title.split(' ').length)
+    for (const bi of bodies) w.bodies[bi].litT = 1
+    lits.push({ bodies, t: LIT })
+    const last = w.bodies[bodies[bodies.length - 1]]
+    emit({ type: 'checkpoint', index, year: cp.year, title: cp.title, line: cp.line, at: [last.x1 - PAD_X, l.inkTop, w.pos[last.p0 * 3 + 2]] })
+  }
+
+  /** the bottom line: the clock stops, the line lights up, its sparks fire up, he dances; Play input stops */
+  let finishDance = 'dance'
+  function finishRun() {
+    const result = run.finish()
+    if (!result) return
+    for (const bi of level.lines[level.finish].bodies) w.bodies[bi].litT = 1
+    fireworks(level.finish)
+    finishDance = rig.dances.length ? rig.dances[Math.floor(Math.random() * rig.dances.length)] : 'idle'
+    smashT = -1
+    emit({ type: 'finish', result })
+  }
+
+  /** the line's words stay lit and solid while copies of their sparks fly up (their sparks are free while they're home) */
+  function fireworks(line: number) {
+    stopFireworks()
+    for (const bi of level.lines[line].bodies) {
+      const bd = w.bodies[bi]
+      if (hidden(bd)) continue
+      for (let k = bd.pt0; k < bd.pt0 + bd.ptN; k++) {
+        const o = k * 3
+        bilerp(w.pos, bd, w.ptLu[k], w.ptLv[k], tmp)
+        const v = [(Math.random() - 0.5) * 2.4, 3 + Math.random() * 5, 0.6 + Math.random() * 1.6]
+        for (let a = 0; a < 3; a++) {
+          w.ptPos[o + a] = w.ptPrev[o + a] = tmp[a]
+          w.ptVel[o + a] = w.ptSV[o + a] = v[a]
+          w.ptTail[o + a] = tmp[a]
+        }
+        w.ptAlpha[k] = 1
+        w.ptAge[k] = 0
+        fw.push(k)
+      }
+    }
+    fwT = 0
+  }
+
+  function stepFireworks(dt: number) {
+    if (!fw.length) return
+    fwT += dt
+    const alpha = 1 - fwT / FIREWORK, drag = Math.max(0, 1 - 0.8 * dt), T = 0.05 * w.s.trail
+    for (const k of fw) {
+      const o = k * 3
+      w.ptVel[o + 1] -= 3.5 * dt
+      for (let a = 0; a < 3; a++) {
+        w.ptVel[o + a] *= drag
+        w.ptPos[o + a] += w.ptVel[o + a] * dt
+        w.ptSV[o + a] = w.ptVel[o + a]
+        w.ptTail[o + a] = w.ptPos[o + a] - w.ptVel[o + a] * T
+        w.ptPrev[o + a] = w.ptPos[o + a]
+      }
+      w.ptAge[k] += dt
+      w.ptAlpha[k] = Math.max(0, alpha)
+    }
+    if (fwT >= FIREWORK) stopFireworks()
+  }
+
+  function stopFireworks() {
+    for (const k of fw) w.ptAlpha[k] = 0
+    fw.length = 0
+  }
+
+  /** Play again: the page heals, the clock and coins reset, and he drops back onto the name */
+  function again() {
+    if (!on) return
+    healAll(w)
+    startRun()
+    place(level.start, startX())
+    spawnLine = level.start
+    y = level.lines[level.start].inkTop + DROP_IN
+    grounded = false
+    ground.body = ground.line = -1
+    facing = 1
+    yaw = facing * (Math.PI / 2 - P.face)
+    anchorY = level.lines[level.start].inkTop
+    splat = true
+    pose.play('idle', 0.2)
+    emit({ type: 'again' })
   }
 
   // ---- his pose ----
   function animate(dt: number) {
     const v0 = (2 * P.jumpHeight) / P.apexTime
-    if (smashT >= 0) {
+    if (run.finished && grounded) {
+      pose.play(finishDance, 0.3)
+      pose.update(dt)
+    } else if (smashT >= 0) {
       // the attack clip's strike window, played fast
       const [a, b] = P.strike
       pose.play('attack', 0.05)
@@ -375,6 +517,14 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   function update(dt: number) {
     if (!on || dt <= 0) return
     const g = (2 * P.jumpHeight) / (P.apexTime * P.apexTime), v0 = (2 * P.jumpHeight) / P.apexTime
+    // the clock (it runs through hit-stops and falls), the glowing titles fading back, the finish's sparks
+    run.tick(dt)
+    for (let i = lits.length - 1; i >= 0; i--) {
+      if ((lits[i].t -= dt) > 0) continue
+      for (const bi of lits[i].bodies) w.bodies[bi].litT = run.finished && level.lineOf[bi] === level.finish ? 1 : 0
+      lits.splice(i, 1)
+    }
+    stepFireworks(dt)
     // a smash's hit-stop: he and his pose hold for a moment (the sparks and the camera don't)
     if (hitStopT > 0) {
       hitStopT -= dt
@@ -395,9 +545,13 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
       sync()
       return
     }
-    const tap = input.pressed
-    const jumpPressed = (input.jump && !prevJump) || tap.has('jump'), downPressed = (input.down && !prevDown) || tap.has('down')
-    const smashPressed = (input.smash && !prevSmash) || tap.has('smash')
+    const tap = input.pressed, live = !run.finished // (after the finish, Play input stops)
+    if (!run.started && (input.left || input.right || input.jump || input.down || input.smash || tap.size)) {
+      run.begin() // the first move starts the clock
+      emit({ type: 'start' })
+    }
+    const jumpPressed = live && ((input.jump && !prevJump) || tap.has('jump')), downPressed = live && ((input.down && !prevDown) || tap.has('down'))
+    const smashPressed = live && ((input.smash && !prevSmash) || tap.has('smash'))
     tap.clear()
     prevJump = input.jump
     prevDown = input.down
@@ -420,7 +574,7 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     landT += dt
 
     // run: accelerate toward the held direction, brake without one (less control in the air; none in a ground-pound)
-    const dir = pounding ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0)
+    const dir = pounding || !live ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0)
     if (dir) facing = dir
     const ctl = pounding ? 100 : grounded ? 1 : P.air
     const rate = (dir ? (vx * dir < 0 ? P.decel + P.accel : P.accel) : P.decel) * ctl
@@ -446,7 +600,7 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
       emit({ type: 'jump' })
     }
     // let go early: a lower jump (the tapped apex)
-    if (!grounded && vy > 0 && !input.jump && !cut) {
+    if (!grounded && vy > 0 && (!input.jump || !live) && !cut) {
       cut = true
       vy = Math.min(vy, Math.max(Math.sqrt(2 * g * Math.max(0, P.tapHeight - (y - jumpY))), vy * 0.5))
     }
@@ -486,8 +640,11 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
       }
     }
     if (!grounded) { ground.body = -1; ground.line = -1 }
-    // the last checkpoint he's reached (standing on its line or any below it)
-    while (grounded && checkpoint + 1 < level.checkpoints.length && ground.line >= level.checkpoints[checkpoint + 1].line) checkpoint++
+    // the checkpoints he's reached (standing on a line at or below theirs), and the bottom line: the finish
+    if (grounded) {
+      for (const cp of run.reach(ground.line)) reached(level.checkpoints.indexOf(cp))
+      if (ground.line === level.finish) finishRun()
+    }
     // off the paper's edge, or below the page: the void
     if (Math.abs(x) > w.pageW / 2 + 0.1 || y < w.pageBottom - 0.2) {
       startFlail()
@@ -517,7 +674,8 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
 
   const state = (): PlayState => ({
     x, y, z, vx, vy, grounded, facing, line: grounded ? ground.line : -1, clip: pose.clip,
-    smashing: smashT >= 0, pounding, falling: flailT >= 0, checkpoint,
+    smashing: smashT >= 0, pounding, falling: flailT >= 0, checkpoint: run.checkpoint,
+    timeMs: run.timeMs, started: run.started, coins: run.coins, total: run.total, finished: run.finished, bestMs: run.best(),
   })
 
   return {
@@ -527,6 +685,7 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     update,
     state,
     isOn: () => on,
+    again,
     /** dev: put him on a line (index into level.lines) at x */
     place: (line: number, at: number) => { if (on) place(line, at) },
   }

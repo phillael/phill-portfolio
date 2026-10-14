@@ -91,6 +91,8 @@ export interface Rig {
   dims: Vec3
   feet: { node: number; rest: number }[]
   stand: number
+  /** his dances (the rotation) */
+  dances: string[]
 }
 
 /** Play mode drives Phill: where his feet are, which way he faces (yaw) and how tall he is (units). */
@@ -509,7 +511,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
         idle.update(0)
         const feet = (m.joints ?? []).filter((n) => /Foot|Toe/.test(m.nodes[n].name)).map((node) => ({ node, rest: rest.world[node * 16 + 13] }))
         const stand = feet.length ? Math.min(...feet.map((f) => idle.world[f.node * 16 + 13] - f.rest)) : 0
-        rigInfo = { pose: phill.pose, height: phill.a.height, dims: phill.a.dims, feet, stand }
+        rigInfo = { pose: phill.pose, height: phill.a.height, dims: phill.a.dims, feet, stand, dances: [...phill.dances] }
       }
       return rigInfo
     },

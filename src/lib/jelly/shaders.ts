@@ -7,18 +7,18 @@
  */
 export const HSV = `vec3 hsv(float h,float s,float v){ vec3 k=clamp(abs(mod(h*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0,0.0,1.0); return v*mix(vec3(1.0),k,s); }`
 export const BODY_VS = `#version 300 es
-in vec3 aPos; in vec2 aUv; in vec2 aLocal; in vec4 aRect; in float aJig; in float aSeed; in float aVis; in float aHl;
+in vec3 aPos; in vec2 aUv; in vec2 aLocal; in vec4 aRect; in float aJig; in float aSeed; in float aVis; in float aHl; in vec2 aGlow;
 uniform mat4 uMVP; uniform float uLift, uLayerZ;
-out vec2 vUv; out vec2 vLocal; out vec4 vRect; out float vJig; out float vSeed; out vec3 vWorld; out float vVis; out float vHl;
+out vec2 vUv; out vec2 vLocal; out vec4 vRect; out float vJig; out float vSeed; out vec3 vWorld; out float vVis; out float vHl; out vec2 vGlow;
 void main(){
-  vUv=aUv; vLocal=aLocal; vRect=aRect; vJig=aJig; vSeed=aSeed; vVis=aVis; vHl=aHl;
+  vUv=aUv; vLocal=aLocal; vRect=aRect; vJig=aJig; vSeed=aSeed; vVis=aVis; vHl=aHl; vGlow=aGlow;
   vec3 p = aPos; p.z += uLift + uLayerZ;
   vWorld = p; gl_Position = uMVP*vec4(p,1.0);
 }`
 export const BODY_FS = `#version 300 es
 precision highp float; precision highp int;
-in vec2 vUv; in vec2 vLocal; in vec4 vRect; in float vJig; in float vSeed; in vec3 vWorld; in float vVis; in float vHl;
-uniform float uSearch; uniform vec3 uGlowA, uGlowB;
+in vec2 vUv; in vec2 vLocal; in vec4 vRect; in float vJig; in float vSeed; in vec3 vWorld; in float vVis; in float vHl; in vec2 vGlow;
+uniform float uSearch; uniform vec3 uGlowA, uGlowB, uCoin;
 uniform sampler2D uAtlas; uniform float uShroom, uMelt, uDrip, uTime, uHue, uGummy, uTextFrac; uniform vec3 uJelly;
 uniform vec3 uEye, uFogCol; uniform float uFog, uFogStart, uFogEnd;
 uniform int uPass, uInkMode; uniform float uShine, uLayerShade, uRot; uniform vec2 uTexel; uniform vec3 uLight;
@@ -84,6 +84,16 @@ void main(){
     float halo = smoothstep(0.0, 0.45, ga)*vHl;
     vec3 gc = mix(uGlowA, uGlowB, 0.5 + 0.5*sin(uTime*1.6 + vSeed*6.28));
     col = mix(gc*(0.9 + 0.5*halo), col*0.85, a);
+    cov = max(cov, halo*0.95);
+  }
+  // Play mode: an Impact coin glows green and pulses gently; a reached checkpoint's title or the finish line glows cyan (neither lifts the word)
+  if((vGlow.x > 0.01 || vGlow.y > 0.01) && uPass == 0){
+    float ga = max(textureLod(uAtlas, clamp(vUv, vRect.xy, vRect.zw), 2.6).a, textureLod(uAtlas, clamp(vUv, vRect.xy, vRect.zw), 3.6).a*0.8);
+    float pulse = 0.75 + 0.25*sin(uTime*3.2 + vSeed*6.28);
+    float hc = smoothstep(0.0, 0.45, ga)*vGlow.x*pulse, hlit = smoothstep(0.0, 0.45, ga)*vGlow.y;
+    vec3 gc = (uCoin*hc + uGlowA*hlit)/max(hc + hlit, 1e-3);
+    float halo = max(hc, hlit);
+    col = mix(gc*(0.9 + 0.5*halo), mix(col, uCoin*0.55, 0.35*vGlow.x), a);
     cov = max(cov, halo*0.95);
   }
   // Words flying into the distance fade into the nebula

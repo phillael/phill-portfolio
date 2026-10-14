@@ -13,6 +13,8 @@ import { clearIntent, getHeroImg, peekIntent } from '@/components/jelly/resumeTr
 import JellyFinder from '@/components/jelly/JellyFinder'
 import JellyHudBar, { type HudToggles, type PlayStatus } from '@/components/jelly/JellyHudBar'
 import JellyNavigator from '@/components/jelly/JellyNavigator'
+import JellyPlayHud from '@/components/jelly/JellyPlayHud'
+import JellyPlayerStart from '@/components/jelly/JellyPlayerStart'
 import { FOCUS, PANEL } from '@/components/jelly/hudStyles'
 import ResumeContent from '@/components/ResumeContent'
 
@@ -121,6 +123,8 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
   const finderInput = useRef<HTMLInputElement>(null)
   const navRef = useRef<HTMLDivElement>(null)
   const hudRef = useRef<HTMLDivElement>(null)
+  const playTopRef = useRef<HTMLDivElement>(null)
+  const playBottomRef = useRef<HTMLDivElement>(null)
   const [engine, setEngine] = useState<JellyEngine | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [opened, setOpened] = useState(false)
@@ -331,7 +335,10 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
         setQuery('')
         setMatches(0)
         sectionRef.current?.focus({ preventScroll: true }) // the keys are his now (not the button's)
-      } else if (e.type === 'exit') setPlaying(false)
+      } else if (e.type === 'exit' || e.type === 'again') {
+        if (e.type === 'exit') setPlaying(false)
+        sectionRef.current?.focus({ preventScroll: true }) // (the HUD or the finish card that had focus is going away: keep it in the resume)
+      }
     })
   }, [engine])
   // a key held when the window loses focus never gets its keyup: let go of everything
@@ -348,25 +355,28 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     }
   }, [engine, playing])
 
-  // The page fits between the Finder (top) and the bar (bottom); on phones the navigator sits under the Finder
+  // The page fits between the Finder (top) and the bar (bottom); on phones the navigator sits under the Finder.
+  // While playing: between the Play HUD's stats and its key legend
   useEffect(() => {
     if (!engine) return
+    const top = playing ? playTopRef : finderRef, bottom = playing ? playBottomRef : hudRef
     const measure = () => {
-      const H = window.innerHeight, f = finderRef.current?.getBoundingClientRect(), h = hudRef.current?.getBoundingClientRect()
-      if (!f || !h || H < 10) return
-      engine.setUiInsets(Math.min(0.3, (f.bottom + 6) / H), Math.min(0.35, (H - h.top + 6) / H))
-      if (navRef.current) navRef.current.style.top = window.matchMedia('(max-width: 820px)').matches ? `${f.bottom + 6}px` : ''
+      const H = window.innerHeight, f = top.current?.getBoundingClientRect(), h = bottom.current?.getBoundingClientRect()
+      if (!f || H < 10) return
+      const bot = h && h.height > 0 ? H - h.top + 6 : 12 // (the legend is hidden on touch screens)
+      engine.setUiInsets(Math.min(0.3, (f.bottom + 6) / H), Math.min(0.35, bot / H))
+      if (navRef.current && !playing) navRef.current.style.top = window.matchMedia('(max-width: 820px)').matches ? `${f.bottom + 6}px` : ''
     }
     const ro = new ResizeObserver(measure)
-    if (finderRef.current) ro.observe(finderRef.current)
-    if (hudRef.current) ro.observe(hudRef.current)
+    if (top.current) ro.observe(top.current)
+    if (bottom.current) ro.observe(bottom.current)
     window.addEventListener('resize', measure)
     measure()
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [engine])
+  }, [engine, playing])
 
   // Keyboard shortcuts while the resume is open
   const queryRef = useRef(query)
@@ -387,6 +397,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
         // playing: his keys, M (sound), P (music) and Esc (leaves Play, not the resume); nothing else
         const k = e.key.toLowerCase(), a = PLAY_KEYS[k]
         if (k === 'escape') { e.stopPropagation(); engine.play.exit() }
+        else if (k === 'enter') { if (!onButton(e) && engine.play.state()?.finished) engine.play.again() } // the finish card's Play again
         else if (a) {
           e.preventDefault()
           engine.play.input[a] = true
@@ -437,9 +448,11 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
   }, [engine, opened, closing, close, toggle, toggleNav, navMode, startPlay])
 
   const uiOn = !!engine && opened && !closing
-  const fadeIn = `transition-opacity duration-[600ms] ${uiOn ? 'opacity-100 delay-[400ms]' : 'pointer-events-none opacity-0'}`
-  // × comes in with the HUD, or on its own when the open is slow
-  const xOn = uiOn || (slow && !opened && !closing)
+  // the Finder, the navigator and the bar fade out while playing (the Play HUD takes over)
+  const hudOn = uiOn && !playing
+  const fadeIn = `transition-opacity duration-[600ms] ${hudOn ? 'opacity-100 delay-[400ms]' : 'pointer-events-none opacity-0'}`
+  // × comes in with the HUD, or on its own when the open is slow; while playing, ✕ Exit stands in for it
+  const xOn = (uiOn && !playing) || (slow && !opened && !closing)
 
   return (
     <section
@@ -458,7 +471,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
       </div>
       {/* mounted once the resume has loaded (it opens after that): its first layout stays out of the busy first frames */}
       {engine && loaded && (
-        <div inert={!uiOn} className={fadeIn}>
+        <div inert={!hudOn} className={fadeIn}>
           <JellyFinder
             query={query}
             matches={matches}
@@ -472,6 +485,8 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
           {JellyCastTune && <JellyCastTune />}
         </div>
       )}
+      {engine && loaded && <JellyPlayerStart engine={engine} visible={hudOn} status={playStatus} onStart={startPlay} />}
+      {engine && playing && !closing && <JellyPlayHud engine={engine} topRef={playTopRef} bottomRef={playBottomRef} />}
       {JellyPlayTune && playing && <JellyPlayTune />}
       <button
         type="button"

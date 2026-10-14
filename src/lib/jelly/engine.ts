@@ -10,11 +10,11 @@
 
 import { introCam, revealY, startIntro, updateIntro } from './intro'
 import { planeZ, resetView, stepMomentum, updateCamera, zoomCenter, type Ray, type UiInsets } from './camera'
-import { HOME, LOOSE, PLAY_CONFIG, initialState, type PlayConfig } from './config'
+import { HOME, LOOSE, PAD_X, PLAY_CONFIG, initialState, type PlayConfig } from './config'
 import { onBeat, updateBend, updateTargets } from './dance'
 import { countMatches, findMatches } from './finder'
 import { attachInput } from './input'
-import { lcg } from './math'
+import { lcg, type Vec3 } from './math'
 import { MusicFeatures, type MusicInput } from './music'
 import { burstAll, chaos, collide, healAll, releaseHole, shakeIt, startHole, step, updateParticles, updateStates } from './physics'
 import type { Cast } from './cast'
@@ -554,6 +554,25 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     setTilt,
     /** called every frame, right after the camera moves (mutate the DOM; never set React state) */
     onFrame: (f: () => void) => { frameListeners.add(f); return () => { frameListeners.delete(f) } },
+    /** a world point on screen: CSS px from the canvas's top left (null: behind the camera); read it in onFrame */
+    project: (p: Vec3): [number, number] | null => {
+      const m = w.cam.mvp, ww = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15]
+      if (ww <= 1e-6) return null
+      return [
+        (((m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12]) / ww) * 0.5 + 0.5) * canvas.clientWidth,
+        (1 - (((m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]) / ww) * 0.5 + 0.5)) * canvas.clientHeight,
+      ]
+    },
+    /**
+     * Where PLAYER 1 START sits on the page: its bottom right corner at the right end of the name's line, level
+     * with the bottom of the name (so it rises into the top margin rather than over the line below; null until loaded).
+     */
+    startSpot: (): Vec3 | null => {
+      if (!loaded || !w.bodies.length) return null
+      const top = Math.max(...w.bodies.map((bd) => bd.b.line.top)), b = w.bodies.find((bd) => bd.b.line.top === top)!.b
+      const right = Math.max(...w.bodies.map((bd) => bd.x1)) - PAD_X
+      return [right, w.pageH / 2 + b.line.top - b.line.lh, 0.02]
+    },
     gesture: unlockAudio,
     /** Play mode (the Career Climb) */
     play: {
@@ -569,6 +588,16 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
       state: () => (playing && play ? play.state() : null),
       onEvent: (f: (e: PlayEvent) => void) => { playListeners.add(f); return () => { playListeners.delete(f) } },
       isOn: () => playing,
+      /** the level for the HUD's climb meter: the page's top (the name) and bottom, and the checkpoints' heights (world y) */
+      levelInfo: () => {
+        if (!play) return null
+        const lv = play.level
+        return {
+          top: lv.lines[lv.start].inkTop,
+          bottom: lv.lines[lv.finish].bottom,
+          checkpoints: lv.checkpoints.map((c) => ({ year: c.year, title: c.title, y: lv.lines[c.line].inkTop })),
+        }
+      },
     },
     stats,
     dispose,

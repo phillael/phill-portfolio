@@ -320,6 +320,26 @@ html.jelly-lock {
   visibility: hidden;
   transition: opacity 0.4s ease, visibility 0s linear 0.4s;
 }
+/* Play mode on the 3D resume: "+1 IMPACT" rises and fades where a coin was smashed; PLAYER 1 START's ▶ blinks */
+@keyframes jelly-pop {
+  from { opacity: 1; transform: translate(-50%, -100%); }
+  to { opacity: 0; transform: translate(-50%, calc(-100% - 40px)); }
+}
+.jelly-pop {
+  animation: jelly-pop 0.8s ease-out forwards;
+}
+@keyframes jelly-blink {
+  50% { opacity: 0; }
+}
+.jelly-blink {
+  animation: jelly-blink 1.1s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jelly-pop,
+  .jelly-blink {
+    animation: none;
+  }
+}
 
 .glow-layer {
   position: absolute;

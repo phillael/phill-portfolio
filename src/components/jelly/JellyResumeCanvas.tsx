@@ -100,7 +100,7 @@ const warmGlyphs = (host: HTMLElement | null) => {
 
 /** Play mode's keys (by e.key, lower-cased) → the input they hold down */
 const PLAY_KEYS: Record<string, 'left' | 'right' | 'jump' | 'down' | 'smash'> = {
-  arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right', ' ': 'jump', arrowup: 'jump', w: 'jump', arrowdown: 'down', s: 'down', x: 'smash', k: 'smash',
+  arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right', w: 'jump', arrowup: 'jump', arrowdown: 'down', s: 'down', ' ': 'smash',
 }
 
 /** Whatever opened the resume (the hero, or the 🍄), so focus can go back to it. */
@@ -338,7 +338,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
   useEffect(() => {
     if (!engine || !playing) return
     const input = engine.play.input
-    const clear = () => { input.left = input.right = input.jump = input.down = input.smash = false }
+    const clear = () => { input.left = input.right = input.jump = input.down = input.smash = false; input.pressed.clear() }
     const hidden = () => { if (document.hidden) clear() }
     window.addEventListener('blur', clear)
     document.addEventListener('visibilitychange', hidden)
@@ -387,7 +387,11 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
         // playing: his keys, M (sound), P (music) and Esc (leaves Play, not the resume); nothing else
         const k = e.key.toLowerCase(), a = PLAY_KEYS[k]
         if (k === 'escape') { e.stopPropagation(); engine.play.exit() }
-        else if (a) { e.preventDefault(); engine.play.input[a] = true }
+        else if (a) {
+          e.preventDefault()
+          engine.play.input[a] = true
+          if (!e.repeat && a !== 'left' && a !== 'right') engine.play.input.pressed.add(a)
+        }
         else if (k === 'm') toggle('sound')
         else if (k === 'p') getSiteMusic()?.toggle()
         return

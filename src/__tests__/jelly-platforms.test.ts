@@ -54,25 +54,25 @@ describe('buildLevel', () => {
     expect(words(w, lv, 1)).toMatch(/^Senior AI Engineer Full-stack/)
   })
 
-  it('starts on the lowest line and ends at the name', () => {
-    expect(lv.start).toBe(46)
-    expect(words(w, lv, lv.start)).toBe('EDUCATION B.A. Jazz Studies · University of North Texas')
-    expect(lv.summit).toBe(0)
-    expect(words(w, lv, lv.summit)).toBe('Phill Aelony')
+  it('starts at the name and finishes on the bottom line (you read the resume walking down it)', () => {
+    expect(lv.start).toBe(0)
+    expect(words(w, lv, lv.start)).toBe('Phill Aelony')
+    expect(lv.finish).toBe(46)
+    expect(words(w, lv, lv.finish)).toBe('EDUCATION B.A. Jazz Studies · University of North Texas')
   })
 
-  it('makes a checkpoint of each dated job line, in climbing order, each year later than the last', () => {
+  it('makes a checkpoint of each role, newest first, in reading order', () => {
     expect(lv.checkpoints.map((c) => [c.year, c.title])).toEqual([
-      [1998, 'Guitarist & Composer · The Funky Knuckles · Strange Loop Games'],
-      [2018, 'Freelance Developer · phillcodes.com'],
-      [2021, 'Front End Developer · Designit for Microsoft'],
-      [2022, 'Software Engineer · Sessions'],
-      [2023, 'Senior Software Engineer II'],
       [2026, 'Generative AI Engineer'],
+      [2023, 'Senior Software Engineer II'],
+      [2022, 'Software Engineer · Sessions'],
+      [2021, 'Front End Developer · Designit for Microsoft'],
+      [2018, 'Freelance Developer · phillcodes.com'],
+      [1998, 'Guitarist & Composer · The Funky Knuckles · Strange Loop Games'],
     ])
-    // climbing order: each one higher up the page
-    for (let i = 1; i < lv.checkpoints.length; i++) expect(lv.checkpoints[i].line).toBeLessThan(lv.checkpoints[i - 1].line)
-    // the TimelyCare line (2023) comes after 2026 on the climb, so it isn't one
+    // reading order: each one lower down the page
+    for (let i = 1; i < lv.checkpoints.length; i++) expect(lv.checkpoints[i].line).toBeGreaterThan(lv.checkpoints[i - 1].line)
+    // the TimelyCare company line (2023) heads the roles; it isn't one
     expect(lv.lines.find((l) => l.title.startsWith('TimelyCare'))?.year).toBe(2023)
   })
 
@@ -84,7 +84,7 @@ describe('buildLevel', () => {
   })
 
   it("stands each line on its tallest glyphs' top, below the boxes' line-height padding", () => {
-    const line = lv.lines[lv.start], bi = line.bodies[0], bd = w.bodies[bi]
+    const line = lv.lines[lv.finish], bi = line.bodies[0], bd = w.bodies[bi]
     expect(line.inkTop).toBeLessThan(bd.yTop - PAD_TOP)
     expect(line.inkTop).toBeGreaterThan(line.bottom)
   })
@@ -100,44 +100,45 @@ describe('surfaceAt', () => {
   })
 
   it("finds the ink top of the word under a foot, with the lattice's z", () => {
-    const line = lv.lines[lv.start], bi = line.bodies[2] // "Jazz"
+    const line = lv.lines[lv.finish], bi = line.bodies[2] // "Jazz"
     const x = (inkL(w, bi) + inkR(w, bi)) / 2
     expect(surfaceAt(w, lv, x, 0.05, line.inkTop + 0.3, out)).toBe(true)
     expect(out.body).toBe(bi)
-    expect(out.line).toBe(lv.start)
+    expect(out.line).toBe(lv.finish)
     expect(out.y).toBeCloseTo(line.inkTop, 5)
     expect(out.z).toBeCloseTo(w.pos[w.bodies[bi].p0 * 3 + 2], 3)
   })
 
   it('takes the highest surface at or below a height (one-way: lines above are skipped)', () => {
-    const line = lv.lines[lv.start - 1], bi = line.bodies[0]
+    const line = lv.lines[lv.finish - 1], bi = line.bodies[0]
     const x = (inkL(w, bi) + inkR(w, bi)) / 2
     expect(surfaceAt(w, lv, x, 0.05, line.inkTop + 0.01, out)).toBe(true)
-    expect(out.line).toBe(lv.start - 1)
+    expect(out.line).toBe(lv.finish - 1)
     expect(surfaceAt(w, lv, x, 0.05, line.inkTop - 0.01, out)).toBe(true) // just under it: the next one down
-    expect(out.line).toBe(lv.start)
+    expect(out.line).toBe(lv.finish)
   })
 
   it('follows the lattice as it wobbles', () => {
-    const line = lv.lines[lv.start], bi = line.bodies[2], bd = w.bodies[bi]
+    const line = lv.lines[lv.finish], bi = line.bodies[2], bd = w.bodies[bi]
     for (let p = bd.p0; p < bd.p1; p++) w.pos[p * 3 + 1] += 0.05
     expect(surfaceAt(w, lv, (inkL(w, bi) + inkR(w, bi)) / 2, 0.05, line.inkTop + 0.3, out)).toBe(true)
     expect(out.y).toBeCloseTo(line.inkTop + 0.05, 5)
   })
 
   it('has nothing past the end of the bottom line, nor in a gap wider than the foot', () => {
-    const start = lv.lines[lv.start]
-    expect(surfaceAt(w, lv, start.x1 + 0.5, 0.05, start.inkTop + 0.3, out)).toBe(false)
-    // the pit before the bottom checkpoint's date: "… Strange Loop Games      1998 – Present"
-    const cp = lv.lines[lv.checkpoints[0].line], ix = cp.bodies.findIndex((bi) => w.bodies[bi].b.text === '1998')
+    const bottom = lv.lines[lv.finish]
+    expect(surfaceAt(w, lv, bottom.x1 + 0.5, 0.05, bottom.inkTop + 0.3, out)).toBe(false)
+    // the pit before the last checkpoint's date: "… Strange Loop Games      1998 – Present"
+    const last = lv.checkpoints[lv.checkpoints.length - 1]
+    const cp = lv.lines[last.line], ix = cp.bodies.findIndex((bi) => w.bodies[bi].b.text === '1998')
     const gap0 = inkR(w, cp.bodies[ix - 1]), gap1 = inkL(w, cp.bodies[ix])
     expect(gap1 - gap0).toBeGreaterThan(0.3)
     const found = surfaceAt(w, lv, (gap0 + gap1) / 2, 0.05, cp.inkTop + 0.01, out)
-    expect(found && out.line === lv.checkpoints[0].line).toBe(false)
+    expect(found && out.line === last.line).toBe(false)
   })
 
   it("only holds him on solid words: home, or springing back at half strength or more", () => {
-    const line = lv.lines[lv.start], bi = line.bodies[2], bd = w.bodies[bi]
+    const line = lv.lines[lv.finish], bi = line.bodies[2], bd = w.bodies[bi]
     const x = (inkL(w, bi) + inkR(w, bi)) / 2
     bd.state = LOOSE
     expect(solid(bd)).toBe(false)

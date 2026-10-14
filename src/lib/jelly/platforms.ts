@@ -1,9 +1,10 @@
 /**
  * Play mode's level, read off the resume itself: every visual line is a one-way (jump-through)
  * platform, standing on its tallest glyphs (a word's box includes line-height padding, so
- * standing on the box would float him). The climb starts on the lowest line and ends on the
- * name; the dated job lines are its checkpoints and the Finder's Impact numbers its coins.
- * Pure functions over the world's bodies (no GL).
+ * standing on the box would float him). The run starts at the name and finishes on the bottom
+ * line, so you read the resume walking down it; its roles (dated lines) are the checkpoints,
+ * newest first, and the Finder's Impact numbers its coins. Pure functions over the world's
+ * bodies (no GL).
  */
 
 import { HOME, PAD_X, RETURN } from './config'
@@ -37,10 +38,10 @@ export interface Level {
   /** per body: its line, and its line's ink top as a lattice v (0 the top row … 1 the bottom row) */
   lineOf: Int32Array
   inkV: Float32Array
-  /** the lowest line (the climb starts here) and the name (the summit) */
+  /** the name (the run starts here) and the bottom line (it finishes here) */
   start: number
-  summit: number
-  /** in climbing order (bottom up), each year later than the last */
+  finish: number
+  /** the roles, in reading order (newest first) */
   checkpoints: Checkpoint[]
   /** the Impact numbers (body indexes) */
   coins: number[]
@@ -108,15 +109,18 @@ export function buildLevel(w: World, inkV: (bi: number) => number | null = (bi) 
       year, title: (year ? text.slice(0, k) : text).join(' '),
     }
   })
+  // the roles: from the bottom up, each dated line whose year is later than the last kept (so a company's
+  // own dated line above its roles is left out), then in reading order
   const checkpoints: Checkpoint[] = []
   for (let li = lines.length - 1; li >= 0; li--) {
     const l = lines[li]
     if (l.year && l.year > (checkpoints[checkpoints.length - 1]?.year ?? 0)) checkpoints.push({ line: li, year: l.year, title: l.title })
   }
+  checkpoints.reverse()
   const hit = findMatches(w.bodies.map((bd) => ({ text: bd.b.text, tok: bd.tok, parts: bd.parts })), 'Impact')
   const coins: number[] = []
   hit.forEach((h, bi) => { if (h) coins.push(bi) })
-  return { lines, lineOf, inkV: inkVOut, start: lines.length - 1, summit: 0, checkpoints, coins }
+  return { lines, lineOf, inkV: inkVOut, start: 0, finish: lines.length - 1, checkpoints, coins }
 }
 
 const at = [0, 0, 0]

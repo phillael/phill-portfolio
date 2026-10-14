@@ -24,7 +24,7 @@ const engine = {
   drawMiniMap: jest.fn(), onFrame: jest.fn(() => () => {}), gesture: jest.fn(), holeAtCursor: jest.fn(),
   releaseHoleKey: jest.fn(),
   play: {
-    enter: jest.fn(() => Promise.resolve(true)), exit: jest.fn(), input: { left: false, right: false, jump: false, down: false, smash: false },
+    enter: jest.fn(() => Promise.resolve(true)), exit: jest.fn(), input: { left: false, right: false, jump: false, down: false, smash: false, pressed: new Set() },
     params: {}, state: jest.fn(() => null), onEvent: jest.fn(() => () => {}), isOn: jest.fn(() => false),
   },
 }

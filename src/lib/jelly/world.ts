@@ -64,6 +64,8 @@ export interface Camera {
   halfH: number
   canPan: boolean
   mom: { x: number; y: number } | null
+  /** a jolt on top of the eased camera (Play mode's smash shake) */
+  shake: { x: number; y: number }
 }
 
 export interface Intro {
@@ -153,7 +155,7 @@ export function createWorld(s: JellyState, low: boolean, sfx: Sfx, music: MusicF
     bend: new BendTable(),
     cam: {
       eye: [0, 0, 15], target: [0, 0, 0], right: [1, 0, 0], up: [0, 1, 0], fwd: [0, 0, -1], mvp: new Float32Array(16), aspect: 1,
-      x: null, y: null, scrollX: 0, scrollY: Infinity, zoom: null, halfW: 1, halfH: 1, canPan: false, mom: null,
+      x: null, y: null, scrollX: 0, scrollY: Infinity, zoom: null, halfW: 1, halfH: 1, canPan: false, mom: null, shake: { x: 0, y: 0 },
     },
     ripples: [], rippleSide: 1,
     searchAmt: 0, searchN: 0, actLoose: 0, actBurst: 0,

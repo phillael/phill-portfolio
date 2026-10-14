@@ -20,6 +20,8 @@ export interface PlayInput {
   jump: boolean
   down: boolean
   smash: boolean
+  /** presses since Play's last frame: a tap shorter than a frame still counts */
+  pressed: Set<'jump' | 'down' | 'smash'>
 }
 
 export interface PlayState {
@@ -82,12 +84,13 @@ const SMASH_DUR = 0.3
 const FLAIL = 1
 const DROP_IN = 0.9
 /** the camera shake's decay (s) */
-const SHAKE = 0.2
+const SHAKE = 0.3
 
 export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: PlayContext) {
   const level: Level = buildLevel(w)
-  const rig = cast.rig()
-  if (!rig) throw new Error('Play mode needs Phill')
+  const found = cast.rig()
+  if (!found) throw new Error('Play mode needs Phill')
+  const rig = found
   const { pose } = rig
   const ground: Surface = { y: 0, z: 0, body: -1, line: -1 }
   const probe: Surface = { y: 0, z: 0, body: -1, line: -1 }
@@ -98,7 +101,10 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   let lead = 0, anchorY = 0, camX = 0, camY = 0
   /** dropping back in after a fall: only this line (or one below it) catches him */
   let spawnLine = -1
-  let prevSmash = false, smashT = -1, smashCd = 0, struck = false, hitStopT = 0, shakeT = 0, pounding = false, splat = false, flailT = -1, checkpoint = -1
+  let prevSmash = false, smashT = -1, smashCd = 0, struck = false, hitStopT = 0, shakeT = 0, shakeClock = 0, shakePh = 0
+  let pounding = false, splat = false, flailT = -1, checkpoint = -1
+  /** how high his soles are above his model's origin now (model units): the planted foot stands on the line */
+  let sole = rig.stand
   const coinSet = new Set(level.coins)
 
   const foot = () => P.size * 0.12
@@ -128,7 +134,7 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   /** a line's left end (where a checkpoint's job title starts) */
   const lineStart = (line: number) => w.bodies[level.lines[line].bodies[0]].x0 + PAD_X + 0.25
 
-  /** the start: the left end of the bottom line's longest stretch without a pit (a gap his foot can't bridge) */
+  /** the start: the left end of the top line's longest stretch without a pit (a gap his foot can't bridge) */
   function startX() {
     const bodies = level.lines[level.start].bodies.map((bi) => w.bodies[bi])
     let a = 0, best = [0, 0]
@@ -155,6 +161,7 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     smashCd = hitStopT = shakeT = 0
     splat = false
     checkpoint = -1
+    sole = rig.stand
     lead = facing * P.lookAhead
     camX = x + lead
     camY = anchorY
@@ -167,16 +174,21 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   function exit() {
     if (!on) return
     on = false
+    w.cam.shake.x = w.cam.shake.y = 0
     cast.drive(null)
     resetView(w)
     input.left = input.right = input.jump = input.down = input.smash = false
+    input.pressed.clear()
     emit({ type: 'exit' })
   }
 
   function sync() {
-    // he stands in front of the page, and the camera looks down a little: lift him by that parallax so his feet sit on the ink
+    // his soles on the text (sunk in a little). He stands in front of the page, so draw his feet where the camera's
+    // line of sight through that spot on the page meets his depth (else they look above or below the ink)
+    const zs = grounded ? ground.z : z - halfDepth() - 0.03, eye = w.cam.eye, ys = y - P.sink
+    const k = Math.abs(zs - eye[2]) > 1e-3 ? (z - eye[2]) / (zs - eye[2]) : 1
     drive.feet[0] = x
-    drive.feet[1] = y + (z - (grounded ? ground.z : z - halfDepth() - 0.03)) * Math.sin(w.s.tilt)
+    drive.feet[1] = eye[1] + (ys - eye[1]) * k - sole * (P.size / rig.height)
     drive.feet[2] = z
     drive.yaw = yaw
     drive.size = P.size
@@ -264,6 +276,7 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     if (hit.length) {
       hitStopT = P.hitStop
       shakeT = SHAKE
+      shakePh = Math.random() * 100
     }
     emit({ type: 'smash', bodies: hit, coins: hit.filter((bi) => coinSet.has(bi)), pound })
   }
@@ -344,17 +357,19 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
       else if (y < camY - halfH * 0.75 || y + P.size > camY + halfH * 0.85) anchorY = y // he's leaving the view: follow him directly
       camX = x + lead
     }
-    // a bit above him (more to see up the climb); on a phone, clear of the pads
-    const bias = halfH * (w.low ? 0.15 : 0.25)
-    camY += (anchorY + bias - camY) * Math.min(1, dt * 4)
-    // a smash shakes it a little
-    shakeT = Math.max(0, shakeT - dt)
-    const amp = P.shake * (shakeT / SHAKE)
-    w.cam.scrollX = camX + (Math.random() - 0.5) * 2 * amp
-    w.cam.scrollY = camY + (Math.random() - 0.5) * 2 * amp
+    // a bit below him: you read the resume walking down it (and on a phone he stays in the upper part, clear of the pads)
+    camY += (anchorY - halfH * 0.25 - camY) * Math.min(1, dt * 4)
+    w.cam.scrollX = camX
+    w.cam.scrollY = camY
     w.cam.mom = null
-    w.s.tilt = P.tilt
-    w.s.yaw += (P.lean * facing * Math.min(1, Math.abs(vx) / P.runSpeed) - w.s.yaw) * Math.min(1, dt * 3)
+    // a smash shakes it: a jolt that rings out (straight onto the camera, past its easing), and a little tilt and turn
+    shakeT = Math.max(0, shakeT - dt)
+    shakeClock += dt
+    const e = shakeT / SHAKE, amp = P.shake * e * e, t = shakeClock * 6.283, ph = shakePh
+    w.cam.shake.x = amp * (0.65 * Math.sin(t * 17 + ph) + 0.35 * Math.sin(t * 29 + 2 * ph))
+    w.cam.shake.y = amp * (0.65 * Math.cos(t * 19 + ph) + 0.35 * Math.sin(t * 31 + 3 * ph))
+    w.s.tilt = P.tilt + amp * 0.12 * Math.sin(t * 13 + ph)
+    w.s.yaw += (P.lean * facing * Math.min(1, Math.abs(vx) / P.runSpeed) + amp * 0.12 * Math.sin(t * 11 + 2 * ph) - w.s.yaw) * Math.min(1, dt * 3)
   }
 
   function update(dt: number) {
@@ -380,7 +395,10 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
       sync()
       return
     }
-    const jumpPressed = input.jump && !prevJump, downPressed = input.down && !prevDown, smashPressed = input.smash && !prevSmash
+    const tap = input.pressed
+    const jumpPressed = (input.jump && !prevJump) || tap.has('jump'), downPressed = (input.down && !prevDown) || tap.has('down')
+    const smashPressed = (input.smash && !prevSmash) || tap.has('smash')
+    tap.clear()
     prevJump = input.jump
     prevDown = input.down
     prevSmash = input.smash
@@ -468,8 +486,8 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
       }
     }
     if (!grounded) { ground.body = -1; ground.line = -1 }
-    // the last checkpoint he's reached (standing on its line or any above it)
-    while (grounded && checkpoint + 1 < level.checkpoints.length && ground.line <= level.checkpoints[checkpoint + 1].line) checkpoint++
+    // the last checkpoint he's reached (standing on its line or any below it)
+    while (grounded && checkpoint + 1 < level.checkpoints.length && ground.line >= level.checkpoints[checkpoint + 1].line) checkpoint++
     // off the paper's edge, or below the page: the void
     if (Math.abs(x) > w.pageW / 2 + 0.1 || y < w.pageBottom - 0.2) {
       startFlail()
@@ -486,6 +504,13 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     const zt = (grounded ? ground.z : w.bend.at(x, y) + 0.012) + halfDepth() + 0.03
     z += (zt - z) * Math.min(1, dt * 12)
     animate(dt)
+    // his planted foot on the line: the lowest foot joint against its rest height (in the air: idle's stance)
+    let s0 = rig.stand
+    if (grounded && rig.feet.length) {
+      s0 = Infinity
+      for (const f of rig.feet) s0 = Math.min(s0, pose.world[f.node * 16 + 13] - f.rest)
+    }
+    sole += (s0 - sole) * Math.min(1, dt * 30)
     frame(dt)
     sync()
   }

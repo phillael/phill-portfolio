@@ -39,7 +39,7 @@ export function updateCamera(w: World, dt: number, width: number, height: number
   cam.x = cam.x === null ? cam.scrollX : cam.x + (cam.scrollX - cam.x) * ease
   cam.halfW = halfW
   cam.halfH = halfH
-  const tg: Vec3 = [cam.x, cam.y, 0]
+  const tg: Vec3 = [cam.x + cam.shake.x, cam.y + cam.shake.y, 0]
   const el = s.tilt + 0.2 * ic, az = s.yaw + 0.5 * ic
   cam.eye = [tg[0] + dist * Math.sin(az) * Math.cos(el), tg[1] + dist * Math.sin(el), tg[2] + dist * Math.cos(az) * Math.cos(el)]
   cam.target = tg

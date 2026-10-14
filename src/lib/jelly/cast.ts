@@ -81,6 +81,18 @@ interface ShrimpState extends Body {
   peak: number
 }
 
+/**
+ * Phill for Play mode: his pose, size, and his foot joints (node, height in the rest pose, where his
+ * soles are at the origin), so the soles can stand on the text; `stand`: how high idle holds them (model units).
+ */
+export interface Rig {
+  pose: Pose
+  height: number
+  dims: Vec3
+  feet: { node: number; rest: number }[]
+  stand: number
+}
+
 /** Play mode drives Phill: where his feet are, which way he faces (yaw) and how tall he is (units). */
 export interface Drive {
   feet: Vec3
@@ -104,6 +116,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
   let alpha = 0
   /** Play mode owns his position, rotation, size and clip while this is set (the cast keeps drawing him) */
   let drive: Drive | null = null
+  let rigInfo: Rig | null = null
   /** the music's bass, smoothed (and zero while it's off) */
   let energy = 0
   let disposed = false
@@ -487,7 +500,19 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     kickAll,
     dispose,
     /** Phill's model and pose for Play mode (null until he's loaded) */
-    rig: () => (phill ? { pose: phill.pose, height: phill.a.height, dims: phill.a.dims } : null),
+    rig: (): Rig | null => {
+      if (!phill) return null
+      if (!rigInfo) {
+        // his foot joints' heights in the rest pose (where his soles are at the origin), and how high idle holds them
+        const m = phill.a.m, rest = new Pose(m), idle = new Pose(m)
+        idle.play(IDLE, 0)
+        idle.update(0)
+        const feet = (m.joints ?? []).filter((n) => /Foot|Toe/.test(m.nodes[n].name)).map((node) => ({ node, rest: rest.world[node * 16 + 13] }))
+        const stand = feet.length ? Math.min(...feet.map((f) => idle.world[f.node * 16 + 13] - f.rest)) : 0
+        rigInfo = { pose: phill.pose, height: phill.a.height, dims: phill.a.dims, feet, stand }
+      }
+      return rigInfo
+    },
     /**
      * Play mode takes Phill (it moves, turns, sizes and poses him; the cast keeps drawing him, and
      * clicks, Chaos and the black hole leave him be), or hands him back (null): he drifts back to his orbit.

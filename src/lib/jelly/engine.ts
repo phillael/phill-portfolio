@@ -91,7 +91,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   // Play mode: its own chunk, loaded on the first Play. The keys (or the touch pads) write its input
   let play: Play | null = null
   let playing = false
-  const playInput: PlayInput = { left: false, right: false, jump: false, down: false, smash: false }
+  const playInput: PlayInput = { left: false, right: false, jump: false, down: false, smash: false, pressed: new Set() }
   const playParams: PlayConfig = { ...PLAY_CONFIG }
   const playListeners = new Set<(e: PlayEvent) => void>()
 

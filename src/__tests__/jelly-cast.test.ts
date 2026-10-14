@@ -63,6 +63,20 @@ describe('readGltf: Phill', () => {
     expect(b.min[1]).toBeCloseTo(0, 1) // feet at the origin
   })
 
+  it("knows where his soles are from his foot joints (the idle stance holds him a little up)", () => {
+    const feet = m.joints!.filter((n) => /Foot|Toe/.test(m.nodes[n].name))
+    const skin = new Set(m.joints!.map((n, j) => (feet.includes(n) ? j : -1)).filter((j) => j >= 0))
+    expect(feet).toHaveLength(4)
+    const rest = new Pose(m), idle = new Pose(m)
+    idle.play('idle', 0)
+    idle.update(0)
+    // in his rest pose his soles are at the origin; in idle, ~0.06 above it, and the foot joints agree
+    expect(bounds(m, rest.world, rest.joints, skin).min[1]).toBeCloseTo(0, 1)
+    const soles = bounds(m, idle.world, idle.joints, skin).min[1]
+    expect(soles).toBeGreaterThan(0.03)
+    expect(Math.min(...feet.map((n) => idle.world[n * 16 + 13] - rest.world[n * 16 + 13]))).toBeCloseTo(soles, 1)
+  })
+
   it('decodes rotation keys to unit quaternions', () => {
     for (const c of m.clips) for (const t of c.tracks) if (t.path === 'rotation') {
       for (let k = 0; k < t.values.length; k += 4) {

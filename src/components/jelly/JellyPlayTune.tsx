@@ -30,7 +30,7 @@ const SLIDERS: [NumKey, string, number, number, number][] = [
   ['hit', 'Smash hit frame (s)', 0, 2.87, 0.01],
   ['smashCooldown', 'Smash cooldown (s)', 0, 1, 0.02],
   ['hitStop', 'Hit-stop (s)', 0, 0.2, 0.005],
-  ['shake', 'Camera shake', 0, 0.2, 0.005],
+  ['shake', 'Camera shake', 0, 1, 0.01],
   ['pxDesktop', 'On screen, desktop (px)', 40, 200, 1],
   ['pxPhone', 'On screen, phone (px)', 30, 150, 1],
   ['lookAhead', 'Camera lead', 0, 2, 0.05],
@@ -40,6 +40,7 @@ const SLIDERS: [NumKey, string, number, number, number][] = [
   ['weight', 'Standing weight', 0, 3, 0.05],
   ['wake', 'Wake through lines', 0, 4, 0.05],
   ['face', 'Turned toward you (rad)', 0, 1.2, 0.05],
+  ['sink', 'Soles into the text', -0.05, 0.08, 0.002],
   ['idleDance', 'Still before he dances (s)', 0.5, 6, 0.1],
   ['runRate', 'Walk clip rate at full speed', 0.5, 3, 0.05],
 ]

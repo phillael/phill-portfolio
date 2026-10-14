@@ -233,7 +233,7 @@ export interface PlayConfig {
   strike: readonly [number, number]
   hit: number
   smashCooldown: number
-  /** the smash's hit-stop (s) and camera shake (units, ~0.2 s decay) */
+  /** the smash's hit-stop (s) and camera shake (units at the camera's target, ~0.3 s decay) */
   hitStop: number
   shake: number
   /** his on-screen height (px) */
@@ -249,6 +249,8 @@ export interface PlayConfig {
   wake: number
   /** how far he turns toward the camera from side-on (rad) */
   face: number
+  /** how far his soles sink into the line's tallest glyphs (units), so he walks on the text */
+  sink: number
   /** seconds standing still (music on) before he dances */
   idleDance: number
   /** the walk clip's playback rate at full speed */
@@ -261,6 +263,6 @@ export const PLAY_CONFIG: Readonly<PlayConfig> = Object.freeze({
   // the attack's first swing, a llama chopped overhead: raised behind him at 0.45 s, fastest at 0.6 s, landing in
   // front at chest height at 0.67 s (his hand furthest forward), followed through by 0.8 s
   reach: 0.42, strike: [0.45, 0.8] as const, hit: 0.67, smashCooldown: 0.32,
-  hitStop: 0.06, shake: 0.04, pxDesktop: 90, pxPhone: 60, lookAhead: 0.6, tilt: 0.08, lean: 0.06,
-  squash: 0.12, weight: 0.6, wake: 1.2, face: 0.35, idleDance: 1.5, runRate: 1.6,
+  hitStop: 0.06, shake: 0.35, pxDesktop: 90, pxPhone: 60, lookAhead: 0.6, tilt: 0.08, lean: 0.06,
+  squash: 0.12, weight: 2, wake: 1.2, face: 0.35, sink: 0.012, idleDance: 1.5, runRate: 1.6,
 })

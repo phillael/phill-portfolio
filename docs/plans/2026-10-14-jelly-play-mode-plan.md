@@ -161,6 +161,41 @@ Order matters: each task builds on the ones before it. One task ≈ one commit (
   - *Done 2026-10-14:* `CLAUDE.md` (a Play mode key-file entry; `phill.glb` with Play's clips; gotchas: `handHeld` + `fbx2glb.py`, per-frame code never reads layout, `setTimeScale(0)` blanks the sparks), `HANDOFF.md` ("Play mode: read the resume walking down it": what, files, clips, the feel-check decisions, measured, later ideas; the cast section's sizes), the `actors.mjs` header (`handHeld`; `fbx2glb.py` and the jump were already there since T1), `package.json` 1.4.0 → **1.5.0**. Gates: `npx tsc --noEmit` exit 0 · `npm run lint` exit 0 (no warnings) · `npx jest --no-watchman` **51 suites / 520 tests passed** (6.4 s; was 47 / 478 at T0) · `npm run build` exit 0.
 
 - [ ] **T15: PR text. STOP before pushing and ask Phill.** Write the PR title/body here (summary, what's in it, measurements, screenshots list, test plan, `🤖 Generated with [Claude Code](https://claude.com/claude-code)` at the end). On Phill's go only: `git push -u origin feat/jelly-play-mode` + `gh pr create --base master`.
+  - *PR text (written 2026-10-14; waiting for Phill's go to push):*
+
+```markdown
+# Jelly Resume: Play mode (read the resume walking down it) · v1.5.0
+
+## Summary
+Phill can now play his own resume. **🎮 Play** (first in the HUD bar, or **J**) or **PLAYER 1 START** (an arcade button on the page beside the name) shrinks him out of his orbit and drops him onto his name; you read the resume walking down it to the bottom line, Mario style. Every line is a one-way platform, the words wobble under his feet, Space smashes words into comet sparks, the 27 Impact numbers are coins, the six roles are checkpoints, and the bottom line is THE END (time, Impact, best). Phones get on-screen pads.
+
+## What's in it
+- **The game** (`src/lib/jelly/play.ts`, its own lazy 14 KB chunk): run / variable jump / coyote time / jump buffer / one-way landing / ↓ drop-through, smash (the attack clip's llama chop, a hit-stop, a camera shake), ↓-in-the-air ground-pound, falling off the page (a flail, back at the last checkpoint), a follow camera (~90 px tall on desktop, ~60 on phones), the jelly (landing squash, standing weight, a wake through lines), an idle dance with the music on, and the dive in / hop out.
+- **The level** (`platforms.ts`): 47 visual lines from the snapshot, standing on their tallest glyphs; the rules (`playRun.ts`): the clock from the first move, coins, checkpoints newest first, the finish, the best time in `localStorage`.
+- **The HUD** (`JellyPlayHud.tsx`): stats, the climb meter, an always-on key legend, checkpoint toasts and flags, "+1 IMPACT", the finish card, ✕ Exit (Esc), a polite live region; `JellyPlayerStart.tsx` (PLAYER 1 START); `JellyTouchPads.tsx` (◀ ▶ / A B ▼, multi-touch; the site's ♫ hides behind a ♫ remote while playing on touch).
+- **Model:** `phill.glb` keeps the game's `walk` and `attack` and gains a retargeted Mixamo `jumping` (`tools/fbx2glb.py` → `actors.mjs`); `actors.mjs` re-skins what he holds in his left hand to the hand (it stretched a sliver to his knee in the jump and in some dances). 800 KB.
+- **Sound:** synthesized jump, land, smash, coin and finish (only with Sound on).
+- **Feel-check changes (Phill):** walk down instead of climbing up; Space smashes, W/↑ jump; soles on the text; standing weight 2; a crisper shake; controls always visible; a labeled Exit; PLAYER 1 START on the page.
+
+## Measured (production build, music on)
+| | entering Play | playing |
+|---|---|---|
+| desktop 1440 × 900 | 119.2 fps, worst gap 18.2 ms | 120.0 fps, worst 9.4 ms |
+| phone 390 × 844, 4× CPU | 98.2 fps, worst gap 65.2 ms | 99.1 fps, worst 18.5 ms |
+
+Nothing about Play loads until it's pressed. Reduced motion is unchanged (the engine never loads).
+
+## Screenshots
+Desktop: the resume with PLAYER 1 START · playing (stats, meter, legend) · a checkpoint toast and flag · a smash with comet sparks · THE END card. Phone: playing with pads · landscape · the stacked finish card.
+
+## Test plan
+- [x] `npx tsc --noEmit`, `npm run lint` (no warnings), `npx jest --no-watchman` (51 suites / 521 tests), `npm run build`
+- [x] Browser (dev): run/jump/drop numbers, smash/pound/fall-off, coins/checkpoints/finish/best, entrance/exit ×3, edge cases (music, shroom mode, resize, hidden tab, closing while playing, lost context, Save-Data, early Play, a failed cast, knocked/eaten)
+- [x] Production acceptance (headless Chrome on the GPU): Play loads on demand, a full run to THE END, Play again, Esc layering, phone portrait/landscape with touch, reduced motion, no console errors
+- [ ] Phill plays it on a real phone
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
 
 ## Per-task verification
 
@@ -199,6 +234,17 @@ After T14, on the **production build** (`npm run build && npm run start`) in a f
 7. Reduced motion: the plain `/resume` (no engine, no Play).
 8. Desktop ≥ 110 fps; emulated phone ≥ 50 fps, no frame over 100 ms; no console errors; `public/` has no phone number or email.
 9. The four gates are green, `git status` is clean (apart from `AGENTS.md`/`next-env.d.ts`), nothing is pushed.
+
+**Acceptance run 2026-10-14** (production build on :3210; the chrome-devtools MCP disconnected during T13, so these ran in a separate headless Chrome driven by `puppeteer-core`, on the real GPU (ANGLE Metal), a fresh context per scenario, trusted key presses, taps and touch events):
+1. ✓ The resume opens as before; 🎮 Play (J) is the bar's first child; the Play chunk (`Play mode needs Phill`) wasn't requested before Play and was after.
+2. ✓ PLAYER 1 START (clicked) → Play: the Finder, navigator and bar inert, ✕ Exit, the meter, focus in the resume; he's on the name (screenshot).
+3. ✓ A keyboard run from the name to the bottom line: runs, jumps, drops, smashes, a ground-pound; walking off the left edge → the meter's marker jumped back up to the last checkpoint (316 → 236 px); toasts in order 2026, 2023, 2022, 2021, 2018 (1998 queued behind 2018 as the finish card came; the live region said "Checkpoints: 2018 …; 1998 …"); a coin pass on the production build → ✦ 1/27 and "Impact 1 of 27" (screenshot). **Found and fixed here:** two checkpoints passed in one landing (2026/2023 and 2018/1998 are adjacent lines) used to show only the second toast and say only the second; now they take turns (1.2 s while another waits) and are announced together; a long title truncates on a phone.
+4. ✓ The bottom line → THE END (0:28.5, NEW BEST!), he dances, the sparks fly (screenshot); Enter → Play again (⏱ 0:00.0, back on the name); Esc → Play left, the resume still open; Esc → the resume closed (`/`).
+5. ✓ Music on (a real P press; the site's ♫ "currently playing"): the words dance under him (screenshot); standing still he dances (checked with clip names on the dev build at T12); Play's clips never join his orbit dances (T2's `danceSet` test and the browser list).
+6. ✓ Phone portrait (390 × 844, touch): pads, ♫ remote (toggled the player), the site's ♫ hidden while playing and visible after; ▶ held + A tapped (touch events) → the clock started; ▼ taps down to the bottom → the finish card 358 px wide (stacked, screenshot). Landscape (844 × 390): pads, ♫ remote, no meter, the one-row stats.
+7. ✓ Reduced motion: no canvas, the plain `/resume` (h1 "Phill Aelony"), no Play.
+8. ✓ T13's numbers (desktop 120.0 fps playing; phone 99.1 fps playing, 65.2 ms worst entering); no console errors in any scenario; `public/` has no phone number or email (grep: 0 matches).
+9. ✓ `npx tsc --noEmit` 0 · `npm run lint` 0 · `npx jest --no-watchman` 51 suites / 521 tests · `npm run build` 0 (after the last fix); `git status`: only `AGENTS.md`/`next-env.d.ts`; nothing pushed.
 
 ## Stop conditions / open questions (only Phill can decide)
 

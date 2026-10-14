@@ -14,7 +14,9 @@
  * hero pose, the others in a T-pose), so rotations go through each bone's direction rather
  * than being copied. The game's Phill has the llamas welded to his mesh and skinned to his
  * arms, so big arm moves swing them around and tear his poncho: --arms 1 keeps his arms in
- * his idle pose (the llamas tucked in) while the rest of him does the dance.
+ * his idle pose (the llamas tucked in) while the rest of him does the dance. What he holds in
+ * his left hand is re-skinned to that hand (handHeld, below): a few of its weights were on his
+ * thigh and shin, and the jump stretched a sliver from his hand to his knee.
  *
  * Its deps aren't the site's, so run a copy from a scratch folder:
  *   mkdir /tmp/cast && cp docs/design/jelly-resume/tools/actors.mjs /tmp/cast && cd /tmp/cast && npm init -y

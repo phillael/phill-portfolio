@@ -18,7 +18,8 @@ import type { AtlasRect, World } from './world'
 const TRI = new Float32Array([-1, -1, 3, -1, -1, 3])
 const CORNERS = new Float32Array([0, -1, 1, -1, 0, 1, 1, 1])
 const LINK_MAX = 2400
-const LIGHT = [-0.45, 0.65, 0.62]
+/** the page's light (the cast's too) */
+export const LIGHT = [-0.45, 0.65, 0.62]
 
 interface Mist {
   front: boolean
@@ -305,9 +306,10 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
 
   /**
    * One frame. skyAmt fades the backdrop in over the page underneath; reveal is the
-   * scanline (revealY); showSparks hides the resume's own sparks while the hero's stand in.
+   * scanline (revealY); showSparks hides the resume's own sparks while the hero's stand in;
+   * cast draws the cast (Phill, the shrimp) after the page and the words, before the sparks.
    */
-  function render(skyAmt: number, reveal: number, showSparks: boolean, hero: HeroPool | null, drawResume = true) {
+  function render(skyAmt: number, reveal: number, showSparks: boolean, hero: HeroPool | null, drawResume = true, cast?: () => void) {
     const s = w.s, cam = w.cam
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight)
     const space = s.backdrop !== 'void'
@@ -381,6 +383,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
       }
       gl.uniform1i(u.uPass, 0); gl.uniform1f(u.uLayerZ, 0)
       gl.drawElements(gl.TRIANGLES, idxCount, gl.UNSIGNED_INT, 0)
+      if (cast) { gl.bindVertexArray(null); cast(); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA) }
 
       gl.depthMask(false)
       gl.bindBuffer(gl.ARRAY_BUFFER, ptPosBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, w.ptPos)

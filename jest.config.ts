@@ -24,4 +24,13 @@ const config: Config = {
   },
 }
 
-export default createJestConfig(config)
+// three ships the meshopt decoder the 3D resume's cast uses as an ES module: let Jest transform it,
+// so the tests run the same decoder the site does
+const transformThree = (pattern: string) => pattern.replace('(?!(geist|', '(?!(three/examples/jsm|geist|')
+
+const jestConfig = async (): Promise<Config> => {
+  const resolved = await createJestConfig(config)()
+  return { ...resolved, transformIgnorePatterns: resolved.transformIgnorePatterns?.map(transformThree) }
+}
+
+export default jestConfig

@@ -265,6 +265,15 @@ The integration plan (T0–T14, with what was done and measured for each task) i
   - **Home first-load JS:** +2.3 KB gzip; the engine, HUD and snapshot load only behind a trigger.
 - **Changing the look:** tune in the playground, then copy the values into `JELLY_CONFIG` (`src/lib/jelly/config.ts`). Regenerate `public/resume/` after editing the resume in Rezmancer (command above).
 
+## The cast: Phill and the shrimp (2026-10-14, v1.4.0)
+
+- **What:** Phill (the Number Slayers model, llamas and all) orbits the page: behind it across the top, in front along the bottom (he can cover the bottom lines for a few seconds a lap; Phill is fine with that, people can knock him away). Shrimp drift through the nebula like slow planets. Click either to send it spinning off (Phill flails through the game's die clip); the black hole eats and spits them out; Chaos knocks them all. Phones: he dances on a stage above the page at 0.55×.
+- **With the site's music:** he goes from idle to dancing (a shuffled round: his own game dance, the zombie's breakdance, and the human, garlic, lasagna and moose dances), moving on every ~16 s at a loop's end, with a squash-and-stretch bounce on the beat and a brighter neon rim on the bass. Each shrimp follows its own slice of the spectrum (swells and glows) and bends along its body (a vertex-shader wave: a swim driven by the music, with the live waveform rippling on top; the raw waveform alone averaged out to an invisible ~1% bend).
+- **Files:** `src/lib/jelly/cast.ts` (behavior), `actors.ts` (GPU, `Pose`), `gltf.ts` (GLB reader), `CAST_VS`/`CAST_FS` in `shaders.ts`, `CAST_CONFIG` in `config.ts`, `JellyCastTune.tsx` (`/resume?tune`, dev only), `public/resume/phill.glb` (775 KB) and `shrimp.glb` (120 KB), built by `tools/actors.mjs`.
+- **Borrowed dances:** `actors.mjs --dances … --arms 1` retargets other characters' clips onto Phill's 24-bone Meshy rig (Meshy rigs by name, Mixamo by a name map), through each bone's direction since the bind poses differ. Checked on the llama-free moose first: every dance matched its source. On Phill the llamas ride his arms, so `--arms 1` keeps his idle arms. The wizard's six dances also retarget (`--dances <wizard glb>`) but weren't included.
+- **Measured (production build, music playing):** desktop 120 fps, worst frame 9.4 ms; emulated phone (390×844, 4× CPU) 119.8 fps, worst 17.5 ms. The cast chunk loads after the page prints, so the cold open didn't change.
+- **Ideas for later:** a Mario-style Play mode (run along the resume, smash words; needs a jump clip); a llama-free Phill for full-arm dances; a higher-detail Meshy model.
+
 ## Earlier plan pointer
 
 The hero → resume plan (T0–T12) is `docs/plans/2026-10-12-jelly-resume-hero-transition-plan.md`.

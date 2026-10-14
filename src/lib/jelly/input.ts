@@ -22,12 +22,16 @@ export interface InputContext {
   setLastRay(ray: Ray): void
   /** a user gesture: unlock audio */
   gesture(): void
+  /** the cast member (Phill, a shrimp) under the ray, if any */
+  castHit?(ray: Ray): object | null
+  /** a click that started on that cast member (picked at pointerdown: it keeps moving) */
+  castClick?(target: object, ray: Ray): void
 }
 
 export function attachInput(ctx: InputContext) {
   const { w, canvas, ui } = ctx
   const cam = w.cam
-  let down: { x: number; y: number; moved: boolean; hit: number; mode: 'orbit' | 'pan' } | null = null
+  let down: { x: number; y: number; moved: boolean; hit: number; cast: object | null; mode: 'orbit' | 'pan' } | null = null
   const touches = new Map<number, { x: number; y: number }>()
   let pinch: { d: number; mx: number; my: number } | null = null
   let holePointer: number | null = null
@@ -87,7 +91,7 @@ export function attachInput(ctx: InputContext) {
       }
       return
     }
-    canvas.style.cursor = pickParticle(w, e.clientX - rc.left, e.clientY - rc.top, rc) >= 0 ? 'pointer' : 'grab'
+    canvas.style.cursor = ctx.castHit?.(ray) || pickParticle(w, e.clientX - rc.left, e.clientY - rc.top, rc) >= 0 ? 'pointer' : 'grab'
     // hover: the cursor squishes the words under it
     const f = w.finger, now = performance.now(), hit = planeZ(ray, 0.3)
     if (f.last) {
@@ -124,10 +128,12 @@ export function attachInput(ctx: InputContext) {
         pinch = { d: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }
         return
       }
-      down = { x: e.clientX, y: e.clientY, moved: false, hit: pickParticle(w, sx, sy, rc, 28), mode: ctx.navMode() === 'rotate' ? 'orbit' : 'pan' }
+      const onCast = ctx.castHit?.(rayAt(w, rc, e.clientX, e.clientY)) ?? null
+      down = { x: e.clientX, y: e.clientY, moved: false, hit: onCast ? -1 : pickParticle(w, sx, sy, rc, 28), cast: onCast, mode: ctx.navMode() === 'rotate' ? 'orbit' : 'pan' }
       return
     }
-    down = { x: e.clientX, y: e.clientY, moved: false, hit: e.button === 0 ? pickParticle(w, sx, sy, rc) : -1, mode: dragMode(e) }
+    const onCast = e.button === 0 ? ctx.castHit?.(rayAt(w, rc, e.clientX, e.clientY)) ?? null : null
+    down = { x: e.clientX, y: e.clientY, moved: false, hit: e.button === 0 && !onCast ? pickParticle(w, sx, sy, rc) : -1, cast: onCast, mode: dragMode(e) }
   }
 
   function onUp(e: PointerEvent) {
@@ -137,14 +143,16 @@ export function attachInput(ctx: InputContext) {
       touches.delete(e.pointerId)
       if (touches.size < 2) pinch = null
       if (down && e.type === 'pointerup' && ctx.enabled()) {
-        if (!down.moved && down.hit >= 0) clickAt(w, rayAt(w, rc, e.clientX, e.clientY), down.hit)
+        if (!down.moved && down.cast) ctx.castClick?.(down.cast, rayAt(w, rc, e.clientX, e.clientY))
+        else if (!down.moved && down.hit >= 0) clickAt(w, rayAt(w, rc, e.clientX, e.clientY), down.hit)
         else if (down.moved && down.mode === 'pan' && touches.size === 0) releaseFling()
       }
       down = null
       return
     }
     if (down && e.type === 'pointerup' && ctx.enabled()) {
-      if (!down.moved && down.hit >= 0) clickAt(w, rayAt(w, rc, e.clientX, e.clientY), down.hit)
+      if (!down.moved && down.cast) ctx.castClick?.(down.cast, rayAt(w, rc, e.clientX, e.clientY))
+      else if (!down.moved && down.hit >= 0) clickAt(w, rayAt(w, rc, e.clientX, e.clientY), down.hit)
       else if (down.moved && down.mode === 'pan') releaseFling()
     }
     if (down) canvas.style.cursor = 'grab'
@@ -155,7 +163,7 @@ export function attachInput(ctx: InputContext) {
   function onDbl(e: MouseEvent) {
     if (!ctx.enabled()) return
     const rc = rect()
-    if (pickParticle(w, e.clientX - rc.left, e.clientY - rc.top, rc) >= 0) return
+    if (pickParticle(w, e.clientX - rc.left, e.clientY - rc.top, rc) >= 0 || ctx.castHit?.(rayAt(w, rc, e.clientX, e.clientY))) return
     if (w.s.zoom <= ZMIN * 1.5) resetView(w)
     else zoomAt(w, rc, ui, e.clientX, e.clientY, 0.45, false)
   }

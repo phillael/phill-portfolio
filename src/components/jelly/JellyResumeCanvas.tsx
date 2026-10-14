@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { createJellyEngine, type JellyEngine } from '@/lib/jelly/engine'
 import { loadSnapshotOnce, releaseSnapshot } from '@/lib/jelly/snapshot'
 import { containedRect, decodePhoto, releasePhoto } from '@/lib/jelly/hero'
@@ -32,6 +33,9 @@ interface JellyResumeCanvasProps {
    */
   onFail?: (reason: 'webgl' | 'load') => void
 }
+
+/** dev only: the cast's sliders (?tune); compiled out of production builds */
+const JellyCastTune = process.env.NODE_ENV !== 'production' ? dynamic(() => import('@/components/jelly/JellyCastTune'), { ssr: false }) : null
 
 const FADE_MS = 400
 /** Still not open after this long (a slow connection): show × anyway */
@@ -408,6 +412,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
           />
           <JellyNavigator engine={engine} loaded={loaded} navMode={navMode} onNavMode={toggleNav} rootRef={navRef} />
           <JellyHudBar engine={engine} toggles={toggles} onToggle={toggle} rootRef={hudRef} />
+          {JellyCastTune && <JellyCastTune />}
         </div>
       )}
       <button

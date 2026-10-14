@@ -234,7 +234,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
    */
   function close(img: HTMLImageElement) {
     if (cl) return true
-    exitPlay() // closing while playing: leave Play first, instantly
+    exitPlay(true) // closing while playing: leave Play first, instantly
     if (diss) {
       if (!loaded) return false // still waiting for the resume: fade out instead of waiting on the handoff
       pendingClose = img
@@ -496,10 +496,11 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     return true
   }
 
-  function exitPlay() {
+  /** Leave Play (he hops back to his orbit; instant: no hop, e.g. the resume is closing) */
+  function exitPlay(instant = false) {
     if (!playing) return
     playing = false
-    play?.exit()
+    play?.exit(instant)
   }
 
   function stats(): JellyStats {

@@ -44,6 +44,8 @@ export interface PlayState {
   pounding: boolean
   /** flailing off the page (he comes back at the last checkpoint) */
   falling: boolean
+  /** diving in from his orbit (the entrance) */
+  entering: boolean
   /** the last checkpoint reached (index into level.checkpoints; -1: none yet) */
   checkpoint: number
   /** the clock (ms; it starts on the first move), the coins collected of the total, the finish, the best time (ms) */
@@ -108,6 +110,8 @@ const SHAKE = 0.3
 /** a reached checkpoint's title glows this long (s); the finish's sparks fly this long (s) */
 const LIT = 1.6
 const FIREWORK = 1.8
+/** the entrance: his dive from his orbit onto the name, and the camera's ease from the whole page (s) */
+const INTRO = 0.8
 
 export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: PlayContext) {
   const level: Level = buildLevel(w)
@@ -136,6 +140,10 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   const fw: number[] = []
   let fwT = 0
   const tmp = [0, 0, 0]
+  /** the entrance: where he dove from (feet, yaw, size), how far along it is (s), and the camera it eases from */
+  let introT = INTRO, from: Drive = { feet: [0, 0, 0], yaw: 0, size: P.size }
+  const cam0 = { zoom: 1, x: 0, y: 0, tilt: 0, yaw: 0 }
+  const arc: Vec3 = [0, 0, 0]
 
   const foot = () => P.size * 0.12
   const halfDepth = () => (Math.max(rig.dims[0], rig.dims[2]) / 2) * (P.size / rig.height)
@@ -179,6 +187,17 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   function enter() {
     if (on) return
     on = true
+    // the entrance: he dives from wherever he is (in his orbit, knocked away, spat out) onto the name, shrinking
+    const was = cast.place()
+    if (was) {
+      from = { feet: [...was.feet], yaw: was.yaw, size: was.size }
+      introT = 0
+    } else introT = INTRO
+    cam0.zoom = w.cam.zoom ?? w.s.zoom
+    cam0.x = w.cam.x ?? w.cam.scrollX
+    cam0.y = w.cam.y ?? 0
+    cam0.tilt = w.s.tilt
+    cam0.yaw = w.s.yaw
     place(level.start, startX())
     facing = 1
     yaw = facing * (Math.PI / 2 - P.face)
@@ -211,14 +230,15 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     stopFireworks()
   }
 
-  function exit() {
+  /** Leave Play: he hops back out to his orbit, growing (instant: the resume is closing, no hop) */
+  function exit(instant = false) {
     if (!on) return
     on = false
     w.cam.shake.x = w.cam.shake.y = 0
     for (const bd of w.bodies) bd.coinT = bd.litT = 0
     lits.length = 0
     stopFireworks()
-    cast.drive(null)
+    cast.drive(null, !instant)
     resetView(w)
     input.left = input.right = input.jump = input.down = input.smash = false
     input.pressed.clear()
@@ -235,6 +255,22 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     drive.feet[2] = z
     drive.yaw = yaw
     drive.size = P.size
+    if (introT < INTRO) {
+      // diving in: along an arc from where he was (up and out in front of the page, then down onto the name), shrinking
+      const u = introT / INTRO, t = Math.pow(u, 1.3), e = u * u * (3 - 2 * u)
+      for (let a = 0; a < 3; a++) {
+        // (it swings out in front of the page, so a dive from behind it is seen)
+        const p0 = from.feet[a], p2 = drive.feet[a], p1 = a === 1 ? Math.max(p0, p2) + 1.2 : a === 2 ? Math.max(p0, p2) + 2.5 : (p0 + p2) / 2
+        arc[a] = (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * p1 + t * t * p2
+      }
+      drive.feet[0] = arc[0]
+      drive.feet[1] = arc[1]
+      drive.feet[2] = arc[2]
+      let dy = yaw - from.yaw
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy))
+      drive.yaw = from.yaw + dy * e
+      drive.size = Math.exp(Math.log(Math.max(1e-3, from.size)) + (Math.log(P.size) - Math.log(Math.max(1e-3, from.size))) * e)
+    }
     return drive
   }
 
@@ -504,6 +540,16 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
     w.cam.scrollX = camX
     w.cam.scrollY = camY
     w.cam.mom = null
+    if (introT < INTRO) {
+      // the entrance: from the whole-page view to the play view, as he dives
+      const u = introT / INTRO, e = u * u * (3 - 2 * u)
+      w.s.zoom = Math.exp(Math.log(cam0.zoom) + (Math.log(w.s.zoom) - Math.log(cam0.zoom)) * e)
+      w.cam.scrollX = cam0.x + (camX - cam0.x) * e
+      w.cam.scrollY = cam0.y + (camY - cam0.y) * e
+      w.s.tilt = cam0.tilt + (P.tilt - cam0.tilt) * e
+      w.s.yaw = cam0.yaw * (1 - e)
+      return
+    }
     // a smash shakes it: a jolt that rings out (straight onto the camera, past its easing), and a little tilt and turn
     shakeT = Math.max(0, shakeT - dt)
     shakeClock += dt
@@ -517,6 +563,25 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
   function update(dt: number) {
     if (!on || dt <= 0) return
     const g = (2 * P.jumpHeight) / (P.apexTime * P.apexTime), v0 = (2 * P.jumpHeight) / P.apexTime
+    if (introT < INTRO) {
+      // the entrance (no control yet): the dive clip's fall frames, then a jelly splat on the name
+      introT += dt
+      pose.play('jumping', 0.1)
+      pose.seek(JUMP_APEX + (JUMP_FALL - JUMP_APEX) * Math.min(1, introT / INTRO))
+      pose.update(dt, 0)
+      if (introT >= INTRO) {
+        press(level.start, 2, foot() + 0.5)
+        landT = 0
+        prevJump = input.jump
+        prevDown = input.down
+        prevSmash = input.smash
+        input.pressed.clear()
+        emit({ type: 'land', line: level.start, speed: 6 })
+      }
+      frame(dt)
+      sync()
+      return
+    }
     // the clock (it runs through hit-stops and falls), the glowing titles fading back, the finish's sparks
     run.tick(dt)
     for (let i = lits.length - 1; i >= 0; i--) {
@@ -674,7 +739,7 @@ export function createPlay({ w, cast, params: P, input, canvas, ui, emit }: Play
 
   const state = (): PlayState => ({
     x, y, z, vx, vy, grounded, facing, line: grounded ? ground.line : -1, clip: pose.clip,
-    smashing: smashT >= 0, pounding, falling: flailT >= 0, checkpoint: run.checkpoint,
+    smashing: smashT >= 0, pounding, falling: flailT >= 0, entering: introT < INTRO, checkpoint: run.checkpoint,
     timeMs: run.timeMs, started: run.started, coins: run.coins, total: run.total, finished: run.finished, bestMs: run.best(),
   })
 

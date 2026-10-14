@@ -20,6 +20,8 @@ import type { World } from './world'
 
 const IDLE = 'idle'
 const KNOCKED = 'die'
+/** handed back from Play mode, he grows back to his orbit size over this long (s) */
+const GROW = 0.7
 /** Play mode's run, smash and jump: never part of his dances */
 export const PLAY_CLIPS: readonly string[] = ['walk', 'attack', 'jumping']
 
@@ -119,6 +121,8 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
   /** Play mode owns his position, rotation, size and clip while this is set (the cast keeps drawing him) */
   let drive: Drive | null = null
   let rigInfo: Rig | null = null
+  /** handed back from Play mode: he grows from Play's size to his orbit's over GROW s */
+  let growFrom = 0, growT = GROW
   /** the music's bass, smoothed (and zero while it's off) */
   let energy = 0
   let disposed = false
@@ -335,6 +339,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     } else if (phill) {
       const p = phill, cam = w.cam
       p.age += dt
+      growT = Math.min(GROW, growT + dt)
       p.th += (dt * Math.PI * 2) / Math.max(4, params.lap)
       orbitAt(p.th + 0.01, ahead)
       orbitAt(p.th, target)
@@ -404,6 +409,14 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     return M4x.compose(place, tv, rot, kv)
   }
 
+  /** his size in his orbit (shrunk inside the black hole; growing back from Play mode's) */
+  function orbitSize() {
+    const full = sizeNow() * (phill?.scale ?? 1)
+    if (growT >= GROW) return full
+    const u = growT / GROW, e = u * u * (3 - 2 * u)
+    return Math.exp(Math.log(Math.max(1e-3, growFrom)) + (Math.log(Math.max(1e-3, full)) - Math.log(Math.max(1e-3, growFrom))) * e)
+  }
+
   const fogCol = hex(NEBULA.base).map((v) => v * 0.8) as Vec3, rimA = hex(SITE.cyan), rimB = hex(SITE.violet)
   const glowShrimp: Vec3 = [1, 0.42, 0.24], glowNow: Vec3 = [0, 0, 0]
   const noGlow: Vec3 = [0, 0, 0]
@@ -432,7 +445,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       }
     }
     if (phill) {
-      const p = phill, k = drive ? drive.size / p.a.height : (sizeNow() / p.a.height) * p.scale
+      const p = phill, k = (drive ? drive.size : orbitSize()) / p.a.height
       // a squash-and-stretch bounce on the beat, and the neon rim brightening with the bass
       R.draw(p.a, placement(p.pos, p.rot, k, p.a.center, 1 - 0.04 * p.pump, 1 + 0.08 * p.pump), p.pose.joints, {
         alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump), ambient: params.ambient, glow: noGlow,
@@ -519,9 +532,27 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
      * Play mode takes Phill (it moves, turns, sizes and poses him; the cast keeps drawing him, and
      * clicks, Chaos and the black hole leave him be), or hands him back (null): he drifts back to his orbit.
      */
-    drive: (d: Drive | null) => {
-      if (!d && drive && phill) phill.pose.play(IDLE, 0.3)
+    drive: (d: Drive | null, hop = false) => {
+      if (!d && drive && phill) {
+        phill.pose.play(IDLE, 0.3)
+        if (hop) {
+          // a hop up and back out toward his orbit (its spring takes him home), growing on the way
+          const p = phill
+          p.vel[0] = Math.sign(p.pos[0] || 1) * 2
+          p.vel[1] = 5
+          p.vel[2] = 2.5
+          growFrom = drive.size
+          growT = 0
+        }
+      }
       drive = d
+    },
+    /** where he is and how big (feet, yaw, height in units), for Play mode's entrance */
+    place: (): Drive | null => {
+      if (!phill) return null
+      const p = phill, size = drive ? drive.size : orbitSize(), k = size / p.a.height, c = p.a.center
+      const yaw = 2 * Math.atan2(p.rot[1], p.rot[3]), cy = Math.cos(yaw), sy = Math.sin(yaw)
+      return { feet: [p.pos[0] - (c[0] * cy + c[2] * sy) * k, p.pos[1] - c[1] * k, p.pos[2] - (-c[0] * sy + c[2] * cy) * k], yaw, size }
     },
     /** dev: skip to the next dance */
     nextDance: () => { if (phill) nextDance(phill, 0.4) },

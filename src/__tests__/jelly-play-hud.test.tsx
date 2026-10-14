@@ -174,7 +174,7 @@ describe('playing', () => {
     expect(screen.getByText('Space').closest('div')).toHaveTextContent('← → run·W / ↑ jump·↓ drop (in the air: pound)·Space smash·Esc exit')
     const live = document.querySelector('p[aria-live="polite"]')!
     expect(live).toHaveTextContent(/^Play mode\./)
-    act(() => fire({ type: 'checkpoint', index: 2, year: 2022, title: 'Software Engineer · Sessions', line: 39, at: [0, 0, 0] }))
+    await act(async () => fire({ type: 'checkpoint', index: 2, year: 2022, title: 'Software Engineer · Sessions', line: 39, at: [0, 0, 0] }))
     const toast = [...document.querySelectorAll('div[aria-hidden="true"]')].find((d) => d.textContent?.includes('CHECKPOINT'))
     expect(toast).toHaveTextContent('✓ CHECKPOINT2022Software Engineer · Sessions')
     expect(live).toHaveTextContent('Checkpoint: 2022, Software Engineer · Sessions')
@@ -183,6 +183,26 @@ describe('playing', () => {
     expect(screen.getByText('+1 IMPACT')).toHaveStyle({ left: '120px', top: '80px' })
     act(() => fire({ type: 'coin', body: 2, at: [0, 0, 0], coins: 2, total: 27 }))
     expect(live).toHaveTextContent('Impact 1 of 27') // (once per 1.5 s)
+  })
+
+  it('two checkpoints passed in one landing: both toasts, one after the other, and one announcement of both', async () => {
+    jest.useFakeTimers({ doNotFake: ['queueMicrotask'] })
+    try {
+      await startPlaying()
+      await act(async () => {
+        fire({ type: 'checkpoint', index: 0, year: 2026, title: 'Generative AI Engineer', line: 13, at: [0, 0, 0] })
+        fire({ type: 'checkpoint', index: 1, year: 2023, title: 'Senior Software Engineer II', line: 14, at: [0, 0, 0] })
+      })
+      const toast = () => [...document.querySelectorAll('div[aria-hidden="true"]')].find((d) => d.textContent?.includes('CHECKPOINT'))?.textContent
+      expect(toast()).toBe('✓ CHECKPOINT2026Generative AI Engineer')
+      expect(document.querySelector('p[aria-live="polite"]')).toHaveTextContent('Checkpoints: 2026, Generative AI Engineer; 2023, Senior Software Engineer II')
+      act(() => { jest.advanceTimersByTime(1300) })
+      expect(toast()).toBe('✓ CHECKPOINT2023Senior Software Engineer II')
+      act(() => { jest.advanceTimersByTime(2600) })
+      expect(toast()).toBeUndefined()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it('the finish card: THE END, the numbers, a new best, focus on Play again, and its buttons', async () => {

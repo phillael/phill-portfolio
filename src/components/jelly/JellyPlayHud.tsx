@@ -29,6 +29,8 @@ export const meterMode = (short: boolean, narrow: boolean) => (short ? 'none' : 
 
 const KBD = 'inline-block min-w-[20px] rounded border border-[#39425a] border-b-2 bg-[#151a26] px-[5px] text-center text-[11px] font-semibold leading-4 text-[#d7deea]'
 const TOAST_MS = 2500
+/** a toast with another waiting behind it (several checkpoints passed in one landing) */
+const TOAST_QUICK_MS = 1200
 const POP_MS = 900
 const ANNOUNCE_COINS_MS = 1500
 
@@ -65,14 +67,24 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
     let key = 0, lastCoinSay = -Infinity
     const timers = new Set<ReturnType<typeof setTimeout>>()
     const later = (f: () => void, ms: number) => { const t = setTimeout(() => { timers.delete(t); f() }, ms); timers.add(t) }
+    // checkpoint toasts take turns (a drop can pass two at once); their announcements go out together
+    const queue: Toast[] = []
+    let showing = false, said: string[] = []
+    const nextToast = () => {
+      const t = queue.shift()
+      showing = !!t
+      setToast(t ?? null)
+      if (t) later(nextToast, queue.length ? TOAST_QUICK_MS : TOAST_MS)
+    }
     setMessage('Play mode. Run with the arrow keys or A and D, jump with W or up, drop with down, smash with Space. Escape leaves.')
     const off = engine.play.onEvent((e: PlayEvent) => {
       if (e.type === 'checkpoint') {
         const k = ++key
-        setToast({ key: k, year: e.year, title: e.title })
-        later(() => setToast((t) => (t?.key === k ? null : t)), TOAST_MS)
+        queue.push({ key: k, year: e.year, title: e.title })
+        if (!showing) { showing = true; queueMicrotask(nextToast) } // (after any others from the same landing are queued)
         setFlags((f) => [...f, { key: k, at: e.at }])
-        setMessage(`Checkpoint: ${e.year}, ${e.title}`)
+        if (!said.length) queueMicrotask(() => { setMessage(said.length > 1 ? `Checkpoints: ${said.join('; ')}` : `Checkpoint: ${said[0]}`); said = [] })
+        said.push(`${e.year}, ${e.title}`)
       } else if (e.type === 'coin') {
         const at = engine.project(e.at), k = ++key
         if (at) {
@@ -93,6 +105,8 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       } else if (e.type === 'again') {
         setResult(null)
         setFlags([])
+        queue.length = 0
+        showing = false
         setToast(null)
         setMessage('Play again: back at the top.')
       }
@@ -202,10 +216,10 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       {toast && (
         <div
           aria-hidden="true"
-          className={`${PANEL} pointer-events-none absolute left-1/2 top-3 z-[3] flex -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-[10px] border-[rgba(128,234,255,0.55)] px-3.5 py-2 shadow-[0_0_18px_rgba(128,234,255,0.25)] max-[820px]:top-[60px] [@media(max-height:559px)]:top-[60px]`}
+          className={`${PANEL} pointer-events-none absolute left-1/2 top-3 z-[3] flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-[10px] border-[rgba(128,234,255,0.55)] px-3.5 py-2 shadow-[0_0_18px_rgba(128,234,255,0.25)] max-[820px]:top-[60px] [@media(max-height:559px)]:top-[60px]`}
         >
-          <span className="rounded bg-[#00ff2b] px-1.5 py-1 font-pixel text-[9px] leading-none text-[#0b0d12]"><span className="font-body text-[10px] font-extrabold">✓</span> CHECKPOINT</span>
-          <span className="text-[13px]"><b className="mr-1.5 font-pixel text-[11px] font-normal text-[#80eaff]">{toast.year}</b>{toast.title}</span>
+          <span className="shrink-0 rounded bg-[#00ff2b] px-1.5 py-1 font-pixel text-[9px] leading-none text-[#0b0d12]"><span className="font-body text-[10px] font-extrabold">✓</span> CHECKPOINT</span>
+          <span className="min-w-0 truncate text-[13px]"><b className="mr-1.5 font-pixel text-[11px] font-normal text-[#80eaff]">{toast.year}</b>{toast.title}</span>
         </div>
       )}
 

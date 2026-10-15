@@ -489,7 +489,7 @@ void main(){
   float fres = pow(1.0 - max(dot(n, V), 0.0), 2.2);
   vec3 c = base*(uAmbient + (1.0 - uAmbient)*diff);
   c += mix(uRimB, uRimA, 0.5 + 0.5*n.y)*fres*uRim;
-  if(uHasGlow) c += texture(uGlowTex, vUv).rgb*uGlowCol;
+  c += (uHasGlow ? texture(uGlowTex, vUv).rgb : base)*uGlowCol; // (no glow map: Meshy's is the base color itself)
   vec3 neon = hsv(fract(uTime*uHue + vWorld.x*0.05 + vWorld.y*0.08), 0.8, 1.0);
   c = mix(c, c*0.45 + neon*(0.35 + 0.65*fres), uShroom*0.65);
   c += vec3(0.9, 0.95, 1.0)*uFlash;

@@ -39,6 +39,8 @@ const TOAST_MS = 2500
 /** a toast with another waiting behind it (several checkpoints passed in one landing) */
 const TOAST_QUICK_MS = 1200
 const POP_MS = 900
+/** a pop sits above its point and rises 40 px: one near the top of the view starts this far down, clear of the stats */
+const POP_TOP = 96
 const ANNOUNCE_COINS_MS = 1500
 const ANNOUNCE_ALERT_MS = 4000
 
@@ -79,11 +81,11 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
 
   // Play's events: the toast, flags, pops, the finish card and the announcements (no per-frame state)
   useEffect(() => {
-    let key = 0, lastCoinSay = -Infinity, lastAlertSay = -Infinity
+    let key = 0, lastCoinSay = -Infinity, lastAlertSay = -Infinity, lastTinkSay = -Infinity
     const pop = (where: [number, number, number], text: string, kind: Pop['kind']) => {
       const at = engine.project(where), k = ++key
       if (!at) return
-      setPops((p) => [...p, { key: k, x: at[0], y: at[1], text, kind }])
+      setPops((p) => [...p, { key: k, x: at[0], y: Math.max(POP_TOP, at[1]), text, kind }])
       later(() => setPops((p) => p.filter((q) => q.key !== k)), POP_MS)
     }
     const timers = new Set<ReturnType<typeof setTimeout>>()
@@ -113,7 +115,16 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
           pop(e.at, '!', 'alert')
           const now = performance.now()
           if (now - lastAlertSay > ANNOUNCE_ALERT_MS) { lastAlertSay = now; setMessage('A lasagna is charging') }
-        } else setMessage(e.what === 'stomped' ? 'Lasagna stomped, 300 points' : e.what === 'smashed' ? 'Lasagna smashed, 300 points' : 'Kicked, minus 250')
+        } else if (e.what === 'tink' || e.what === 'bounce') {
+          // the giant shrugs it off
+          if (e.what === 'tink') pop(e.at, 'TINK!', 'alert')
+          const now = performance.now()
+          if (now - lastTinkSay > ANNOUNCE_ALERT_MS) { lastTinkSay = now; setMessage("TINK! The giant can't be hurt") }
+        } else if (e.what === 'huge') {
+          pop(e.at, '!!', 'alert')
+          setMessage('The lasagna grew huge. Run!')
+        } else if (e.what === 'shrunk') setMessage('The lasagna shrank back. Get even!')
+        else setMessage(e.what === 'stomped' ? 'Lasagna stomped, 300 points' : e.what === 'smashed' ? 'Lasagna smashed, 300 points' : 'Kicked, minus 250')
       } else if (e.type === 'coin') {
         const now = performance.now()
         if (now - lastCoinSay > ANNOUNCE_COINS_MS || e.coins === e.total) {

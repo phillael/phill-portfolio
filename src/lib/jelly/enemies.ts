@@ -5,12 +5,15 @@
  * (or drops down one), charges, and kicks him when it's close on his line, then walks away. Lines are
  * one-way platforms: it lands only coming down, so a stomp comes from the line above it (his feet,
  * falling, over its middle; a ground-pound counts). A smash flings it off the page, spinning.
+ * In the trip it's a giant (4×) that can't be hurt: a smash goes TINK, a stomp bounces off its head, its feet
+ * trample him; it chases him (slower than his run), waits under him when he's out of reach, and shrinks back
+ * when the trip ends.
  */
 
-import { bodyBox, feetBox, lasagnaBody, lasagnaKick, overlaps, type Box } from './hitboxes'
+import { bodyBox, feetBox, lasagnaBody, lasagnaKick, overlaps, trampleBox, type Box } from './hitboxes'
 import type { Surface } from './platforms'
 
-export type LasagnaState = 'patrol' | 'alert' | 'jump' | 'charge' | 'kick' | 'leave' | 'flying' | 'squashed' | 'gone'
+export type LasagnaState = 'patrol' | 'alert' | 'jump' | 'charge' | 'kick' | 'leave' | 'flying' | 'squashed' | 'gone' | 'grow' | 'chase' | 'shrink'
 
 export interface Lasagna {
   /** its feet, velocity, which way it faces, whether it's in the air, and the line it's on */
@@ -29,9 +32,14 @@ export interface Lasagna {
   S: number
   spin: number
   squash: number
-  /** a line it's dropping through (−1: none), and whether it has kicked this time */
-  skip: number
+  /** dropping: it lands only on this line or one further down (−1: any); whether it has kicked this time */
+  landFrom: number
   kicked: boolean
+  /** the trip's giant (growing, chasing or shrinking: it can't be hurt), and one dropped in (it says "!!" when it lands) */
+  huge: boolean
+  drop: boolean
+  /** the size it's growing or shrinking from */
+  from: number
   /** its clip: a looping one at a rate, or one held at a time (t ≥ 0) */
   clip: string
   clipT: number
@@ -57,7 +65,7 @@ export interface EnemyWorld {
   pageBottom: number
 }
 
-export type EnemyEvent = { kind: 'alert' | 'jump' | 'kick' | 'hurt' | 'stomped' | 'gone'; e: Lasagna }
+export type EnemyEvent = { kind: 'alert' | 'jump' | 'kick' | 'hurt' | 'stomped' | 'gone' | 'huge' | 'bounce' | 'shrunk'; e: Lasagna }
 
 /** speeds (units/s) and gravity, the notice range, the wind-up, the kick (the attack clip from 0.85 s at 1.3×; its window) */
 const PATROL = 0.35
@@ -72,20 +80,62 @@ const KICK_WINDOW: [number, number] = [1.2, 1.6]
 const KICK_END = 1.95
 const STEP_UP = 0.06
 const STEP_DOWN = 0.1
+/** the giant: its size, how long it grows (a back-out overshoot) and shrinks (s), its chase (units/s, the walk's rate) */
+const GIANT = 4
+const GROW = 0.9
+const SHRINK = 0.8
+const CHASE = 1.6
+const CHASE_RATE = 0.9
 
 export const createLasagna = (x: number, y: number, line: number, dir: number): Lasagna => ({
-  x, y, vx: 0, vy: 0, dir, air: false, line, state: 'patrol', t: 0, kickT: 0, S: 1, spin: 0, squash: 1, skip: -1, kicked: false,
-  clip: 'walk', clipT: -1, rate: 1,
+  x, y, vx: 0, vy: 0, dir, air: false, line, state: 'patrol', t: 0, kickT: 0, S: 1, spin: 0, squash: 1, landFrom: -1, kicked: false,
+  huge: false, drop: false, from: 1, clip: 'walk', clipT: -1, rate: 1,
 })
+
+/** the trip's giant dropped in from the top of the screen (x, y), landing on line `landFrom` or further down */
+export const dropGiant = (x: number, y: number, landFrom: number, dir: number): Lasagna =>
+  Object.assign(createLasagna(x, y, -1, dir), { S: GIANT, huge: true, drop: true, air: true, landFrom, state: 'jump' as const })
+
+const backOut = (f: number) => 1 + 2.70158 * (f - 1) ** 3 + 1.70158 * (f - 1) ** 2
+const ease = (f: number) => f * f * (3 - 2 * f)
+const ALIVE: LasagnaState[] = ['patrol', 'alert', 'jump', 'charge', 'kick', 'leave']
+
+/** the trip: it grows 4× (again, if it was shrinking back); false if it's beyond it (flung, squashed, gone) or already huge */
+export function growLasagna(e: Lasagna) {
+  if (e.state !== 'shrink' && (e.huge || !ALIVE.includes(e.state))) return false
+  e.huge = true
+  e.from = e.S
+  to(e, 'grow')
+  return true
+}
+
+/** the trip is over: a giant shrinks back (and is beatable again) */
+export function shrinkLasagna(e: Lasagna) {
+  if (!e.huge || e.state === 'shrink') return
+  e.from = e.S
+  to(e, 'shrink')
+}
 
 const probe: Surface = { y: 0, z: 0, body: -1, line: -1 }
 
 function to(e: Lasagna, s: LasagnaState) { e.state = s; e.t = 0 }
 
+/** ground under it at x (a giant stands on either foot, so it steps over the gaps between words) */
+function footing(e: Lasagna, x: number, W: EnemyWorld) {
+  const ok = () => probe.y >= e.y - STEP_DOWN
+  if (W.ground(x, e.y + STEP_UP, probe) && ok()) return true
+  if (!e.huge) return false
+  const f = 0.1 * e.S
+  return (W.ground(x + e.dir * f, e.y + STEP_UP, probe) && ok()) || (W.ground(x - e.dir * f, e.y + STEP_UP, probe) && ok())
+}
+
+/** at the page's edge (it never walks or steps off the page) */
+const atEdge = (e: Lasagna, W: EnemyWorld) => Math.abs(e.x + e.dir * 0.25) > W.pageW / 2 - 0.2
+
 /** walk along its line; false when there's no ground ahead (a line's end or a pit) */
 function walk(e: Lasagna, speed: number, dt: number, W: EnemyWorld) {
   const nx = e.x + e.dir * speed * dt
-  if (Math.abs(nx) > W.pageW / 2 - 0.2 || !W.ground(nx, e.y + STEP_UP, probe) || probe.y < e.y - STEP_DOWN) return false
+  if (Math.abs(nx) > W.pageW / 2 - 0.2 || !footing(e, nx, W)) return false
   e.x = nx
   e.y = probe.y
   e.line = probe.line
@@ -98,8 +148,8 @@ function fly(e: Lasagna, dt: number, W: EnemyWorld, solid = true) {
   const ny = e.y + e.vy * dt
   e.x += e.vx * dt
   if (solid && e.vy < 0 && W.ground(e.x, e.y + 1e-4, probe)) {
-    while (probe.line === e.skip && W.ground(e.x, probe.y - 1e-3, probe)) { /* (through the line it's dropping from) */ }
-    if (probe.line !== e.skip && ny <= probe.y) { e.y = probe.y; e.line = probe.line; e.vy = 0; e.vx = 0; e.air = false; e.skip = -1; return true }
+    while (probe.line < e.landFrom && W.ground(e.x, probe.y - 1e-3, probe)) { /* (through the lines it's dropping past) */ }
+    if (probe.line >= e.landFrom && ny <= probe.y) { e.y = probe.y; e.line = probe.line; e.vy = 0; e.vx = 0; e.air = false; e.landFrom = -1; return true }
   }
   e.y = ny
   return false
@@ -110,13 +160,14 @@ export function stepLasagna(e: Lasagna, dt: number, him: Him, W: EnemyWorld, ev:
   if (e.state === 'gone') return
   e.t += dt
   // standing on nothing (the word under it was smashed, or it was put there): it falls to the next line down
-  if (!e.air && ['patrol', 'alert', 'charge', 'kick', 'leave'].includes(e.state) && (!W.ground(e.x, e.y + STEP_UP, probe) || probe.y < e.y - STEP_DOWN)) {
+  if (!e.air && ['patrol', 'alert', 'charge', 'kick', 'leave', 'chase', 'grow', 'shrink'].includes(e.state) && !footing(e, e.x, W)) {
     e.air = true
     e.vx = 0
     e.vy = 0
-    to(e, 'jump')
+    if (e.state !== 'grow' && e.state !== 'shrink') to(e, 'jump') // (those fall where they are)
   }
   const dx = him.x - e.x, near = (him.line >= 0 ? Math.abs(him.line - e.line) <= 1 : Math.abs(him.y - e.y) < 0.25)
+  let hurt = false
   switch (e.state) {
     case 'patrol':
       e.clip = 'walk'; e.clipT = -1; e.rate = 1
@@ -134,20 +185,26 @@ export function stepLasagna(e: Lasagna, dt: number, him: Him, W: EnemyWorld, ev:
           e.air = true
           e.vx = e.dir * 0.8
           e.vy = up ? Math.sqrt(2 * G * Math.max(0.05, him.y - e.y + 0.08)) : 0.6
-          e.skip = down ? e.line : -1
+          e.landFrom = down ? e.line + 1 : -1
           ev.push({ kind: 'jump', e })
         } else to(e, 'charge')
       }
       break
     case 'jump':
       e.clip = 'jumping'; e.clipT = 0.58 + 0.5 * Math.min(1, e.t / 0.55)
-      if (fly(e, dt, W)) to(e, 'charge')
+      if (fly(e, dt, W)) {
+        to(e, e.huge ? 'chase' : 'charge')
+        if (e.drop) { e.drop = false; ev.push({ kind: 'huge', e }) } // (a giant dropped in: thud, "!!")
+      }
       if (e.y < W.pageBottom - 0.5) to(e, 'gone')
       break
     case 'charge': {
       e.clip = 'walk'; e.clipT = -1; e.rate = 2.2
       e.dir = Math.sign(dx) || e.dir
-      if (!walk(e, CHARGE, dt, W)) { e.air = true; e.vx = e.dir * 0.6; e.vy = 0; to(e, 'jump') } // (off its line's end: it falls)
+      if (!walk(e, CHARGE, dt, W)) {
+        if (atEdge(e, W)) { to(e, 'leave'); e.dir = -e.dir } // (the page's edge: it gives up)
+        else { e.air = true; e.vx = e.dir * 0.6; e.vy = 0; to(e, 'jump') } // (off its line's end: it falls)
+      }
       else if (Math.abs(dx) < 0.36 && Math.abs(him.y - e.y) < 0.05) { to(e, 'kick'); e.kickT = KICK_FROM; e.kicked = false; ev.push({ kind: 'kick', e }) }
       else if (him.line >= 0 && him.line !== e.line && Math.abs(him.line - e.line) <= 1 && Math.abs(dx) < 1.2) to(e, 'alert') // he's a line off: after him
       else if (e.t > 6 || !near) to(e, 'leave')
@@ -158,10 +215,52 @@ export function stepLasagna(e: Lasagna, dt: number, him: Him, W: EnemyWorld, ev:
       e.clip = 'attack'; e.clipT = e.kickT
       if (!e.kicked && !him.inv && e.kickT >= KICK_WINDOW[0] && e.kickT <= KICK_WINDOW[1] && overlaps(lasagnaKick(e.x, e.y, e.dir, e.S), bodyBox(him.x, him.y))) {
         e.kicked = true
+        hurt = true
         ev.push({ kind: 'hurt', e })
       }
-      if (e.kickT > KICK_END) { to(e, 'leave'); e.dir = -e.dir }
+      if (e.kickT > KICK_END) {
+        if (e.huge) to(e, 'chase') // (the giant keeps coming)
+        else { to(e, 'leave'); e.dir = -e.dir }
+      }
       break
+    case 'grow': {
+      // 4× over 0.9 s, overshooting a little, then "!!"
+      const f = Math.min(1, e.t / GROW)
+      e.S = e.from + (GIANT - e.from) * backOut(f)
+      e.clip = 'idle'; e.clipT = -1; e.rate = 1
+      if (e.air) fly(e, dt, W)
+      if (f >= 1 && !e.air) { e.S = GIANT; to(e, 'chase'); ev.push({ kind: 'huge', e }) }
+      break
+    }
+    case 'chase': {
+      // after him (slower than his run); under him, it waits, looking up; he's down the page: it drops through its line
+      e.dir = Math.sign(dx) || e.dir
+      e.clip = 'walk'; e.clipT = -1; e.rate = CHASE_RATE
+      if (him.line > e.line && Math.abs(dx) < 1.5) {
+        to(e, 'jump')
+        e.air = true
+        e.vx = e.dir * 0.4
+        e.vy = 0.4
+        e.landFrom = e.line + 1
+        ev.push({ kind: 'jump', e })
+      } else if (Math.abs(dx) < 0.36 * e.S && Math.abs(him.y - e.y) < 0.05 && e.t > 0.5) { to(e, 'kick'); e.kickT = KICK_FROM; e.kicked = false; ev.push({ kind: 'kick', e }) }
+      else if (Math.abs(dx) < 0.12) e.clip = 'idle'
+      else if (!walk(e, CHASE, dt, W)) {
+        // a line's end or a pit: it waits there for him, unless he's below (then it steps off)
+        if (him.y < e.y - 0.05 && !atEdge(e, W)) { e.air = true; e.vx = e.dir * 0.6; e.vy = 0; to(e, 'jump') }
+        else e.clip = 'idle'
+      }
+      break
+    }
+    case 'shrink': {
+      // back to its size over 0.8 s; beatable again
+      const f = Math.min(1, e.t / SHRINK)
+      e.S = e.from - (e.from - 1) * ease(f)
+      e.clip = 'idle'; e.clipT = -1; e.rate = 1
+      if (e.air) fly(e, dt, W)
+      if (f >= 1 && !e.air) { e.S = 1; e.huge = false; to(e, 'patrol'); ev.push({ kind: 'shrunk', e }) }
+      break
+    }
     case 'leave':
       e.clip = 'walk'; e.clipT = -1; e.rate = 1.2
       if (!walk(e, LEAVE, dt, W)) e.dir = -e.dir
@@ -180,11 +279,17 @@ export function stepLasagna(e: Lasagna, dt: number, him: Him, W: EnemyWorld, ev:
       if (e.t >= 0.7) { to(e, 'gone'); ev.push({ kind: 'gone', e }) }
       return
   }
-  // a stomp: his feet, coming down, over its middle (from the line above; a ground-pound counts)
+  // a stomp: his feet, coming down, over its middle (from the line above; a ground-pound counts); off a giant's head he just bounces
   if (him.falling && him.y > e.y + 0.15 * e.S && overlaps(feetBox(him.x, him.y), lasagnaBody(e.x, e.y, e.S))) {
-    to(e, 'squashed')
-    ev.push({ kind: 'stomped', e })
+    if (e.huge) ev.push({ kind: 'bounce', e })
+    else {
+      to(e, 'squashed')
+      ev.push({ kind: 'stomped', e })
+    }
+    return
   }
+  // a giant's feet trample him
+  if (!hurt && e.huge && e.S > 1.5 && !him.inv && overlaps(trampleBox(e.x, e.y, e.S), bodyBox(him.x, him.y))) ev.push({ kind: 'hurt', e })
 }
 
 /** the squash (stomped): flattened (y 0.3, x/z 1.35 in 0.08 s), gone by 0.7 s; as a stretch of its size (x/z, y) */
@@ -194,15 +299,16 @@ export function squashShape(e: Lasagna): [number, number] {
   return [1.35 * (1 - gone) + 0.001, s * (1 - gone) + 0.001]
 }
 
-/** his smash (its strike box): it's flung off the page his way, spinning; true if it was hit */
-export function smashLasagna(e: Lasagna, box: Box, dir: number) {
-  if (!['patrol', 'alert', 'jump', 'charge', 'kick', 'leave'].includes(e.state) || !overlaps(box, lasagnaBody(e.x, e.y, e.S))) return false
+/** his smash (its strike box): it's flung off the page his way, spinning ('flung'); a giant just goes TINK ('tink'); null: a miss */
+export function smashLasagna(e: Lasagna, box: Box, dir: number): 'flung' | 'tink' | null {
+  if (!(e.huge || ALIVE.includes(e.state)) || !overlaps(box, lasagnaBody(e.x, e.y, e.S))) return null
+  if (e.huge) return 'tink'
   to(e, 'flying')
   e.dir = dir
   e.vx = 2.4 * dir
   e.vy = 2.6
   e.air = true
-  return true
+  return 'flung'
 }
 
 /**

@@ -244,7 +244,7 @@ describe('playing', () => {
     act(() => fire({ type: 'score', why: 'coin', points: 100, at: [0, 0, 0], score: 100 }))
     const coin = screen.getByText('+100').closest('div')!
     expect(coin).toHaveTextContent('+100+1 IMPACT')
-    expect(coin).toHaveStyle({ left: '120px', top: '80px' })
+    expect(coin).toHaveStyle({ left: '120px', top: '96px' }) // (projected at y 80: kept clear of the stats)
     act(() => fire({ type: 'score', why: 'shrimp', points: 500, at: [0, 0, 0], score: 600 }))
     expect(screen.getByText('+500')).toBeInTheDocument()
     act(() => fire({ type: 'score', why: 'hurt', points: -250, at: [0, 0, 0], score: 350 }))
@@ -307,6 +307,22 @@ describe('playing', () => {
     expect(live).toHaveTextContent('Lasagna smashed, 300 points')
     act(() => fire({ type: 'enemy', what: 'hurt', at: [0, 0, 0] }))
     expect(live).toHaveTextContent('Kicked, minus 250')
+  })
+
+  it('the giant: "!!" and "Run!", "TINK!" (it can\'t be hurt, said at most every 4 s), and when it shrinks back', async () => {
+    await startPlaying()
+    const live = document.querySelector('p[aria-live="polite"]')!
+    act(() => fire({ type: 'enemy', what: 'huge', at: [0, 0, 0] }))
+    expect(screen.getByText('!!').closest('[data-alert]')).not.toBeNull()
+    expect(live).toHaveTextContent('The lasagna grew huge. Run!')
+    act(() => fire({ type: 'enemy', what: 'tink', at: [0, 0, 0] }))
+    expect(screen.getByText('TINK!').closest('[data-alert]')).not.toBeNull()
+    expect(live).toHaveTextContent("TINK! The giant can't be hurt")
+    act(() => fire({ type: 'enemy', what: 'stomped', at: [0, 0, 0] }))
+    act(() => fire({ type: 'enemy', what: 'bounce', at: [0, 0, 0] }))
+    expect(live).toHaveTextContent('Lasagna stomped, 300 points') // (throttled)
+    act(() => fire({ type: 'enemy', what: 'shrunk', at: [0, 0, 0] }))
+    expect(live).toHaveTextContent('The lasagna shrank back. Get even!')
   })
 
   it('writes ★ SCORE (6 digits) and the shrimp into the stats through refs, ≤ 10×/s', async () => {

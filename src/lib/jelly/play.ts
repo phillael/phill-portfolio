@@ -13,7 +13,7 @@ import { resetView, type UiInsets } from './camera'
 import { FOV, LOOSE, PAD_TOP, PAD_X, PLAY_R2, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
 import { lcg, Q, type Vec3 } from './math'
 import { burst, healAll } from './physics'
-import { createLasagna, lasagnaLines, smashLasagna, squashShape, stepLasagna, type EnemyEvent, type EnemyWorld, type Lasagna } from './enemies'
+import { createLasagna, dropGiant, growLasagna, lasagnaLines, shrinkLasagna, smashLasagna, squashShape, stepLasagna, type EnemyEvent, type EnemyWorld, type Lasagna } from './enemies'
 import { smashBox } from './hitboxes'
 import { Boost, placeShrimp, touchesShrimp, type ShrimpSpot } from './pickups'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
@@ -95,8 +95,11 @@ export type PlayEvent =
   | { type: 'trip'; at: Vec3 }
   /** the trip wore off */
   | { type: 'tripEnd' }
-  /** the lasagna: it noticed him ("!"), was stomped or smashed, or kicked him */
-  | { type: 'enemy'; what: 'alert' | 'stomped' | 'smashed' | 'hurt'; at: Vec3 }
+  /**
+   * the lasagna: it noticed him ("!"), was stomped or smashed, or kicked (or trampled) him; in the trip it grew
+   * huge ("!!"), shrugged off a smash ("TINK!") or a stomp (he bounced off its head), and shrank back after
+   */
+  | { type: 'enemy'; what: 'alert' | 'stomped' | 'smashed' | 'hurt' | 'huge' | 'tink' | 'bounce' | 'shrunk'; at: Vec3 }
   /** points won (or a kick's lost: negative), why, where (world), and the score now */
   | { type: 'score'; why: AwardKind; points: number; at: Vec3; score: number }
   /** a checkpoint reached: its line and where its title ends (world, on the ink: the flag's spot) */
@@ -184,7 +187,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   const shrimp: { spot: ShrimpSpot; prop: Prop; gone: number }[] = []
   const boost = new Boost()
   /** the run's UFOs and the mushroom (its voxel models are uploaded once, here) */
-  const ufos = createUfos({ w, level, cast, emit: (e) => { if (e.type === 'trip') tripT = 0; emit(e) }, award: (why, at) => award(why, at) })
+  const ufos = createUfos({ w, level, cast, emit: (e) => { if (e.type === 'trip') { tripT = 0; giantFor() } emit(e) }, award: (why, at) => award(why, at) })
   /** seconds into the trip (-1: none); another mushroom starts it over */
   let tripT = -1
   /** the run's lasagnas: the lines they wait on, and the one out now (its pose and prop) */
@@ -192,6 +195,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   const foes: { e: Lasagna; pose: ReturnType<Cast['pose']>; prop: Prop }[] = []
   /** kicked lately: he can't be hurt again, and flickers (2.5 Hz); knocked back: no steering or braking for a moment */
   let invT = 0, knockT = 0
+  /** the trip's giant: dropping in this long from now (s; −1: not), how far the camera has pulled back for it (0…1), its steps' bob */
+  let giantDropT = -1, giantView = 0, giantStep = 0
   const enemyWorld: EnemyWorld = { ground: (gx, maxY, out) => surfaceAt(w, level, gx, 0.06, maxY, out), pageW: w.pageW, pageBottom: w.pageBottom }
   const foeEvents: EnemyEvent[] = []
   /** dev: a posed lasagna (showLasagna) */
@@ -440,8 +445,19 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     // a UFO or a lasagna in the swing (not a pound)
     const ufo = !pound && ufos.smash(smashBox(x, y, facing, P.size, P.reach))
     let foe = false
-    if (!pound) for (const f of foes) if (smashLasagna(f.e, smashBox(x, y, facing, P.size, P.reach), facing)) {
+    if (!pound) for (const f of foes) {
+      const r = smashLasagna(f.e, smashBox(x, y, facing, P.size, P.reach), facing)
+      if (!r) continue
       foe = true
+      if (r === 'tink') {
+        // the giant can't be hurt: TINK!, and he bounces back off it (1.5 away, 1.4 up)
+        emit({ type: 'enemy', what: 'tink', at: [f.e.x, f.e.y + 0.3 * f.e.S * 0.55, f.prop.pos[2]] })
+        vx = -Math.sign(f.e.x - x || facing) * 1.5
+        vy = 1.4
+        grounded = false
+        knockT = 0.3
+        continue
+      }
       const at: Vec3 = [f.e.x, f.e.y + 0.3, f.prop.pos[2]]
       award('lasagna', at)
       emit({ type: 'enemy', what: 'smashed', at })
@@ -510,6 +526,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     for (const f of foes) { const i = cast.props.indexOf(f.prop); if (i >= 0) cast.props.splice(i, 1) }
     foes.length = 0
     invT = knockT = 0
+    giantDropT = -1
+    giantView = giantStep = 0
   }
 
   /** the next one comes out on its line when he's within 1.5 screens above it, as far across the line from him as it goes */
@@ -522,12 +540,48 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     const words = l.bodies.map((bi) => w.bodies[bi]).filter((bd) => solid(bd) && Math.abs((bd.x0 + bd.x1) / 2) < w.pageW / 2 - 0.4)
     if (!words.length) return
     const bd = words.reduce((b, c) => (Math.abs((c.x0 + c.x1) / 2 - x) > Math.abs((b.x0 + b.x1) / 2 - x) ? c : b))
-    const fx = (bd.x0 + bd.x1) / 2, e = createLasagna(fx, l.inkTop, line, fx > x ? -1 : 1)
+    const fx = (bd.x0 + bd.x1) / 2
+    addFoe(createLasagna(fx, l.inkTop, line, fx > x ? -1 : 1))
+  }
+
+  function addFoe(e: Lasagna) {
+    const a = cast.lasagna()
+    if (!a) return
     const pose = cast.pose(a, ['jumping'])
     pose.play('walk', 0)
-    const prop: Prop = { model: a, anchor: 'origin', pos: [fx, l.inkTop, 0], rot: [0, 0, 0, 1], size: 0, alpha: 1, glow: [0, 0, 0], flash: 0, joints: pose.joints, halo: null, ambient: 0.6 }
+    const prop: Prop = { model: a, anchor: 'origin', pos: [e.x, e.y, 0], rot: [0, 0, 0, 1], size: 0, alpha: 1, glow: [0, 0, 0], flash: 0, joints: pose.joints, halo: null, ambient: 0.6 }
     foes.push({ e, pose, prop })
     cast.props.push(prop)
+  }
+
+  function removeFoe(i: number) {
+    const k = cast.props.indexOf(foes[i].prop)
+    if (k >= 0) cast.props.splice(k, 1)
+    foes.splice(i, 1)
+  }
+
+  /** the trip: the lasagna out grows 4× if it's on the screen (you see it grow); if none is, a giant one drops in ~1 s later */
+  function giantFor() {
+    giantDropT = -1
+    if (!cast.lasagna() || foes.some((f) => f.e.huge && f.e.state !== 'shrink')) return // (it's already here)
+    const near = foes.find((f) => Math.abs(f.e.x - w.cam.scrollX) < w.cam.halfW + 0.2 && Math.abs(f.e.y + 0.15 - w.cam.scrollY) < w.cam.halfH + 0.2)
+    if (near && growLasagna(near.e)) return
+    giantDropT = 1
+  }
+
+  /** the giant drops in from the top of the screen behind him (or ahead, if the page ends there) onto his line */
+  function dropIn() {
+    // (one at a time: the one out, far away, goes back to wait on its line if he hasn't met it yet)
+    for (let i = foes.length - 1; i >= 0; i--) {
+      const e = foes[i].e
+      if (e.state === 'patrol' && e.line > (grounded ? ground.line : -1) && !lasagnaPlan.includes(e.line)) lasagnaPlan.unshift(e.line)
+      removeFoe(i)
+    }
+    const lim = w.pageW / 2 - 0.7
+    let gx = x - facing * 1.4
+    if (Math.abs(gx) > lim) gx = Math.max(-lim, Math.min(lim, x + facing * 1.4))
+    const landFrom = grounded ? ground.line : surfaceAt(w, level, x, 0.06, y, probe) ? probe.line : -1
+    addFoe(dropGiant(gx, w.cam.scrollY + w.cam.halfH + 0.1, landFrom, gx > x ? -1 : 1))
   }
 
   /** each frame: its rules, what they did to him (and he to it), and its pose and place */
@@ -535,6 +589,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     invT = Math.max(0, invT - dt)
     knockT = Math.max(0, knockT - dt)
     if (live) spawnFoe()
+    if (giantDropT >= 0 && (giantDropT -= dt) < 0 && tripT >= 0 && live) dropIn()
+    let view = 0
+    giantStep = 0
     for (let i = foes.length - 1; i >= 0; i--) {
       const f = foes[i], e = f.e, a = f.prop.model as { extent: number; height: number }
       foeEvents.length = 0
@@ -542,6 +599,15 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       for (const ev of foeEvents) {
         const at: Vec3 = [e.x, e.y + 0.3 * e.S, f.prop.pos[2]]
         if (ev.kind === 'alert') emit({ type: 'enemy', what: 'alert', at: [e.x, e.y + 0.42 * e.S, at[2]] })
+        else if (ev.kind === 'huge') emit({ type: 'enemy', what: 'huge', at: [e.x, e.y + 0.26 * e.S, at[2]] }) // (over its face: its head is near the top of the view)
+        else if (ev.kind === 'shrunk') emit({ type: 'enemy', what: 'shrunk', at })
+        else if (ev.kind === 'bounce') {
+          // off the giant's head: he bounces, no harm done either way
+          emit({ type: 'enemy', what: 'bounce', at: [x, y, z] })
+          vy = 2.2
+          pounding = false
+          grounded = false
+        }
         else if (ev.kind === 'stomped') {
           // he bounces off it; +300
           award('lasagna', at)
@@ -560,7 +626,13 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
           knockT = 0.3
         }
       }
-      if (e.state === 'gone') { const k = cast.props.indexOf(f.prop); if (k >= 0) cast.props.splice(k, 1); foes.splice(i, 1); continue }
+      if (e.state === 'gone') { removeFoe(i); continue }
+      // the giant: the camera pulls back to fit it while it's near, and its steps bob the view a little
+      if (e.S > 1.5) {
+        const near = Math.max(0, Math.min(1, 2 - Math.max(Math.abs(e.x - x) / (2 * w.cam.halfW), Math.abs(e.y - y) / (2 * w.cam.halfH))))
+        view = Math.max(view, ((e.S - 1) / 3) * near)
+        if (e.S > 2 && e.clip === 'walk' && e.clipT < 0) giantStep = Math.max(giantStep, near * Math.abs(Math.sin(w.time * 7)))
+      }
       // its pose: a clip held at a time (the jump, its kick, the knock) or looping at a rate
       if (e.clipT >= 0) { f.pose.play(e.clip, 0.08); f.pose.seek(e.clipT); f.pose.update(dt, 0) }
       else { f.pose.play(e.clip, 0.12); f.pose.update(dt, e.rate) }
@@ -573,6 +645,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       f.prop.sx = sx
       f.prop.sy = sy
     }
+    giantView += (Math.min(1, view) - giantView) * Math.min(1, dt * 2)
   }
 
   // ---- the trip's swelling words ----
@@ -768,7 +841,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     const dist = (P.size * H) / (2 * tf * px) + z // (he stands z in front of the page, a little nearer the camera)
     // (the trip: the view breathes ±4% and rolls ±3° on a ~6 s cycle)
     const sway = w.tripAmt * Math.sin(w.time * 1.05)
-    w.s.zoom = Math.max(ZMIN, Math.min(ZMAX, (dist / Math.max(fitW, fitH)) * (1 + 0.04 * sway)))
+    w.s.zoom = Math.max(ZMIN, Math.min(ZMAX, (dist / Math.max(fitW, fitH)) * (1 + 0.04 * sway) * (1 - 0.15 * giantView))) // (pulled back ×0.85 for the giant)
     w.cam.roll = 0.052 * sway
     const halfH = w.cam.halfH
     if (flailT < 0) {
@@ -798,7 +871,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     shakeClock += dt
     const e = shakeT / SHAKE, amp = P.shake * e * e, t = shakeClock * 6.283, ph = shakePh
     w.cam.shake.x = amp * (0.65 * Math.sin(t * 17 + ph) + 0.35 * Math.sin(t * 29 + 2 * ph))
-    w.cam.shake.y = amp * (0.65 * Math.cos(t * 19 + ph) + 0.35 * Math.sin(t * 31 + 3 * ph))
+    w.cam.shake.y = amp * (0.65 * Math.cos(t * 19 + ph) + 0.35 * Math.sin(t * 31 + 3 * ph)) + 0.012 * giantStep
     w.s.tilt = P.tilt + amp * 0.12 * Math.sin(t * 13 + ph)
     w.s.yaw += (P.lean * facing * Math.min(1, Math.abs(vx) / P.runSpeed) + amp * 0.12 * Math.sin(t * 11 + 2 * ph) - w.s.yaw) * Math.min(1, dt * 3)
   }
@@ -810,7 +883,12 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     stepFoes(dt, introT >= INTRO && !run.finished)
     ufos.update(dt, x, y, introT >= INTRO && flailT < 0 && !run.finished)
     // the trip: the clock and its look; moon jumps (×1.5 high, ×0.6 gravity) while it lasts
-    if (tripT >= 0 && (tripT += dt) >= PLAY_R2.trip) { tripT = -1; emit({ type: 'tripEnd' }) }
+    if (tripT >= 0 && (tripT += dt) >= PLAY_R2.trip) {
+      tripT = -1
+      giantDropT = -1
+      for (const f of foes) shrinkLasagna(f.e) // (the giant shrinks back: beatable again)
+      emit({ type: 'tripEnd' })
+    }
     w.trip = tripT >= 0 ? tripLook(tripT) : 0
     // its molten words: the heat comes up over 1.5 s and cools in the last 2.5 s; the drips grow over 3 s
     const left = PLAY_R2.trip - tripT

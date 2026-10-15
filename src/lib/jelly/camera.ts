@@ -44,16 +44,24 @@ export function updateCamera(w: World, dt: number, width: number, height: number
   cam.eye = [tg[0] + dist * Math.sin(az) * Math.cos(el), tg[1] + dist * Math.sin(el), tg[2] + dist * Math.cos(az) * Math.cos(el)]
   cam.target = tg
   cam.aspect = asp
-  cam.mvp = M4.mul(M4.persp(FOV, asp, 0.05, 300), M4.lookAt(cam.eye, tg, [0, 1, 0]))
   let f: Vec3 = [tg[0] - cam.eye[0], tg[1] - cam.eye[1], tg[2] - cam.eye[2]]
   const fl = Math.hypot(...f)
   f = [f[0] / fl, f[1] / fl, f[2] / fl]
   let r: Vec3 = [-f[2], 0, f[0]]
   const rl = Math.hypot(...r)
   r = [r[0] / rl, r[1] / rl, r[2] / rl]
+  let up: Vec3 = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]
+  if (cam.roll) {
+    // rolled about the view (the trip's sway)
+    const c = Math.cos(cam.roll), sn = Math.sin(cam.roll)
+    const r2: Vec3 = [r[0] * c + up[0] * sn, r[1] * c + up[1] * sn, r[2] * c + up[2] * sn]
+    up = [up[0] * c - r[0] * sn, up[1] * c - r[1] * sn, up[2] * c - r[2] * sn]
+    r = r2
+  }
+  cam.mvp = M4.mul(M4.persp(FOV, asp, 0.05, 300), M4.lookAt(cam.eye, tg, up))
   cam.fwd = f
   cam.right = r
-  cam.up = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]
+  cam.up = up
 }
 
 export const camDist = (w: World) => Math.hypot(w.cam.eye[0] - w.cam.target[0], w.cam.eye[1] - w.cam.target[1], w.cam.eye[2] - w.cam.target[2])

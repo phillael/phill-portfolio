@@ -125,6 +125,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   let holeMode = false
   let lastRay: Ray | null = null
   let back: HTMLCanvasElement | null = null
+  /** the user's 🍄, eased (the look is this or Play's trip, whichever is more) */
+  let userShroom = 0
   /** PLAYER 1 START printed on the paper: its box (world units, at the page's rest), and what its button says */
   let startBox: { x0: number; x1: number; top: number; bottom: number } | null = null
   let startStatus: StartArtStatus = 'ready', startCursor = false, startPress = 0
@@ -415,7 +417,11 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     const dt = Math.min(0.033, (now - last) / 1000) * timeScale
     last = now
     w.time += dt
-    w.shroomAmt += ((s.shroom ? 1 : 0) - w.shroomAmt) * Math.min(1, dt * 1.2)
+    userShroom += ((s.shroom ? 1 : 0) - userShroom) * Math.min(1, dt * 1.2)
+    w.tripAmt += ((playing ? w.trip : 0) - w.tripAmt) * Math.min(1, dt * 6)
+    w.shroomAmt = Math.max(userShroom, w.tripAmt)
+    w.meltAmt = userShroom
+    w.noDrops = playing
     for (let a = 0; a < 3; a++) w.finger.vel[a] *= 0.88
     updateIntro(w, dt, () => {
       if (!pendingFind) return

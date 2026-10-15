@@ -16,7 +16,7 @@ let playing = false
 const state: PlayState = {
   x: 0, y: 0, z: 0, vx: 0, vy: 0, grounded: true, facing: 1, line: 0, clip: 'idle', smashing: false, pounding: false, falling: false,
   entering: false, checkpoint: -1, timeMs: 0, started: false, coins: 0, total: 27, finished: false, bestMs: null,
-  score: 0, shrimp: 0, shrimpTotal: 5, bestScore: null, boost: 0, boostLeft: 0,
+  score: 0, shrimp: 0, shrimpTotal: 5, bestScore: null, boost: 0, boostLeft: 0, trip: 0, tripLeft: 0,
 }
 const play = {
   enter: jest.fn(async () => { playing = true; fire({ type: 'enter' }); return true }),
@@ -83,7 +83,7 @@ afterEach(() => {
   jest.clearAllMocks()
   listeners.clear()
   playing = false
-  Object.assign(state, { finished: false, checkpoint: -1, score: 0, shrimp: 0, boost: 0, boostLeft: 0 })
+  Object.assign(state, { finished: false, checkpoint: -1, score: 0, shrimp: 0, boost: 0, boostLeft: 0, trip: 0, tripLeft: 0 })
   play.enter.mockImplementation(async () => { playing = true; fire({ type: 'enter' }); return true })
 })
 
@@ -272,6 +272,26 @@ describe('playing', () => {
     expect(bar).not.toHaveStyle({ display: 'none' })
     expect(bar).toHaveTextContent('+35%')
     expect((bar.querySelector('[data-fill]') as HTMLElement).style.transform).toBe('scaleX(0.500)')
+    engine.onFrame.mockImplementation(() => () => {})
+  })
+
+  it('the trip: a 🍄 pill draining beside the stats, and the live region (on and over)', async () => {
+    const frames = new Set<() => void>()
+    engine.onFrame.mockImplementation(((f: () => void) => { frames.add(f); return () => { frames.delete(f) } }) as never)
+    await startPlaying()
+    const live = document.querySelector('p[aria-live="polite"]')!
+    const pill = screen.getByTestId('jelly-trip')
+    act(() => fire({ type: 'trip', at: [0, 0, 0] }))
+    expect(live).toHaveTextContent('Shroom mode for 12 seconds')
+    Object.assign(state, { trip: 9, tripLeft: 0.75 })
+    act(() => frames.forEach((f) => f()))
+    expect(pill.closest('[data-trip]')).not.toBeNull() // (the stats know: on a narrow phone the pill takes the score's place)
+    expect((pill.querySelector('[data-fill]') as HTMLElement).style.transform).toBe('scaleX(0.750)')
+    Object.assign(state, { trip: 0, tripLeft: 0 })
+    act(() => frames.forEach((f) => f()))
+    expect(pill.closest('[data-trip]')).toBeNull()
+    act(() => fire({ type: 'tripEnd' }))
+    expect(live).toHaveTextContent('Shroom mode over')
     engine.onFrame.mockImplementation(() => () => {})
   })
 

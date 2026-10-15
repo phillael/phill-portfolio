@@ -17,6 +17,7 @@ import { smashBox } from './hitboxes'
 import { Boost, placeShrimp, touchesShrimp, type ShrimpSpot } from './pickups'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
 import { BEST_SCORE_KEY, bestStore, createRun, type RunResult } from './playRun'
+import { moonJump, tripFlicker, tripLook } from './trip'
 import { createUfos } from './ufos'
 import { bilerp, hidden, type World } from './world'
 
@@ -66,6 +67,9 @@ export interface PlayState {
   /** a shrimp's speed boost: how much faster (0, 0.35, 0.7) and how much of it is left (0…1) */
   boost: number
   boostLeft: number
+  /** the trip: seconds left (0: none) and how much of it is left (0…1) */
+  trip: number
+  tripLeft: number
 }
 
 export type PlayEvent =
@@ -88,6 +92,8 @@ export type PlayEvent =
   | { type: 'ufo'; index: number; at: Vec3 }
   | { type: 'mushroom'; at: Vec3 }
   | { type: 'trip'; at: Vec3 }
+  /** the trip wore off */
+  | { type: 'tripEnd' }
   /** points won (or a kick's lost: negative), why, where (world), and the score now */
   | { type: 'score'; why: AwardKind; points: number; at: Vec3; score: number }
   /** a checkpoint reached: its line and where its title ends (world, on the ink: the flag's spot) */
@@ -175,7 +181,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   const shrimp: { spot: ShrimpSpot; prop: Prop; gone: number }[] = []
   const boost = new Boost()
   /** the run's UFOs and the mushroom (its voxel models are uploaded once, here) */
-  const ufos = createUfos({ w, level, cast, emit, award: (why, at) => award(why, at) })
+  const ufos = createUfos({ w, level, cast, emit: (e) => { if (e.type === 'trip') tripT = 0; emit(e) }, award: (why, at) => award(why, at) })
+  /** seconds into the trip (-1: none); another mushroom starts it over */
+  let tripT = -1
 
   const foot = () => P.size * 0.12
   const halfDepth = () => (Math.max(rig.dims[0], rig.dims[2]) / 2) * (P.size / rig.height)
@@ -256,6 +264,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   function startRun() {
     run.reset()
     boost.reset()
+    tripT = -1
+    w.trip = 0
     rollShrimp()
     ufos.roll(shrimp.map((s) => s.spot.line))
     for (const bi of level.coins) w.bodies[bi].coinT = 1
@@ -275,6 +285,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     stopFireworks()
     clearShrimp()
     ufos.clear()
+    tripT = -1
+    w.trip = 0
+    w.cam.roll = 0
     cast.drive(null, !instant)
     resetView(w)
     input.left = input.right = input.jump = input.down = input.smash = false
@@ -292,6 +305,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     drive.feet[2] = z
     drive.yaw = yaw
     drive.size = P.size
+    // the trip: rainbow Phill with afterimages (the cast), flickering as it wears off
+    drive.trip = w.tripAmt
+    drive.flicker = tripT >= 0 && tripFlicker(tripT)
     if (introT < INTRO) {
       // diving in: along an arc from where he was (up and out in front of the page, then down onto the name), shrinking
       const u = introT / INTRO, t = Math.pow(u, 1.3), e = u * u * (3 - 2 * u)
@@ -579,7 +595,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
 
   // ---- his pose ----
   function animate(dt: number) {
-    const v0 = (2 * P.jumpHeight) / P.apexTime
+    const v0 = moonJump(P, tripT >= 0).v0
     if (run.finished && grounded) {
       pose.play(finishDance, 0.3)
       pose.update(dt)
@@ -623,7 +639,10 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     const px = w.low ? P.pxPhone : P.pxDesktop
     const fitW = (w.pageW / 2 + 0.35) / (tf * asp), fitH = (w.pageH / 2 + 0.25) / (tf * Math.max(0.3, 1 - ui.top - ui.bot))
     const dist = (P.size * H) / (2 * tf * px) + z // (he stands z in front of the page, a little nearer the camera)
-    w.s.zoom = Math.max(ZMIN, Math.min(ZMAX, dist / Math.max(fitW, fitH)))
+    // (the trip: the view breathes ±4% and rolls ±3° on a ~6 s cycle)
+    const sway = w.tripAmt * Math.sin(w.time * 1.05)
+    w.s.zoom = Math.max(ZMIN, Math.min(ZMAX, (dist / Math.max(fitW, fitH)) * (1 + 0.04 * sway)))
+    w.cam.roll = 0.052 * sway
     const halfH = w.cam.halfH
     if (flailT < 0) {
       // (flailing off the page, the camera holds)
@@ -661,7 +680,10 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     if (!on || dt <= 0) return
     stepShrimp(dt)
     ufos.update(dt, x, y, introT >= INTRO && flailT < 0 && !run.finished)
-    const g = (2 * P.jumpHeight) / (P.apexTime * P.apexTime), v0 = (2 * P.jumpHeight) / P.apexTime
+    // the trip: the clock and its look; moon jumps (×1.5 high, ×0.6 gravity) while it lasts
+    if (tripT >= 0 && (tripT += dt) >= PLAY_R2.trip) { tripT = -1; emit({ type: 'tripEnd' }) }
+    w.trip = tripT >= 0 ? tripLook(tripT) : 0
+    const { g, v0, tap: tapH } = moonJump(P, tripT >= 0)
     if (introT < INTRO) {
       // the entrance (no control yet): the dive clip's fall frames, then a jelly splat on the name
       introT += dt
@@ -769,7 +791,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     // let go early: a lower jump (the tapped apex)
     if (!grounded && vy > 0 && (!input.jump || !live) && !cut) {
       cut = true
-      vy = Math.min(vy, Math.max(Math.sqrt(2 * g * Math.max(0, P.tapHeight - (y - jumpY))), vy * 0.5))
+      vy = Math.min(vy, Math.max(Math.sqrt(2 * g * Math.max(0, tapH - (y - jumpY))), vy * 0.5))
     }
     if (pounding) vy = -P.poundSpeed
     else if (!grounded) vy = Math.max(-P.maxFall, vy - g * (vy < 0 ? P.fallMul : 1) * dt)
@@ -846,6 +868,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     timeMs: run.timeMs, started: run.started, coins: run.coins, total: run.total, finished: run.finished, bestMs: run.best(),
     score: run.score, shrimp: run.shrimp, shrimpTotal: run.shrimpTotal, bestScore: run.bestScore(),
     boost: boost.mul - 1, boostLeft: boost.left,
+    trip: tripT >= 0 ? PLAY_R2.trip - tripT : 0, tripLeft: tripT >= 0 ? 1 - tripT / PLAY_R2.trip : 0,
   })
 
   return {

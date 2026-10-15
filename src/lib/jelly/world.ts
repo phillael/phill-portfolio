@@ -69,8 +69,9 @@ export interface Camera {
   halfH: number
   canPan: boolean
   mom: { x: number; y: number } | null
-  /** a jolt on top of the eased camera (Play mode's smash shake) */
+  /** a jolt on top of the eased camera (Play mode's smash shake), and a roll about its view (the trip's sway; rad) */
   shake: { x: number; y: number }
+  roll: number
 }
 
 export interface Intro {
@@ -93,7 +94,14 @@ export interface World {
   pageH: number
   pageBottom: number
   time: number
+  /** the shroom look: the user's 🍄 or Play's trip, whichever is more (eased) */
   shroomAmt: number
+  /** Play's trip: its look (Play sets the target; the engine eases tripAmt toward it), and no random word drops while playing */
+  trip: number
+  tripAmt: number
+  noDrops: boolean
+  /** how soft the words' springs are (the user's 🍄 only: the trip is a look, so the text stays readable and walkable) */
+  meltAmt: number
   danceMix: number
   /** 1 while scrolling/panning/zooming/rotating, fading over ~0.5 s: words hold on tighter */
   navCalm: number
@@ -147,7 +155,7 @@ export function createWorld(s: JellyState, low: boolean, sfx: Sfx, music: MusicF
   return {
     s, low, sfx, music, rnd: lcg(7),
     pageW: 8.5, pageH: 11, pageBottom: -5.5, // Letter until the resume loads, so the camera doesn't move when it does
-    time: 0, shroomAmt: 0, danceMix: 0, navCalm: 0,
+    time: 0, shroomAmt: 0, trip: 0, tripAmt: 0, noDrops: false, meltAmt: 0, danceMix: 0, navCalm: 0,
     bodies: [], NP: 0, NS: 0,
     pos: F0, vel: F0, home: F0, off: F0, frc: F0, inv: F0, pBody: new Int32Array(0), vis: F0,
     sa: new Int32Array(0), sb: new Int32Array(0), srest: F0, sk: F0,
@@ -160,7 +168,7 @@ export function createWorld(s: JellyState, low: boolean, sfx: Sfx, music: MusicF
     bend: new BendTable(),
     cam: {
       eye: [0, 0, 15], target: [0, 0, 0], right: [1, 0, 0], up: [0, 1, 0], fwd: [0, 0, -1], mvp: new Float32Array(16), aspect: 1,
-      x: null, y: null, scrollX: 0, scrollY: Infinity, zoom: null, halfW: 1, halfH: 1, canPan: false, mom: null, shake: { x: 0, y: 0 },
+      x: null, y: null, scrollX: 0, scrollY: Infinity, zoom: null, halfW: 1, halfH: 1, canPan: false, mom: null, shake: { x: 0, y: 0 }, roll: 0,
     },
     ripples: [], rippleSide: 1,
     searchAmt: 0, searchN: 0, actLoose: 0, actBurst: 0,

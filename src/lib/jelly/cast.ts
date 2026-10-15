@@ -98,11 +98,13 @@ export interface Rig {
   dances: string[]
 }
 
-/** Play mode drives Phill: where his feet are, which way he faces (yaw) and how tall he is (units). */
+/** Play mode drives Phill: where his feet are, which way he faces (yaw) and how tall he is (units); in the trip, rainbow with afterimages (and hidden while it flickers) */
 export interface Drive {
   feet: Vec3
   yaw: number
   size: number
+  trip?: number
+  flicker?: boolean
 }
 
 /**
@@ -134,6 +136,21 @@ export interface Beam {
   rTop: number
   rBot: number
   alpha: number
+}
+
+/** the trip's afterimages: how many, and how far back each (in snapshots, taken 60 a second) */
+const GHOSTS = 3
+const GHOST_STEP = 8
+const GHOST_SLOTS = GHOSTS * GHOST_STEP + 1
+
+/** a fully saturated hue (HSL 1, 0.5), into out */
+function hueRgb(h: number, out: Vec3, k = 1) {
+  const f = (n: number) => Math.max(0, Math.min(1, n))
+  h = ((h % 1) + 1) % 1
+  out[0] = f(Math.abs(h * 6 - 3) - 1) * k
+  out[1] = f(2 - Math.abs(h * 6 - 2)) * k
+  out[2] = f(2 - Math.abs(h * 6 - 4)) * k
+  return out
 }
 
 const body = (pos: Vec3): Body => ({ pos, vel: [0, 0, 0], rot: [0, 0, 0, 1], spin: [0, 0, 0], free: 0, flash: 0, eaten: false, scale: 1 })
@@ -452,6 +469,25 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     return Math.exp(Math.log(Math.max(1e-3, growFrom)) + (Math.log(Math.max(1e-3, full)) - Math.log(Math.max(1e-3, growFrom))) * e)
   }
 
+  /** the trip's afterimages: a ring of his recent placements and poses (16 + the joints' floats each) */
+  let ghostJ = 0, ghostHead = 0, ghostN = 0, ghostLast = -1
+  let ghostModel: Float32Array[] = [], ghostJoints: Float32Array[] = []
+  const rainbow: Vec3 = [0, 0, 0], ghostGlow: Vec3 = [0, 0, 0]
+  function snapGhost(m: Float32Array, joints: Float32Array) {
+    if (ghostJ !== joints.length) {
+      // (sized to his joints once)
+      ghostJ = joints.length
+      const buf = new Float32Array(GHOST_SLOTS * (16 + ghostJ))
+      ghostModel = Array.from({ length: GHOST_SLOTS }, (_, i) => buf.subarray(i * (16 + ghostJ), i * (16 + ghostJ) + 16))
+      ghostJoints = Array.from({ length: GHOST_SLOTS }, (_, i) => buf.subarray(i * (16 + ghostJ) + 16, (i + 1) * (16 + ghostJ)))
+      ghostN = 0
+    }
+    ghostHead = (ghostHead + 1) % GHOST_SLOTS
+    ghostModel[ghostHead].set(m)
+    ghostJoints[ghostHead].set(joints)
+    ghostN = Math.min(GHOST_SLOTS, ghostN + 1)
+  }
+
   const fogCol = hex(NEBULA.base).map((v) => v * 0.8) as Vec3, rimA = hex(SITE.cyan), rimB = hex(SITE.violet)
   const glowShrimp: Vec3 = [1, 0.42, 0.24], glowNow: Vec3 = [0, 0, 0]
   const noGlow: Vec3 = [0, 0, 0]
@@ -480,11 +516,26 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       }
     }
     if (phill) {
-      const p = phill, k = (drive ? drive.size : orbitSize()) / p.a.height
-      // a squash-and-stretch bounce on the beat, and the neon rim brightening with the bass
-      R.draw(p.a, placement(p.pos, p.rot, k, p.a.center, 1 - 0.04 * p.pump, 1 + 0.08 * p.pump), p.pose.joints, {
-        alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump), ambient: params.ambient, glow: noGlow,
+      const p = phill, k = (drive ? drive.size : orbitSize()) / p.a.height, trip = drive?.trip ?? 0
+      // a squash-and-stretch bounce on the beat, and the neon rim brightening with the bass; in the trip, rainbow
+      const m = placement(p.pos, p.rot, k, p.a.center, 1 - 0.04 * p.pump, 1 + 0.08 * p.pump)
+      R.draw(p.a, m, p.pose.joints, {
+        alpha: drive?.flicker ? 0 : alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump),
+        ambient: params.ambient, glow: trip > 0.01 ? hueRgb(w.time * 0.25, rainbow, 0.35 * trip) : noGlow,
       })
+      // and his afterimages: his poses 0.13, 0.27 and 0.4 s ago, fading, each a hue further on
+      if (trip > 0.01) {
+        if (w.time - ghostLast >= 1 / 60 || w.time < ghostLast) { ghostLast = w.time; snapGhost(m, p.pose.joints) }
+        for (let i = 0; i < GHOSTS; i++) {
+          const back = (i + 1) * GHOST_STEP
+          if (back >= ghostN) break
+          const slot = (ghostHead - back + GHOST_SLOTS) % GHOST_SLOTS
+          R.draw(p.a, ghostModel[slot], ghostJoints[slot], {
+            alpha: alpha * 0.3 * trip * (1 - i * 0.25), flash: 0, rim: params.rim, ambient: params.ambient,
+            glow: hueRgb(w.time * 0.25 + 0.2 * (i + 1), ghostGlow, 0.6),
+          })
+        }
+      } else ghostN = 0
     }
     // Play mode's props, then its beams and the props' halos (no depth writes: last; the halos a little behind them)
     if (!props.length && !beams.length) return

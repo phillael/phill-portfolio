@@ -71,6 +71,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
   const boostRef = useRef<HTMLSpanElement>(null)
   const boostFill = useRef<HTMLSpanElement>(null)
   const boostText = useRef<HTMLSpanElement>(null)
+  const tripFill = useRef<HTMLSpanElement>(null)
   const yearRef = useRef<HTMLSpanElement>(null)
   const bestRef = useRef<HTMLDivElement>(null)
   const flagEls = useRef(new Map<number, HTMLDivElement>())
@@ -121,6 +122,10 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
         setMessage(`Shrimp! ${e.shrimp} of ${e.total}`)
       } else if (e.type === 'mushroom') {
         setMessage('A mushroom came down from the UFO. Catch it!')
+      } else if (e.type === 'trip') {
+        setMessage('Shroom mode for 12 seconds')
+      } else if (e.type === 'tripEnd') {
+        setMessage('Shroom mode over')
       } else if (e.type === 'start') {
         setMoved(true)
       } else if (e.type === 'again') {
@@ -140,7 +145,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
 
   // the stats' text (≤ 10×/s), the flags and the boost's draining bar (each frame: transforms), through refs
   useEffect(() => {
-    let last = -Infinity, lastText = '', boosting = false
+    let last = -Infinity, lastText = '', boosting = false, tripping = false
     return engine.onFrame(() => {
       for (const f of flagEls.current) {
         const flag = flags.find((g) => g.key === f[0]), p = flag && engine.project(flag.at)
@@ -149,6 +154,9 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       const b = engine.play.state()
       if (b && (b.boost > 0) !== boosting && boostRef.current) { boosting = b.boost > 0; boostRef.current.style.display = boosting ? '' : 'none' }
       if (b && boosting && boostFill.current) boostFill.current.style.transform = `scaleX(${b.boostLeft.toFixed(3)})`
+      // the trip's 🍄 pill (the stats panel knows: on a narrow phone it takes the score's place)
+      if (b && (b.trip > 0) !== tripping && topRef.current) { tripping = b.trip > 0; topRef.current.toggleAttribute('data-trip', tripping) }
+      if (b && tripping && tripFill.current) tripFill.current.style.transform = `scaleX(${b.tripLeft.toFixed(3)})`
       const now = performance.now()
       if (now - last < 100) return
       last = now
@@ -170,7 +178,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       if (yearRef.current) yearRef.current.textContent = era
       if (bestRef.current) bestRef.current.textContent = `BEST ${fmtTime(s.bestMs)}`
     })
-  }, [engine, flags])
+  }, [engine, flags, topRef])
 
   const leave = () => engine.play.exit()
 
@@ -186,7 +194,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       {/* stats: time and Impact, the best under them (on phones one 44 px row; short screens add the year) */}
       <div
         ref={topRef}
-        className={`${PANEL} pointer-events-none absolute left-3 top-2.5 z-[3] flex flex-col gap-[5px] rounded-[10px] px-3 pb-[7px] pt-2 max-[420px]:px-2.5 max-[820px]:left-2 max-[820px]:top-2 max-[820px]:h-11 max-[820px]:justify-center max-[820px]:py-0 [@media(max-height:559px)]:left-2 [@media(max-height:559px)]:top-2 [@media(max-height:559px)]:h-11 [@media(max-height:559px)]:justify-center [@media(max-height:559px)]:py-0`}
+        className={`${PANEL} group pointer-events-none absolute left-3 top-2.5 z-[3] flex flex-col gap-[5px] rounded-[10px] px-3 pb-[7px] pt-2 max-[420px]:px-2.5 max-[820px]:left-2 max-[820px]:top-2 max-[820px]:h-11 max-[820px]:justify-center max-[820px]:py-0 [@media(max-height:559px)]:left-2 [@media(max-height:559px)]:top-2 [@media(max-height:559px)]:h-11 [@media(max-height:559px)]:justify-center [@media(max-height:559px)]:py-0`}
       >
         {/* (a 390 px phone fits time, Impact and the score in one row beside ♫ and ✕ Exit only at 9 px) */}
         <div className="flex items-center gap-4 font-pixel text-[14px] leading-none max-[820px]:gap-3 max-[820px]:text-[11px] max-[420px]:gap-2 max-[420px]:text-[9px] [@media(max-height:559px)]:gap-3 [@media(max-height:559px)]:text-[11px]">
@@ -195,7 +203,14 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
             <span ref={coinsRef}>✦ 0/27</span>
             <small className="ml-1 text-[9px] text-[#7fd98e] [text-shadow:none] max-[820px]:hidden [@media(max-height:559px)]:hidden">IMPACT</small>
           </span>
-          <span ref={scoreRef} className="text-[#ffd24a] [text-shadow:0_0_8px_rgba(255,210,74,0.45)]">★ 000000</span>
+          <span ref={scoreRef} className="text-[#ffd24a] [text-shadow:0_0_8px_rgba(255,210,74,0.45)] max-[420px]:group-data-[trip]:hidden">★ 000000</span>
+          {/* the trip: 🍄 and its time draining */}
+          <span data-testid="jelly-trip" className="hidden items-center gap-1.5 group-data-[trip]:inline-flex">
+            <span aria-hidden="true">🍄</span>
+            <span className="relative block h-1 w-12 overflow-hidden rounded-sm bg-[rgba(196,77,255,0.25)]">
+              <span ref={tripFill} data-fill className="absolute inset-0 block origin-left bg-[#c44dff] shadow-[0_0_6px_#c44dff]" />
+            </span>
+          </span>
           <span className="inline-flex items-center gap-2 text-[#ff9a6c] max-[820px]:hidden">
             <span ref={shrimpRef}>🍤 0/5</span>
             {/* a shrimp's speed boost, draining */}

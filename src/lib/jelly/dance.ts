@@ -30,7 +30,7 @@ export function onBeat(w: World, k: number) {
 
 export function updateBend(w: World) {
   const p = w.bend.p, s = w.s
-  p.a = s.paperBend * 0.16 * (1 + 2.5 * w.danceMix * s.dance * w.music.bass)
+  p.a = s.paperBend * 0.16 * (1 + 2.5 * w.danceMix * s.dance * w.music.bass) * (1 + 2 * w.tripAmt) // (the trip: the page breathes ×3)
   p.c = s.paperCurl * 0.6
   p.t = w.time
   p.s = w.shroomAmt

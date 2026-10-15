@@ -8,14 +8,16 @@
  *   engine.dispose()
  */
 
+import { bendZ } from './bend'
 import { introCam, revealY, startIntro, updateIntro } from './intro'
 import { planeZ, resetView, stepMomentum, updateCamera, zoomCenter, type Ray, type UiInsets } from './camera'
-import { HOME, LOOSE, PAD_X, PLAY_CONFIG, initialState, type PlayConfig } from './config'
+import { HOME, LOOSE, PLAY_CONFIG, initialState, type PlayConfig } from './config'
 import { onBeat, updateBend, updateTargets } from './dance'
 import { countMatches, findMatches } from './finder'
 import { attachInput } from './input'
 import { lcg, type Vec3 } from './math'
 import { MusicFeatures, type MusicInput } from './music'
+import { paintStart, startArtBox } from './pixelArt'
 import { burstAll, chaos, collide, healAll, releaseHole, shakeIt, startHole, step, updateParticles, updateStates } from './physics'
 import type { Cast } from './cast'
 import type { Play, PlayEvent, PlayInput } from './play'
@@ -62,6 +64,9 @@ export interface NavView {
   height: number
 }
 
+/** PLAYER 1 START's state, as its button knows it (playing and shroom mode the engine knows itself) */
+export type StartArtStatus = 'ready' | 'loading' | 'unavailable'
+
 export interface JellyStats {
   words: number
   home: number
@@ -71,6 +76,9 @@ export interface JellyStats {
   fps: number
   loaded: boolean
 }
+
+/** PLAYER 1 START's art pixel, in texels of the page's backing (220 a unit) */
+const ART_PX = 4
 
 export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onClosed }: JellyEngineOptions) {
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true })
@@ -117,6 +125,10 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   let holeMode = false
   let lastRay: Ray | null = null
   let back: HTMLCanvasElement | null = null
+  /** PLAYER 1 START printed on the paper: its box (world units, at the page's rest), and what its button says */
+  let startBox: { x0: number; x1: number; top: number; bottom: number } | null = null
+  let startStatus: StartArtStatus = 'ready', startCursor = false, startPress = 0
+  const quad = new Float32Array(8)
   const frameListeners = new Set<() => void>()
 
   // ---- size: device pixels, DPR capped at 2 ----
@@ -183,7 +195,19 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     g.fillStyle = '#ffffff'
     g.fillRect(0, 0, back.width, back.height)
     g.drawImage(snapshot.decor, snap.page.marginX * PP, snap.page.marginY * PP, (snap.content.w / 96) * PP, (snap.content.h / 96) * PP)
+    // PLAYER 1 START, printed in the top right: its right edge on the content's, centered on the name's line
+    // (one art pixel = 4 texels); its blink's off frame goes in a small texture of its own (no re-upload of the page)
+    const [ax, ay, aw, ah] = startArtBox(snap.page.marginX * PP + (snap.content.w / 96) * PP, (snap.page.marginY + 16.5 / 96) * PP, ART_PX)
+    const off = document.createElement('canvas')
+    off.width = aw
+    off.height = ah
+    const og = off.getContext('2d')!
+    og.drawImage(back, ax, ay, aw, ah, 0, 0, aw, ah)
+    paintStart(og, aw, ah / 2, ART_PX, { on: false })
+    const art = paintStart(g, ax + aw, ay + ah / 2, ART_PX, { on: true })
     renderer.buildBacking(back)
+    renderer.buildStartArt(off, [ax / back.width, ay / back.height, (ax + aw) / back.width, (ay + ah) / back.height], art.size)
+    startBox = { x0: ax / PP - w.pageW / 2, x1: (ax + aw) / PP - w.pageW / 2, top: w.pageH / 2 - ay / PP, bottom: w.pageH / 2 - (ay + ah) / PP }
     w.cam.scrollY = Infinity
     w.cam.y = null
     w.cam.scrollX = 0
@@ -460,8 +484,22 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
       if (!saveData) loadCast()
     }
     cast?.update(dt, settled)
+    if (startBox) startArtLook(dt)
     renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null, !!loaded, cast?.draw)
   }
+  /** PLAYER 1 START's look this frame: the ▶ blinks at 2 Hz (steady while playing, in shroom mode or unavailable) */
+  function startArtLook(dt: number) {
+    const a = renderer.startArt, gone = startStatus === 'unavailable'
+    const ease = (v: number, to: number, k: number) => v + (to - v) * Math.min(1, dt * k)
+    a.off = gone ? 1 : playing || w.shroomAmt > 0.5 ? 0 : Math.floor(w.time * 2) % 2
+    a.gray = ease(a.gray, gone ? 1 : 0, 6)
+    a.dim = ease(a.dim, playing ? 1 : 0, 6)
+    const c = ease(a.cursor, startCursor && !playing && !gone ? 1 : 0, 15)
+    a.cursor = c > 0.02 ? c : 0
+    startPress = Math.max(0, startPress - dt)
+    a.press = startPress > 0 ? 1 : 0
+  }
+
   function startLoop() {
     if (raf) return
     last = performance.now()
@@ -489,6 +527,41 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   }
 
   const emitPlay = (e: PlayEvent) => playListeners.forEach((f) => f(e))
+
+  /** a world point on screen: CSS px from the canvas's top left (null: behind the camera) */
+  function project(p: Vec3): [number, number] | null {
+    const m = w.cam.mvp, ww = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15]
+    if (ww <= 1e-6) return null
+    return [
+      (((m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12]) / ww) * 0.5 + 0.5) * cssW,
+      (1 - (((m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]) / ww) * 0.5 + 0.5)) * cssH,
+    ]
+  }
+
+  /**
+   * PLAYER 1 START's four corners on screen (top left, top right, bottom right, bottom left; CSS px), on the
+   * bent page as drawn this frame; null when it's behind the camera, turned away, degenerate or off screen.
+   */
+  function startQuad() {
+    if (!startBox) return null
+    const { x0, x1, top, bottom } = startBox, hw = w.pageW / 2, hh = w.pageH / 2
+    const xs = [x0, x1, x1, x0], ys = [top, top, bottom, bottom]
+    for (let i = 0; i < 4; i++) {
+      const p = project([xs[i], ys[i], bendZ(w.bend.p, hw, hh, xs[i], ys[i])])
+      if (!p) return null
+      quad[i * 2] = p[0]
+      quad[i * 2 + 1] = p[1]
+    }
+    // the signed area (y down: clockwise is the front) and the bounds
+    let area = 0, l = Infinity, r = -Infinity, t = Infinity, b = -Infinity
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 1) % 4, x = quad[i * 2], y = quad[i * 2 + 1]
+      area += x * quad[j * 2 + 1] - quad[j * 2] * y
+      l = Math.min(l, x); r = Math.max(r, x); t = Math.min(t, y); b = Math.max(b, y)
+    }
+    if (area / 2 < 4 || r < 0 || b < 0 || l > cssW || t > cssH) return null
+    return quad
+  }
 
   /**
    * Play as Phill: loads the cast (if it hasn't yet) and Play's chunk, then he takes the bottom line.
@@ -580,24 +653,16 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     /** called every frame, right after the camera moves (mutate the DOM; never set React state) */
     onFrame: (f: () => void) => { frameListeners.add(f); return () => { frameListeners.delete(f) } },
     /** a world point on screen: CSS px from the canvas's top left (null: behind the camera); read it in onFrame */
-    project: (p: Vec3): [number, number] | null => {
-      const m = w.cam.mvp, ww = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15]
-      if (ww <= 1e-6) return null
-      return [
-        (((m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12]) / ww) * 0.5 + 0.5) * cssW,
-        (1 - (((m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]) / ww) * 0.5 + 0.5)) * cssH,
-      ]
+    project,
+    /** PLAYER 1 START's projected corners (read it in onFrame; the array is reused) */
+    startQuad,
+    /** its button's state: ready / loading / unavailable, and the cursor (hover or keyboard focus) */
+    setStartArt: ({ status, cursor }: { status?: StartArtStatus; cursor?: boolean }) => {
+      if (status) startStatus = status
+      if (cursor !== undefined) startCursor = cursor
     },
-    /**
-     * Where PLAYER 1 START sits on the page: its bottom right corner at the right end of the name's line, level
-     * with the bottom of the name (so it rises into the top margin rather than over the line below; null until loaded).
-     */
-    startSpot: (): Vec3 | null => {
-      if (!loaded || !w.bodies.length) return null
-      const top = Math.max(...w.bodies.map((bd) => bd.b.line.top)), b = w.bodies.find((bd) => bd.b.line.top === top)!.b
-      const right = Math.max(...w.bodies.map((bd) => bd.x1)) - PAD_X
-      return [right, w.pageH / 2 + b.line.top - b.line.lh, 0.02]
-    },
+    /** pressed: the art drops a pixel for 120 ms */
+    pressStart: () => { startPress = 0.12 },
     gesture: unlockAudio,
     /** Play mode (the Career Climb) */
     play: {

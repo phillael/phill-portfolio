@@ -35,9 +35,15 @@ const engine = {
   resetView: jest.fn(), zoomBy: jest.fn(), setNavMode: jest.fn(), setUiInsets: jest.fn(), panKey: jest.fn(),
   navView: jest.fn(() => ({ fit: true, left: 0, top: 0, width: 1, height: 1 })), navTo: jest.fn(),
   drawMiniMap: jest.fn(), onFrame: jest.fn(() => () => {}), gesture: jest.fn(), holeAtCursor: jest.fn(), releaseHoleKey: jest.fn(),
-  project: jest.fn(() => [120, 80]), startSpot: jest.fn(() => [3.7, 5, 0]),
+  project: jest.fn(() => [120, 80]),
+  // PLAYER 1 START's art on the paper: its four projected corners (top left, top right, bottom right, bottom left)
+  startQuad: jest.fn((): Float32Array | null => new Float32Array([100, 50, 200, 52, 198, 80, 101, 78])),
+  setStartArt: jest.fn(), pressStart: jest.fn(),
   play,
 }
+/** the engine's per-frame listeners (the mock runs them on demand) */
+const frameFns = new Set<() => void>()
+const runFrame = () => act(() => frameFns.forEach((f) => f()))
 jest.mock('@/lib/jelly/engine', () => ({
   createJellyEngine: jest.fn((opts: { onOpen?: () => void }) => {
     engine.openDirect.mockImplementation(() => opts.onOpen?.())
@@ -106,14 +112,62 @@ describe('starting Play mode', () => {
     expect(btn).toHaveAttribute('title', "Play mode couldn't load")
   })
 
-  it('PLAYER 1 START sits on the page while not playing, and starts Play', async () => {
-    await open()
-    const start = screen.getByRole('button', { name: 'Player 1 start: play as Phill (J)' })
-    expect(start).toHaveTextContent('PLAYER 1 START')
-    expect(start).toHaveAttribute('aria-keyshortcuts', 'J')
-    fireEvent.click(start)
-    await waitFor(() => expect(play.enter).toHaveBeenCalled())
-    await waitFor(() => expect(start).toHaveAttribute('inert')) // hidden while playing
+  describe('PLAYER 1 START (printed on the paper)', () => {
+    beforeEach(() => {
+      engine.onFrame.mockImplementation(((f: () => void) => { frameFns.add(f); return () => { frameFns.delete(f) } }) as never)
+    })
+    afterEach(() => frameFns.clear())
+
+    it('is a transparent button over the art, at least 44 × 44, moved by transforms only', async () => {
+      await open()
+      const start = screen.getByRole('button', { name: 'Player 1 start: play as Phill (J)' })
+      expect(start).toHaveAttribute('aria-keyshortcuts', 'J')
+      expect(start).toHaveTextContent('') // the art is in the page texture; no pill
+      runFrame()
+      // the art's box is 100 × 30 px: grown to 44 tall around its center (65), a 100 px box scaled to it
+      expect(start.style.transform).toBe('translate(100.0px, 43.0px) scale(1.000, 0.440)')
+      expect(start.style.visibility).toBe('')
+      engine.startQuad.mockReturnValueOnce(null) // turned away or off screen
+      runFrame()
+      expect(start.style.visibility).toBe('hidden')
+      runFrame()
+      expect(start.style.visibility).toBe('')
+    })
+
+    it('starts Play after the art is pressed (Enter or Space), and goes inert while playing', async () => {
+      await open()
+      const start = screen.getByRole('button', { name: 'Player 1 start: play as Phill (J)' })
+      start.focus()
+      fireEvent.click(start) // what Enter / Space do on a native button
+      expect(engine.pressStart).toHaveBeenCalledTimes(1)
+      expect(play.enter).not.toHaveBeenCalled() // the art drops a pixel first
+      await waitFor(() => expect(play.enter).toHaveBeenCalled())
+      await waitFor(() => expect(start).toHaveAttribute('inert'))
+    })
+
+    it('tells the paper its state: the cursor on hover or keyboard focus, loading, unavailable', async () => {
+      await open()
+      const start = screen.getByRole('button', { name: 'Player 1 start: play as Phill (J)' })
+      expect(engine.setStartArt).toHaveBeenLastCalledWith({ status: 'ready' })
+      fireEvent.pointerEnter(start)
+      expect(engine.setStartArt).toHaveBeenLastCalledWith({ cursor: true })
+      fireEvent.pointerLeave(start)
+      expect(engine.setStartArt).toHaveBeenLastCalledWith({ cursor: false })
+      act(() => start.focus()) // keyboard-style focus (:focus-visible)
+      expect(engine.setStartArt).toHaveBeenLastCalledWith({ cursor: true })
+      act(() => start.blur())
+      expect(engine.setStartArt).toHaveBeenLastCalledWith({ cursor: false })
+      let done: (ok: boolean) => void = () => {}
+      play.enter.mockImplementationOnce(() => new Promise<boolean>((r) => (done = r)))
+      fireEvent.click(start)
+      await waitFor(() => expect(start).toHaveAttribute('aria-busy', 'true'))
+      expect(engine.setStartArt).toHaveBeenCalledWith({ status: 'loading' })
+      await act(async () => done(false))
+      const off = screen.getByRole('button', { name: "Play mode couldn't load" })
+      expect(off).toBe(start)
+      expect(off).toBeDisabled()
+      expect(engine.setStartArt).toHaveBeenLastCalledWith({ status: 'unavailable' })
+    })
   })
 })
 

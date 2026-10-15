@@ -137,6 +137,7 @@ precision highp float;
 in vec2 vUv; in vec3 vWorld; in vec3 vN; in float vSide;
 uniform float uShroom, uTime, uHue, uAspect, uGrain, uRot, uReveal, uDim; uniform sampler2D uBack, uGrainTex, uSky; uniform int uFinish;
 uniform vec3 uEye, uLight, uScan;
+uniform vec4 uArtRect; uniform vec2 uArtSize; uniform float uArtOff, uArtGray, uArtDim, uArtCursor, uArtPress; uniform sampler2D uArtTex;
 out vec4 o;
 ${HSV}
 vec3 skyLook(vec3 d){ float c = cos(uRot), s = sin(uRot); d.xz = mat2(c, -s, s, c)*d.xz;
@@ -158,6 +159,26 @@ void main(){
     o = vec4(c, 1.0); return;
   }
   vec3 base = texture(uBack, vUv).rgb;
+  // PLAYER 1 START, printed on the paper (q: art pixels, y down): the blink's off frame (a small overlay
+  // texture), grayed (unavailable), pressed (the art drops a pixel), dimmed (playing), and its cursor
+  vec2 q = (vUv - uArtRect.xy)/(uArtRect.zw - uArtRect.xy)*uArtSize, qs = q - vec2(0.0, uArtPress);
+  vec3 artOn = texture(uBack, uArtRect.xy + qs/uArtSize*(uArtRect.zw - uArtRect.xy)).rgb;
+  vec3 artOff = texture(uArtTex, clamp(qs/uArtSize, 0.0, 1.0)).rgb;
+  float artInk = 0.0;
+  if(q.x >= 0.0 && q.x <= uArtSize.x && q.y >= 0.0 && q.y <= uArtSize.y + uArtPress){
+    base = qs.y >= 0.0 && uArtOff > 0.5 ? artOff : artOn;
+    float v = dot(base, vec3(0.3, 0.59, 0.11));
+    base = mix(base, vec3(1.0 - (1.0 - v)*0.45), uArtGray);
+    artInk = max(1.0 - smoothstep(0.45, 0.85, dot(base, vec3(0.299, 0.587, 0.114))),
+                 smoothstep(0.15, 0.4, max(base.r, max(base.g, base.b)) - min(base.r, min(base.g, base.b))));
+    base = mix(base, vec3(1.0), uArtDim*0.55);
+  }
+  if(uArtCursor > 0.0){ // pixel corner brackets 3 art px outside it: electric cyan with a darker inner edge (a retro menu cursor)
+    vec2 p = floor(q) + 0.5, lo = vec2(-3.0), hi = uArtSize + 3.0, dl = p - lo, dh = hi - p;
+    float onX = min(dl.x, dh.x), onY = min(dl.y, dh.y);
+    if(p.x > lo.x && p.y > lo.y && p.x < hi.x && p.y < hi.y && ((onX < 2.0 && onY < 7.0) || (onY < 2.0 && onX < 7.0)))
+      base = mix(base, (onX < 1.0 || onY < 1.0) ? vec3(0.0, 0.86, 0.95) : vec3(0.0, 0.73, 0.8), uArtCursor);
+  }
   vec2 guv = vUv*vec2(1.0, uAspect)*1.6;
   vec3 g = texture(uGrainTex, guv).rgb; // r: fine grain, g: fibers, b: mottling
   vec3 V = normalize(uEye - vWorld), L = normalize(uLight);
@@ -178,9 +199,11 @@ void main(){
     vec3 env = skyLook(reflect(-V, normalize(n + vec3(0.0, (streak - 0.5)*0.2, 0.0))));
     base = base*metal + env*0.28 + vec3(spec)*0.3;
   }
-  base *= 1.0 + 0.55*(dot(NG, L) - L.z); // the curves catch the light (flat = exactly the PDF)
+  float shade = 1.0 + 0.55*(dot(NG, L) - L.z);
+  base *= shade; // the curves catch the light (flat = exactly the PDF)
   vec3 paper = mix(base, vec3(0.07, 0.03, 0.11), uShroom*0.92);
   vec3 neon = hsv(fract(uTime*uHue + vWorld.x*0.05 + vWorld.y*0.08), 0.8, 1.0);
+  paper = mix(paper, neon*1.15*shade, uShroom*artInk); // shroom mode: the art's ink goes neon, like the words
   float edge = min(min(vUv.x, 1.0-vUv.x), min(vUv.y, 1.0-vUv.y)*uAspect)*8.5;
   paper = mix(paper, paper*vec3(0.2, 0.23, 0.36), uDim*0.85);
   paper += uScan*(exp(-dy*28.0)*1.6 + exp(-dy*5.0)*0.25)*step(-1e8, uReveal)*step(uReveal, 1e8);

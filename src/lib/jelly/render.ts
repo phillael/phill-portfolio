@@ -57,7 +57,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
   gl.bindVertexArray(null)
 
   let skyTex: WebGLTexture | null = null, cloudTex: WebGLTexture | null = null, grainTex: WebGLTexture | null = null
-  let backTex: WebGLTexture | null = null, atlasTex: WebGLTexture | null = null
+  let backTex: WebGLTexture | null = null, atlasTex: WebGLTexture | null = null, artTex: WebGLTexture | null = null
   let atlasW = 1, atlasH = 1
   let starVAO: WebGLVertexArrayObject | null = null, starCount = 0
   let mistVAO: WebGLVertexArrayObject | null = null, mistBuf: WebGLBuffer | null = null, mistData = new Float32Array(0)
@@ -245,9 +245,20 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     gl.bindVertexArray(null)
   }
 
-  /** The page's backing: white paper plus the snapshot's decorations (tint bars, rules, bullets). */
+  /** The page's backing: white paper plus the snapshot's decorations (tint bars, rules, bullets) and PLAYER 1 START. */
   function buildBacking(back: HTMLCanvasElement) {
     backTex = texFrom(gl, back, backTex)
+  }
+
+  /**
+   * PLAYER 1 START printed on the paper: where it is (page UVs, y down: x0, y0, x1, y1), its size in art
+   * pixels, and its blink's off frame (just the art's box). `startArt` is its look, set every frame.
+   */
+  const startArt = { rect: [-2, -2, -1, -1], size: [1, 1], off: 0, gray: 0, dim: 0, cursor: 0, press: 0 }
+  function buildStartArt(off: HTMLCanvasElement, rect: number[], size: number[]) {
+    artTex = texFrom(gl, off, artTex)
+    startArt.rect = rect
+    startArt.size = size
   }
 
   /** The comet program's uniforms, for the resume's sparks and the hero pool (photo colors heating into the comet ramp). */
@@ -354,6 +365,10 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
       gl.uniform1f(pu.uThick, s.paperThick); gl.uniform2f(pu.uHalf, w.pageW / 2, w.pageH / 2)
       gl.uniform1f(pu.uBendA, bend.a); gl.uniform1f(pu.uBendC, bend.c); gl.uniform1f(pu.uBendT, bend.t); gl.uniform1f(pu.uBendS, bend.s)
       gl.uniform1f(pu.uReveal, reveal); gl.uniform1f(pu.uDim, w.searchAmt); gl.uniform3fv(pu.uScan, hex(SITE.cyan))
+      const art = startArt
+      gl.uniform4fv(pu.uArtRect, art.rect); gl.uniform2fv(pu.uArtSize, art.size); gl.uniform1f(pu.uArtOff, art.off); gl.uniform1f(pu.uArtGray, art.gray)
+      gl.uniform1f(pu.uArtDim, art.dim); gl.uniform1f(pu.uArtCursor, art.cursor); gl.uniform1f(pu.uArtPress, art.press)
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, artTex ?? backTex); gl.uniform1i(pu.uArtTex, 3)
       gl.bindVertexArray(pageVAO); gl.drawElements(gl.TRIANGLES, pageCount, gl.UNSIGNED_INT, 0)
 
       let glows = false
@@ -458,10 +473,10 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     for (const b of [...buffers, ...heroOwn]) gl.deleteBuffer(b)
     if (heroVAO) gl.deleteVertexArray(heroVAO)
     gl.deleteBuffer(linkBuf)
-    for (const t of [skyTex, cloudTex, grainTex, backTex, atlasTex]) if (t) gl.deleteTexture(t)
+    for (const t of [skyTex, cloudTex, grainTex, backTex, atlasTex, artTex]) if (t) gl.deleteTexture(t)
   }
 
-  return { bakeSky, buildStars, buildGPU, buildBacking, buildHero, render, setDpr, dispose }
+  return { bakeSky, buildStars, buildGPU, buildBacking, buildStartArt, startArt, buildHero, render, setDpr, dispose }
 }
 
 export type Renderer = ReturnType<typeof createRenderer>

@@ -137,6 +137,12 @@ function arcadeButton(on: boolean) {
 /** canvas pixels: x, y, width, height */
 export type PixelRect = [number, number, number, number]
 
+/** where paintStart puts PLAYER 1 START (canvas pixels), its right edge at `right`, centered on `cy` */
+export function startArtBox(right: number, cy: number, px: number): PixelRect {
+  const w = 30 + 4 + textWidth('PLAYER 1', { bold: true }), h = 22
+  return [Math.round(right - w * px), Math.round(cy - (h * px) / 2), w * px, h * px]
+}
+
 /**
  * Paint PLAYER 1 START (the arcade button beside "PLAYER 1 / ▶ START", 89 × 22 art pixels) into a
  * canvas: its right edge at canvas x `right`, centered on canvas y `cy`, one art pixel = `px` canvas
@@ -144,8 +150,7 @@ export type PixelRect = [number, number, number, number]
  * that blink (the ▶ and the button's highlight) and its size in art pixels.
  */
 export function paintStart(g: Painter, right: number, cy: number, px: number, { on = true } = {}) {
-  const btn = arcadeButton(on), w = 30 + 4 + textWidth('PLAYER 1', { bold: true }), h = 22
-  const x0 = Math.round(right - w * px), y0 = Math.round(cy - (h * px) / 2)
+  const btn = arcadeButton(on), [x0, y0, bw, bh] = startArtBox(right, cy, px), w = bw / px, h = bh / px
   g.save()
   g.translate(x0, y0)
   g.imageSmoothingEnabled = false

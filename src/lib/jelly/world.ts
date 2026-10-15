@@ -102,6 +102,9 @@ export interface World {
   noDrops: boolean
   /** how soft the words' springs are (the user's 🍄 only: the trip is a look, so the text stays readable and walkable) */
   meltAmt: number
+  /** the trip's molten words (Play sets them): the heat (0…1) and the drips' melt (0…1) */
+  heat: number
+  tripMelt: number
   danceMix: number
   /** 1 while scrolling/panning/zooming/rotating, fading over ~0.5 s: words hold on tighter */
   navCalm: number
@@ -155,7 +158,7 @@ export function createWorld(s: JellyState, low: boolean, sfx: Sfx, music: MusicF
   return {
     s, low, sfx, music, rnd: lcg(7),
     pageW: 8.5, pageH: 11, pageBottom: -5.5, // Letter until the resume loads, so the camera doesn't move when it does
-    time: 0, shroomAmt: 0, trip: 0, tripAmt: 0, noDrops: false, meltAmt: 0, danceMix: 0, navCalm: 0,
+    time: 0, shroomAmt: 0, trip: 0, tripAmt: 0, noDrops: false, meltAmt: 0, heat: 0, tripMelt: 0, danceMix: 0, navCalm: 0,
     bodies: [], NP: 0, NS: 0,
     pos: F0, vel: F0, home: F0, off: F0, frc: F0, inv: F0, pBody: new Int32Array(0), vis: F0,
     sa: new Int32Array(0), sb: new Int32Array(0), srest: F0, sk: F0,
@@ -260,7 +263,7 @@ export interface AtlasRect {
  * one batch of words per step, so a cold load never blocks a frame for long; the seeded
  * random numbers are drawn in the same order as building it in one go.
  */
-export function* atlasSteps(w: World, list: BodySpec[], snapText: CanvasImageSource, batch = 120): Generator<void, { atlas: HTMLCanvasElement; rects: AtlasRect[] }> {
+export function* atlasSteps(w: World, list: BodySpec[], snapText: CanvasImageSource, batch = 120): Generator<void, { atlas: HTMLCanvasElement; rects: AtlasRect[]; ppu: number }> {
   const AW = 4096
   let ppu = 230, ok = false, AH = 4096
   let rects: AtlasRect[] = []
@@ -320,7 +323,7 @@ export function* atlasSteps(w: World, list: BodySpec[], snapText: CanvasImageSou
     ptPrev: new Float32Array(NPT * 3), ptSV: new Float32Array(NPT * 3), ptTail: new Float32Array(NPT * 3),
     ptGal: galaxySlots(NPT, w.rnd),
   })
-  return { atlas, rects }
+  return { atlas, rects, ppu }
 }
 
 /** Bilinear lookup into a body's lattice (positions or homes) at local (lu, lv). */

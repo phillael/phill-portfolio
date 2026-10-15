@@ -20,6 +20,7 @@ precision highp float; precision highp int;
 in vec2 vUv; in vec2 vLocal; in vec4 vRect; in float vJig; in float vSeed; in vec3 vWorld; in float vVis; in float vHl; in vec2 vGlow;
 uniform float uSearch; uniform vec3 uGlowA, uGlowB, uCoin;
 uniform sampler2D uAtlas; uniform float uShroom, uMelt, uDrip, uTime, uHue, uGummy, uTextFrac; uniform vec3 uJelly;
+uniform float uHeat, uTripMelt, uPsy, uPpu;
 uniform vec3 uEye, uFogCol; uniform float uFog, uFogStart, uFogEnd;
 uniform int uPass, uInkMode; uniform float uShine, uLayerShade, uRot; uniform vec2 uTexel; uniform vec3 uLight;
 uniform sampler2D uSky;
@@ -28,10 +29,59 @@ ${HSV}
 vec4 ink(vec2 uv){ return texture(uAtlas, clamp(uv, vRect.xy, vRect.zw)); }
 vec3 skyLook(vec3 d){ float c = cos(uRot), s = sin(uRot); d.xz = mat2(c, -s, s, c)*d.xz;
   return texture(uSky, vec2(atan(d.x, -d.z)/6.2831853 + 0.5, 0.5 - asin(clamp(d.y, -1.0, 1.0))/3.14159265)).rgb; }
+float h1(float n){ return fract(sin(n*12.9898)*43758.5453); }
+float vn(float x){ float i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f); return mix(h1(i), h1(i + 1.0), f); }
+// the trip's molten words (the mockup's, its linear colors): heated metal, deep red → orange → yellow → white-hot,
+// and the psychedelic kind (the white-hot core stays, the mid-band takes the neon hue, the edges cool to violet)
+vec3 molten(float T){
+  vec3 c = mix(vec3(0.1, 0.0, 0.0), vec3(0.8, 0.05, 0.0), smoothstep(0.0, 0.3, T));
+  c = mix(c, vec3(1.0, 0.3, 0.02), smoothstep(0.25, 0.55, T));
+  c = mix(c, vec3(1.0, 0.72, 0.18), smoothstep(0.5, 0.8, T));
+  return mix(c, vec3(1.0, 0.96, 0.82), smoothstep(0.8, 1.0, T));
+}
+vec3 psyMolten(float T, float h){
+  vec3 c = mix(vec3(0.1, 0.0, 0.22), hsv(h, 0.9, 1.0), smoothstep(0.05, 0.5, T));
+  c = mix(c, hsv(h + 0.12, 0.45, 1.0), smoothstep(0.55, 0.85, T));
+  return mix(c, vec3(1.0, 0.97, 0.9), smoothstep(0.86, 1.0, T));
+}
 void main(){
   if(vVis < 0.01) discard;
-  vec4 t = ink(vUv); float a = t.a; vec3 c = t.rgb;
-  float m = uShroom*uMelt;
+  // the trip: sizes in the mockup's page texels (220 a unit) → atlas uv; px, py: where this is in them (fixed to the letters)
+  vec2 tx = uTexel/1.5*(uPpu/220.0);
+  float px = vUv.x/tx.x, py = vUv.y/tx.y, mt = uTripMelt;
+  vec2 uv = vUv;
+  if(mt > 0.001){
+    uv.x += mt*tx.x*0.8*sin(py*0.05 + uTime*6.0); // a faint heat shimmer
+    uv.y -= mt*tx.y*7.0*vn(px/23.0 + 7.0)*(0.85 + 0.15*sin(uTime*0.7 + px*0.02)); // each stretch of letters slumps its own amount
+  }
+  // the forge glow (how much ink is around: the Finder's blurred copy) and, in the trip's own pass, just that on the paper
+  float h = fract(uTime*0.06 + vWorld.x*0.05 + vWorld.y*0.08), band = 0.5 + 0.5*sin(uTime*0.8 + vWorld.x*1.3 - vWorld.y*0.9);
+  float psy = uPsy*(0.1 + 0.8*band*band);
+  // (one tap of a blurred mip: the mockup averaged a ring 4–10 texels out; ~0.3 inside a word, as there)
+  float glow = uHeat > 0.001 ? textureLod(uAtlas, clamp(uv, vRect.xy, vRect.zw), 2.8 + log2(uPpu/220.0)).a : 0.0;
+  if(uPass == 2){
+    vec3 glowC = pow(mix(vec3(1.0, 0.22, 0.02), hsv(h + 0.05, 0.9, 1.0), psy), vec3(0.4545));
+    // (a wider blur than the words' own glow: the haze reaches past the letters, as the mockup's ring did)
+    float haze = textureLod(uAtlas, clamp(uv, vRect.xy, vRect.zw), 3.8 + log2(uPpu/220.0)).a;
+    vec3 add = glowC*min(1.0, haze*1.6)*0.45*uHeat*uShroom*vVis;
+    if(max(add.r, max(add.g, add.b)) < 0.004) discard;
+    o = vec4(add, 0.0); return;
+  }
+  vec4 t = ink(uv); float a = t.a; vec3 c = t.rgb;
+  float ink0 = a;
+  // the trip's drips: thin strands every 4 texels, mostly short and now and then long, narrowing to a point, cooling toward the tip
+  float drip = 0.0, dripT = 0.0;
+  if(mt > 0.001 && uPass == 0){
+    float across = abs(fract(px/4.0) - 0.5)*2.0, n = h1(floor(px/4.0) + 3.0), n5 = n*n*n*n*n;
+    float len = mt*tx.y*(3.0 + 80.0*n5)*(0.8 + 0.2*sin(uTime*1.1 + n*40.0));
+    for(int k = 1; k <= 14; k++){
+      float f = float(k)/14.0;
+      if(across > 1.0 - f*0.75) continue;
+      float s = ink(uv - vec2(0.0, f*len)).a*(1.0 - f*0.65);
+      if(s > drip){ drip = s; dripT = 1.0 - f; }
+    }
+  }
+  float m = uShroom*uMelt*(1.0 - step(0.001, uHeat));
   if(m > 0.01){
     float n = fract(sin(floor(vLocal.x*26.0 + vSeed*50.0)*12.9898)*43758.5453);
     float len = uDrip*m*(0.15 + n*0.85)*(0.7 + 0.3*sin(uTime*0.8 + vSeed*6.28 + vLocal.x*9.0));
@@ -68,7 +118,16 @@ void main(){
     c = mix(c, mix(c*0.45, iri*0.9, 0.85), uShine) + vec3(spec)*0.6*uShine;
   }
   vec3 neon = hsv(fract(uTime*uHue + vWorld.x*0.05 + vWorld.y*0.08 + vSeed*0.15), 0.8, 1.0);
-  c = mix(c, neon*1.15, uShroom);
+  vec3 shroomC = neon*1.15;
+  if(uHeat > 0.001){
+    // molten: white-hot inside thick strokes (the ink around it; the atlas's glyphs are softer than the mockup's page,
+    // so ±2.5 texels where it took ±1.5, or every stroke reads white-hot), cooler at their edges and down the drips
+    float core = 0.25*(ink(uv + vec2(2.5*tx.x, 0.0)).a + ink(uv - vec2(2.5*tx.x, 0.0)).a + ink(uv + vec2(0.0, 2.5*tx.y)).a + ink(uv - vec2(0.0, 2.5*tx.y)).a);
+    float T = clamp(max(ink0*(0.3 + 0.5*core*core + 0.35*glow), drip*(0.25 + 0.5*dripT)) + 0.07*sin(uTime*2.3 + vWorld.x*3.0 + vWorld.y*2.0), 0.0, 1.0);
+    shroomC = mix(shroomC, pow(mix(molten(T), psyMolten(T, h), psy)*1.3, vec3(0.4545)), uHeat);
+    a = max(a, drip);
+  }
+  c = mix(c, shroomC, uShroom);
   vec2 q = vec2(abs(vLocal.x-0.5)*2.0, abs(vLocal.y/uTextFrac-0.5)*2.0);
   float edge = max(q.x, q.y);
   float slab = (1.0 - smoothstep(0.82, 1.0, edge)) * step(vLocal.y, uTextFrac*1.08);

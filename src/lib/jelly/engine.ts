@@ -182,10 +182,10 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
       if (disposed) return
       step = steps.next()
     } while (!step.done)
-    const { atlas, rects } = step.value
+    const { atlas, rects, ppu } = step.value
     await nextTask()
     if (disposed) return
-    renderer.buildGPU(atlas, rects)
+    renderer.buildGPU(atlas, rects, ppu)
     await nextTask()
     if (disposed) return
     // the page's backing: white paper plus the decorations at their place in the margins

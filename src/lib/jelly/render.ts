@@ -58,7 +58,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
 
   let skyTex: WebGLTexture | null = null, cloudTex: WebGLTexture | null = null, grainTex: WebGLTexture | null = null
   let backTex: WebGLTexture | null = null, atlasTex: WebGLTexture | null = null, artTex: WebGLTexture | null = null
-  let atlasW = 1, atlasH = 1
+  let atlasW = 1, atlasH = 1, atlasPpu = 230
   let starVAO: WebGLVertexArrayObject | null = null, starCount = 0
   let mistVAO: WebGLVertexArrayObject | null = null, mistBuf: WebGLBuffer | null = null, mistData = new Float32Array(0)
   let mistInst: Mist[] = []
@@ -169,7 +169,8 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
   }
 
   /** Upload the words (lattices + atlas), their sparks and the paper sheet. */
-  function buildGPU(atlas: HTMLCanvasElement, rects: AtlasRect[]) {
+  function buildGPU(atlas: HTMLCanvasElement, rects: AtlasRect[], ppu = 230) {
+    atlasPpu = ppu
     const NP = w.NP, NPT = w.NPT
     if (bodyVAO) gl.deleteVertexArray(bodyVAO)
     bodyVAO = gl.createVertexArray()!
@@ -398,6 +399,9 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
       gl.uniform2f(u.uTexel, 1.5 / atlasW, 1.5 / atlasH); gl.uniform3fv(u.uLight, LIGHT); gl.uniform1f(u.uRot, skyRot)
       gl.uniform1f(u.uSearch, w.searchAmt); gl.uniform3fv(u.uGlowA, hex(SITE.cyan)); gl.uniform3fv(u.uGlowB, hex(SITE.purple))
       gl.uniform3fv(u.uCoin, hex(SITE.green))
+      // the trip's molten words (their heat and drips fade with the trip's look); the atlas's px a unit, for the mockup's sizes (page texels, 220 a unit)
+      const heat = w.heat * w.tripAmt
+      gl.uniform1f(u.uHeat, heat); gl.uniform1f(u.uTripMelt, w.tripMelt * w.tripAmt); gl.uniform1f(u.uPsy, 1); gl.uniform1f(u.uPpu, atlasPpu)
       // Raised letters: lift the face and fill the gap with darker stacked copies (fewer on phones)
       const thick = s.textDepth * 0.05, layers = s.textDepth > 0 ? Math.min(w.low ? 2 : 6, Math.max(1, Math.round(s.textDepth * 6))) : 0
       gl.uniform1f(u.uLift, thick)
@@ -408,6 +412,12 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
         gl.drawElements(gl.TRIANGLES, idxCount, gl.UNSIGNED_INT, 0)
       }
       gl.uniform1i(u.uPass, 0); gl.uniform1f(u.uLayerZ, 0)
+      if (heat > 0.001) {
+        // the forge glow on the paper around the words: added under the ink, writing no depth (the empty parts of a word's quad mustn't hide what passes behind)
+        gl.depthMask(false); gl.uniform1i(u.uPass, 2)
+        gl.drawElements(gl.TRIANGLES, idxCount, gl.UNSIGNED_INT, 0)
+        gl.depthMask(true); gl.uniform1i(u.uPass, 0)
+      }
       gl.drawElements(gl.TRIANGLES, idxCount, gl.UNSIGNED_INT, 0)
       if (cast) { gl.bindVertexArray(null); cast(); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA) }
 

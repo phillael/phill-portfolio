@@ -265,7 +265,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     run.reset()
     boost.reset()
     tripT = -1
-    w.trip = 0
+    w.trip = w.heat = w.tripMelt = 0
     rollShrimp()
     ufos.roll(shrimp.map((s) => s.spot.line))
     for (const bi of level.coins) w.bodies[bi].coinT = 1
@@ -683,6 +683,10 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     // the trip: the clock and its look; moon jumps (×1.5 high, ×0.6 gravity) while it lasts
     if (tripT >= 0 && (tripT += dt) >= PLAY_R2.trip) { tripT = -1; emit({ type: 'tripEnd' }) }
     w.trip = tripT >= 0 ? tripLook(tripT) : 0
+    // its molten words: the heat comes up over 1.5 s and cools in the last 2.5 s; the drips grow over 3 s
+    const left = PLAY_R2.trip - tripT
+    w.heat = tripT >= 0 ? Math.min(1, tripT / 1.5) * Math.min(1, left / 2.5) : 0
+    w.tripMelt = tripT >= 0 ? Math.min(1, tripT / 3) * (0.6 + 0.4 * Math.min(1, left / 2)) : 0
     const { g, v0, tap: tapH } = moonJump(P, tripT >= 0)
     if (introT < INTRO) {
       // the entrance (no control yet): the dive clip's fall frames, then a jelly splat on the name

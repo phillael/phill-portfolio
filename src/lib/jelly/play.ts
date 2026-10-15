@@ -10,11 +10,11 @@
 
 import type { Cast, Drive } from './cast'
 import { resetView, type UiInsets } from './camera'
-import { FOV, LOOSE, PAD_X, ZMAX, ZMIN, type PlayConfig } from './config'
+import { FOV, LOOSE, PAD_X, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
 import type { Vec3 } from './math'
 import { burst, healAll } from './physics'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
-import { bestStore, createRun, type RunResult } from './playRun'
+import { BEST_SCORE_KEY, bestStore, createRun, type RunResult } from './playRun'
 import { bilerp, hidden, type World } from './world'
 
 export interface PlayInput {
@@ -55,6 +55,11 @@ export interface PlayState {
   total: number
   finished: boolean
   bestMs: number | null
+  /** the SCORE, the shrimp eaten of the run's, and the best score */
+  score: number
+  shrimp: number
+  shrimpTotal: number
+  bestScore: number | null
 }
 
 export type PlayEvent =
@@ -71,6 +76,8 @@ export type PlayEvent =
   | { type: 'start' }
   /** a coin collected: where it was (world), and the count */
   | { type: 'coin'; body: number; at: Vec3; coins: number; total: number }
+  /** points won (or a kick's lost: negative), why, where (world), and the score now */
+  | { type: 'score'; why: AwardKind; points: number; at: Vec3; score: number }
   /** a checkpoint reached: its line and where its title ends (world, on the ink: the flag's spot) */
   | { type: 'checkpoint'; index: number; year: number; title: string; line: number; at: Vec3 }
   /** the bottom line: the run's over */
@@ -136,7 +143,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   /** how high his soles are above his model's origin now (model units): the planted foot stands on the line */
   let sole = rig.stand
   const coinSet = new Set(level.coins)
-  const run = createRun(level, bestStore())
+  const run = createRun(level, bestStore(), bestStore(BEST_SCORE_KEY))
   /** lit checkpoint titles fading back (their bodies, seconds left) */
   const lits: { bodies: number[]; t: number }[] = []
   /** the finish's sparks in flight, and how long they've flown */
@@ -354,7 +361,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
         let cx = 0, cy = 0, cz = 0
         for (let p = bd.p0; p < bd.p1; p++) { cx += w.pos[p * 3]; cy += w.pos[p * 3 + 1]; cz += w.pos[p * 3 + 2] }
         const n = bd.p1 - bd.p0
-        emit({ type: 'coin', body: bi, at: [cx / n, cy / n, cz / n], coins: run.coins, total: run.total })
+        const at: Vec3 = [cx / n, cy / n, cz / n]
+        emit({ type: 'coin', body: bi, at, coins: run.coins, total: run.total })
+        award('coin', at)
       }
       for (let p = bd.p0; p < bd.p1; p++) {
         const o = p * 3
@@ -369,6 +378,12 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       shakePh = Math.random() * 100
     }
     emit({ type: 'smash', bodies: hit, coins: hit.filter((bi) => coinSet.has(bi)), pound })
+  }
+
+  /** points for something (a kick's penalty is negative): the HUD pops them where it happened */
+  function award(why: AwardKind, at: Vec3) {
+    const points = run.award(why)
+    if (points) emit({ type: 'score', why, points, at, score: run.score })
   }
 
   // ---- falling off the page ----
@@ -751,6 +766,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     x, y, z, vx, vy, grounded, facing, line: grounded ? ground.line : -1, clip: pose.clip,
     smashing: smashT >= 0, pounding, falling: flailT >= 0, entering: introT < INTRO, checkpoint: run.checkpoint,
     timeMs: run.timeMs, started: run.started, coins: run.coins, total: run.total, finished: run.finished, bestMs: run.best(),
+    score: run.score, shrimp: run.shrimp, shrimpTotal: run.shrimpTotal, bestScore: run.bestScore(),
   })
 
   return {

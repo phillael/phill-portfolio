@@ -266,3 +266,24 @@ export const PLAY_CONFIG: Readonly<PlayConfig> = Object.freeze({
   hitStop: 0.06, shake: 0.35, pxDesktop: 90, pxPhone: 60, lookAhead: 0.6, tilt: 0.08, lean: 0.06,
   squash: 0.12, weight: 2, wake: 1.2, face: 0.35, sink: 0.012, idleDance: 1.5, runRate: 1.6,
 })
+
+/**
+ * Play mode round 2's numbers (agreed with Phill on 2026-10-15; see the plan's "Round 2 addendum"): what a run
+ * holds, the SCORE's awards, the shrimp's boost, and the trip (eating the mushroom).
+ */
+export const PLAY_R2 = Object.freeze({
+  /** per run (the shrimp are re-rolled on Play again) */
+  shrimp: 5, ufos: 3, lasagnas: 2,
+  /** points: an Impact coin, a shrimp, a UFO smashed, the mushroom eaten, a lasagna beaten, and a kick taken */
+  points: Object.freeze({ coin: 100, shrimp: 500, ufo: 200, mushroom: 1000, lasagna: 300, hurt: -250 }),
+  /** the finish's time bonus: this many points a second under `par` (s) */
+  bonusPerSec: 100, par: 60,
+  /** a shrimp: run speed ×(1 + boost) for boostTime s; a second stacks once */
+  boost: 0.35, boostTime: 8, boostStack: 2,
+  /** the trip: how long, its last flickering seconds (Hz, under 3) and the look easing out (s) */
+  trip: 12, tripFlicker: 2, flickerHz: 2.5, tripEaseOut: 1,
+  /** moon jumps in the trip */
+  moonJump: 1.5, moonGravity: 0.6,
+})
+
+export type AwardKind = keyof typeof PLAY_R2.points

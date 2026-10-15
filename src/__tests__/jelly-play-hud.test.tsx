@@ -16,6 +16,7 @@ let playing = false
 const state: PlayState = {
   x: 0, y: 0, z: 0, vx: 0, vy: 0, grounded: true, facing: 1, line: 0, clip: 'idle', smashing: false, pounding: false, falling: false,
   entering: false, checkpoint: -1, timeMs: 0, started: false, coins: 0, total: 27, finished: false, bestMs: null,
+  score: 0, shrimp: 0, shrimpTotal: 5, bestScore: null,
 }
 const play = {
   enter: jest.fn(async () => { playing = true; fire({ type: 'enter' }); return true }),
@@ -82,7 +83,7 @@ afterEach(() => {
   jest.clearAllMocks()
   listeners.clear()
   playing = false
-  Object.assign(state, { finished: false, checkpoint: -1 })
+  Object.assign(state, { finished: false, checkpoint: -1, score: 0, shrimp: 0 })
   play.enter.mockImplementation(async () => { playing = true; fire({ type: 'enter' }); return true })
 })
 
@@ -234,9 +235,31 @@ describe('playing', () => {
     expect(live).toHaveTextContent('Checkpoint: 2022, Software Engineer · Sessions')
     act(() => fire({ type: 'coin', body: 1, at: [0, 0, 0], coins: 1, total: 27 }))
     expect(live).toHaveTextContent('Impact 1 of 27')
-    expect(screen.getByText('+1 IMPACT')).toHaveStyle({ left: '120px', top: '80px' })
     act(() => fire({ type: 'coin', body: 2, at: [0, 0, 0], coins: 2, total: 27 }))
     expect(live).toHaveTextContent('Impact 1 of 27') // (once per 1.5 s)
+  })
+
+  it('pops every award where it happened: +100 with +1 IMPACT for a coin, +500, and a kick in red', async () => {
+    await startPlaying()
+    act(() => fire({ type: 'score', why: 'coin', points: 100, at: [0, 0, 0], score: 100 }))
+    const coin = screen.getByText('+100').closest('div')!
+    expect(coin).toHaveTextContent('+100+1 IMPACT')
+    expect(coin).toHaveStyle({ left: '120px', top: '80px' })
+    act(() => fire({ type: 'score', why: 'shrimp', points: 500, at: [0, 0, 0], score: 600 }))
+    expect(screen.getByText('+500')).toBeInTheDocument()
+    act(() => fire({ type: 'score', why: 'hurt', points: -250, at: [0, 0, 0], score: 350 }))
+    expect(screen.getByText('−250').closest('div')).toHaveAttribute('data-bad')
+  })
+
+  it('writes ★ SCORE (6 digits) and the shrimp into the stats through refs, ≤ 10×/s', async () => {
+    const frames = new Set<() => void>()
+    engine.onFrame.mockImplementation(((f: () => void) => { frames.add(f); return () => { frames.delete(f) } }) as never)
+    await startPlaying()
+    Object.assign(state, { score: 4300, shrimp: 2 })
+    act(() => frames.forEach((f) => f()))
+    expect(screen.getByText('★ 004300')).toBeInTheDocument()
+    expect(screen.getByText('🍤 2/5')).toBeInTheDocument()
+    engine.onFrame.mockImplementation(() => () => {})
   })
 
   it('two checkpoints passed in one landing: both toasts, one after the other, and one announcement of both', async () => {
@@ -262,13 +285,22 @@ describe('playing', () => {
   it('the finish card: THE END, the numbers, a new best, focus on Play again, and its buttons', async () => {
     await startPlaying()
     state.finished = true
-    act(() => fire({ type: 'finish', result: { timeMs: 42_300, bestMs: 42_300, newBest: true, coins: 19, total: 27 } }))
+    act(() => fire({ type: 'finish', result: {
+      timeMs: 42_300, bestMs: 40_000, newBest: false, coins: 19, total: 27,
+      score: 6870, bonus: 1770, bestScore: 6870, newBestScore: true, shrimp: 3, shrimpTotal: 5,
+    } }))
     const card = screen.getByRole('dialog', { name: 'The end' })
     expect(card).toHaveTextContent('THE END')
     expect(card).toHaveTextContent('Now → 1998. You read the whole career.')
+    expect(card).toHaveTextContent('SCORE006870')
     expect(card).toHaveTextContent('TIME0:42.3')
     expect(card).toHaveTextContent('IMPACT19/27')
-    expect(card).toHaveTextContent('NEW BEST!')
+    expect(card).toHaveTextContent('SHRIMP3/5')
+    expect(card).toHaveTextContent('BEST SCORE006870NEW BEST!')
+    expect(card).toHaveTextContent('BEST TIME0:40.0')
+    expect(card).toHaveTextContent('+1770 TIME BONUS')
+    expect(card.textContent!.match(/NEW BEST!/g)).toHaveLength(1)
+    expect(document.querySelector('p[aria-live="polite"]')).toHaveTextContent('The end. Score 6870, a new best. Time 0:42.3, best 0:40.0. Impact 19 of 27. Shrimp 3 of 5.')
     const again = screen.getByRole('button', { name: /Play again/ })
     expect(again).toHaveFocus()
     expect(screen.getByRole('link', { name: /Resume PDF/ })).toHaveAttribute('href', '/Phillip_Aelony_Resume_2025.pdf')
@@ -344,7 +376,7 @@ describe('touch', () => {
   it('the pads give way to the finish card', async () => {
     await playOnTouch()
     expect(screen.getByTestId('jelly-pads')).toBeInTheDocument()
-    act(() => fire({ type: 'finish', result: { timeMs: 1000, bestMs: 900, newBest: false, coins: 0, total: 27 } }))
+    act(() => fire({ type: 'finish', result: { timeMs: 1000, bestMs: 900, newBest: false, coins: 0, total: 27, score: 5900, bonus: 5900, bestScore: 9000, newBestScore: false, shrimp: 0, shrimpTotal: 5 } }))
     expect(screen.queryByTestId('jelly-pads')).toBeNull()
   })
 })

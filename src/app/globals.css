@@ -320,7 +320,7 @@ html.jelly-lock {
   visibility: hidden;
   transition: opacity 0.4s ease, visibility 0s linear 0.4s;
 }
-/* Play mode on the 3D resume: "+1 IMPACT" rises and fades where a coin was smashed; PLAYER 1 START's ▶ blinks */
+/* Play mode on the 3D resume: a score pop ("+100 +1 IMPACT", "+500", "−250") rises and fades where it happened */
 @keyframes jelly-pop {
   from { opacity: 1; transform: translate(-50%, -100%); }
   to { opacity: 0; transform: translate(-50%, calc(-100% - 40px)); }

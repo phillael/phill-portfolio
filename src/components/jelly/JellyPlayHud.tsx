@@ -1,14 +1,15 @@
 'use client'
 
 /**
- * Play mode's HUD (mounted while playing): the stats (time, Impact coins, best), the climb
- * meter down the right edge, the key legend, the checkpoint toast and flags, the "+1 IMPACT"
- * pops, ✕ Exit, the finish card and a polite live region. Everything that moves per frame is
+ * Play mode's HUD (mounted while playing): the stats (time, Impact coins, SCORE, shrimp, best),
+ * the climb meter down the right edge, the key legend, the checkpoint toast and flags, the score
+ * pops ("+100 +1 IMPACT", "+500", "−250"), ✕ Exit, the finish card and a polite live region. Everything that moves per frame is
  * written through refs in engine.onFrame (text ≤ 10×/s); React state changes only on Play's events.
  */
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { JellyEngine } from '@/lib/jelly/engine'
+import type { AwardKind } from '@/lib/jelly/config'
 import type { PlayEvent } from '@/lib/jelly/play'
 import type { RunResult } from '@/lib/jelly/playRun'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -24,6 +25,9 @@ export const fmtTime = (ms: number | null | undefined) => {
   return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`
 }
 
+/** ★ 004300: the score, arcade style */
+export const fmtScore = (n: number | null | undefined) => (n == null ? '—' : String(Math.max(0, Math.round(n))).padStart(6, '0'))
+
 /** the climb meter: full (labels), slim (phones: ticks and the current era), or none (short screens) */
 export const meterMode = (short: boolean, narrow: boolean) => (short ? 'none' : narrow ? 'slim' : 'full')
 
@@ -35,7 +39,7 @@ const POP_MS = 900
 const ANNOUNCE_COINS_MS = 1500
 
 interface Toast { key: number; year: number; title: string }
-interface Pop { key: number; x: number; y: number }
+interface Pop { key: number; x: number; y: number; points: number; why: AwardKind }
 interface Flag { key: number; at: [number, number, number] }
 
 interface JellyPlayHudProps {
@@ -58,6 +62,8 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
   const [message, setMessage] = useState('')
   const timeRef = useRef<HTMLSpanElement>(null)
   const coinsRef = useRef<HTMLSpanElement>(null)
+  const scoreRef = useRef<HTMLSpanElement>(null)
+  const shrimpRef = useRef<HTMLSpanElement>(null)
   const yearRef = useRef<HTMLSpanElement>(null)
   const bestRef = useRef<HTMLDivElement>(null)
   const flagEls = useRef(new Map<number, HTMLDivElement>())
@@ -85,12 +91,13 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
         setFlags((f) => [...f, { key: k, at: e.at }])
         if (!said.length) queueMicrotask(() => { setMessage(said.length > 1 ? `Checkpoints: ${said.join('; ')}` : `Checkpoint: ${said[0]}`); said = [] })
         said.push(`${e.year}, ${e.title}`)
-      } else if (e.type === 'coin') {
+      } else if (e.type === 'score') {
         const at = engine.project(e.at), k = ++key
         if (at) {
-          setPops((p) => [...p, { key: k, x: at[0], y: at[1] }])
+          setPops((p) => [...p, { key: k, x: at[0], y: at[1], points: e.points, why: e.why }])
           later(() => setPops((p) => p.filter((q) => q.key !== k)), POP_MS)
         }
+      } else if (e.type === 'coin') {
         const now = performance.now()
         if (now - lastCoinSay > ANNOUNCE_COINS_MS || e.coins === e.total) {
           lastCoinSay = now
@@ -99,7 +106,10 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       } else if (e.type === 'finish') {
         setResult(e.result)
         const r = e.result
-        setMessage(`The end. Your time: ${fmtTime(r.timeMs)}. Impact ${r.coins} of ${r.total}. Best ${fmtTime(r.bestMs)}.${r.newBest ? ' A new best!' : ''}`)
+        setMessage(
+          `The end. Score ${r.score}${r.newBestScore ? ', a new best' : ''}. Time ${fmtTime(r.timeMs)}${r.newBest ? ', a new best' : `, best ${fmtTime(r.bestMs)}`}.`
+          + ` Impact ${r.coins} of ${r.total}. Shrimp ${r.shrimp} of ${r.shrimpTotal}.`,
+        )
       } else if (e.type === 'start') {
         setMoved(true)
       } else if (e.type === 'again') {
@@ -132,7 +142,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       if (!s) return
       const info = engine.play.levelInfo()
       const era = s.checkpoint >= 0 && info ? String(info.checkpoints[s.checkpoint].year) : ''
-      const text = `${fmtTime(s.timeMs)}|${s.coins}/${s.total}|${era}|${fmtTime(s.bestMs)}|${s.finished}`
+      const text = `${fmtTime(s.timeMs)}|${s.coins}/${s.total}|${s.score}|${s.shrimp}|${era}|${fmtTime(s.bestMs)}|${s.finished}`
       if (text === lastText) return
       lastText = text
       if (timeRef.current) {
@@ -140,6 +150,8 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
         timeRef.current.style.color = s.finished ? '#00ff2b' : ''
       }
       if (coinsRef.current) coinsRef.current.textContent = `✦ ${s.coins}/${s.total}`
+      if (scoreRef.current) scoreRef.current.textContent = `★ ${fmtScore(s.score)}`
+      if (shrimpRef.current) shrimpRef.current.textContent = `🍤 ${s.shrimp}/${s.shrimpTotal}`
       if (yearRef.current) yearRef.current.textContent = era
       if (bestRef.current) bestRef.current.textContent = `BEST ${fmtTime(s.bestMs)}`
     })
@@ -159,14 +171,17 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       {/* stats: time and Impact, the best under them (on phones one 44 px row; short screens add the year) */}
       <div
         ref={topRef}
-        className={`${PANEL} pointer-events-none absolute left-3 top-2.5 z-[3] flex flex-col gap-[5px] rounded-[10px] px-3 pb-[7px] pt-2 max-[820px]:left-2 max-[820px]:top-2 max-[820px]:h-11 max-[820px]:justify-center max-[820px]:py-0 [@media(max-height:559px)]:left-2 [@media(max-height:559px)]:top-2 [@media(max-height:559px)]:h-11 [@media(max-height:559px)]:justify-center [@media(max-height:559px)]:py-0`}
+        className={`${PANEL} pointer-events-none absolute left-3 top-2.5 z-[3] flex flex-col gap-[5px] rounded-[10px] px-3 pb-[7px] pt-2 max-[420px]:px-2.5 max-[820px]:left-2 max-[820px]:top-2 max-[820px]:h-11 max-[820px]:justify-center max-[820px]:py-0 [@media(max-height:559px)]:left-2 [@media(max-height:559px)]:top-2 [@media(max-height:559px)]:h-11 [@media(max-height:559px)]:justify-center [@media(max-height:559px)]:py-0`}
       >
-        <div className="flex items-center gap-4 font-pixel text-[14px] leading-none max-[820px]:gap-3 max-[820px]:text-[11px] [@media(max-height:559px)]:gap-3 [@media(max-height:559px)]:text-[11px]">
+        {/* (a 390 px phone fits time, Impact and the score in one row beside ♫ and ✕ Exit only at 9 px) */}
+        <div className="flex items-center gap-4 font-pixel text-[14px] leading-none max-[820px]:gap-3 max-[820px]:text-[11px] max-[420px]:gap-2 max-[420px]:text-[9px] [@media(max-height:559px)]:gap-3 [@media(max-height:559px)]:text-[11px]">
           <span ref={timeRef}>⏱ 0:00.0</span>
           <span className="text-[#00ff2b] [text-shadow:0_0_8px_rgba(0,255,43,0.55)]">
             <span ref={coinsRef}>✦ 0/27</span>
             <small className="ml-1 text-[9px] text-[#7fd98e] [text-shadow:none] max-[820px]:hidden [@media(max-height:559px)]:hidden">IMPACT</small>
           </span>
+          <span ref={scoreRef} className="text-[#ffd24a] [text-shadow:0_0_8px_rgba(255,210,74,0.45)]">★ 000000</span>
+          <span ref={shrimpRef} className="text-[#ff9a6c] max-[820px]:hidden">🍤 0/5</span>
           <span ref={yearRef} className="hidden text-[11px] text-[#80eaff] [@media(max-height:559px)]:inline" />
         </div>
         <div ref={bestRef} className="font-pixel text-[9px] tracking-[0.5px] text-[#7c8798] max-[820px]:hidden [@media(max-height:559px)]:hidden">BEST —</div>
@@ -216,7 +231,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       {toast && (
         <div
           aria-hidden="true"
-          className={`${PANEL} pointer-events-none absolute left-1/2 top-3 z-[3] flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-[10px] border-[rgba(128,234,255,0.55)] px-3.5 py-2 shadow-[0_0_18px_rgba(128,234,255,0.25)] max-[820px]:top-[60px] [@media(max-height:559px)]:top-[60px]`}
+          className={`${PANEL} pointer-events-none absolute left-1/2 top-[76px] z-[3] flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-[10px] border-[rgba(128,234,255,0.55)] px-3.5 py-2 shadow-[0_0_18px_rgba(128,234,255,0.25)] max-[820px]:top-[60px] [@media(max-height:559px)]:top-[60px]`}
         >
           <span className="shrink-0 rounded bg-[#00ff2b] px-1.5 py-1 font-pixel text-[9px] leading-none text-[#0b0d12]"><span className="font-body text-[10px] font-extrabold">✓</span> CHECKPOINT</span>
           <span className="min-w-0 truncate text-[13px]"><b className="mr-1.5 font-pixel text-[11px] font-normal text-[#80eaff]">{toast.year}</b>{toast.title}</span>
@@ -242,10 +257,13 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
         <div
           key={p.key}
           aria-hidden="true"
-          className="jelly-pop pointer-events-none absolute z-[3] whitespace-nowrap rounded-[3px] border border-[rgba(0,255,43,0.6)] bg-[rgba(8,10,16,0.82)] px-2 pb-1 pt-1.5 font-pixel text-[12px] leading-none text-[#00ff2b] [text-shadow:0_0_4px_rgba(0,255,43,0.9)]"
+          data-coin={p.why === 'coin' || undefined}
+          data-bad={p.points < 0 || undefined}
+          className="jelly-pop pointer-events-none absolute z-[3] flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[rgba(255,210,74,0.6)] bg-[rgba(8,10,16,0.82)] px-2 pb-1 pt-1.5 font-pixel text-[12px] leading-none text-[#ffd24a] [text-shadow:0_0_4px_rgba(255,210,74,0.8)] data-[bad]:border-[rgba(255,59,92,0.7)] data-[coin]:border-[rgba(0,255,43,0.6)] data-[bad]:text-[#ff6b86] data-[coin]:text-[#00ff2b] data-[bad]:[text-shadow:0_0_4px_rgba(255,59,92,0.9)] data-[coin]:[text-shadow:0_0_4px_rgba(0,255,43,0.9)]"
           style={{ left: p.x, top: p.y }}
         >
-          +1 IMPACT
+          <span>{p.points > 0 ? `+${p.points}` : `−${-p.points}`}</span>
+          {p.why === 'coin' && <small className="text-[9px]">+1 IMPACT</small>}
         </div>
       ))}
 
@@ -271,6 +289,8 @@ const FinishCard = ({ result, onAgain, onLeave }: { result: RunResult; onAgain: 
   const again = useRef<HTMLButtonElement>(null)
   useEffect(() => { again.current?.focus({ preventScroll: true }) }, [])
   const cell = 'rounded-lg border border-[#1e2431] bg-[rgba(18,22,33,0.7)] px-1 pb-2 pt-[9px]'
+  const label = 'font-pixel text-[8px] tracking-[0.5px] text-[#7c8798]', value = 'mt-2 font-pixel text-[14px] leading-none max-[820px]:text-[12px]'
+  const newBest = 'mt-1.5 inline-block rounded-[3px] bg-[#00ff2b] px-[5px] py-[3px] font-pixel text-[7px] leading-none text-[#0b0d12]'
   return (
     <div
       role="dialog"
@@ -279,15 +299,23 @@ const FinishCard = ({ result, onAgain, onLeave }: { result: RunResult; onAgain: 
     >
       <h3 className="m-0 font-heading text-[30px] leading-[1.1] tracking-[2px] text-[#80eaff] [text-shadow:0_0_16px_rgba(128,234,255,0.6)]">THE END</h3>
       <p className="mb-3.5 mt-1.5 text-[13.5px] text-[#b9c6da]">Now → 1998. You read the whole career.</p>
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        <div className={cell}><div className="font-pixel text-[8px] tracking-[0.5px] text-[#7c8798]">TIME</div><div className="mt-2 font-pixel text-[14px] leading-none">{fmtTime(result.timeMs)}</div></div>
-        <div className={cell}><div className="font-pixel text-[8px] tracking-[0.5px] text-[#7c8798]">IMPACT</div><div className="mt-2 font-pixel text-[14px] leading-none text-[#00ff2b] [text-shadow:0_0_8px_rgba(0,255,43,0.5)]">{result.coins}/{result.total}</div></div>
+      <div className="mb-2 grid grid-cols-3 gap-2">
+        <div className={cell}><div className={label}>SCORE</div><div className={`${value} text-[#ffd24a] [text-shadow:0_0_8px_rgba(255,210,74,0.5)]`}>{fmtScore(result.score)}</div></div>
+        <div className={cell}><div className={label}>TIME</div><div className={value}>{fmtTime(result.timeMs)}</div></div>
+        <div className={cell}><div className={label}>IMPACT</div><div className={`${value} text-[#00ff2b] [text-shadow:0_0_8px_rgba(0,255,43,0.5)]`}>{result.coins}/{result.total}</div></div>
+        <div className={cell}><div className={label}>SHRIMP</div><div className={`${value} text-[#ff9a6c]`}>{result.shrimp}/{result.shrimpTotal}</div></div>
         <div className={cell}>
-          <div className="font-pixel text-[8px] tracking-[0.5px] text-[#7c8798]">BEST</div>
-          <div className="mt-2 font-pixel text-[14px] leading-none">{fmtTime(result.bestMs)}</div>
-          {result.newBest && <div className="mt-1.5 inline-block rounded-[3px] bg-[#00ff2b] px-[5px] py-[3px] font-pixel text-[7px] leading-none text-[#0b0d12]">NEW BEST!</div>}
+          <div className={label}>BEST SCORE</div>
+          <div className={value}>{fmtScore(result.bestScore)}</div>
+          {result.newBestScore && <div className={newBest}>NEW BEST!</div>}
+        </div>
+        <div className={cell}>
+          <div className={label}>BEST TIME</div>
+          <div className={value}>{fmtTime(result.bestMs)}</div>
+          {result.newBest && <div className={newBest}>NEW BEST!</div>}
         </div>
       </div>
+      <p className="mb-4 mt-0 font-pixel text-[8px] tracking-[0.5px] text-[#7c8798]">{result.bonus > 0 ? `+${result.bonus} TIME BONUS` : 'NO TIME BONUS (OVER 1:00)'}</p>
       <div className="flex flex-wrap justify-center gap-2 max-[820px]:flex-col">
         <button ref={again} type="button" onClick={onAgain} aria-keyshortcuts="Enter" className={`${PLAY_BTN} flex-auto`}>
           <span aria-hidden="true">↻</span> Play again<span className={KEY}> (Enter)</span>

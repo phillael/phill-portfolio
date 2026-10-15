@@ -6,7 +6,7 @@
  * needs WebGL2, which tests don't have; that's checked in the browser.
  */
 
-import { readFileSync } from 'fs'
+import { readFileSync, statSync } from 'fs'
 import path from 'path'
 import { Pose, bendAxes, jointMatrices, sampleTrack } from '@/lib/jelly/actors'
 import { danceSet, PLAY_CLIPS } from '@/lib/jelly/cast'
@@ -83,6 +83,17 @@ describe('readGltf: Phill', () => {
         expect(Math.hypot(t.values[k], t.values[k + 1], t.values[k + 2], t.values[k + 3])).toBeCloseTo(1, 2)
       }
     }
+  })
+})
+
+describe('readGltf: the lasagna (Play mode round 2)', () => {
+  it("is Number Slayers' lasagna on Phill's 24-bone rig, with its own idle, walk, attack and die and Play's jump; under 700 KB", async () => {
+    const m = await readGltf(glb('lasagna.glb'))
+    expect(m.joints).toHaveLength(24)
+    expect(m.clips.map((c) => c.name).sort()).toEqual(['attack', 'die', 'idle', 'jumping', 'walk'])
+    const jump = m.clips.find((c) => c.name === 'jumping')!
+    expect(jump.duration).toBeCloseTo(1.93, 1)
+    expect(statSync(path.join(process.cwd(), 'public/resume/lasagna.glb')).size).toBeLessThanOrEqual(700 * 1024)
   })
 })
 

@@ -125,6 +125,8 @@ export interface Prop {
   flash: number
   ambient?: number
   rim?: number
+  /** a skinned model's pose (its joint matrices: a Pose's `joints`) */
+  joints?: Float32Array | null
   /** a soft glow just behind it (its diameter, color and strength) */
   halo: { size: number; color: Vec3; alpha: number } | null
 }
@@ -162,6 +164,8 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
   let phill: PhillState | null = null
   let shrimpModel: ActorModel | null = null
   let shrimpWorld: Float32Array | null = null
+  /** Play mode round 2's enemy: fetched once Play has started (never in the cold open) */
+  let lasagna: ActorModel | null = null, lasagnaLoad: Promise<ActorModel | null> | null = null
   const shrimp: ShrimpState[] = Array.from({ length: 4 }, (_, i) => ({
     ...body([0, 0, -40]), on: false, wait: 3 + i * 6 + rnd() * 6, t: 0, dur: 1, from: [0, 0, 0], to: [0, 0, 0], axis: [0, 1, 0], rate: 0, ang: 0, base: [0, 0, 0, 1], size: 1,
     band: 0, level: 0, wave: new Float32Array(WAVE), ph: 0, span: 32, peak: 0.2,
@@ -544,7 +548,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       const shrimp = pr.model === 'shrimp', a = shrimp ? shrimpModel : (pr.model as ActorModel)
       if (!a || (shrimp && !shrimpWorld)) continue
       const m = placement(pr.pos, pr.rot, pr.size / a.extent, pr.anchor === 'origin' ? origin : a.center)
-      R.draw(a, shrimp ? M4x.mulInto(model, m, shrimpWorld!) : m, null, {
+      R.draw(a, shrimp ? M4x.mulInto(model, m, shrimpWorld!) : m, pr.joints ?? null, {
         alpha: alpha * pr.alpha, flash: pr.flash, rim: params.rim * (pr.rim ?? 0.8), ambient: pr.ambient ?? 0.7, glow: pr.glow, fog: 0,
       })
     }
@@ -618,6 +622,22 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     beams,
     /** upload a voxel mesh as a model for Play's props (null before the cast has loaded) */
     voxels: (v: VoxelMesh): ActorModel | null => (R ? R.addVoxels(v) : null),
+    /** Play mode round 2's lasagna: fetch and upload it once (a step per frame); null if it fails (Play goes on without it) */
+    loadLasagna: (nextTask: () => Promise<void>) => {
+      lasagnaLoad ??= (async () => {
+        const r = await fetch('/resume/lasagna.glb')
+        if (!r.ok) throw new Error(`/resume/lasagna.glb: ${r.status}`)
+        const buf = await r.arrayBuffer()
+        await nextTask()
+        if (disposed || !R) return null
+        lasagna = await R.load(buf, nextTask)
+        return lasagna
+      })().catch((err) => { if (!disposed) console.warn('The lasagna failed to load', err); return null })
+      return lasagnaLoad
+    },
+    lasagna: () => lasagna,
+    /** a pose for a skinned model (its own clips, crossfades and the jump's hip clamp) */
+    pose: (a: ActorModel, noLift: string[] = []) => new Pose(a.m, { noLift }),
     /** the body under the ray (Phill or a shrimp), if any */
     hit: (ray: Ray): object | null => hit(ray),
     click,

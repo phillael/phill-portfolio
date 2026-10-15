@@ -4,6 +4,9 @@
  *   - phill.glb: the game's Phill (mesh, WebP texture, idle/walk/dance/attack/die) plus other characters'
  *     dances and the Play mode's jump
  *   - shrimp.glb: the game's shrimp, Draco → meshopt, only its base color and glow maps
+ *   - lasagna.glb (--lasagna, Play mode round 2's enemy): the game's lasagna (a Meshy character on the same
+ *     24-bone rig and bone names as Phill) with its idle/walk/attack/die and Play's jump (--jump), arms held
+ *     as --arms says, like Phill's
  *
  * --dances <glb>,<glb>,… retargets other characters' dances onto Phill: the shroom wizard's
  * six (named below), any clip called "dance" and a file's only clip (both named after the
@@ -24,6 +27,8 @@
  *   NS=~/Desktop/dev/number-slayers/apps/web/public/models
  *   G=$NS/glb; node actors.mjs --phill $G/phill.glb --shrimp $NS/shrimp.glb --out <repo>/public/resume \
  *     --dances $G/zombie.glb,$G/human.glb,$G/garlic.glb,$G/lasagna.glb,$G/moose.glb,<scratch>/jumping.glb --arms 1
+ *   node actors.mjs --lasagna $G/lasagna.glb --jump <scratch>/jumping.glb --arms 1 --out <repo>/public/resume
+ * (Each model is built only when its input is given; rebuilding all of them reproduces the files byte for byte.)
  */
 import { NodeIO } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
@@ -34,7 +39,10 @@ import sharp from 'sharp'
 
 const arg = (k) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : null }
 const phillPath = arg('phill'), dancePaths = arg('dances'), armHold = +(arg('arms') ?? 0), shrimpPath = arg('shrimp'), outDir = arg('out')
-if (!phillPath || !shrimpPath || !outDir) throw new Error('usage: node actors.mjs --phill <glb> --shrimp <glb> --out <dir> [--dances <glb>,<glb>,… [--arms 0…1]]')
+const lasagnaPath = arg('lasagna'), jumpPath = arg('jump')
+if (!outDir || (!phillPath && !shrimpPath && !lasagnaPath)) {
+  throw new Error('usage: node actors.mjs --out <dir> [--phill <glb> [--dances <glb>,<glb>,…]] [--shrimp <glb>] [--lasagna <glb> [--jump <glb>]] [--arms 0…1]')
+}
 await MeshoptDecoder.ready
 await MeshoptEncoder.ready
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
@@ -240,39 +248,55 @@ function handHeld(doc) {
   }
 }
 
-// ---- Phill ----
-const phill = await io.read(phillPath)
-const keep = new Set(['idle', 'dance', 'die', 'walk', 'attack']) // walk and attack: Play mode's run and smash
-for (const a of phill.getRoot().listAnimations()) if (!keep.has(a.getName())) a.dispose()
-for (const m of phill.getRoot().listMaterials()) m.setExtension('KHR_materials_specular', null)
-handHeld(phill)
-if (dancePaths) {
-  const tgt = rig(phill), idle = phill.getRoot().listAnimations().find((a) => a.getName() === 'idle')
-  const hold = idle && armHold > 0 ? { ch: channels(idle), dur: clipLength(idle), k: armHold } : null
-  const WIZARD = { All_Night_Dance: 'allnight', Boom_Dance: 'boom', Bubble_Dance: 'bubble', Hip_Hop_Dance_3: 'hiphop', Magic_Genie: 'genie', Proud_Strut: 'strut' }
-  for (const path of dancePaths.split(',')) {
-    const doc = await io.read(path), src = rig(doc), file = path.split('/').pop().replace(/\.glb$/, '')
-    const only = doc.getRoot().listAnimations().length === 1
-    for (const clip of doc.getRoot().listAnimations()) {
-      const name = WIZARD[clip.getName()] ?? (clip.getName() === 'dance' || only ? file : null)
-      if (!name) continue
-      const dur = retarget(src, tgt, phill, clip, name, hold)
-      console.log('retargeted', file, clip.getName(), '→', name, dur.toFixed(2) + 's')
+/** the clips a character keeps (its own), with others retargeted onto it; then packed like Phill */
+async function character(path, keep, borrow, hand) {
+  const doc = await io.read(path)
+  for (const a of doc.getRoot().listAnimations()) if (!keep.has(a.getName())) a.dispose()
+  for (const m of doc.getRoot().listMaterials()) m.setExtension('KHR_materials_specular', null)
+  if (hand) handHeld(doc)
+  if (borrow.length) {
+    const tgt = rig(doc), idle = doc.getRoot().listAnimations().find((a) => a.getName() === 'idle')
+    const hold = idle && armHold > 0 ? { ch: channels(idle), dur: clipLength(idle), k: armHold } : null
+    const WIZARD = { All_Night_Dance: 'allnight', Boom_Dance: 'boom', Bubble_Dance: 'bubble', Hip_Hop_Dance_3: 'hiphop', Magic_Genie: 'genie', Proud_Strut: 'strut' }
+    for (const p of borrow) {
+      const src = await io.read(p), from = rig(src), file = p.split('/').pop().replace(/\.glb$/, '')
+      const only = src.getRoot().listAnimations().length === 1
+      for (const clip of src.getRoot().listAnimations()) {
+        const name = WIZARD[clip.getName()] ?? (clip.getName() === 'dance' || only ? file : null)
+        if (!name) continue
+        const dur = retarget(from, tgt, doc, clip, name, hold)
+        console.log('retargeted', file, clip.getName(), '→', name, dur.toFixed(2) + 's', 'onto', path.split('/').pop())
+      }
     }
   }
+  await doc.transform(
+    resample(), // drops keys a straight line through their neighbors already gives
+    prune(),
+    textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 88 }),
+    meshopt({ encoder: MeshoptEncoder, level: 'high' }), // 'high' also packs the clips (16-bit quaternions), half their size
+  )
+  return doc
 }
-await phill.transform(
-  resample(), // drops keys a straight line through their neighbors already gives
-  prune(),
-  textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 88 }),
-  meshopt({ encoder: MeshoptEncoder, level: 'high' }), // 'high' also packs the clips (16-bit quaternions), half their size
-)
-await io.write(`${outDir}/phill.glb`, phill)
+
+// ---- Phill ----
+if (phillPath) {
+  const phill = await character(phillPath, new Set(['idle', 'dance', 'die', 'walk', 'attack']), dancePaths ? dancePaths.split(',') : [], true) // walk and attack: Play mode's run and smash
+  await io.write(`${outDir}/phill.glb`, phill)
+}
+
+// ---- the lasagna: Play mode round 2's enemy (patrols, jumps a line, charges, kicks; flung or squashed) ----
+if (lasagnaPath) {
+  const lasagna = await character(lasagnaPath, new Set(['idle', 'walk', 'attack', 'die']), jumpPath ? [jumpPath] : [], false)
+  await io.write(`${outDir}/lasagna.glb`, lasagna)
+}
+
 
 // ---- the shrimp: keep its color and its glow; the asteroid shader needs nothing else ----
-const shrimp = await io.read(shrimpPath)
-for (const m of shrimp.getRoot().listMaterials()) { m.setNormalTexture(null); m.setMetallicRoughnessTexture(null) }
-shrimp.getRoot().listExtensionsUsed().filter((e) => e.extensionName === 'KHR_draco_mesh_compression').forEach((e) => e.dispose())
-await shrimp.transform(prune(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }))
-await io.write(`${outDir}/shrimp.glb`, shrimp)
+if (shrimpPath) {
+  const shrimp = await io.read(shrimpPath)
+  for (const m of shrimp.getRoot().listMaterials()) { m.setNormalTexture(null); m.setMetallicRoughnessTexture(null) }
+  shrimp.getRoot().listExtensionsUsed().filter((e) => e.extensionName === 'KHR_draco_mesh_compression').forEach((e) => e.dispose())
+  await shrimp.transform(prune(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }))
+  await io.write(`${outDir}/shrimp.glb`, shrimp)
+}
 console.log('done')

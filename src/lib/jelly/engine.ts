@@ -595,6 +595,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     find('')
     playing = true
     play.enter()
+    void cast.loadLasagna(nextTask) // round 2's enemy: only now that Play has started
     return true
   }
 

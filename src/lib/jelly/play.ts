@@ -184,6 +184,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   const ufos = createUfos({ w, level, cast, emit: (e) => { if (e.type === 'trip') tripT = 0; emit(e) }, award: (why, at) => award(why, at) })
   /** seconds into the trip (-1: none); another mushroom starts it over */
   let tripT = -1
+  /** dev: a posed lasagna (showLasagna) */
+  let devLas: { prop: Prop } | null = null
   /** the trip's swelling words (up to 3), and the wait for the next */
   const swelling: { body: number; A: number; dur: number; t: number; sw: Swell }[] = []
   let swellWait = 0
@@ -921,6 +923,21 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     again,
     /** dev: put him on a line (index into level.lines) at x */
     place: (line: number, at: number) => { if (on) place(line, at) },
+    /** dev: a lasagna posed beside him (clip at time t, or 'off'), to check the model */
+    showLasagna: (clip: string, t = 0) => {
+      const a = cast.lasagna()
+      if (devLas) { const i = cast.props.indexOf(devLas.prop); if (i >= 0) cast.props.splice(i, 1); devLas = null }
+      if (!a || clip === 'off') return !!a
+      const pose = cast.pose(a, ['jumping'])
+      pose.play(clip, 0)
+      pose.seek(t)
+      pose.update(0, 0)
+      const prop: Prop = { model: a, anchor: 'origin', pos: [x + 0.5 * facing, y, z], rot: [0, 0, 0, 1], size: a.extent * (0.32 / a.height), alpha: 1, glow: [0, 0, 0], flash: 0, joints: pose.joints, halo: null }
+      Q.axis(0, 1, 0, -facing * (Math.PI / 2 - P.face), prop.rot)
+      cast.props.push(prop)
+      devLas = { prop }
+      return true
+    },
     /** dev: the swelling words now */
     swells: () => swelling.map((s) => ({ word: w.bodies[s.body].b.text, line: level.lineOf[s.body], a: +s.sw.a.toFixed(3) })),
     /** dev: the run's UFOs and the mushroom, and a mushroom walking from a line */

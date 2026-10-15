@@ -10,14 +10,14 @@
 
 import type { Cast, Drive, Prop } from './cast'
 import { resetView, type UiInsets } from './camera'
-import { FOV, LOOSE, PAD_X, PLAY_R2, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
+import { FOV, LOOSE, PAD_TOP, PAD_X, PLAY_R2, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
 import { lcg, Q, type Vec3 } from './math'
 import { burst, healAll } from './physics'
 import { smashBox } from './hitboxes'
 import { Boost, placeShrimp, touchesShrimp, type ShrimpSpot } from './pickups'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
 import { BEST_SCORE_KEY, bestStore, createRun, type RunResult } from './playRun'
-import { moonJump, tripFlicker, tripLook } from './trip'
+import { moonJump, swellEnvelope, tripFlicker, tripLook, type Swell } from './trip'
 import { createUfos } from './ufos'
 import { bilerp, hidden, type World } from './world'
 
@@ -184,6 +184,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   const ufos = createUfos({ w, level, cast, emit: (e) => { if (e.type === 'trip') tripT = 0; emit(e) }, award: (why, at) => award(why, at) })
   /** seconds into the trip (-1: none); another mushroom starts it over */
   let tripT = -1
+  /** the trip's swelling words (up to 3), and the wait for the next */
+  const swelling: { body: number; A: number; dur: number; t: number; sw: Swell }[] = []
+  let swellWait = 0
 
   const foot = () => P.size * 0.12
   const halfDepth = () => (Math.max(rig.dims[0], rig.dims[2]) / 2) * (P.size / rig.height)
@@ -266,6 +269,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     boost.reset()
     tripT = -1
     w.trip = w.heat = w.tripMelt = 0
+    swelling.length = 0
+    w.swells.length = 0
     rollShrimp()
     ufos.roll(shrimp.map((s) => s.spot.line))
     for (const bi of level.coins) w.bodies[bi].coinT = 1
@@ -288,6 +293,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     tripT = -1
     w.trip = 0
     w.cam.roll = 0
+    swelling.length = 0
+    w.swells.length = 0
     cast.drive(null, !instant)
     resetView(w)
     input.left = input.right = input.jump = input.down = input.smash = false
@@ -474,6 +481,34 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       award('shrimp', at)
       emit({ type: 'shrimp', index, at, shrimp: run.shrimp, total: run.shrimpTotal })
     })
+  }
+
+  // ---- the trip's swelling words ----
+  /** now and then a word near him (4 letters or more) swells (or shrinks) and shoves its neighbors; at most 3 at once */
+  function stepSwells(dt: number) {
+    if (tripT >= 0 && (swellWait -= dt) <= 0) {
+      swellWait = 0.5 + Math.random() * 0.7
+      if (swelling.length < 3) {
+        const near = w.bodies.map((bd, bi) => ({ bd, bi })).filter(({ bd, bi }) =>
+          solid(bd) && bd.b.text.replace(/[^\p{L}\p{N}]/gu, '').length >= 4 && Math.abs(bd.hcx - x) <= 2.2 && Math.abs(bd.hcy - y) <= 1.2 && !swelling.some((s) => s.body === bi))
+        if (near.length) {
+          const { bd, bi } = near[Math.floor(Math.random() * near.length)], lh = bd.b.line.lh
+          const cy = bd.yTop - PAD_TOP - lh / 2 // (the middle of its text)
+          swelling.push({
+            body: bi, A: Math.random() < 0.7 ? 0.7 + Math.random() * 0.5 : -0.35, dur: 2.2 + Math.random() * 1.2, t: 0,
+            sw: { body: bi, cx: (bd.x0 + bd.x1) / 2, cy, hx: ((bd.x1 - bd.x0) / 2 - PAD_X) * 1.15, hy: (lh / 2) * 1.15, a: 0 },
+          })
+        }
+      }
+    }
+    w.swells.length = 0
+    for (let i = swelling.length - 1; i >= 0; i--) {
+      const s = swelling[i]
+      s.t += dt
+      if (s.t >= s.dur) { swelling.splice(i, 1); continue }
+      s.sw.a = swellEnvelope(s.A, s.t / s.dur) * w.tripAmt // (fading with the trip's look)
+      w.swells.push(s.sw)
+    }
   }
 
   // ---- falling off the page ----
@@ -679,6 +714,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   function update(dt: number) {
     if (!on || dt <= 0) return
     stepShrimp(dt)
+    stepSwells(dt)
     ufos.update(dt, x, y, introT >= INTRO && flailT < 0 && !run.finished)
     // the trip: the clock and its look; moon jumps (×1.5 high, ×0.6 gravity) while it lasts
     if (tripT >= 0 && (tripT += dt) >= PLAY_R2.trip) { tripT = -1; emit({ type: 'tripEnd' }) }
@@ -885,6 +921,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     again,
     /** dev: put him on a line (index into level.lines) at x */
     place: (line: number, at: number) => { if (on) place(line, at) },
+    /** dev: the swelling words now */
+    swells: () => swelling.map((s) => ({ word: w.bodies[s.body].b.text, line: level.lineOf[s.body], a: +s.sw.a.toFixed(3) })),
     /** dev: the run's UFOs and the mushroom, and a mushroom walking from a line */
     ufos: () => ufos.state(),
     mushroom: (line: number, at: number, dir: number) => { if (on) ufos.devMushroom(line, at, dir) },

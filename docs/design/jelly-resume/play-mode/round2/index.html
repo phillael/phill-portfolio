@@ -1,0 +1,1499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Play Mode Round 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Nunito:wght@400;600;700;800&family=Press+Start+2P&family=Rubik+Pixels&display=swap" rel="stylesheet">
+<!--
+  Jelly Resume · Play mode round 2: the mockups (2026-10-14). Three things to decide with Phill:
+  PLAYER 1 START printed on the paper, the shrimp / container / mushroom look, and what the mushroom's
+  shroom trip does. The 3D views are three.js stand-ins for the engine: the real page (snapshot.json,
+  text.webp, decor.webp), the real phill.glb and shrimp.glb, and the pixel art from art.js (the code the
+  engine will reuse). Serve the repo (python3 -m http.server 8765 from its root) and open
+  http://localhost:8765/docs/design/jelly-resume/play-mode/round2/index.html
+-->
+<style>
+  :root {
+    --bg: #05070c; --ink: #d7deea; --muted: #7c8798; --cyan: #80eaff; --electric: #00d4ff; --green: #00ff2b;
+    --pink: #ff4fd8; --violet: #c44dff; --line: #1e2431; --card: #0b0e16; --btn: #121621; --anno: #ff4fd8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 Nunito, system-ui, sans-serif; }
+  header, main { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+  header { padding-top: 30px; }
+  h1 { font: 26px/1.2 Audiowide, sans-serif; margin: 0 0 6px; color: var(--cyan); text-shadow: 0 0 18px rgba(128, 234, 255, .35); }
+  h2 { font: 19px/1.3 Audiowide, sans-serif; margin: 0 0 12px; }
+  h2 .n { color: var(--anno); margin-right: 6px; }
+  h3 { font: 15px/1.3 Audiowide, sans-serif; margin: 0 0 8px; color: var(--cyan); }
+  a { color: var(--cyan); }
+  .sub { color: var(--muted); margin: 0 0 20px; max-width: 900px; }
+  section.block { margin: 30px 0 50px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .pick-me { color: var(--green); font-weight: 800; }
+  code { font-size: 12.5px; background: #141926; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: #b9c6da; }
+
+  /* the three looks, flat */
+  .looks, .boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 0 0 16px; }
+  .look, .box-card { position: relative; display: grid; align-content: start; gap: 8px; text-align: left; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer; }
+  .look[aria-pressed="true"], .box-card[aria-pressed="true"] { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan), 0 0 18px rgba(128, 234, 255, .2); }
+  .look canvas, .box-card canvas { width: 100%; height: auto; background: #fff; border-radius: 6px; image-rendering: pixelated; }
+  .look b, .box-card b { font-family: Audiowide, sans-serif; font-weight: 400; color: var(--cyan); }
+  .look span, .box-card span { color: var(--muted); font-size: 14px; }
+
+  /* a 3D stage and its controls */
+  .stage { position: relative; overflow: hidden; border-radius: 14px; background: #05070f; box-shadow: 0 0 0 1px #2a3142, 0 18px 50px rgba(0, 0, 0, .6); aspect-ratio: 16 / 9.6; margin: 0 auto; }
+  .stage.phone { aspect-ratio: 390 / 844; max-width: 390px; border-radius: 30px; box-shadow: 0 0 0 7px #161a24, 0 0 0 8px #2a3142, 0 18px 50px rgba(0, 0, 0, .6); }
+  .stage canvas.gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .stage .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font: 11px 'Press Start 2P', monospace; }
+  .ctl { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 12px 0 0; }
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .seg > span { color: var(--muted); font-size: 13px; margin-right: 4px; }
+  .seg button, .act { font: 700 13.5px Nunito, sans-serif; color: var(--ink); background: var(--btn); border: 1px solid #2a3142; border-radius: 10px; min-height: 44px; padding: 0 12px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); background: rgba(128, 234, 255, .1); }
+  .act { border-color: var(--pink); color: var(--pink); }
+  .act:hover, .seg button:hover { border-color: var(--cyan); }
+  button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  .notes { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: n; columns: 2 420px; column-gap: 28px; }
+  .notes li { break-inside: avoid; position: relative; padding-left: 32px; margin: 0 0 10px; font-size: 14px; }
+  .notes li::before { counter-increment: n; content: counter(n); position: absolute; left: 0; top: 1px; width: 22px; height: 22px; border-radius: 50%; background: var(--anno); color: #0b0d12; font: 700 12px/22px Nunito, sans-serif; text-align: center; }
+  .notes b { color: #fff; }
+
+  /* the real control: a transparent button over the art (its hit box is shown on demand) */
+  .hit { position: absolute; left: 0; top: 0; z-index: 2; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; transform-origin: 0 0; }
+  .hit.show { outline: 2px dashed var(--pink); outline-offset: 0; }
+  .hit:focus-visible { outline: none; } /* its focus is drawn on the paper (pixel brackets) */
+  .hud-note { position: absolute; left: 12px; bottom: 10px; z-index: 3; font: 10px 'Press Start 2P', monospace; color: var(--cyan); text-shadow: 0 0 6px rgba(0, 0, 0, .9); pointer-events: none; }
+  .status { position: absolute; right: 12px; top: 10px; z-index: 3; font: 10px 'Press Start 2P', monospace; color: #fff; background: rgba(8, 10, 16, .72); border: 1px solid #2a3142; border-radius: 8px; padding: 8px 10px; pointer-events: none; }
+  .status .g { color: var(--green); }
+
+  /* SHRIMP! (ported from Number Slayers' ShrimpCelebration: DOM + CSS transforms only) */
+  .shrimp-show { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+  .shrimp-word { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .shrimp-word > div { font-family: 'Rubik Pixels', monospace; font-size: clamp(2.6rem, 9vw, 7rem); letter-spacing: .06em; text-shadow: 0 0 24px rgba(255, 90, 36, .8), 4px 4px 0 rgba(0, 0, 0, .55); animation: shrimp-word-pop 2500ms ease-out both; }
+  .shrimp-word span { display: inline-block; animation: shrimp-letter-flash 260ms ease-in-out infinite; }
+  .shrimp-rain { position: absolute; top: 0; animation: shrimp-rain-fall linear both; }
+  @keyframes shrimp-word-pop { 0% { transform: scale(.2) rotate(-6deg); opacity: 0 } 12% { transform: scale(1.25) rotate(3deg); opacity: 1 } 20% { transform: scale(1) rotate(-2deg) } 80% { transform: scale(1.05) rotate(2deg); opacity: 1 } 100% { transform: scale(1.6) rotate(0); opacity: 0 } }
+  @keyframes shrimp-letter-flash { 0%, 100% { filter: brightness(1); transform: translateY(0) } 50% { filter: brightness(1.8); transform: translateY(-.12em) } }
+  @keyframes shrimp-rain-fall { 0% { transform: translateY(calc(var(--h) * -.12)) rotate(0); opacity: 0 } 8% { opacity: 1 } 100% { transform: translateY(calc(var(--h) * 1.15)) rotate(var(--spin)); opacity: 1 } }
+
+  .boxes { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin-top: 4px; }
+  .new { display: inline-block; font: 9px 'Press Start 2P', monospace; color: #0b0d12; background: var(--green); border-radius: 4px; padding: 3px 5px 2px; margin-right: 6px; vertical-align: 2px; }
+  .changes { margin: 0 0 8px; padding-left: 20px; }
+  .changes li { margin: 0 0 6px; }
+  /* a score pop (like Play's "+1 IMPACT"): projected once, CSS-animated */
+  .pop { position: absolute; z-index: 3; left: 0; top: 0; font: 11px 'Press Start 2P', monospace; color: #fff; text-shadow: 0 0 8px rgba(255, 90, 36, .9), 2px 2px 0 rgba(0, 0, 0, .6); pointer-events: none; animation: pop-up 1000ms ease-out both; }
+  @keyframes pop-up { 0% { transform: translate(-50%, 0) scale(.6); opacity: 0 } 15% { transform: translate(-50%, -14px) scale(1.15); opacity: 1 } 100% { transform: translate(-50%, -56px) scale(1); opacity: 0 } }
+  .pop.bad { text-shadow: 0 0 8px rgba(255, 59, 92, .95), 2px 2px 0 rgba(0, 0, 0, .6); color: #ffd0d8; }
+  .pop.alert { font-size: 20px; color: #ffd24a; text-shadow: 0 0 10px rgba(255, 210, 74, .9), 2px 2px 0 rgba(0, 0, 0, .7); }
+  @media (prefers-reduced-motion: reduce) { .pop { animation: none; transform: translate(-50%, -20px); } }
+  table.qa { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.qa th, table.qa td { text-align: left; vertical-align: top; padding: 10px 12px; border-top: 1px solid var(--line); }
+  table.qa th { width: 30%; color: #fff; font-weight: 800; }
+  table.qa td .alt { color: var(--muted); }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/" } }</script>
+</head>
+<body>
+<header>
+  <h1>Play mode, round 2: the mockups</h1>
+  <div class="card" style="margin: 0 0 18px; max-width: 900px">
+    <h3>Round 2c: your notes, done</h3>
+    <ul class="changes">
+      <li><span class="new">NEW</span><b>Psychedelic molten:</b> the forge colors stay, but rainbow bands now flow through the metal (white-hot cores, neon mid-tones, violet edges) and the glow takes the neon hue. Less hellfire, more trip (§2, <i>Eat the mushroom</i>; <i>Trip words</i> keeps the 2b version to compare).</li>
+      <li><span class="new">NEW</span><b>Swelling words:</b> in the trip, a word near you swells up to about twice its size (now and then one shrinks instead), shoves its neighbors aside with a jelly wobble, then settles.</li>
+      <li><span class="new">NEW</span><b>The lasagna</b> (§3): Number Slayers' lasagna as an enemy that notices you, jumps a line to get at you and kicks. Real hitboxes; stomp it, smash it, or get kicked. <b>In the trip it grows 4× and can't be hurt: run</b> (<i>Giant</i>).</li>
+      <li><b>Settled:</b> the arcade button (one size smaller), the UFO, the violet voxel mushroom, shrimp = boost + 500 points, the SCORE. The walrus is out.</li>
+    </ul>
+  </div>
+  <p class="sub">Your four asks, designed: <b>PLAYER 1 START printed on the paper</b> (§1), <b>shrimp pickups</b> with the Number Slayers SHRIMP! and <b>mushrooms</b> that come out of something you smash and slide along the lines (§2), <b>the lasagna</b>, an enemy (§3), what the <b>shroom trip</b> does (§4), and my answers to the open questions (§5). The sounds are on their own page: <a href="sounds.html"><b>the sound audition →</b></a> (the buttons here play whatever you pick there). The 3D views use the real page, the real Phill and the real shrimp; everything else is a stand-in for the engine's shaders. My picks are marked <span class="pick-me">✓ my pick</span>.</p>
+</header>
+<main>
+
+<!-- ============ §1 PLAYER 1 START ============ -->
+<section class="block" id="start">
+  <h2><span class="n">§1</span>PLAYER 1 START, printed on the paper</h2>
+  <p class="sub">It's painted into the page's own texture (where the decorations already go), in the empty top right beside your name, so it tilts, bends, lights and goes shroom with the sheet. Three looks (click one to see it in 3D). Pixel art in the site's colors, printed like ink: one art pixel is 4 texels now (about 1.7 px of the PDF; it was 5). Try the sizes with <i>Size</i> under the stage.</p>
+  <div class="looks" role="group" aria-label="PLAYER 1 START look">
+    <button class="look" data-look="A" aria-pressed="true"><canvas width="560" height="220"></canvas><b>A · The arcade button <span class="pick-me">✓ your pick</span></b><span>The 1P button off a cabinet's panel (pink dome) beside "PLAYER 1 / ▶ START". The most "start button".</span></button>
+    <button class="look" data-look="B" aria-pressed="false"><canvas width="560" height="220"></canvas><b>B · The controller</b><span>A little pad (d-pad, select/start, B and A) over "▶ PLAYER 1 START". Reads as "game" at any size; the START pill and the ▶ blink.</span></button>
+    <button class="look" data-look="C" aria-pressed="false"><canvas width="560" height="220"></canvas><b>C · 8-bit Phill</b><span>You as a 16-px sprite (hat, poncho) beside "PLAYER 1 / ▶ START", like a title screen. The cutest; the least obviously a button.</span></button>
+  </div>
+  <div class="stage" id="s1"><canvas class="gl"></canvas><div class="loading">LOADING THE PAGE…</div></div>
+  <div class="ctl">
+    <div class="seg" data-ctl="view"><span>View</span><button aria-pressed="true" data-v="page">Whole page</button><button data-v="corner" aria-pressed="false">Corner close-up</button><button data-v="phone" aria-pressed="false">Phone (portrait)</button></div>
+    <div class="seg" data-ctl="state"><span>State</span><button aria-pressed="true" data-v="idle">Idle</button><button data-v="focus" aria-pressed="false">Hover / focus</button><button data-v="loading" aria-pressed="false">Loading</button><button data-v="playing" aria-pressed="false">Playing</button><button data-v="shroom" aria-pressed="false">Shroom mode</button></div>
+    <div class="seg" data-ctl="sway"><span>Paper</span><button aria-pressed="true" data-v="on">Sway + waves</button><button data-v="off" aria-pressed="false">Still</button></div>
+    <div class="seg" data-ctl="size"><span>Size</span><button data-v="5" aria-pressed="false">Round 1 (5)</button><button data-v="4" aria-pressed="true">Smaller ✓ (4)</button><button data-v="3" aria-pressed="false">Smallest (3)</button></div>
+    <div class="seg" data-ctl="hit"><span>Hit box</span><button aria-pressed="false" data-v="on">Show</button><button data-v="off" aria-pressed="true">Hide</button></div>
+  </div>
+  <ol class="notes">
+    <li><b>Printed, not floating.</b> <code>engine.load()</code> paints it into the page backing (the <code>back</code> canvas, next to the decorations), anchored to the content's right edge and centered on the name's line. The navigator's mini map shows it too.</li>
+    <li><b>Animated by the page shader, not by re-uploads:</b> a small overlay texture (just the art's box) holds its other frames (▶ and START off, pressed, unavailable) and the shader mixes it in inside the art's rect. The ▶ blinks at 2 Hz (on 0.5 s, off 0.5 s; never faster than 3 Hz).</li>
+    <li><b>Hover / focus:</b> pixel corner brackets in electric cyan with an ink edge (a retro menu cursor) light up around it, on the paper, and the art lifts a little. Pressed: the art drops one art pixel for 120 ms, then Play starts.</li>
+    <li><b>The real control:</b> a transparent <code>&lt;button&gt;</code> over the art's projected box, never smaller than 44 × 44 px (it grows around the art when the page is small, e.g. on a phone: turn on <i>Hit box</i>). Placed in <code>onFrame</code> from the four projected corners (style writes only, no layout reads). Same <code>aria-label</code>, <code>aria-keyshortcuts="J"</code>, <code>aria-busy</code> and disabled states as today. Tab reaches it; Enter/Space start Play.</li>
+    <li><b>States:</b> idle (blinking); loading (the ▶ blinks, <code>aria-busy</code>); unavailable (the art grays out, the button is disabled with the reason in its label); playing (it stays printed, steady and a little faded, like a logo; not clickable); shroom mode (its ink goes neon like the words).</li>
+    <li><b>Hidden when the page can't be seen:</b> the button is <code>inert</code> during the intro, closing and while playing, and when the corner is off screen or turned away (its projected box is degenerate).</li>
+  </ol>
+</section>
+
+<!-- ============ §2 pickups ============ -->
+<section class="block" id="pickups">
+  <h2><span class="n">§2</span>On the lines: shrimp, the containers and the mushroom</h2>
+  <p class="sub">At Play's zoom (Phill ~90 px tall). The <b>shrimp</b> is the cast's own <code>shrimp.glb</code>, small, glowing coral, spinning and bobbing over a line; touch it for <b>SHRIMP!</b> (ported straight from Number Slayers) and +500. Instead of Mario's ? block, the mushroom comes out of <b>a container</b> from the site's world (space and cyberpunk): pick one below to see it in 3D. Smash it (Space, or pound it) and the <b>mushroom</b> comes out, slides along the line, drops off line ends onto the lines below, and falls into the void past the paper's edge. Eat it for the shroom trip (§4).</p>
+  <div class="boxes" role="group" aria-label="The container">
+    <button class="box-card" data-box="ufo" aria-pressed="true"><canvas width="400" height="200"></canvas><b>1 · The UFO <span class="pick-me">✓ your pick</span></b><span>A little saucer hovering over a line at chest height, the mushroom riding in its glass dome, rim lights chasing. Smash it: it wobbles, beams the mushroom down onto the line and zips off into the nebula. The most alive (you notice it moving on a busy page) and the furthest from a block.</span></button>
+    <button class="box-card" data-box="meteor" aria-pressed="false"><canvas width="400" height="200"></canvas><b>2 · The spore meteor</b><span>A space rock crashed into a line, its cracks glowing cyan: the spores inside are alive (mushrooms from outer space). Smash it: it splits into chunks and the mushroom pops out of the wreck.</span></button>
+    <button class="box-card" data-box="pod" aria-pressed="false"><canvas width="400" height="200"></canvas><b>3 · The specimen pod</b><span>A lab capsule of glowing fluid with the mushroom floating inside: you can see what you'll get. Smash it: the glass shatters and the mushroom hops out.</span></button>
+    <button class="box-card" data-box="crate" aria-pressed="false"><canvas width="400" height="200"></canvas><b>4 · The cyber crate</b><span>A dark cargo crate with a neon frame and hazard stripes; a flickering hologram over it shows what's inside. Smash it: it bursts and the hologram becomes the real thing.</span></button>
+  </div>
+  <div class="stage" id="s2"><canvas class="gl"></canvas><div class="loading">LOADING PHILL…</div><div class="status" id="s2status"></div></div>
+  <div class="ctl">
+    <div class="seg" data-ctl="mush"><span>Mushroom</span><button aria-pressed="true" data-v="violet">Voxel, site violet ✓ your pick</button><button data-v="red" aria-pressed="false">Voxel, classic red</button><button data-v="smooth" aria-pressed="false">Smooth 3D</button><button data-v="ns" aria-pressed="false">NS mushroom.glb</button></div>
+    <div class="seg" data-ctl="words"><span>Trip words</span><button aria-pressed="true" data-v="psy">Psychedelic molten ✓</button><button data-v="molten" aria-pressed="false">Molten metal (2b)</button><button data-v="neonmelt" aria-pressed="false">Neon, melting</button><button data-v="neon" aria-pressed="false">Neon (2a)</button></div>
+    <div class="seg" data-ctl="swell"><span>Swelling words</span><button aria-pressed="true" data-v="on">On ✓</button><button data-v="off" aria-pressed="false">Off</button></div>
+  </div>
+  <div class="ctl">
+    <button class="act" id="touchShrimp">🍤 Touch the shrimp</button>
+    <button class="act" id="smashBlock">💥 Smash it</button>
+    <button class="act" id="eatShroom">🍄 Eat the mushroom (12 s)</button>
+  </div>
+  <ol class="notes">
+    <li><b>Shrimp:</b> 5 a run, at random spots spread down the page (never on the name, the bottom line, a coin or a checkpoint title), re-rolled on Play again. They hover just over a line (~0.25 units long: half his height), spin and bob, and glow coral (the cast's shrimp look). <b>Touch</b> = his body overlaps it (no smash needed).</li>
+    <li><b>SHRIMP!</b> is Number Slayers' <code>ShrimpCelebration</code>: rainbow <i>Rubik Pixels</i> letters and 16 🍤 raining for 2.5 s, DOM and CSS transforms only (no per-frame JS). Sounds: your pickup blip, then Phill's own <code>shrimp-announce.mp3</code>, then a CC0 shower 1.5 s later (NS's shower is a paid Epic Stock Media sound: it can't go in this public repo). The site's music ducks for 4 s, if it's playing.</li>
+    <li><b>What a shrimp does:</b> a little speed boost, +35% run speed for 8 s (a second stacks to +70%; the stats show 🍤 and a draining bar), and <b>+500 points</b> (a "+500" pops where it was). Counted on THE END card ("SHRIMP 3/5").</li>
+    <li><b>Containers:</b> 3 a run, on lines spread down the page, at his knee-to-chest height so Space hits them (a pound from above works too; the UFO hovers low enough for a plain smash, no headbutt). Smashed: +200, the smash sound, and the mushroom comes out with the sprout sound. Then it's gone (the UFO flies off; the others break into voxel chunks that fall and fade). One kind for the whole run (your pick), or a mix.</li>
+    <li><b>The mushroom</b> slides at 1.2 units/s (half his run) away from him, follows the line (it rides the jelly like he does), drops off line ends and pits onto the next line below, and is lost if it falls past the paper's edge (blinks and poofs after 15 s too). One at a time. Touch it to eat it.</li>
+    <li><b>Look:</b> pixel art extruded into voxels (built in code from the art.js grids, no download), lit like the cast, in the site's violet with cyan spots. The containers are voxels too (the round ones are turned like a pot: saucer, rock, capsule), with unlit cells for their lights and see-through glass. Its eyes face the camera; it wobbles as it slides. The NS <code>mushroom.glb</code> is a 1.37 MB walking creature (three skinned meshes), not a power-up: not recommended.</li>
+  </ol>
+</section>
+
+<!-- ============ §3 the lasagna ============ -->
+<section class="block" id="enemy">
+  <h2><span class="n">§3</span>The lasagna: an enemy to fight</h2>
+  <p class="sub">Number Slayers' lasagna, at Play's zoom. It's built on the same Meshy rig as your Phill (24 bones, same names, same six clips), so Play's jump plays on it unchanged: what you see here is the real <code>lasagna.glb</code> wearing Phill's <code>jumping</code> clip. The scene loops through the four ways an encounter ends; the outcomes come from real hitbox tests (turn on <i>Hitboxes</i> to see them light up only while they're live).</p>
+  <div class="stage" id="s3"><canvas class="gl"></canvas><div class="loading">LOADING THE LASAGNA…</div><div class="status" id="s3status"></div></div>
+  <div class="ctl">
+    <button class="act" data-mode="auto">↻ Loop all four</button>
+    <button class="act" data-mode="stomp">⬇ Stomp it</button>
+    <button class="act" data-mode="smash">💥 Smash it</button>
+    <button class="act" data-mode="kicked">🦶 Get kicked</button>
+    <button class="act" data-mode="giant">🍄 Giant (in the trip)</button>
+    <div class="seg" data-ctl="boxes"><span>Hitboxes</span><button aria-pressed="true" data-v="on">Show</button><button data-v="off" aria-pressed="false">Hide</button></div>
+  </div>
+  <ol class="notes">
+    <li><b>Who:</b> the lasagna, two-thirds his height (0.32 units), googly eyes and all. <code>actors.mjs</code> builds <code>public/resume/lasagna.glb</code> from the Number Slayers model plus Play's <code>jumping</code> (~0.65 MB), loaded with Play's chunk after Play starts (never in the cold open). It's Meshy-made like your Phill, which already ships.</li>
+    <li><b>How it acts:</b> 2 a run, on lines ahead, one at a time. It patrols its line; when you're within ~2.5 units on its line or the next one, a <b>"!"</b> pops and it winds up for 0.45 s (fair warning), then <b>jumps up or drops down a line</b> to get at you, charges at half your run speed, and <b>kicks</b> when close (its own Number Slayers attack: a right-foot kick).</li>
+    <li><b>Hitboxes</b> are boxes on the page plane (everything stands on the paper): your body <span style="color:#80eaff">■</span>, your feet <span style="color:#00ff2b">■</span> (only while falling), your smash <span style="color:#ff4fd8">■</span> (only in the strike, 0.45–0.8 s of the swing); its body <span style="color:#ffd24a">■</span> and its kick <span style="color:#ff3b5c">■</span> (only in the kick's window, from Number Slayers' capsule data: 1.2–1.6 s). Sizes come from those capsules, scaled. Pure functions in <code>play.ts</code>, unit-tested.</li>
+    <li><b>Stomp:</b> lines are one-way platforms only 0.17 units apart and it's taller than that, so you stomp it from <b>the line above</b>: hop and come down on it, or drop (↓) when it's under you. Squash, a bounce, +300. A pound (↓ in the air) works too.</li>
+    <li><b>Smash:</b> Space when it's in reach: it's knocked flying off the page, +300. <b>It kicks you:</b> knocked back, 1.5 s of flicker (no more hits; 2.5 Hz), −250 (never below 0). No lives, no game over, like the rest of Play: it costs time and points.</li>
+    <li><span class="new">NEW</span><b>In the trip it's a giant:</b> eat a mushroom and the nearest lasagna grows <b>4×</b> (taller than the screen's middle third) and can't be hurt: smashes go <b>TINK!</b>, a stomp just bounces you off its head, and its feet trample you (−250). It lumbers after you at 1.6 units/s, slower than your run, so <b>run</b>: your moon jumps carry you up out of reach. If no lasagna is near when you eat one, a giant one drops in from the top of the screen a moment later. When the shrooms wear off it shrinks back (1 s) and you can get even: drop on it, +300.</li>
+    <li><b>Sounds and words:</b> new audition slots: alert, stomp, kicked, defeated, the giant's growl and its steps (the stand-ins here borrow other slots). Live region: "A lasagna is charging", "Lasagna stomped, 300 points", "Kicked, minus 250", "The lasagna grew huge. Run!". Touch: A jumps, B smashes, ▼ drops, as now.</li>
+  </ol>
+</section>
+
+<!-- ============ §4 the trip ============ -->
+<section class="block" id="trip">
+  <h2><span class="n">§4</span>The shroom trip: what "things get weird" means</h2>
+  <div class="card">
+    <p style="margin-top:0">Eating the mushroom turns on <b>the resume's own shroom mode</b> for <b>12 s</b> (not the site's global one: the wizard is hidden under the resume anyway, and it would stay on after you leave Play). On top of today's look (the paper goes night violet, the words go neon and hue-cycle, they melt and droop), Play gets weirder (try <i>Eat the mushroom</i> in §2):</p>
+    <ol class="notes" style="columns: 2 380px">
+      <li><span class="new">NEW</span><b>Psychedelic molten:</b> on top of the forge colors below, rainbow bands sweep across the page through the metal: the white-hot cores stay, the mid-tones take the neon hue, the edges cool to violet, and the glow on the paper is neon too. Some words run forge-orange while others run rainbow, changing as the bands pass.</li>
+      <li><span class="new">NEW</span><b>Swelling words:</b> every half second or so a word near you swells (to ~1.7–2.2×) or, now and then, shrinks (to ~0.65×), shoving its neighbors aside with a jelly wobble over 2–3 s, then settles; up to three at once. <span style="color:var(--muted)">In the engine it's real: the swelling word's lattice gets new spring targets (its <code>off</code>) that grow it, and its neighbors' targets push away, so the jelly does the shoving and you ride the swollen words (your footing follows the lattice).</span></li>
+      <li><span class="new">NEW</span><b>The lasagna turns giant:</b> it grows 4× and can't be hurt for as long as the trip lasts (§3, <i>Giant</i>): the mushroom is a power-up and a dare. Your moon jumps are how you get away.</li>
+      <li><b>Molten words:</b> the ink heats like metal in a forge: deep red at the edges, orange, white-hot in the thick strokes, with an orange glow on the night paper and a heat shimmer. Each column of letters slumps its own amount and drips; the drips narrow to a point and cool to red. It heats up over the first 1.5 s and cools back to neon, then ink, as it wears off. The lines you stand on don't move (the drips are paint, not physics). <span style="color:var(--muted)">In the engine: the words' shader already drips in shroom mode (<code>uMelt</code>/<code>uDrip</code>); this adds the heat colors, the glow and longer drips while the trip is on.</span></li>
+      <li><b>Moon jumps:</b> jumps go 1.5× higher and float down slowly (gravity × 0.6). New lines are in reach.</li>
+      <li><b>Rainbow Phill:</b> his neon rim cycles through the hues and he leaves a trail of three fading afterimages.</li>
+      <li><b>The camera sways:</b> a slow roll of ±3° and a breathing zoom (±4%) on a 6 s cycle. Gentle on purpose.</li>
+      <li><b>The page breathes:</b> the sheet's waves swell (3×) and the words dance as if the music were loud, music or not.</li>
+      <li><b>The floor stays:</b> the random word drops of shroom mode are off while playing (a power-up shouldn't delete the level under you); his smashes still work.</li>
+      <li><b>Wearing off:</b> in the last 2 s he flickers (2.5 Hz, under the 3 Hz flash limit) and the power-down sound plays; the look eases back over 1 s. Another mushroom resets the 12 s.</li>
+      <li><b>HUD:</b> a 🍄 pill with a draining bar beside the stats; the live region says "Shroom mode for 12 seconds" / "Shroom mode over".</li>
+      <li><b>Already in shroom mode</b> (site or HUD toggle)? The mushroom still adds the Play weirdness for 12 s; the look stays on after.</li>
+    </ol>
+    <p class="sub" style="margin: 8px 0 0">Optional extra, your call: <b>Big Phill</b> (Mario's real mushroom): he grows to 1.6× for the 12 s and bursts any word he walks into.</p>
+  </div>
+</section>
+
+<!-- ============ §5 answers ============ -->
+<section class="block" id="answers">
+  <h2><span class="n">§5</span>The open questions, answered (veto any)</h2>
+  <div class="card">
+    <table class="qa">
+      <tr><th>Does a shrimp do anything to the run?</th><td>Yes: a little speed boost (+35% for 8 s, stacks once) and +500 points; counted (🍤 in the stats and on THE END).</td></tr>
+      <tr><th><span class="new">NEW</span>Points? Play has no score yet</th><td>A <b>SCORE</b> joins the stats (arcade style, <code>★ 004300</code>): Impact coin 100, shrimp 500, UFO 200, mushroom 1,000, lasagna 300 (a kick: −250), and at THE END a time bonus of 100 per second under 1:00 (runs take ~20–45 s today). THE END shows SCORE and the best score (<code>localStorage</code>, beside the best time). Each award pops "+500" where it happened, like "+1 IMPACT". <span class="alt">Numbers are a first guess; veto or tune.</span></td></tr>
+      <tr><th>Where do shrimp appear?</th><td>5 per run, random lines spread down the page (one per ~9 lines), re-rolled on Play again. Not on the name or the bottom line, not over a coin or a checkpoint title.</td></tr>
+      <tr><th>Where do mushrooms come from?</th><td>The UFO (your pick): 3 a run; smash it and it beams the mushroom down.</td></tr>
+      <tr><th><span class="new">NEW</span>An enemy?</th><td>The lasagna (§3): 2 a run; it jumps lines to reach you and kicks. Stomp it from the line above or smash it (+300); a kick costs 250 and knocks you back. In the trip it grows 4× and can't be hurt: run until the shrooms wear off, then get even.</td></tr>
+      <tr><th>Which shroom mode?</th><td>The resume's own look plus Play-only weirdness (§4), not the site's global mode.</td></tr>
+      <tr><th>How long?</th><td>12 s, with a 2 s warning. Another mushroom resets it.</td></tr>
+      <tr><th>"Weirder" than today's look?</th><td>Yes: psychedelic molten words that swell and shove, moon jumps, rainbow afterimages, a swaying camera, a breathing page (§4). Big Phill optional.</td></tr>
+      <tr><th>The mushroom model?</th><td>Voxel pixel art in the site's violet with cyan spots (your pick; original art, no file to download).</td></tr>
+      <tr><th>PLAYER 1 START's look?</th><td>A, the arcade button (your pick), printed in the paper's top right at 4 texels per art pixel.</td></tr>
+      <tr><th>Sounds: a CC0 pack or the NS AudioManager?</th><td>CC0 files (Juhani Junkala's 512 8-bit sounds, Kenney's NES jingles): small mp3s (~60 KB for all of them, plus the 136 KB SHRIMP! announce), fetched and decoded when Play starts, played through the resume's existing <code>sfx.ts</code> mixer (it already has the Sound toggle and a compressor; I'd add NS's ducking for SHRIMP!). NS's sound files can't be used: they're from paid libraries. Pick them in <a href="sounds.html">the audition</a>.</td></tr>
+      <tr><th>Do sounds stay silent outside Play?</th><td>Yes: clicks on the page stay silent (your earlier rule); everything here plays only from Play, only with Sound on.</td></tr>
+      <tr><th>Performance</th><td>Shrimp and containers are a handful of extra draws in the cast's pass; voxels are one small mesh each (merged faces). The sound files load with Play, never in the cold open. Same budgets as T13.</td></tr>
+    </table>
+  </div>
+</section>
+
+</main>
+<script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js'
+import { PAL, paintStart, grid, mushroom, ufo, meteor, pod, crate, hologram, UFO_LIGHTS } from './art.js'
+
+const ROOT = '../../../../../public/resume/'
+const PW = 8.5, PH = 11, MX = 0.55, MY = 0.4, PP = 220, ART_PX = 4
+const LIGHT = new THREE.Vector3(0.35, 0.6, 1).normalize()
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// ---- the page: snapshot, layers, the visual lines ----
+const img = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src })
+const [snap, textImg, decorImg] = await Promise.all([fetch(ROOT + 'snapshot.json').then((r) => r.json()), img(ROOT + 'text.webp'), img(ROOT + 'decor.webp')])
+const cw = snap.content.w, ch = snap.content.h
+const toX = (px) => (MX * 96 + px) / 96 - PW / 2 // content px → world
+const toY = (px) => PH / 2 - (MY * 96 + px) / 96
+
+const lines = (() => {
+  const ws = snap.words.map((w) => ({ ...w, b: w.y + w.h })).sort((a, b) => a.b - b.b), out = []
+  for (const w of ws) { const l = out.find((l) => Math.abs(l.b - w.b) <= 4); l ? l.w.push(w) : out.push({ b: w.b, w: [w] }) }
+  return out.sort((a, b) => a.b - b.b).map((l) => {
+    l.w.sort((a, b) => a.x - b.x)
+    const ink = Math.min(...l.w.map((w) => w.y + w.h / 2 - 0.37 * w.size))
+    return { inkTop: toY(ink), spans: l.w.map((w) => [toX(w.x), toX(w.x + w.w)]), text: l.w.map((w) => w.t).join(' ') }
+  })
+})()
+/** is there ink under x on this line (gaps narrower than his foot don't count) */
+const covers = (l, x) => l.spans.some(([a, b], i) => (x >= a - 0.02 && x <= b + 0.02) || (i + 1 < l.spans.length && x > b && x < l.spans[i + 1][0] && l.spans[i + 1][0] - b < 0.12))
+
+/** the page's backing with PLAYER 1 START painted in (two frames: the blink on and off) */
+function pageCanvas(look, on, { gray = false, px = ART_PX } = {}) {
+  const c = document.createElement('canvas')
+  c.width = Math.round(PW * PP)
+  c.height = Math.round(PH * PP)
+  const g = c.getContext('2d')
+  g.fillStyle = '#fff'
+  g.fillRect(0, 0, c.width, c.height)
+  g.drawImage(decorImg, MX * PP, MY * PP, (cw / 96) * PP, (ch / 96) * PP)
+  g.drawImage(textImg, MX * PP, MY * PP, (cw / 96) * PP, (ch / 96) * PP)
+  const k = PP / 96, right = (MX * 96 + cw) * k, cy = (MY * 96 + 16.5) * k
+  const r = paintStart(g, look, right, cy, px, { on })
+  if (gray) {
+    const [x, y, w, h] = r.box, d = g.getImageData(x, y, w, h)
+    for (let i = 0; i < d.data.length; i += 4) { const v = 0.3 * d.data[i] + 0.59 * d.data[i + 1] + 0.11 * d.data[i + 2]; d.data[i] = d.data[i + 1] = d.data[i + 2] = 255 - (255 - v) * 0.45 }
+    g.putImageData(d, x, y)
+  }
+  return { canvas: c, box: r.box, size: r.size }
+}
+
+// ---- the page shader: the engine's bend, its light, shroom mode, and the art's cursor ----
+const BEND = `
+uniform float uA, uC, uT, uS;
+float bendZ(vec2 p){ float qx = p.x/4.25, qy = p.y/5.5, t = uT;
+  float z = uA*(0.55*sin(1.6*qx + 0.5*t)*cos(1.2*qy + 0.35*t) + 0.35*sin(2.3*qy - 0.45*t + 0.8*qx));
+  float k = max(0.0, (qx - qy)*0.5 - 0.55)/0.45, k2 = max(0.0, (qy - qx)*0.5 - 0.7)/0.3;
+  z += uC*(k*k*(0.85 + 0.15*sin(t*0.6)) + 0.5*k2*k2*(0.85 + 0.15*sin(t*0.5 + 2.0)));
+  z += uS*(0.06*sin(p.y*1.3 + t*1.4) + 0.04*sin(p.x*0.9 + t));
+  return z; }`
+function bendJS(u, x, y) {
+  const qx = x / 4.25, qy = y / 5.5, t = u.uT.value, A = u.uA.value, C = u.uC.value, S = u.uS.value
+  let z = A * (0.55 * Math.sin(1.6 * qx + 0.5 * t) * Math.cos(1.2 * qy + 0.35 * t) + 0.35 * Math.sin(2.3 * qy - 0.45 * t + 0.8 * qx))
+  const k = Math.max(0, (qx - qy) * 0.5 - 0.55) / 0.45, k2 = Math.max(0, (qy - qx) * 0.5 - 0.7) / 0.3
+  z += C * (k * k * (0.85 + 0.15 * Math.sin(t * 0.6)) + 0.5 * k2 * k2 * (0.85 + 0.15 * Math.sin(t * 0.5 + 2)))
+  z += S * (0.06 * Math.sin(y * 1.3 + t * 1.4) + 0.04 * Math.sin(x * 0.9 + t))
+  return z
+}
+function pageMesh(tex) {
+  const u = {
+    uMap: { value: tex }, uA: { value: 0.08 }, uC: { value: 0.33 }, uT: { value: 0 }, uS: { value: 0 }, uShroom: { value: 0 }, uTime: { value: 0 },
+    uRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uArt: { value: new THREE.Vector2(1, 1) }, uCursor: { value: 0 }, uDim: { value: 0 }, uLight: { value: LIGHT },
+    uMelt: { value: 0 }, uHeat: { value: 0 }, uPsy: { value: 1 },
+    uSwellC: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 1, 1)) }, uSwellA: { value: [0, 0, 0, 0] },
+    uTexel: { value: new THREE.Vector2(1 / Math.round(PW * PP), 1 / Math.round(PH * PP)) },
+  }
+  const mat = new THREE.ShaderMaterial({
+    uniforms: u,
+    vertexShader: `${BEND}
+      varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+      void main(){ vUv = uv; vec3 p = position; p.z = bendZ(p.xy); vec2 e = vec2(0.03, 0.0);
+        float zx = (bendZ(p.xy + e.xy) - bendZ(p.xy - e.xy))/0.06, zy = (bendZ(p.xy + e.yx) - bendZ(p.xy - e.yx))/0.06;
+        vN = normalize(vec3(-zx, -zy, 1.0)); vW = p; gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }`,
+    fragmentShader: `
+      uniform sampler2D uMap; uniform float uShroom, uTime, uCursor, uDim, uMelt, uHeat, uPsy; uniform vec4 uRect; uniform vec2 uArt, uTexel; uniform vec3 uLight;
+      uniform vec4 uSwellC[4]; uniform float uSwellA[4];
+      varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+      vec3 hsv(float h, float s, float v){ vec3 k = clamp(abs(mod(h*6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); return v*mix(vec3(1.0), k, s); }
+      float h1(float n){ return fract(sin(n*12.9898)*43758.5453); }
+      float vn(float x){ float i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f); return mix(h1(i), h1(i + 1.0), f); }
+      float inkOf(vec3 c){ float lum = dot(c, vec3(0.299, 0.587, 0.114)), sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b)); return max(1.0 - smoothstep(0.45, 0.85, lum), smoothstep(0.15, 0.4, sat)); }
+      // heated metal (linear): deep red → orange → yellow → white-hot
+      vec3 molten(float T){
+        vec3 c = mix(vec3(0.1, 0.0, 0.0), vec3(0.8, 0.05, 0.0), smoothstep(0.0, 0.3, T));
+        c = mix(c, vec3(1.0, 0.3, 0.02), smoothstep(0.25, 0.55, T));
+        c = mix(c, vec3(1.0, 0.72, 0.18), smoothstep(0.5, 0.8, T));
+        return mix(c, vec3(1.0, 0.96, 0.82), smoothstep(0.8, 1.0, T));
+      }
+      // swelling words: inside the word's ellipse everything is magnified by 1 + a; the ring around it
+      // is squeezed outward (a < 0: the word shrinks and its neighbors lean in)
+      vec2 swell(vec2 uv){
+        for(int i = 0; i < 4; i++){
+          float a = uSwellA[i];
+          if(abs(a) < 0.001) continue;
+          vec2 d = (uv - uSwellC[i].xy)/uSwellC[i].zw;
+          float r = length(d), k = 1.0 + a, R1 = 2.6;
+          if(r >= R1 || r < 1e-5) continue;
+          float f = r < 1.0 ? r/k : mix(1.0/k, R1, (r - 1.0)/(R1 - 1.0));
+          uv = uSwellC[i].xy + d*(f/r)*uSwellC[i].zw;
+        }
+        return uv;
+      }
+      // psychedelic molten: the white-hot core stays, the mid-band takes the neon hue, the edges cool to violet
+      vec3 psyMolten(float T, float h){
+        vec3 c = mix(vec3(0.1, 0.0, 0.22), hsv(h, 0.9, 1.0), smoothstep(0.05, 0.5, T));
+        c = mix(c, hsv(h + 0.12, 0.45, 1.0), smoothstep(0.55, 0.85, T));
+        return mix(c, vec3(1.0, 0.97, 0.9), smoothstep(0.86, 1.0, T));
+      }
+      void main(){
+        vec2 uv = swell(vUv);
+        float m = uMelt*uShroom, tx = uv.x/uTexel.x;
+        if(m > 0.001){
+          uv.x += m*uTexel.x*0.8*sin(uv.y/uTexel.y*0.05 + uTime*6.0); // heat shimmer
+          uv.y += m*uTexel.y*7.0*vn(tx/23.0 + 7.0)*(0.85 + 0.15*sin(uTime*0.7 + tx*0.02)); // each stretch of letters slumps its own amount
+        }
+        vec3 base = texture2D(uMap, uv).rgb;
+        float ink0 = inkOf(base);
+        // drips: a strand every 5 texels, mostly short, now and then a long one; it narrows to its tip and cools
+        float drip = 0.0, dripT = 0.0;
+        if(m > 0.001){
+          float across = abs(fract(tx/4.0) - 0.5)*2.0, n = h1(floor(tx/4.0) + 3.0), n5 = n*n*n*n*n;
+          float len = m*uTexel.y*(3.0 + 80.0*n5)*(0.8 + 0.2*sin(uTime*1.1 + n*40.0));
+          for(int k = 1; k <= 14; k++){
+            float f = float(k)/14.0;
+            if(across > 1.0 - f*0.75) continue;
+            float s = inkOf(texture2D(uMap, uv + vec2(0.0, f*len)).rgb)*(1.0 - f*0.65);
+            if(s > drip){ drip = s; dripT = 1.0 - f; }
+          }
+        }
+        // the forge glow: how much ink is around; and the core: inside a stroke (white-hot) or at its edge
+        float glow = 0.0, core = 0.0;
+        if(uHeat*uShroom > 0.001){
+          core = 0.25*(inkOf(texture2D(uMap, uv + vec2(1.5, 0.0)*uTexel).rgb) + inkOf(texture2D(uMap, uv - vec2(1.5, 0.0)*uTexel).rgb)
+                     + inkOf(texture2D(uMap, uv + vec2(0.0, 1.5)*uTexel).rgb) + inkOf(texture2D(uMap, uv - vec2(0.0, 1.5)*uTexel).rgb));
+          for(int i = 0; i < 8; i++){
+            float a = float(i)*0.7854 + 0.3; vec2 o = vec2(cos(a), sin(a))*uTexel;
+            glow += inkOf(texture2D(uMap, uv + o*4.0).rgb) + 0.6*inkOf(texture2D(uMap, uv + o*10.0).rgb);
+          }
+          glow /= 12.8;
+        }
+        // the art's rect in art pixels (y down), for its fade and the cursor
+        vec2 q = vec2((vUv.x - uRect.x)/(uRect.z - uRect.x), (uRect.w - vUv.y)/(uRect.w - uRect.y))*uArt;
+        bool inArt = q.x >= 0.0 && q.y >= 0.0 && q.x <= uArt.x && q.y <= uArt.y;
+        if(inArt) base = mix(base, vec3(1.0), uDim*0.55);
+        // hover / focus: pixel corner brackets around it, electric cyan with an ink edge (a retro menu cursor)
+        vec2 p = floor(q) + 0.5, lo = vec2(-3.0), hi = uArt + 3.0;
+        vec2 dl = p - lo, dh = hi - p;
+        float onX = min(dl.x, dh.x), onY = min(dl.y, dh.y);
+        bool box = (onX < 2.0 && onY < 7.0) || (onY < 2.0 && onX < 7.0);
+        bool inside = p.x > lo.x && p.y > lo.y && p.x < hi.x && p.y < hi.y;
+        if(uCursor > 0.0 && inside && box) base = mix(base, (onX < 1.0 || onY < 1.0) ? vec3(0.0, 0.72, 0.88) : vec3(0.0, 0.83, 1.0)*0.6, uCursor);
+        vec3 L = normalize(uLight);
+        float shade = 1.0 + 0.55*(dot(normalize(vN), L) - L.z);
+        base *= shade;
+        // shroom mode: night paper, neon ink (or molten metal, in the trip)
+        float ink = max(max(ink0, inkOf(base)), drip);
+        vec3 neon = hsv(fract(uTime*0.06 + vW.x*0.05 + vW.y*0.08), 0.8, 1.0);
+        float T = clamp(max(ink0*(0.3 + 0.5*core*core + 0.35*glow), drip*(0.25 + 0.5*dripT)) + 0.07*sin(uTime*2.3 + vW.x*3.0 + vW.y*2.0), 0.0, 1.0);
+        // rainbow bands flow through the metal: some words run forge-orange, some neon, sweeping across the page
+        float h = fract(uTime*0.06 + vW.x*0.05 + vW.y*0.08), band = 0.5 + 0.5*sin(uTime*0.8 + vW.x*1.3 - vW.y*0.9);
+        float psy = uPsy*(0.1 + 0.8*band*band);
+        vec3 inkC = mix(neon*1.15, mix(molten(T), psyMolten(T, h), psy)*1.3, uHeat);
+        vec3 glowC = mix(vec3(1.0, 0.22, 0.02), hsv(h + 0.05, 0.9, 1.0), psy);
+        vec3 paper = mix(base, vec3(0.0061, 0.0024, 0.0116), uShroom*0.995); // (linear: the engine's 0.07, 0.03, 0.11)
+        paper += glowC*glow*0.3*uHeat*uShroom*shade; // the words' heat on the paper
+        paper = mix(paper, inkC*shade, uShroom*ink);
+        gl_FragColor = vec4(paper, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  })
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH, 64, 84), mat)
+  return { mesh, u }
+}
+
+function makeTex(renderer, canvas) {
+  const t = new THREE.CanvasTexture(canvas)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy()
+  return t
+}
+
+// the nebula backdrop (a stand-in: a few soft glows)
+function backdrop(scene) {
+  const c = document.createElement('canvas')
+  c.width = 1024; c.height = 512
+  const g = c.getContext('2d'), grad = (x, y, r, col) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, col); gr.addColorStop(1, 'transparent'); g.fillStyle = gr; g.fillRect(0, 0, 1024, 512) }
+  g.fillStyle = '#060814'; g.fillRect(0, 0, 1024, 512)
+  grad(260, 160, 360, 'rgba(196,77,255,.45)'); grad(760, 360, 380, 'rgba(0,212,255,.28)'); grad(560, 140, 300, 'rgba(20,31,82,.9)'); grad(880, 120, 220, 'rgba(213,128,255,.25)')
+  for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.8})`; g.fillRect(Math.random() * 1024, Math.random() * 512, 1.2, 1.2) }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.mapping = THREE.EquirectangularReflectionMapping
+  scene.background = t
+}
+
+function stageRenderer(el) {
+  const canvas = el.querySelector('canvas.gl')
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio))
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 200)
+  let W = 1, H = 1
+  const fit = () => { const r = el.getBoundingClientRect(); W = r.width; H = r.height; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix() }
+  new ResizeObserver(fit).observe(el)
+  fit()
+  let visible = true
+  new IntersectionObserver(([e]) => (visible = e.isIntersecting)).observe(el)
+  return { renderer, camera, size: () => [W, H], visible: () => visible }
+}
+
+function seg(name, cb) {
+  const g = document.querySelector(`.seg[data-ctl="${name}"]`)
+  g.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+    cb(b.dataset.v)
+  }))
+}
+
+// ---- the sounds (whatever's picked in the audition, else my picks) ----
+const DEF = { 'shrimp-pickup': 'shrimp-pickup-1-junkala-512.mp3', shower: 'shower-1-junkala-512.mp3', 'mushroom-appear': 'mushroom-appear-1-junkala-512.mp3', 'power-up': 'power-up-1-junkala-512.mp3', 'power-down': 'power-down-3-kenney-music-jingles.mp3', smash: 'smash-2-junkala-512.mp3', start: 'start-2-kenney-music-jingles.mp3' }
+let ac = null, manifest = null
+const bufs = new Map()
+async function sfx(slot) {
+  try {
+    ac ??= new AudioContext()
+    manifest ??= await fetch('audio/manifest.json').then((r) => r.json())
+    let file = slot === 'announce' ? 'shrimp-announce.mp3' : DEF[slot], gain = 1
+    try {
+      const p = JSON.parse(localStorage.getItem('jelly-round2-picks') || '{}')[slot]
+      if (p) { gain = p.gain ?? 1; if (typeof p.n === 'number') { const c = manifest.filter((e) => e.slot === slot).sort((a, b) => a.file.localeCompare(b.file))[p.n - 1]; file = p.n === 0 ? null : c?.file ?? file } }
+    } catch {}
+    if (!file) return
+    if (!bufs.has(file)) bufs.set(file, fetch('audio/' + file).then((r) => r.arrayBuffer()).then((b) => ac.decodeAudioData(b)))
+    const b = await bufs.get(file), s = ac.createBufferSource(), g = ac.createGain()
+    s.buffer = b; g.gain.value = 0.7 * gain; s.connect(g); g.connect(ac.destination); s.start()
+  } catch (e) { console.warn('sound', slot, e) }
+}
+
+// ======================= §1: PLAYER 1 START =======================
+const looks = {}
+for (const b of document.querySelectorAll('.look')) {
+  const look = b.dataset.look, cv = b.querySelector('canvas'), g = cv.getContext('2d')
+  g.imageSmoothingEnabled = false
+  let on = true
+  const draw = () => { g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); paintStart(g, look, cv.width - 20, cv.height / 2, 6, { on }) }
+  draw()
+  if (!reduce) setInterval(() => { on = !on; draw() }, 500)
+  looks[look] = b
+}
+{
+  const el = document.getElementById('s1'), R = stageRenderer(el), { renderer, camera } = R
+  const scene = new THREE.Scene()
+  backdrop(scene)
+  const frames = {}
+  let look = 'A', view = 'page', state = 'idle', sway = true, px = ART_PX
+  const build = (lk) => {
+    const key = lk + px
+    if (frames[key]) return frames[key]
+    const a = pageCanvas(lk, true, { px }), b = pageCanvas(lk, false, { px }), gray = pageCanvas(lk, false, { gray: true, px })
+    return (frames[key] = { on: makeTex(renderer, a.canvas), off: makeTex(renderer, b.canvas), gray: makeTex(renderer, gray.canvas), box: a.box, size: a.size })
+  }
+  const page = pageMesh(build('A').on)
+  scene.add(page.mesh)
+  el.querySelector('.loading').remove()
+  // the transparent button (the real control) and its hit box
+  const hit = document.createElement('button')
+  hit.className = 'hit'
+  hit.setAttribute('aria-label', 'Player 1 start: play as Phill (J)')
+  hit.setAttribute('aria-keyshortcuts', 'J')
+  el.append(hit)
+  const note = document.createElement('div')
+  note.className = 'hud-note'
+  el.append(note)
+  let pressT = -1
+  hit.addEventListener('click', () => { pressT = 0; sfx('start') })
+  hit.addEventListener('pointerenter', () => { if (state === 'idle') hover = 1 })
+  hit.addEventListener('pointerleave', () => { hover = 0 })
+  hit.addEventListener('focus', () => { focused = hit.matches(':focus-visible') ? 1 : 0 })
+  hit.addEventListener('blur', () => { focused = 0 })
+  let hover = 0, focused = 0, cursor = 0, t0 = performance.now()
+  for (const b of document.querySelectorAll('.look')) b.addEventListener('click', () => {
+    document.querySelectorAll('.look').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+    look = b.dataset.look
+  })
+  seg('view', (v) => { view = v; el.classList.toggle('phone', v === 'phone') })
+  seg('state', (v) => { state = v })
+  seg('sway', (v) => { sway = v === 'on' })
+  seg('size', (v) => { px = Number(v) })
+  seg('hit', (v) => hit.classList.toggle('show', v === 'on'))
+
+  const corners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+  function frame(now) {
+    requestAnimationFrame(frame)
+    if (!R.visible()) return
+    const t = (now - t0) / 1000, u = page.u, f = build(look), [W, H] = R.size()
+    // which frame of the art (the ▶ blinks at 2 Hz; loading too; playing: steady)
+    const blinkOn = reduce || state === 'playing' || state === 'shroom' ? true : Math.floor(t * 2) % 2 === 0
+    u.uMap.value = blinkOn ? f.on : f.off
+    u.uT.value = sway ? t : 0
+    u.uTime.value = t
+    u.uA.value = sway ? 0.08 : 0
+    u.uC.value = sway ? 0.33 : 0
+    u.uShroom.value += ((state === 'shroom' ? 1 : 0) - u.uShroom.value) * 0.06
+    u.uS.value = u.uShroom.value
+    u.uDim.value += ((state === 'playing' ? 1 : 0) - u.uDim.value) * 0.1
+    const [bx, by, bw, bh] = f.box, cw0 = PW * PP, ch0 = PH * PP
+    u.uRect.value.set(bx / cw0, 1 - (by + bh) / ch0, (bx + bw) / cw0, 1 - by / ch0)
+    u.uArt.value.set(f.size[0], f.size[1])
+    const want = state === 'focus' || hover || focused ? 1 : 0
+    cursor += (want - cursor) * 0.25
+    u.uCursor.value = cursor > 0.02 ? cursor : 0
+    // the camera: the resume's default (the page fits, a slight tilt), swaying so you can see it's printed on
+    const art = new THREE.Vector3(((bx + bw / 2) / PP) - PW / 2, PH / 2 - (by + bh / 2) / PP, 0)
+    const yaw = sway ? 0.32 * Math.sin(t * 0.35) : 0, tilt = sway ? 0.08 + 0.18 * (0.5 + 0.5 * Math.sin(t * 0.27)) : 0.05
+    let target = new THREE.Vector3(0, 0, 0), dist
+    const tf = Math.tan((camera.fov * Math.PI) / 360)
+    if (view === 'corner') { target = art; dist = (bw / PP) / (0.45 * 2 * tf * camera.aspect) }
+    else dist = Math.max((PW / 2 + 0.35) / (tf * camera.aspect), (PH / 2 + 0.25) / tf)
+    camera.position.set(target.x + dist * Math.sin(yaw) * Math.cos(tilt), target.y - dist * Math.sin(tilt), target.z + dist * Math.cos(yaw) * Math.cos(tilt))
+    camera.lookAt(target)
+    renderer.render(scene, camera)
+    // the button: over the art's projected box, at least 44 × 44 px (style writes only)
+    const x0 = bx / PP - PW / 2, x1 = (bx + bw) / PP - PW / 2, y0 = PH / 2 - by / PP, y1 = PH / 2 - (by + bh) / PP
+    const pts = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y], i) => corners[i].set(x, y, bendJS(u, x, y)).project(camera))
+    const sx = pts.map((p) => (p.x * 0.5 + 0.5) * W), sy = pts.map((p) => (1 - (p.y * 0.5 + 0.5)) * H)
+    let l = Math.min(...sx), r = Math.max(...sx), tp = Math.min(...sy), bt = Math.max(...sy)
+    const gw = Math.max(0, 44 - (r - l)) / 2, gh = Math.max(0, 44 - (bt - tp)) / 2
+    l -= gw; r += gw; tp -= gh; bt += gh
+    hit.style.transform = `translate(${l.toFixed(1)}px, ${tp.toFixed(1)}px)`
+    hit.style.width = `${(r - l).toFixed(1)}px`
+    hit.style.height = `${(bt - tp).toFixed(1)}px`
+    hit.disabled = state === 'playing'
+    hit.setAttribute('aria-busy', String(state === 'loading'))
+    note.textContent = `art ${Math.round(Math.max(...sx) - Math.min(...sx))}×${Math.round(Math.max(...sy) - Math.min(...sy))} px · button ${Math.round(r - l)}×${Math.round(bt - tp)} px`
+    if (pressT >= 0) { pressT += 1 / 60; if (pressT > 0.4) pressT = -1 }
+  }
+  requestAnimationFrame(frame)
+}
+
+// ======================= §2: the lines, Phill, shrimp, the UFO, the mushroom =======================
+{
+  const el = document.getElementById('s2'), R = stageRenderer(el), { renderer, camera } = R
+  const scene = new THREE.Scene()
+  backdrop(scene)
+  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x332244, 1.6))
+  const sun = new THREE.DirectionalLight(0xffffff, 2.2)
+  sun.position.copy(LIGHT).multiplyScalar(10)
+  scene.add(sun)
+  const rim = new THREE.DirectionalLight(0x80eaff, 2.4)
+  rim.position.set(-4, 3, -6)
+  scene.add(rim)
+  const page = pageMesh(makeTex(renderer, pageCanvas('A', true).canvas))
+  scene.add(page.mesh)
+  const u = page.u
+  const status = document.getElementById('s2status')
+
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
+  const [phillG, shrimpG] = await Promise.all([loader.loadAsync(ROOT + 'phill.glb'), loader.loadAsync(ROOT + 'shrimp.glb')])
+  el.querySelector('.loading').remove()
+
+  // a clip with its root held still (the engine holds the root; the physics moves him)
+  const still = (clip) => {
+    const c = clip.clone()
+    for (const tr of c.tracks) if (/Hips\.position$/.test(tr.name)) for (let i = 0; i < tr.values.length; i += 3) { tr.values[i] = tr.values[0]; tr.values[i + 1] = tr.values[1]; tr.values[i + 2] = tr.values[2] }
+    return c
+  }
+  const clips = Object.fromEntries(phillG.animations.map((c) => [c.name, still(c)]))
+  const pbox = new THREE.Box3().setFromObject(phillG.scene), size = pbox.getSize(new THREE.Vector3())
+  const PHILL = 0.5, k = PHILL / size.y
+  function makePhill(ghost) {
+    const root = SkeletonUtils.clone(phillG.scene)
+    root.scale.setScalar(k)
+    if (ghost) root.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.32; o.material.depthWrite = false; o.material.emissive = new THREE.Color(1, 0, 1); o.material.emissiveIntensity = 1.2 } })
+    else root.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0, 0, 0) } })
+    const holder = new THREE.Group()
+    root.position.y = -pbox.min.y * k
+    holder.add(root)
+    scene.add(holder)
+    const mixer = new THREE.AnimationMixer(root)
+    const acts = Object.fromEntries(Object.entries(clips).map(([n, c]) => [n, mixer.clipAction(c)]))
+    return { holder, root, mixer, acts, cur: null }
+  }
+  const play = (p, name, fade = 0.15) => { if (p.cur === name) return; const a = p.acts[name]; a.reset().fadeIn(fade).play(); if (p.cur) p.acts[p.cur].fadeOut(fade); p.cur = name }
+  const phill = makePhill(false)
+  play(phill, 'walk', 0)
+  const ghosts = [makePhill(true), makePhill(true), makePhill(true)]
+  ghosts.forEach((g) => { g.holder.visible = false; play(g, 'walk', 0) })
+
+  // shrimp pickups: the cast's shrimp, small, glowing coral, spinning and bobbing over a line
+  const sbox = new THREE.Box3().setFromObject(shrimpG.scene), ssize = sbox.getSize(new THREE.Vector3()), scen = sbox.getCenter(new THREE.Vector3())
+  function makeShrimp() {
+    const inner = shrimpG.scene.clone(true)
+    inner.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color('#ff6a3c'); o.material.emissiveIntensity = 0.6 } })
+    inner.position.copy(scen).multiplyScalar(-1)
+    const holder = new THREE.Group(), spin = new THREE.Group()
+    spin.add(inner)
+    spin.scale.setScalar(0.27 / Math.max(ssize.x, ssize.y, ssize.z))
+    holder.add(spin)
+    // a soft coral halo behind it
+    const hc = document.createElement('canvas'); hc.width = hc.height = 64
+    const hg = hc.getContext('2d'), gr = hg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,120,70,.55)'); gr.addColorStop(1, 'rgba(255,120,70,0)'); hg.fillStyle = gr; hg.fillRect(0, 0, 64, 64)
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(hc), depthWrite: false, transparent: true }))
+    halo.scale.setScalar(0.42)
+    holder.add(halo)
+    scene.add(holder)
+    return { holder, spin, gone: -1 }
+  }
+  const lineOf = (re) => lines.findIndex((l) => re.test(l.text))
+  const shrimps = [{ line: lineOf(/^Shipped/), x: toX(250) }, { line: lineOf(/^Ran an/), x: toX(470) }].map((s) => ({ ...s, ...makeShrimp() }))
+
+  // voxels from a pixel grid: each cell extruded `depthOf(x, y)` deep; one instanced mesh per kind of cell
+  // (lit, glow = unlit lights, glass = see-through, holo = a see-through glow)
+  const cube = new THREE.BoxGeometry(1, 1, 1)
+  const MATS = {
+    lit: () => new THREE.MeshLambertMaterial(),
+    glow: () => new THREE.MeshBasicMaterial(),
+    glass: () => new THREE.MeshLambertMaterial({ transparent: true, opacity: 0.42, depthWrite: false, emissive: 0x0b3a46 }),
+    holo: () => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false }),
+  }
+  function voxels(rows, depthOf, vox, kindOf = () => 'lit', group = new THREE.Group()) {
+    const H = rows.length, Wd = rows[0].length, cells = []
+    rows.forEach((row, y) => [...row].forEach((c, x) => { if (c !== '.') cells.push({ x, y, c, kind: kindOf(x, y, c) }) }))
+    const m = new THREE.Matrix4(), col = new THREE.Color()
+    group.userData.all ??= []
+    group.userData.cells ??= []
+    for (const kind of Object.keys(MATS)) {
+      const mine = cells.filter((c) => c.kind === kind)
+      if (!mine.length) continue
+      // see-through cells are a shell (front and back voxels only), so the glass doesn't stack up into fog
+      const shell = kind === 'glass' || kind === 'holo', layers = (d) => (shell ? Math.min(d, 2) : d)
+      const n = mine.reduce((a, c) => a + layers(depthOf(c.x, c.y, c.c)), 0)
+      const mesh = new THREE.InstancedMesh(cube, MATS[kind](), n)
+      mesh.renderOrder = kind === 'glass' || kind === 'holo' ? 2 : 0
+      let i = 0
+      for (const c of mine) {
+        const d = depthOf(c.x, c.y, c.c)
+        Object.assign(c, { mesh, i0: i, n: layers(d) })
+        for (let z = 0; z < d; z++) {
+          if (shell && z > 0 && z < d - 1) continue
+          const p = new THREE.Vector3((c.x - Wd / 2 + 0.5) * vox, (H - c.y - 0.5) * vox, (z - d / 2 + 0.5) * vox)
+          mesh.setMatrixAt(i, m.makeScale(vox, vox, vox).setPosition(p))
+          mesh.setColorAt(i, col.set(PAL[c.c] ?? c.c))
+          group.userData.all.push({ p, mesh, i })
+          i++
+        }
+      }
+      mesh.instanceColor.needsUpdate = true
+      group.add(mesh)
+    }
+    group.userData.cells.push(...cells)
+    Object.assign(group.userData, { vox, w: Wd * vox, h: H * vox })
+    return group
+  }
+  /** a solid of revolution: each row is a disc as wide as the row (the saucer, the rock, the capsule) */
+  const revolve = (rows, k = 1, min = 1) => {
+    const ext = rows.map((r) => { const a = r.search(/[^.]/); return a < 0 ? null : [a, r.length - 1 - [...r].reverse().join('').search(/[^.]/)] })
+    return (x, y) => {
+      const e = ext[y]
+      if (!e) return min
+      const cx = (e[0] + e[1] + 1) / 2, R = (e[1] - e[0] + 1) / 2, dx = x + 0.5 - cx
+      return Math.max(min, Math.round(2 * k * Math.sqrt(Math.max(0, R * R - dx * dx))))
+    }
+  }
+  const MV = 0.3 / 18 // the mushroom: 0.3 units tall
+  const mushDepth = () => (x, y) => (y <= 10 ? 7 : 5)
+  function smoothMushroom() {
+    const g = new THREE.Group(), capM = new THREE.MeshToonMaterial({ color: '#c44dff' }), stemM = new THREE.MeshToonMaterial({ color: '#fff1d6' })
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.15, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), capM)
+    cap.scale.y = 0.95; cap.position.y = 0.13
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.075, 0.14, 24), stemM)
+    stem.position.y = 0.07
+    g.add(cap, stem)
+    for (const [a, b] of [[0, 0.95], [0.9, 0.45], [-0.9, 0.45], [2.4, 0.5], [-2.4, 0.5]]) {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 8), new THREE.MeshToonMaterial({ color: '#80eaff' }))
+      s.position.setFromSphericalCoords(0.15, Math.acos(b), a).multiply(new THREE.Vector3(1, 0.95, 1)).add(new THREE.Vector3(0, 0.13, 0))
+      s.scale.set(1, 0.45, 1); s.lookAt(0, 0.13, 0); g.add(s)
+    }
+    for (const x of [-0.025, 0.025]) { const e = new THREE.Mesh(new THREE.CapsuleGeometry(0.008, 0.02, 4, 8), new THREE.MeshBasicMaterial({ color: '#16181d' })); e.position.set(x, 0.08, 0.072); g.add(e) }
+    return g
+  }
+  let nsMush = null
+  async function nsMushroom() {
+    if (!nsMush) {
+      const gl = await loader.loadAsync('_local/mushroom.glb').catch(() => null)
+      if (!gl) return new THREE.Group()
+      const b = new THREE.Box3().setFromObject(gl.scene), s = b.getSize(new THREE.Vector3())
+      gl.scene.scale.setScalar(0.32 / s.y)
+      gl.scene.position.y = -b.min.y * (0.32 / s.y)
+      const mixer = new THREE.AnimationMixer(gl.scene)
+      const walk = gl.animations.find((a) => a.name === 'walk')
+      if (walk) mixer.clipAction(walk).play()
+      nsMush = { obj: new THREE.Group().add(gl.scene), mixer }
+    }
+    return nsMush.obj
+  }
+  const mush = { holder: new THREE.Group(), model: null, kind: 'violet', path: [], t: -1, gone: true }
+  scene.add(mush.holder)
+  async function setMush(kind) {
+    mush.kind = kind
+    if (mush.model) mush.holder.remove(mush.model)
+    mush.model = kind === 'smooth' ? smoothMushroom() : kind === 'ns' ? await nsMushroom() : voxels(mushroom(kind), mushDepth(), MV)
+    mush.holder.add(mush.model)
+  }
+  await setMush('violet')
+
+  // ---- the containers: what you smash for a mushroom ----
+  const inGlass = (x, y) => y >= 7 && y <= 16 && x >= 3 && x <= 10
+  const BOXES = {
+    ufo() {
+      const rows = ufo(), dome = (x, y, c) => y <= 5 && 'Ccw'.includes(c) && !(y === 5 && (x < 8 || x > 15))
+      const passenger = (x, y) => (y === 2 && (x === 11 || x === 12)) || (y === 3 && x >= 10 && x <= 13) || (y === 4 && (x === 11 || x === 12))
+      const rev = revolve(rows)
+      const g = voxels(rows, (x, y) => (passenger(x, y) ? 2 : rev(x, y)), 0.42 / 24, (x, y, c) => (passenger(x, y) ? 'lit' : dome(x, y, c) ? 'glass' : UFO_LIGHTS(x, y) || (y === 10 && c === 'c') ? 'glow' : 'lit'))
+      g.userData.lights = g.userData.cells.filter((c) => UFO_LIGHTS(c.x, c.y))
+      g.userData.passenger = g.userData.cells.filter((c) => passenger(c.x, c.y))
+      return { g, lift: 0.2, from: 'beam' }
+    },
+    meteor() {
+      const rows = meteor()
+      return { g: voxels(rows, revolve(rows, 0.85), 0.3 / 13, (x, y, c) => ('Ccw'.includes(c) ? 'glow' : 'lit')), lift: -0.025, from: 'pop' }
+    },
+    pod() {
+      const { rows, glass } = pod(), rev = revolve(rows)
+      const g = voxels(rows, (x, y, c) => (inGlass(x, y) ? (c === 'w' ? 1 : 3) : rev(x, y)), 0.4 / 21, (x, y, c) => ((y >= 17 && 'cy'.includes(c)) || (y === 2 && c === 'm') ? 'glow' : 'lit'))
+      voxels(glass, revolve(glass), 0.4 / 21, () => 'glass', g)
+      return { g, lift: 0, from: 'pop' }
+    },
+    crate() {
+      const g = voxels(crate(), () => 12, 0.27 / 13, (x, y, c) => ('mcC'.includes(c) ? 'glow' : 'lit'))
+      const holo = voxels(hologram(), () => 1, 0.021, () => 'holo')
+      holo.position.y = 0.27 + 0.025
+      g.add(holo)
+      g.userData.holo = holo
+      return { g, lift: 0, from: 'pop' }
+    },
+  }
+  const box = { holder: new THREE.Group(), kind: 'ufo', state: 'idle', t: 0, line: lineOf(/^backed by/), x: toX(120), cur: null }
+  scene.add(box.holder)
+  // the UFO's beam: an open cone of see-through cyan (additive would vanish on white paper), rings running down it
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.17, 1, 32, 1, true).translate(0, -0.5, 0), new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: { uT: { value: 0 }, uA: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uT, uA; varying vec2 vUv; void main(){ float rings = 0.5 + 0.5*sin(vUv.y*70.0 + uT*16.0); gl_FragColor = vec4(mix(vec3(0.0, 0.72, 0.9), vec3(0.55, 0.95, 1.0), rings), (0.16 + 0.22*rings)*(0.45 + 0.55*vUv.y)*uA); }`,
+  }))
+  beam.visible = false
+  scene.add(beam)
+  function setBox(kind) {
+    box.kind = kind
+    if (box.cur) box.holder.remove(box.cur.g)
+    box.cur = BOXES[kind]()
+    box.holder.add(box.cur.g)
+    box.state = 'in'
+    box.t = 0
+    beam.visible = false
+  }
+  // the wreck: the voxels split into chunks (nearest of a few random seeds) that fly, tumble, fall and shrink
+  function burst() {
+    const { all, w, h } = box.cur.g.userData, seeds = []
+    for (let i = 0; i < 12; i++) seeds.push(new THREE.Vector3((Math.random() - 0.5) * w, Math.random() * h, (Math.random() - 0.5) * w * 0.6))
+    const chunks = seeds.map((c) => ({ c, v: new THREE.Vector3(), axis: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(), spin: 4 + Math.random() * 8 }))
+    for (const ch of chunks) ch.v.set(ch.c.x * 6 + (Math.random() - 0.5) * 0.6, 1.4 + Math.random() * 1.4, ch.c.z * 6 + 0.4 + Math.random() * 0.6)
+    for (const v of all) {
+      let best = 0, bd = Infinity
+      seeds.forEach((s, i) => { const d = s.distanceToSquared(v.p); if (d < bd) { bd = d; best = i } })
+      v.chunk = chunks[best]
+    }
+    if (box.cur.g.userData.holo) box.cur.g.userData.holo.visible = false
+  }
+  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3()
+  function updateBurst(t) {
+    const { all, vox } = box.cur.g.userData, k = Math.max(0.001, 1 - Math.max(0, t - 0.45) / 0.6)
+    for (const v of all) {
+      if (!v.chunk) continue
+      const ch = v.chunk
+      _q.setFromAxisAngle(ch.axis, ch.spin * t)
+      _p.copy(v.p).sub(ch.c).applyQuaternion(_q).add(ch.c).addScaledVector(ch.v, t)
+      _p.y -= 4.9 * t * t
+      v.mesh.setMatrixAt(v.i, _m.compose(_p, _q, _s.setScalar(vox * k)))
+    }
+    for (const m of box.cur.g.children) if (m.isInstancedMesh) m.instanceMatrix.needsUpdate = true
+  }
+
+  // the mushroom's run: out of the container (down the UFO's beam, or popping out of the wreck), along the line,
+  // off its end, onto the lines below, into the void. Each step: [x, y, t, visible, scale]
+  function mushroomPath(from) {
+    const out = [], dt = 1 / 60, l0 = lines[box.line]
+    let x = box.x, y = l0.inkTop, vy = 0, li = box.line, t = 0, grounded = true
+    if (from === 'beam') {
+      for (let i = 0; i < 21; i++) out.push([x, l0.inkTop + 0.2, t += dt, false, 0.4]) // still aboard while it wobbles
+      for (let i = 0; i < 54; i++) { const f = i / 53; out.push([x, l0.inkTop + 0.2 * (1 - f), t += dt, true, 0.4 + 0.6 * f]) }
+    } else {
+      for (let i = 0; i < 36; i++) { const f = i / 35; out.push([x + 0.14 * f, l0.inkTop + 0.1 * (1 - f) + 0.3 * 4 * f * (1 - f), t += dt, true, 0.6 + 0.4 * Math.min(1, f * 3)]) }
+      x += 0.14
+    }
+    const vx = 1.2
+    while (t < 15 && y > -PH / 2 - 1.5) {
+      t += dt
+      x += vx * dt
+      if (grounded) {
+        if (!covers(lines[li], x)) { grounded = false; vy = 0 }
+        else y = lines[li].inkTop
+      } else {
+        vy -= 12 * dt
+        const ny = y + vy * dt
+        // land on the first line it crosses that has ink under it (on the page)
+        const hitL = Math.abs(x) < PW / 2 ? lines.findIndex((l, j) => l.inkTop <= y + 1e-4 && l.inkTop > ny && covers(l, x) && j >= box.line) : -1
+        if (hitL >= 0) { y = lines[hitL].inkTop; li = hitL; vy = 0; grounded = true } else y = ny
+      }
+      out.push([x, y, t, true, 1])
+    }
+    return out
+  }
+  function smash() {
+    if (box.state !== 'idle' || (!mush.gone && mush.t >= 0)) return
+    box.state = 'hit'
+    box.t = 0
+    sfx('smash')
+    award(200, box.holder.position)
+    setTimeout(() => sfx('mushroom-appear'), box.cur.from === 'beam' ? 350 : 120)
+    if (box.cur.from === 'pop') burst()
+    mush.path = mushroomPath(box.cur.from)
+    mush.t = 0
+    mush.gone = false
+  }
+
+  // the score: an award pops "+n" where it happened (projected once, CSS does the rest)
+  let score = 0
+  const _v = new THREE.Vector3()
+  function award(n, at) {
+    score += n
+    const [W, H] = R.size(), p = _v.copy(at).project(camera), el2 = document.createElement('div')
+    el2.className = 'pop'
+    el2.textContent = `+${n}`
+    el2.style.left = `${((p.x * 0.5 + 0.5) * W).toFixed(0)}px`
+    el2.style.top = `${((0.5 - p.y * 0.5) * H - 30).toFixed(0)}px`
+    el.append(el2)
+    setTimeout(() => el2.remove(), 1000)
+  }
+
+  // SHRIMP! (ported from Number Slayers)
+  const COLORS = ['#ff5a24', '#ffd24a', '#3ef58c', '#43d9ff', '#ff4dd2', '#ff2d55', '#ffa63e']
+  let showTimer = 0
+  function shrimpShow() {
+    el.querySelector('.shrimp-show')?.remove()
+    clearTimeout(showTimer)
+    const show = document.createElement('div')
+    show.className = 'shrimp-show'
+    show.setAttribute('aria-hidden', 'true')
+    show.style.setProperty('--h', `${el.getBoundingClientRect().height}px`)
+    for (let i = 0; i < 16; i++) {
+      const s = document.createElement('span')
+      s.className = 'shrimp-rain'
+      s.textContent = '🍤'
+      s.style.left = `${2 + Math.random() * 96}%`
+      s.style.fontSize = `${1.6 + Math.random() * 2.2}rem`
+      s.style.setProperty('--spin', `${(Math.random() - 0.5) * 720}deg`)
+      s.style.animationDuration = `${1100 + Math.random() * 900}ms`
+      s.style.animationDelay = `${1500 + Math.random() * 900}ms` // the shower trails the announce
+      show.append(s)
+    }
+    const word = document.createElement('div')
+    word.className = 'shrimp-word'
+    word.innerHTML = `<div>${'SHRIMP'.split('').map((c, i) => `<span style="color:${COLORS[i % 7]};animation-delay:${i * 60}ms">${c}</span>`).join('')}</div>`
+    show.append(word)
+    el.append(show)
+    showTimer = setTimeout(() => show.remove(), 4200)
+    sfx('shrimp-pickup')
+    setTimeout(() => sfx('announce'), 90)
+    setTimeout(() => sfx('shower'), 1590)
+  }
+  document.getElementById('touchShrimp').onclick = () => { const s = shrimps[0]; if (s.gone < 0) award(500, s.holder.position); s.gone = 0; boost = 8; shrimpShow() }
+  document.getElementById('smashBlock').onclick = smash
+  let tripT = -1, boost = 0, words = 'psy'
+  document.getElementById('eatShroom').onclick = () => {
+    award(1000, mush.holder.visible ? mush.holder.position : phill.holder.position.clone().setY(phill.holder.position.y + 0.5))
+    tripT = 0; mush.gone = true; mush.t = -1; sfx('power-up')
+  }
+  seg('mush', (v) => setMush(v))
+  seg('words', (v) => { words = v })
+  seg('swell', (v) => { swellOn = v === 'on' })
+  for (const b of document.querySelectorAll('.box-card')) {
+    const cv = b.querySelector('canvas'), g = cv.getContext('2d'), k = b.dataset.box, px = 7
+    g.imageSmoothingEnabled = false
+    g.fillStyle = '#fff'
+    g.fillRect(0, 0, cv.width, cv.height)
+    const at = (rows, dy = 0) => [Math.round((cv.width / px - rows[0].length) / 2), Math.round((cv.height / px - rows.length) / 2) + dy]
+    if (k === 'ufo') { const r = ufo(), [x, y] = at(r); grid(g, r, x, y, px) }
+    if (k === 'meteor') { const r = meteor(), [x, y] = at(r); grid(g, r, x, y, px) }
+    if (k === 'pod') { const { rows, glass } = pod(), [x, y] = at(rows); g.globalAlpha = 0.45; grid(g, glass, x, y, px); g.globalAlpha = 1; grid(g, rows, x, y, px) }
+    if (k === 'crate') {
+      const r = crate(), h = hologram(), [x, y] = at(r, 4)
+      h.forEach((row, i) => { g.globalAlpha = i % 2 ? 0.3 : 0.6; grid(g, [row], x + 4, y - 9 + i, px) })
+      g.globalAlpha = 1
+      grid(g, r, x, y, px)
+    }
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.box-card').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+      mush.gone = true
+      mush.t = -1
+      setBox(k)
+    })
+  }
+  setBox('ufo')
+
+  window.__mock = { mush, box, lines, mushroomPath, smash, setBox, get score() { return score }, u, hold: false, cam: null, speed: 1 }
+
+  // swelling words (the trip): now and then a word near him swells up (or shrinks), shoves its neighbors, and settles
+  const k96 = PP / 96
+  const wordUV = (wd) => [(MX * 96 + wd.x + wd.w / 2) * k96 / (PW * PP), 1 - (MY * 96 + wd.y + wd.h / 2) * k96 / (PH * PP), (wd.w / 2) * 1.15 * k96 / (PW * PP), (wd.h / 2) * 1.15 * k96 / (PH * PP)]
+  const swells = []
+  let swellOn = true, nextSwell = 0
+  function updateSwells(dt, trip) {
+    nextSwell -= dt
+    if (swellOn && trip > 0.5 && nextSwell <= 0 && swells.length < 3) {
+      nextSwell = 0.5 + Math.random() * 0.7
+      // a word in view, at least 4 letters long, not already swelling
+      const near = snap.words.filter((w) => w.t.length >= 4 && Math.abs(toX(w.x + w.w / 2) - cam.x) < 2.2 && Math.abs(toY(w.y + w.h / 2) - cam.y) < 1.2 && !swells.some((s) => s.wd === w))
+      if (near.length) { const wd = near[Math.floor(Math.random() * near.length)]; swells.push({ wd, uv: wordUV(wd), t: 0, T: 2.2 + Math.random() * 1.2, A: Math.random() < 0.7 ? 0.7 + Math.random() * 0.5 : -0.35 }) }
+    }
+    for (const s of swells) s.t += dt
+    for (let i = swells.length - 1; i >= 0; i--) if (swells[i].t >= swells[i].T || trip <= 0) swells.splice(i, 1)
+    for (let i = 0; i < 4; i++) {
+      const s = swells[i]
+      if (!s) { u.uSwellA.value[i] = 0; continue }
+      const f = s.t / s.T
+      // up (or down) with a jelly wobble, then back
+      u.uSwellA.value[i] = s.A * Math.sin(Math.PI * f) * (1 + 0.18 * Math.sin(f * 20) * (1 - f)) * trip
+      u.uSwellC.value[i].set(...s.uv)
+    }
+  }
+
+  // the scene's clock
+  const line = lineOf(/^Cut the/), walk = [toX(30), toX(330)]
+  let px = walk[0], dir = 1, last = performance.now(), auto = 2, jumpT = -1, clock = 0
+  const hist = []
+  const cam = new THREE.Vector3(toX(360), lines[lineOf(/^Designed/)].inkTop - 0.15, 0)
+  window.__mock.cam = cam
+  window.__mock.zoom = 1
+  function frame(now) {
+    requestAnimationFrame(frame)
+    if (!R.visible()) { last = now; return }
+    const dt = Math.min(0.033, (now - last) / 1000) * window.__mock.speed // (debug: speed 0 freezes it)
+    last = now
+    const t = (clock += dt)
+    // the trip: 12 s, the last 2 s flickering, easing in and out over a second
+    let trip = 0
+    if (tripT >= 0) { tripT += dt; trip = Math.min(1, tripT, Math.max(0, 12 - tripT)); if (tripT === dt) {} if (tripT > 10 && tripT - dt <= 10) sfx('power-down'); if (tripT >= 12) tripT = -1 }
+    u.uT.value = t
+    u.uTime.value = t
+    u.uShroom.value = trip
+    u.uS.value = trip
+    // molten words: they melt over the first 3 s; the heat comes up over 1.5 s and cools off in the last 2.5 s
+    const melt = words === 'neon' ? 0 : Math.min(1, Math.max(0, tripT) / 3)
+    u.uMelt.value = melt * (0.6 + 0.4 * Math.min(1, Math.max(0, 12 - tripT) / 2))
+    u.uHeat.value = words === 'molten' || words === 'psy' ? Math.min(1, Math.max(0, tripT) / 1.5) * Math.min(1, Math.max(0, 12 - tripT) / 2.5) : 0
+    u.uPsy.value = words === 'psy' ? 1 : 0
+    updateSwells(dt, trip)
+    u.uA.value = 0.08 * (1 + 2 * trip)
+    // Phill walks the line, turning at the ends; in the trip he moon-jumps now and then
+    const speed = 1.3 * (boost > 0 ? 1.35 : 1)
+    boost = Math.max(0, boost - dt)
+    px += dir * speed * dt
+    if (px > walk[1]) dir = -1
+    if (px < walk[0]) dir = 1
+    let py = lines[line].inkTop
+    if (trip > 0.5 && jumpT < 0 && Math.random() < dt * 0.6) jumpT = 0
+    if (jumpT >= 0) { jumpT += dt; const T = 1.3, h = 0.9; py += Math.max(0, 4 * h * (jumpT / T) * (1 - jumpT / T)); if (jumpT > T) jumpT = -1 }
+    const pz = bendJS(u, px, py) + 0.11
+    phill.holder.position.set(px, py, pz)
+    phill.holder.rotation.y = dir * (Math.PI / 2 - 0.35)
+    play(phill, jumpT >= 0 ? 'jumping' : 'walk')
+    if (jumpT >= 0) phill.acts.jumping.time = 0.58 + 0.5 * Math.min(1, jumpT / 1.3)
+    phill.mixer.update(dt * (jumpT >= 0 ? 0 : 1.6 * (speed / 1.3)))
+    // rainbow Phill and his afterimages
+    const hue = (t * 0.25) % 1
+    phill.root.traverse((o) => { if (o.isMesh) { o.material.emissive.setHSL(hue, 1, 0.5); o.material.emissiveIntensity = 0.35 * trip } })
+    const flick = tripT > 10 && Math.floor(tripT * 5) % 2 === 1
+    phill.holder.visible = !flick
+    hist.unshift([px, py, pz, phill.holder.rotation.y])
+    hist.length = Math.min(hist.length, 40)
+    ghosts.forEach((g, i) => {
+      const h = hist[Math.min(hist.length - 1, (i + 1) * 8)]
+      g.holder.visible = trip > 0.05 && !!h
+      if (!h) return
+      g.holder.position.set(h[0], h[1], h[2] - 0.01 * (i + 1))
+      g.holder.rotation.y = h[3]
+      g.mixer.setTime(phill.mixer.time - (i + 1) * 0.13)
+      g.root.traverse((o) => { if (o.isMesh) { o.material.emissive.setHSL((hue + 0.2 * (i + 1)) % 1, 1, 0.5); o.material.opacity = 0.3 * trip * (1 - i * 0.25) } })
+    })
+    // shrimp
+    for (const s of shrimps) {
+      const l = lines[s.line]
+      if (s.gone >= 0) { s.gone += dt; if (s.gone > 3) s.gone = -1 }
+      const pop = s.gone >= 0 ? Math.max(0, 1 - s.gone * 4) : 1
+      s.holder.position.set(s.x, l.inkTop + 0.15 + 0.025 * Math.sin(t * 2.4 + s.x), bendJS(u, s.x, l.inkTop) + 0.1)
+      s.holder.scale.setScalar(Math.max(0.001, pop * (1 + 0.06 * Math.sin(t * 5))))
+      s.spin.rotation.y = t * 1.6
+      s.spin.rotation.z = 0.25 * Math.sin(t * 1.3)
+    }
+    // the container: idle, hit, then gone (flown off or wrecked), and a slow auto-replay of the whole thing
+    const bl = lines[box.line], cur = box.cur, ud = cur.g.userData
+    box.t += dt
+    let bx = box.x, by = bl.inkTop + cur.lift, sc = 1
+    if (box.state === 'in') {
+      const f = Math.min(1, box.t / 0.45)
+      sc = f < 1 ? Math.max(0.001, 1 - (1 - f) ** 3 * Math.cos(f * 9)) : 1
+      if (box.kind === 'ufo') { bx += 1.6 * (1 - f) ** 2; by += 1.0 * (1 - f) ** 2 } // it flies in
+      if (f >= 1) { box.state = 'idle'; box.t = 0 }
+    }
+    if (box.kind === 'ufo') {
+      by += 0.02 * Math.sin(t * 2.2)
+      cur.g.rotation.z = 0.06 * Math.sin(t * 1.3)
+      cur.g.rotation.x = 0.12
+      // the rim lights chase (and flash white when it's hit)
+      const ph = Math.floor(t * 8), col = new THREE.Color()
+      ud.lights.forEach((c, i) => { col.set(box.state === 'hit' && box.t < 0.4 && ph % 2 ? '#ffffff' : PAL['ymC'[(i + ph) % 3]]); for (let j = 0; j < c.n; j++) c.mesh.setColorAt(c.i0 + j, col) })
+      if (ud.lights[0]) ud.lights[0].mesh.instanceColor.needsUpdate = true
+      if (box.state === 'hit') {
+        const ht = box.t
+        cur.g.rotation.z += 0.35 * Math.sin(ht * 40) * Math.max(0, 1 - ht / 0.35)
+        // the passenger leaves: its seat goes back to glass color
+        if (ht > 0.35 && !ud.left) { ud.left = true; const pc = new THREE.Color(PAL.C); for (const c of ud.passenger) for (let j = 0; j < c.n; j++) c.mesh.setColorAt(c.i0 + j, pc); ud.passenger[0].mesh.instanceColor.needsUpdate = true }
+        const on = ht > 0.3 && ht < 1.45 ? Math.min(1, (ht - 0.3) / 0.12, (1.45 - ht) / 0.15) : 0
+        beam.visible = on > 0
+        beam.material.uniforms.uA.value = on
+        beam.material.uniforms.uT.value = t
+        if (ht > 1.45) { const f = (ht - 1.45) / 0.9; bx += 2.6 * f * f; by += 1.6 * f * f; sc = Math.max(0.001, 1 - f * 0.8) } // and zips off
+        if (ht > 2.35) { box.state = 'gone'; box.t = 0; beam.visible = false }
+      }
+    } else {
+      cur.g.rotation.y = 0.3 * Math.sin(t * 0.7)
+      if (box.kind === 'crate' && box.state !== 'hit') {
+        const hg = ud.holo
+        hg.rotation.y = t * 1.6
+        hg.position.x = Math.random() < 0.04 ? 0.012 : 0 // a glitch now and then
+        hg.children.forEach((m) => (m.material.opacity = 0.5 + 0.15 * Math.sin(t * 13) - (Math.random() < 0.05 ? 0.3 : 0)))
+      }
+      if (box.state === 'hit') {
+        if (box.t < 0.08) bx += 0.015 * Math.sin(box.t * 140)
+        updateBurst(box.t)
+        if (box.t > 1.1) { box.state = 'gone'; box.t = 0 }
+      }
+    }
+    box.holder.visible = box.state !== 'gone'
+    box.holder.position.set(bx, by, bendJS(u, bx, bl.inkTop) + 0.13)
+    box.holder.scale.setScalar(sc)
+    beam.position.set(bx, by, box.holder.position.z)
+    beam.scale.set(1, Math.max(0.01, by - bl.inkTop), 1)
+    // the mushroom
+    if (!mush.gone && mush.t >= 0) {
+      mush.t += dt
+      const i = Math.min(mush.path.length - 1, Math.floor(mush.t * 60)), p = mush.path[i]
+      mush.holder.visible = p[3]
+      mush.holder.scale.setScalar(p[4])
+      mush.holder.position.set(p[0], p[1], bendJS(u, p[0], p[1]) + 0.1)
+      mush.holder.rotation.y = 0.3 * Math.sin(t * 6) + (mush.kind === 'ns' ? Math.PI / 2 : 0)
+      mush.holder.rotation.z = 0.08 * Math.sin(t * 9)
+      if (i === mush.path.length - 1) { mush.gone = true; mush.t = -1 }
+    } else mush.holder.visible = false
+    if (mush.kind === 'ns' && nsMush) nsMush.mixer.update(dt)
+    if (window.__mock.hold) auto = 3.5 // (debug: no auto-replay)
+    if (box.state === 'gone' && mush.gone && mush.t < 0) { auto -= dt; if (auto < 0) { auto = 3.5; setBox(box.kind) } }
+    else if (box.state === 'idle') { auto -= dt; if (auto < 0) { auto = 3.5; smash() } }
+    // the camera: Play's (Phill ~90 px tall), tilted a little, swaying in the trip
+    const [, H] = R.size(), tf = Math.tan((camera.fov * Math.PI) / 360)
+    const dist = (PHILL * H) / (2 * tf * 90) * (1 + 0.04 * trip * Math.sin(t * 1.05)) / window.__mock.zoom
+    const tilt = 0.08
+    camera.position.set(cam.x, cam.y - dist * Math.sin(tilt), dist * Math.cos(tilt))
+    camera.up.set(Math.sin(0.052 * trip * Math.sin(t * 1.05)), Math.cos(0.052 * trip * Math.sin(t * 1.05)), 0)
+    camera.lookAt(cam)
+    renderer.render(scene, camera)
+    status.innerHTML = `★ ${String(score).padStart(6, '0')} ⏱ 0:42.0 <span class="g">✦ 3/27</span> 🍤 ${shrimps.filter((s) => s.gone >= 0).length ? 1 : 0}/5${boost > 0 ? ` <span class="g">+35%</span>` : ''}${tripT >= 0 ? ` 🍄 ${Math.ceil(12 - tripT)}s` : ''}`
+  }
+  requestAnimationFrame(frame)
+}
+
+// ======================= §3: the lasagna (an enemy) =======================
+{
+  const el = document.getElementById('s3'), R = stageRenderer(el), { renderer, camera } = R
+  const scene = new THREE.Scene()
+  backdrop(scene)
+  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x332244, 1.6))
+  const sun = new THREE.DirectionalLight(0xffffff, 2.2)
+  sun.position.copy(LIGHT).multiplyScalar(10)
+  scene.add(sun)
+  const rimL = new THREE.DirectionalLight(0x80eaff, 2.4)
+  rimL.position.set(-4, 3, -6)
+  scene.add(rimL)
+  const page = pageMesh(makeTex(renderer, pageCanvas('A', true).canvas))
+  scene.add(page.mesh)
+  const u = page.u, status = document.getElementById('s3status')
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
+  let phillG, lasG
+  try {
+    ;[phillG, lasG] = await Promise.all([loader.loadAsync(ROOT + 'phill.glb'), loader.loadAsync('_local/lasagna.glb')])
+  } catch {
+    el.querySelector('.loading').textContent = 'LASAGNA.GLB IS IN _local/ (NOT IN THE REPO)'
+    throw new Error('lasagna.glb missing')
+  }
+  el.querySelector('.loading').remove()
+
+  // clips with the hips' position held (the engine's physics moves them); the lasagna borrows Phill's jump
+  const hold = (clip, drop = false) => {
+    const c = clip.clone()
+    c.tracks = c.tracks.filter((tr) => !(drop && /Hips\.position$/.test(tr.name)))
+    for (const tr of c.tracks) if (/Hips\.position$/.test(tr.name)) for (let i = 0; i < tr.values.length; i += 3) { tr.values[i] = tr.values[0]; tr.values[i + 1] = tr.values[1]; tr.values[i + 2] = tr.values[2] }
+    return c
+  }
+  const pClips = Object.fromEntries(phillG.animations.map((c) => [c.name, hold(c)]))
+  const lClips = Object.fromEntries(lasG.animations.map((c) => [c.name, hold(c)]))
+  lClips.jumping = hold(phillG.animations.find((c) => c.name === 'jumping'), true)
+  function actor(G, clips, height) {
+    const bb = new THREE.Box3().setFromObject(G.scene), k = height / bb.getSize(new THREE.Vector3()).y
+    const root = SkeletonUtils.clone(G.scene)
+    root.scale.setScalar(k)
+    root.position.y = -bb.min.y * k
+    root.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0, 0, 0); o.frustumCulled = false } })
+    const holder = new THREE.Group()
+    holder.add(root)
+    scene.add(holder)
+    const mixer = new THREE.AnimationMixer(root)
+    const acts = Object.fromEntries(Object.entries(clips).map(([n, c]) => [n, mixer.clipAction(c)]))
+    return { holder, root, mixer, acts, cur: null, x: 0, y: 0, vx: 0, vy: 0, dir: 1, air: false }
+  }
+  // a looping clip at a speed, or a one-shot scrubbed to a time (crossfades still run)
+  const loop = (a, name, speed = 1) => { const x = a.acts[name]; x.timeScale = speed; if (a.cur !== name) { x.reset().fadeIn(0.12).play(); if (a.cur) a.acts[a.cur].fadeOut(0.12); a.cur = name } }
+  const scrub = (a, name, t) => { const x = a.acts[name]; if (a.cur !== name) { x.reset().fadeIn(0.08).play(); if (a.cur) a.acts[a.cur].fadeOut(0.08); a.cur = name } x.timeScale = 0; x.time = t }
+  const phill = actor(phillG, pClips, 0.5), las = actor(lasG, lClips, 0.32)
+  las.S = 1 // its size (4 in the trip)
+
+  // the stage: his line and the one below it (where the lasagna starts)
+  const Lp = lines.findIndex((l) => /^Cut the/.test(l.text)), G = 9
+  const ink = (i) => lines[i].inkTop
+  // land on the first line crossed while falling (lines are one-way: you jump up through them)
+  function fall(a, dt, ghost = false, skip = -1, g = G) {
+    a.vy -= g * dt
+    const ny = a.y + a.vy * dt
+    a.x += a.vx * dt
+    if (!ghost && a.vy < 0) {
+      const hit = lines.findIndex((l, j) => j !== skip && l.inkTop <= a.y + 1e-4 && l.inkTop > ny && covers(l, a.x))
+      if (hit >= 0) { a.y = lines[hit].inkTop; a.vy = 0; a.vx = 0; a.air = false; return true }
+    }
+    a.y = ny
+    return false
+  }
+
+  // ---- hitboxes: page-plane boxes, [x0, y0, x1, y1] ----
+  const front = (a, n, f) => (a.dir > 0 ? [a.x + n, a.x + f] : [a.x - f, a.x - n])
+  const boxes = {
+    body: () => [phill.x - 0.1, phill.y, phill.x + 0.1, phill.y + 0.46],
+    feet: () => [phill.x - 0.11, phill.y - 0.02, phill.x + 0.11, phill.y + 0.07],
+    smash: () => { const [a, b] = front(phill, 0.05, 0.42); return [a, phill.y + 0.1, b, phill.y + 0.42] },
+    lBody: () => [las.x - 0.15 * las.S, las.y, las.x + 0.15 * las.S, las.y + 0.3 * las.S],
+    kick: () => { const [a, b] = front(las, 0.05 * las.S, 0.34 * las.S); return [a, las.y, b, las.y + 0.16 * las.S] },
+    trample: () => [las.x - 0.1 * las.S, las.y, las.x + 0.1 * las.S, las.y + 0.1 * las.S], // the giant's feet
+  }
+  const hits = (p, q) => p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3]
+  const COLS = { body: '#80eaff', feet: '#00ff2b', smash: '#ff4fd8', lBody: '#ffd24a', kick: '#ff3b5c', trample: '#ff3b5c' }
+  const outlines = Object.fromEntries(Object.entries(COLS).map(([k, c]) => {
+    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(1, 1, 0), new THREE.Vector3(0, 1, 0)])
+    const l = new THREE.LineLoop(g, new THREE.LineBasicMaterial({ color: c, depthTest: false, transparent: true }))
+    l.renderOrder = 10
+    scene.add(l)
+    return [k, l]
+  }))
+  let showBoxes = true
+  const drawBox = (k, on) => {
+    const l = outlines[k]
+    l.visible = showBoxes && on
+    if (!l.visible) return
+    const [x0, y0, x1, y1] = boxes[k]()
+    l.position.set(x0, y0, bendJS(u, (x0 + x1) / 2, y0) + 0.25)
+    l.scale.set(x1 - x0, y1 - y0, 1)
+  }
+
+  // ---- pops ("!", "+300", "-250") and the score ----
+  let score = 0
+  const _v = new THREE.Vector3()
+  function pop(text, at, cls = '') {
+    const [W, H] = R.size(), p = _v.copy(at).project(camera), e = document.createElement('div')
+    e.className = `pop ${cls}`
+    e.textContent = text
+    e.style.left = `${((p.x * 0.5 + 0.5) * W).toFixed(0)}px`
+    e.style.top = `${((0.5 - p.y * 0.5) * H - 20).toFixed(0)}px`
+    el.append(e)
+    setTimeout(() => e.remove(), 1000)
+  }
+  const over = (a, h) => new THREE.Vector3(a.x, a.y + h, bendJS(u, a.x, a.y) + 0.15)
+
+  // ---- the encounter, scripted around real hitbox tests: stomp, smash, get kicked, or the trip ----
+  const MODES = ['stomp', 'smash', 'kicked', 'giant']
+  let mode = 'stomp', auto = true, enc, nextAt = 0
+  const LABEL = { stomp: 'STOMP', smash: 'SMASH', kicked: 'KICKED', giant: 'THE TRIP: GIANT' }
+  const GP = { grow: "IT'S GROWING", chase: 'RUN!', flee: 'RUN!', perch: 'SAFE UP HERE', shrink: 'THE SHROOMS WEAR OFF', revenge: 'GET EVEN' }
+  function start(m) {
+    mode = m
+    enc = { t: 0, state: 'patrol', out: '', outT: 0, inv: 0, flyT: -1, squashT: -1, kickT: -1, atkT: -1, jumpT: -1, pj: 0, skip: -1 }
+    // stomp: he waits on the line above and drops onto it; the others: it starts a line below him and jumps up
+    las.S = 1
+    if (m === 'stomp') {
+      Object.assign(phill, { x: toX(200), y: ink(Lp - 1), vx: 0, vy: 0, dir: 1, air: false })
+      Object.assign(las, { x: toX(470), y: ink(Lp), vx: 0, vy: 0, dir: -1, air: false })
+    } else if (m === 'giant') {
+      // the trip starts half a second in; it grows, you run
+      enc.gp = 'calm'
+      Object.assign(phill, { x: toX(230), y: ink(Lp), vx: 0, vy: 0, dir: 1, air: false })
+      Object.assign(las, { x: toX(560), y: ink(Lp), vx: 0, vy: 0, dir: -1, air: false })
+    } else {
+      Object.assign(phill, { x: toX(40), y: ink(Lp), vx: 0, vy: 0, dir: 1, air: false })
+      Object.assign(las, { x: toX(470), y: ink(Lp + 1), vx: 0, vy: 0, dir: -1, air: false })
+    }
+    las.holder.visible = true
+    las.holder.scale.setScalar(1)
+    las.holder.rotation.set(0, 0, 0)
+    phill.holder.visible = true
+    phill.holder.rotation.z = 0
+  }
+  start('stomp')
+  for (const b of document.querySelectorAll('#enemy [data-mode]')) b.addEventListener('click', () => { auto = b.dataset.mode === 'auto'; start(auto ? 'stomp' : b.dataset.mode) })
+  seg('boxes', (v) => { showBoxes = v === 'on' })
+  const cam = new THREE.Vector3(toX(260), ink(Lp) + 0.05, 0), gcam = new THREE.Vector3(), _gt = new THREE.Vector3(), _gs = new THREE.Vector3()
+  window.__las = { get enc() { return enc }, phill, las, start, speed: 1, cam, zoom: 1 } // (debug)
+
+  function squash(e, dt) {
+    e.squashT += dt
+    const s = e.squashT < 0.08 ? 1 - (e.squashT / 0.08) * 0.7 : 0.3
+    const gone = Math.min(1, Math.max(0, e.squashT - 0.45) / 0.25)
+    las.holder.scale.set(1.35 * (1 - gone) + 0.001, s * (1 - gone) + 0.001, 1.35 * (1 - gone) + 0.001)
+    scrub(las, 'die', 0.2)
+  }
+  function hurt(e, dx) {
+    e.out = 'kicked'; e.inv = 1.5; phill.air = true; phill.vx = -Math.sign(dx || 1) * 1.9; phill.vy = 1.2
+    score = Math.max(0, score - 250); pop('-250', over(phill, 0.55), 'bad'); sfx('fall')
+  }
+  const backOut = (f) => 1 + 2.70158 * (f - 1) ** 3 + 1.70158 * (f - 1) ** 2
+  const ease = (f) => f * f * (3 - 2 * f)
+  // the trip, giant version: it grows 4× and can't be hurt (smashes go TINK, its feet trample you); it's slower
+  // than your run, so you run (moon jumps help) until the shrooms wear off, it shrinks back, and you get even
+  function giant(dt, e) {
+    // the moon: Play's jump is 1.0 unit high (apex 0.36 s, gravity 15.4); the trip's is 1.5 high at 0.6 gravity
+    const dx = las.x - phill.x, dist = Math.abs(dx), MG = 15.4 * 0.6
+    // --- it ---
+    if (e.gp === 'calm') {
+      las.x += las.dir * 0.35 * dt
+      loop(las, 'walk', 1)
+      if (e.t > 0.5) { e.gp = 'grow'; e.g0 = e.t; sfx('power-up') }
+    } else if (e.gp === 'grow') {
+      const f = Math.min(1, (e.t - e.g0) / 0.9)
+      las.S = 1 + 3 * backOut(f)
+      loop(las, 'idle', 1)
+      if (f >= 1) { e.gp = 'chase'; pop('!!', over(las, 0.3 * las.S + 0.06), 'alert'); sfx('mushroom-appear') }
+    } else if (e.gp === 'chase' || e.gp === 'flee' || e.gp === 'perch') {
+      las.dir = Math.sign(-dx) || las.dir
+      if (dist > 0.12) { las.x += las.dir * 1.6 * dt; loop(las, 'walk', 0.9) } else loop(las, 'idle', 1) // under him, looking up
+      if (e.t > 6.5) { e.gp = 'shrink'; e.s0 = e.t; sfx('power-down') }
+    } else if (e.gp === 'shrink') {
+      const f = Math.min(1, (e.t - e.s0) / 0.8)
+      las.S = 4 - 3 * ease(f)
+      loop(las, 'idle', 1)
+      if (f >= 1 && e.t > 7.6) { e.gp = 'revenge'; phill.air = true; phill.vy = 0; e.pj = 0 }
+    } else if (e.gp === 'revenge') loop(las, 'idle', 1)
+    else if (e.gp === 'squashed') squash(e, dt)
+    // --- him ---
+    if (e.gp === 'calm') { phill.x += 0.9 * dt; loop(phill, 'walk', 1.4) }
+    else if (e.gp === 'grow') loop(phill, 'idle', 1)
+    else if (e.gp === 'chase') {
+      if (phill.air) { // bounced off its hide
+        scrub(phill, 'jumping', 0.95)
+        phill.holder.rotation.z = -phill.dir * 0.3
+        if (fall(phill, dt, false, -1, MG)) { phill.holder.rotation.z = 0; e.gp = 'flee'; e.f0 = e.t; phill.dir = -(Math.sign(dx) || 1) }
+      } else if (e.atkT >= 0) {
+        e.atkT += dt * 1.2
+        scrub(phill, 'attack', e.atkT)
+        if (e.atkT >= 0.45 && e.atkT <= 0.8 && hits(boxes.smash(), boxes.lBody())) {
+          e.atkT = -1; e.tink = true
+          pop('TINK!', over(las, 0.3 * las.S * 0.55), 'alert'); sfx('smash')
+          phill.air = true; phill.vx = -Math.sign(dx) * 1.5; phill.vy = 1.4
+        } else if (e.atkT > 1.3) e.atkT = -1
+      } else if (dist < 1.25) e.atkT = 0.2
+      else { phill.x += phill.dir * 0.9 * dt; loop(phill, 'walk', 1.4) }
+    } else if (e.gp === 'flee') {
+      if (!phill.air) {
+        phill.x += phill.dir * 2.2 * dt
+        loop(phill, 'walk', 2.6)
+        if (e.t - e.f0 > 0.7) { phill.air = true; phill.vy = Math.sqrt(2 * MG * 1.5); phill.vx = phill.dir * 0.6; e.pj = 0; sfx('jump') } // a moon jump: up over its head
+      } else {
+        e.pj += dt
+        scrub(phill, 'jumping', 0.58 + 0.5 * Math.min(1, e.pj / 1.1))
+        if (fall(phill, dt, false, -1, MG)) e.gp = 'perch'
+      }
+    } else if (e.gp === 'perch' || e.gp === 'shrink') {
+      loop(phill, 'idle', 1)
+      phill.dir = Math.sign(las.x - phill.x) || phill.dir
+    } else if (e.gp === 'revenge') {
+      // ↓ ↓ ↓ down through the lines onto it
+      scrub(phill, 'jumping', 0.95)
+      phill.vx = (las.x - phill.x) * 3
+      fall(phill, dt, true)
+      if (phill.vy < 0 && hits(boxes.feet(), boxes.lBody()) && phill.y > las.y + 0.15) {
+        e.gp = 'squashed'; e.state = 'squashed'; e.squashT = 0; e.out = 'revenge'
+        phill.vy = 2.2; phill.vx = 0.3 * phill.dir; e.pj = 0.3
+        score += 300; pop('+300', over(las, 0.3)); sfx('land')
+      }
+    } else if (e.gp === 'squashed') {
+      if (phill.air) { e.pj += dt; scrub(phill, 'jumping', 0.58 + 0.5 * Math.min(1, e.pj / 0.62)); fall(phill, dt) } else loop(phill, 'idle', 1)
+    }
+    // its feet trample you (the script stays clear; the test is real)
+    if (las.S > 1.5 && e.inv <= 0 && hits(boxes.body(), boxes.trample())) hurt(e, dx)
+  }
+
+  let last = performance.now(), clock = 0
+  function frame(now) {
+    requestAnimationFrame(frame)
+    if (!R.visible()) { last = now; return }
+    const dt = Math.min(0.033, (now - last) / 1000) * window.__las.speed
+    last = now
+    const t = (clock += dt), e = enc
+    e.t += dt
+    u.uT.value = t
+    u.uTime.value = t
+    const trip = mode === 'giant' ? Math.max(0, Math.min(1, (e.t - 0.5) / 0.5, (6.9 - e.t) / 0.6)) : 0
+    u.uShroom.value = trip; u.uS.value = trip; u.uMelt.value = 0.6 * trip; u.uHeat.value = trip; u.uPsy.value = 1
+    const dx = las.x - phill.x, dist = Math.abs(dx)
+
+    if (mode === 'giant') giant(dt, e)
+    // --- the lasagna ---
+    else if (e.state === 'patrol') {
+      las.x += las.dir * 0.35 * dt
+      loop(las, 'walk', 1)
+      if (e.t > 1.1 && dist < 2.6) { e.state = 'alert'; e.alertT = 0; las.dir = Math.sign(-dx) || -1; pop('!', over(las, 0.42), 'alert'); sfx('mushroom-appear') }
+    } else if (e.state === 'alert') {
+      e.alertT += dt
+      loop(las, 'idle', 1)
+      // up a line toward him: an apex between his line and the one above it (lines are one-way platforms)
+      if (e.alertT > 0.45) {
+        if (mode === 'stomp') e.state = 'charge'
+        else { e.state = 'jump'; las.vy = Math.sqrt(2 * G * (ink(Lp) - ink(Lp + 1) + 0.08)); las.vx = las.dir * 0.8; las.air = true; e.jumpT = 0; sfx('jump') }
+      }
+    } else if (e.state === 'jump') {
+      e.jumpT += dt
+      scrub(las, 'jumping', 0.58 + 0.5 * Math.min(1, e.jumpT / 0.55))
+      if (fall(las, dt)) { e.state = 'charge'; las.vx = 0 }
+    } else if (e.state === 'charge') {
+      las.dir = Math.sign(-dx) || las.dir
+      las.x += las.dir * 1.3 * dt
+      loop(las, 'walk', 2.2)
+      if (dist < 0.36 && mode !== 'stomp' && Math.abs(las.y - phill.y) < 0.05) { e.state = 'kick'; e.kickT = 0.85 }
+    } else if (e.state === 'kick') {
+      e.kickT += dt * 1.3
+      scrub(las, 'attack', e.kickT)
+      if (e.kickT > 1.95) { e.state = 'leave'; las.dir *= -1 }
+    } else if (e.state === 'leave') {
+      las.x += las.dir * 0.6 * dt
+      loop(las, 'walk', 1.2)
+    } else if (e.state === 'flying') {
+      e.flyT += dt
+      las.holder.rotation.z += las.dir * 9 * dt
+      fall(las, dt, true)
+      scrub(las, 'die', 0.3)
+      las.holder.scale.setScalar(Math.max(0.001, 1 - Math.max(0, e.flyT - 0.6) / 0.4))
+    } else if (e.state === 'squashed') squash(e, dt)
+
+    // --- Phill (scripted for the mode) ---
+    const kicked = e.out === 'kicked' && phill.air
+    if (mode === 'giant') {
+      // (the giant scene drives him)
+    } else if (kicked) {
+      fall(phill, dt)
+      scrub(phill, 'jumping', 0.95)
+      phill.holder.rotation.z = -phill.dir * 0.4
+    } else if (phill.air) {
+      e.pj += dt
+      scrub(phill, 'jumping', 0.58 + 0.5 * Math.min(1, e.pj / 0.62))
+      if (fall(phill, dt, false, e.skip)) phill.holder.rotation.z = 0
+    } else if (e.atkT >= 0) {
+      e.atkT += dt * 1.2
+      scrub(phill, 'attack', e.atkT)
+      if (e.atkT > 1.3) e.atkT = -1
+    } else if (e.out && e.out !== 'trip') {
+      loop(phill, 'idle', 1)
+      phill.holder.rotation.z = 0
+    } else {
+      // walk toward it; stomp mode jumps at it, smash mode stops and swings, kicked mode just stands there
+      const walking = mode === 'trip' || (mode === 'stomp' && e.t < 0.8) || (mode === 'smash' && (e.state !== 'charge' || dist > 0.55)) || (mode === 'kicked' && e.t < 1.6)
+      if (walking && !(mode === 'trip' && e.out)) { phill.x += phill.dir * 0.9 * dt; loop(phill, 'walk', 1.4) } else loop(phill, 'idle', 1)
+      // ↓ drops him through his line onto it
+      if (mode === 'stomp' && e.state === 'charge' && dist < 0.12 && !phill.air) { phill.air = true; phill.vy = 0; phill.vx = 0; e.pj = 0.9; e.skip = Lp - 1 }
+      if (mode === 'smash' && e.state === 'charge' && dist < 0.55 && e.atkT < 0) { e.atkT = 0.2; sfx('smash') }
+    }
+
+    // --- the hitbox tests ---
+    const falling = phill.air && phill.vy < 0 && !kicked
+    const striking = e.atkT >= 0.45 && e.atkT <= 0.8
+    const kicking = e.state === 'kick' && e.kickT >= 1.2 && e.kickT <= 1.6
+    const alive = mode !== 'giant' && ['charge', 'kick', 'patrol', 'alert', 'jump', 'leave'].includes(e.state)
+    if (alive && falling && hits(boxes.feet(), boxes.lBody()) && phill.y > las.y + 0.15) {
+      e.state = 'squashed'; e.squashT = 0; e.out = 'stomp'; phill.vy = 2.2; phill.vx = 0.3 * phill.dir; e.pj = 0.3; e.skip = -1
+      score += 300; pop('+300', over(las, 0.3)); sfx('land')
+    }
+    if (alive && striking && hits(boxes.smash(), boxes.lBody())) {
+      e.state = 'flying'; e.flyT = 0; e.out = 'smash'; las.vx = phill.dir * 2.4; las.vy = 2.6; las.dir = phill.dir
+      score += 300; pop('+300', over(las, 0.3)); sfx('smash')
+    }
+    if (alive && kicking && e.inv <= 0 && hits(boxes.kick(), boxes.body())) hurt(e, dx)
+    if (e.out && !e.outT) e.outT = e.t
+    e.inv = Math.max(0, e.inv - dt)
+    phill.holder.visible = !(e.inv > 0 && Math.floor(e.inv / 0.2) % 2 === 1) // 2.5 Hz
+    if (e.outT && e.t - e.outT > 2.4) start(auto ? MODES[(MODES.indexOf(mode) + 1) % MODES.length] : mode)
+
+    // --- place them on the page, facing their way (three-quarters to the camera) ---
+    const hue = (t * 0.25) % 1
+    phill.root.traverse((o) => { if (o.isMesh) { o.material.emissive.setHSL(hue, 1, 0.5); o.material.emissiveIntensity = 0.35 * trip } })
+    if (mode === 'giant' && e.gp !== 'squashed') las.holder.scale.setScalar(las.S)
+    for (const a of [phill, las]) {
+      a.holder.position.set(a.x, a.y, bendJS(u, a.x, a.y) + 0.11)
+      a.holder.rotation.y = a.dir * (Math.PI / 2 - 0.35)
+      a.mixer.update(dt)
+    }
+    drawBox('body', true)
+    drawBox('feet', falling)
+    drawBox('smash', striking)
+    const giantUp = mode === 'giant' && e.gp !== 'squashed' && e.gp !== 'revenge'
+    drawBox('lBody', las.holder.visible && (alive || giantUp))
+    drawBox('kick', kicking)
+    drawBox('trample', giantUp && las.S > 1.5)
+
+    // the camera: Play's zoom; the giant scene pulls back to fit it, and its steps shake the page a little
+    const [, H] = R.size(), tf = Math.tan((camera.fov * Math.PI) / 360)
+    let target = cam, zoom = window.__las.zoom
+    if (mode === 'giant') {
+      gcam.lerp(_gt.set((phill.x + las.x) / 2, Math.max(ink(Lp) + 0.5, (phill.y + las.y) / 2 + 0.35), 0), e.t < 0.05 ? 1 : 0.08)
+      target = _gs.copy(gcam)
+      zoom = 0.85
+      if (las.S > 2 && las.cur === 'walk') target.y += 0.012 * Math.abs(Math.sin(t * 7))
+    }
+    const dist0 = (0.5 * H) / (2 * tf * 90) / zoom
+    camera.position.set(target.x, target.y - dist0 * Math.sin(0.08), dist0 * Math.cos(0.08))
+    camera.lookAt(target)
+    renderer.render(scene, camera)
+    const note = e.out ? (e.out === 'kicked' ? 'OUCH' : e.out === 'revenge' ? 'REVENGE' : 'DEFEATED') : mode === 'giant' ? GP[e.gp] ?? '' : ''
+    status.innerHTML = `★ ${String(score).padStart(6, '0')} · ${LABEL[mode]}${note ? ` <span class="g">${note}</span>` : ''}`
+  }
+  requestAnimationFrame(frame)
+}
+</script>
+</body>
+</html>

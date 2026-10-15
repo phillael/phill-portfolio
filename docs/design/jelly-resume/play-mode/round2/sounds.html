@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Play Sound Audition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Nunito:wght@400;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+  Jelly Resume · Play mode round 2: the sound audition (2026-10-14).
+  Every candidate is CC0 (Juhani Junkala's "512 Sound Effects (8-bit style)", Kenney's "Music Jingles"
+  and "Digital Audio", celestialghost8's "Victory"); see CREDITS.md. "Today" is the synthesized blip
+  the game plays now (sfx.ts). Serve the repo (python3 -m http.server 8765 from its root) and open
+  http://localhost:8765/docs/design/jelly-resume/play-mode/round2/sounds.html
+-->
+<style>
+  :root {
+    --bg: #05070c; --ink: #d7deea; --muted: #7c8798; --cyan: #80eaff; --green: #00ff2b; --pink: #ff4fd8;
+    --violet: #c44dff; --line: #1e2431; --card: #0b0e16; --btn: #121621;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 Nunito, system-ui, sans-serif; }
+  header, main { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+  header { padding-top: 28px; }
+  h1 { font: 24px/1.2 Audiowide, sans-serif; margin: 0 0 6px; color: var(--cyan); }
+  h2 { font: 16px/1.3 Audiowide, sans-serif; margin: 0; }
+  .sub { color: var(--muted); margin: 0 0 18px; max-width: 760px; }
+  a { color: var(--cyan); }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 16px; margin: 0 -16px 18px; background: rgba(5, 7, 12, .92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+  button { font: 700 14px Nunito, sans-serif; color: var(--ink); background: var(--btn); border: 1px solid #2a3142; border-radius: 10px; min-height: 44px; padding: 0 14px; cursor: pointer; }
+  button:hover { border-color: var(--cyan); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  button.primary { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 12px rgba(128, 234, 255, .25); }
+  button.playing { background: rgba(128, 234, 255, .14); }
+  label.vol { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); }
+  input[type=range] { accent-color: var(--cyan); }
+  .slot { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 0 0 14px; }
+  .slot header { all: unset; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+  .slot .when { color: var(--muted); font-size: 14px; }
+  .slot .tag { font: 10px 'Press Start 2P', monospace; color: var(--violet); border: 1px solid var(--violet); border-radius: 6px; padding: 3px 6px; }
+  .opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
+  .opt { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; border: 1px solid #222a3a; border-radius: 10px; padding: 10px; }
+  .opt.picked { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+  .opt .play { grid-row: span 2; width: 44px; padding: 0; font-size: 16px; }
+  .opt .name { font-weight: 800; }
+  .opt .meta { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+  .opt .pick { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; min-height: 32px; font-size: 13.5px; cursor: pointer; }
+  .opt .pick input { width: 18px; height: 18px; accent-color: var(--green); }
+  .gain { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; margin-left: auto; }
+  pre#out { white-space: pre-wrap; background: #0b0e16; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 12.5px; color: #b9c6da; }
+  .note { color: var(--muted); font-size: 14px; }
+  .warn { color: #ffd24a; }
+  .total { font: 11px 'Press Start 2P', monospace; color: var(--green); }
+  @media (max-width: 600px) { .opts { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Play mode: the sound audition</h1>
+  <p class="sub">Every candidate is <b>CC0</b> (free, no attribution needed; credits in <code>CREDITS.md</code>), trimmed to a small mp3. Pick one per slot (my suggestion is pre-picked), set its level, then <b>Play a run</b> to hear your picks together, and <b>Copy picks</b> to paste them back to me. "Today" is the synthesized blip Play makes now. They all play only while the resume's Sound is on, only from Play, and they load with Play (not with the page). Mockups: <a href="index.html">index.html</a>.</p>
+</header>
+<main>
+  <div class="bar">
+    <button class="primary" id="run">▶ Play a run</button>
+    <button id="stop">■ Stop</button>
+    <label class="vol">Volume <input id="vol" type="range" min="0" max="1" step="0.01" value="0.7"></label>
+    <button id="copy">Copy picks</button>
+    <button id="reset">Reset to my picks</button>
+    <span class="total" id="total"></span>
+  </div>
+  <div id="slots"></div>
+  <h2 style="margin: 26px 0 8px">Your picks</h2>
+  <pre id="out"></pre>
+  <p class="note">Left out on purpose: Number Slayers' own sound effects. Its <code>eat-correct.mp3</code> (the shrimp collect) and most of its effects come from paid libraries (SoundMorph, IndieSFX) whose licenses forbid putting the files on a public server, and its <code>shrimp-shower.mp3</code> is "Magic spell - sparkle shield" by Epic Stock Media (paid). Only <code>shrimp-announce.mp3</code> is Phill's own bounce (Logic Pro), so SHRIMP! keeps its real announce and gets a CC0 shower.</p>
+</main>
+<script>
+// ---- the slots, in the order they come up in a run ----
+const SLOTS = [
+  { slot: 'start', when: 'PLAYER 1 START or 🎮 Play: he dives in', mine: 2 },
+  { slot: 'jump', when: 'W / ↑ (every jump)', today: 'jump', mine: 1 },
+  { slot: 'land', when: 'landing from a fall (louder the faster; gentle steps are silent)', today: 'land', mine: 'today', optional: true },
+  { slot: 'smash', when: 'Space or a ground-pound bursts words (often several a second)', today: 'smash', mine: 2 },
+  { slot: 'coin', when: 'an Impact coin (one of 27)', today: 'coin', mine: 1 },
+  { slot: 'checkpoint', when: 'a role reached (six a run)', mine: 1 },
+  { slot: 'fall', when: 'off the paper\'s edge: the flail', mine: 1 },
+  { slot: 'respawn', when: 'dropping back in at the checkpoint', mine: 2, optional: true },
+  { slot: 'shrimp-pickup', when: 'touching a shrimp (SHRIMP! follows at once)', mine: 1 },
+  { slot: 'shrimp-announce', when: 'SHRIMP! (Phill\'s own Logic bounce, from Number Slayers; fixed)', fixed: 'shrimp-announce.mp3', mine: 1 },
+  { slot: 'shower', when: 'the shrimp rain, 1.5 s after SHRIMP! (NS used a paid sound here)', mine: 1, synth: 'shower' },
+  { slot: 'mushroom-appear', when: 'a ? block smashed: the mushroom sprouts', mine: 1 },
+  { slot: 'power-up', when: 'eating the mushroom: shroom mode', mine: 1 },
+  { slot: 'power-down', when: 'shroom mode wearing off (12 s later)', mine: 3, optional: true },
+  { slot: 'finish', when: 'THE END (the bottom line)', today: 'finish', mine: 1 },
+]
+
+let ac = null, master = null, synthMix = null, noise = null
+const bufs = new Map()
+const live = new Set()
+function audio() {
+  if (ac) return ac
+  ac = new AudioContext({ latencyHint: 'interactive' })
+  const comp = ac.createDynamicsCompressor()
+  comp.threshold.value = -14
+  comp.ratio.value = 4
+  master = ac.createGain()
+  master.gain.value = +document.getElementById('vol').value
+  master.connect(comp)
+  comp.connect(ac.destination)
+  synthMix = ac.createGain()
+  synthMix.connect(master)
+  noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate)
+  const d = noise.getChannelData(0)
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
+  return ac
+}
+async function buffer(file) {
+  if (!bufs.has(file)) bufs.set(file, fetch('audio/' + file).then((r) => r.arrayBuffer()).then((b) => audio().decodeAudioData(b)))
+  return bufs.get(file)
+}
+async function playFile(file, gain = 1, t = 0) {
+  const a = audio(), b = await buffer(file), s = a.createBufferSource(), g = a.createGain()
+  s.buffer = b
+  g.gain.value = gain
+  s.connect(g)
+  g.connect(master)
+  s.start(t || a.currentTime)
+  live.add(s)
+  s.onended = () => live.delete(s)
+  return b.duration
+}
+
+// ---- today's synthesized sounds (a port of sfx.ts) ----
+function tone(type, f0, f1, len, g, t) {
+  const a = audio(), o = a.createOscillator(), e = a.createGain()
+  t ??= a.currentTime
+  o.type = type
+  o.frequency.setValueAtTime(f0, t)
+  if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + len)
+  e.gain.setValueAtTime(0.0001, t)
+  e.gain.exponentialRampToValueAtTime(g, t + 0.008)
+  e.gain.exponentialRampToValueAtTime(0.0001, t + len)
+  o.connect(e)
+  e.connect(synthMix)
+  o.start(t)
+  o.stop(t + len + 0.05)
+  live.add(o)
+  o.onended = () => live.delete(o)
+}
+function crunch(type, f, len, g, t) {
+  const a = audio(), s = a.createBufferSource(), bp = a.createBiquadFilter(), e = a.createGain()
+  t ??= a.currentTime
+  s.buffer = noise
+  bp.type = type
+  bp.frequency.setValueAtTime(f, t)
+  bp.frequency.exponentialRampToValueAtTime(f * 0.3, t + len)
+  e.gain.setValueAtTime(g, t)
+  e.gain.exponentialRampToValueAtTime(0.0001, t + len)
+  s.connect(bp)
+  bp.connect(e)
+  e.connect(synthMix)
+  s.start(t, Math.random() * 0.5)
+  s.stop(t + len + 0.05)
+}
+const TODAY = {
+  jump: () => tone('square', 310, 760, 0.1, 0.06),
+  land: () => { tone('sine', 150, 55, 0.14, 0.28); crunch('lowpass', 700, 0.06, 0.12) },
+  smash: () => { crunch('bandpass', 2200, 0.13, 0.5); tone('square', 240, 70, 0.12, 0.12) },
+  coin: () => { const t = audio().currentTime; tone('triangle', 988, 988, 0.22, 0.13, t); tone('triangle', 1319, 1319, 0.34, 0.13, t + 0.075) },
+  finish: () => { const t = audio().currentTime; [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone('triangle', f, f, i === 3 ? 0.7 : 0.18, 0.12, t + i * 0.085)); tone('sine', 1046.5, 1046.5, 0.9, 0.06, t + 0.255) },
+  // a synthesized glitter (no file): high square blips falling for ~1.8 s
+  shower: () => { const t = audio().currentTime; for (let i = 0; i < 26; i++) { const f = 1800 + Math.random() * 2600; tone('square', f, f * 0.92, 0.07, 0.025 * (1 - i / 30), t + i * 0.065 + Math.random() * 0.03) } },
+}
+
+// ---- the page ----
+const KEY = 'jelly-round2-picks'
+let manifest = []
+let picks = {}
+const mine = () => Object.fromEntries(SLOTS.map((s) => [s.slot, { n: s.mine, gain: 1 }]))
+function load() {
+  try { picks = { ...mine(), ...JSON.parse(localStorage.getItem(KEY) || '{}') } } catch { picks = mine() }
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(picks)) } catch {} }
+const cands = (slot) => manifest.filter((e) => e.slot === slot).sort((a, b) => a.file.localeCompare(b.file))
+/** the pick for a slot: a file, 'today'/'synth', or none (0) */
+function pickOf(slot) {
+  const s = SLOTS.find((x) => x.slot === slot), p = picks[slot] ?? { n: 0, gain: 1 }
+  if (s.fixed) return { file: s.fixed, gain: p.gain }
+  if (p.n === 'today' || p.n === 'synth') return { synth: s.today || s.synth, gain: p.gain }
+  if (!p.n) return null
+  const c = cands(slot)[p.n - 1]
+  return c ? { file: c.file, gain: p.gain } : null
+}
+async function playSlot(slot) {
+  const p = pickOf(slot)
+  if (!p) return 0
+  if (p.synth) { synthMix.gain.value = p.gain; TODAY[p.synth](); return 0.4 }
+  return playFile(p.file, p.gain)
+}
+
+function render() {
+  const root = document.getElementById('slots')
+  root.innerHTML = ''
+  for (const s of SLOTS) {
+    const el = document.createElement('section')
+    el.className = 'slot'
+    const list = s.fixed ? [{ fixed: true, file: s.fixed, note: 'Phill\'s own SHRIMP! announce (136 KB; it\'s a ~5 s jingle). Ships as is.', bytes: 136369, durationSec: 4.9, pack: 'Phill (Logic Pro)' }] : cands(s.slot)
+    el.innerHTML = `<header><h2>${s.slot}</h2><span class="when">${s.when}</span>${s.optional ? '<span class="tag">OPTIONAL</span>' : ''}
+      <label class="gain">level <input type="range" min="0" max="1.5" step="0.05" value="${picks[s.slot]?.gain ?? 1}" aria-label="${s.slot} level"><output>${(picks[s.slot]?.gain ?? 1).toFixed(2)}</output></label></header>
+      <div class="opts"></div>`
+    const opts = el.querySelector('.opts')
+    const add = (n, name, meta, play) => {
+      const o = document.createElement('div')
+      const id = `${s.slot}-${n}`
+      const cur = s.fixed ? true : (picks[s.slot]?.n ?? 0) === n
+      o.className = 'opt' + (cur ? ' picked' : '')
+      o.innerHTML = `<button class="play" aria-label="Play ${name}">▶</button><div class="name">${name}</div><div class="meta">${meta}</div>
+        ${s.fixed ? '' : `<label class="pick"><input type="radio" name="${s.slot}" ${cur ? 'checked' : ''}> pick${n === s.mine ? ' <span class="note">(my suggestion)</span>' : ''}</label>`}`
+      o.querySelector('.play').onclick = async (e) => {
+        const b = e.currentTarget
+        b.classList.add('playing')
+        const d = await play()
+        setTimeout(() => b.classList.remove('playing'), Math.max(200, (d || 0.4) * 1000))
+      }
+      const r = o.querySelector('input[type=radio]')
+      if (r) r.onchange = () => { picks[s.slot] = { ...(picks[s.slot] || { gain: 1 }), n }; save(); render() }
+      opts.append(o)
+    }
+    list.forEach((c, i) => {
+      const kb = (c.bytes / 1024).toFixed(1)
+      add(c.fixed ? 1 : i + 1, c.fixed ? 'SHRIMP! announce' : `#${i + 1} · ${c.pack}`, `${c.note}<br>${c.durationSec.toFixed(2)} s · ${kb} KB${c.fixed ? '' : ` · <span title="${c.sourceFile}">${c.sourceFile.split('/').pop()}</span>`}`, () => playFile(c.file, picks[s.slot]?.gain ?? 1))
+    })
+    if (s.today || s.synth) add(s.today ? 'today' : 'synth', s.today ? 'Today (synth)' : 'Synth glitter (no file)', s.today ? 'What Play plays now: synthesized in sfx.ts, no file.' : 'A synthesized sparkle shower: no download at all.', () => { synthMix.gain.value = picks[s.slot]?.gain ?? 1; TODAY[s.today || s.synth](); return 0.5 })
+    if (s.optional) add(0, 'None', 'Leave this moment silent.', () => 0)
+    const g = el.querySelector('.gain input'), out = el.querySelector('.gain output')
+    g.oninput = () => { picks[s.slot] = { ...(picks[s.slot] || { n: s.mine }), gain: +g.value }; out.textContent = (+g.value).toFixed(2); save(); summary() }
+    root.append(el)
+  }
+  summary()
+}
+
+function summary() {
+  let bytes = 0
+  const lines = SLOTS.map((s) => {
+    const p = pickOf(s.slot)
+    if (!p) return `${s.slot}: none`
+    if (p.synth) return `${s.slot}: ${s.today ? 'today (synth)' : 'synth glitter'} @ ${p.gain.toFixed(2)}`
+    const c = s.fixed ? { bytes: 136369, file: s.fixed } : manifest.find((e) => e.file === p.file)
+    bytes += c.bytes
+    return `${s.slot}: ${p.file} @ ${p.gain.toFixed(2)}`
+  })
+  document.getElementById('out').textContent = 'Play round 2 sound picks\n' + lines.join('\n')
+  document.getElementById('total').textContent = `${(bytes / 1024).toFixed(0)} KB`
+}
+
+// ---- a run: the picks in the order a run would play them ----
+let runId = 0
+async function run() {
+  const id = ++runId
+  audio()
+  const wait = (s) => new Promise((r) => setTimeout(r, s * 1000))
+  const step = async (slot, pause) => { if (id !== runId) return; await playSlot(slot); await wait(pause) }
+  await step('start', 0.9)
+  for (const k of [0, 1]) { await step('jump', 0.42); await step('land', 0.25) }
+  await step('smash', 0.18); await step('smash', 0.3); await step('coin', 0.6)
+  await step('jump', 0.4); await step('land', 0.3); await step('checkpoint', 1)
+  await step('smash', 0.35); await step('shrimp-pickup', 0.05)
+  if (id !== runId) return
+  playSlot('shrimp-announce'); await wait(1.5); await step('shower', 2.4)
+  await step('smash', 0.25); await step('mushroom-appear', 1.1); await step('power-up', 1.4)
+  await step('jump', 0.45); await step('land', 0.6); await step('power-down', 1.2)
+  await step('jump', 0.25); await step('fall', 1.1); await step('respawn', 0.5); await step('land', 0.8)
+  await step('coin', 0.5); await step('finish', 0)
+}
+function stop() { runId++; for (const s of live) { try { s.stop() } catch {} } live.clear() }
+
+document.getElementById('run').onclick = run
+document.getElementById('stop').onclick = stop
+document.getElementById('vol').oninput = (e) => { if (master) master.gain.value = +e.target.value }
+document.getElementById('copy').onclick = async () => { const t = document.getElementById('out').textContent; try { await navigator.clipboard.writeText(t); document.getElementById('copy').textContent = 'Copied ✓' } catch { document.getElementById('copy').textContent = 'Select the text below' } setTimeout(() => (document.getElementById('copy').textContent = 'Copy picks'), 1600) }
+document.getElementById('reset').onclick = () => { picks = mine(); save(); render() }
+
+fetch('audio/manifest.json').then((r) => r.json()).then((m) => { manifest = m; load(); render() })
+</script>
+</body>
+</html>

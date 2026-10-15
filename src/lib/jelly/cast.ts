@@ -16,10 +16,18 @@ import { camDist, type Ray } from './camera'
 import { CAST_CONFIG, FOV, NEBULA, SITE, type CastConfig } from './config'
 import { hex, lcg, M4x, Q, type Quat, type Vec3 } from './math'
 import { LIGHT } from './render'
+import type { VoxelMesh } from './voxels'
 import type { World } from './world'
 
 const IDLE = 'idle'
 const KNOCKED = 'die'
+/** handed back from Play mode, he grows back to his orbit size over this long (s) */
+const GROW = 0.7
+/** Play mode's run, smash and jump: never part of his dances */
+export const PLAY_CLIPS: readonly string[] = ['walk', 'attack', 'jumping']
+
+/** the clips he dances to the music: all but idle, the knock and Play mode's */
+export const danceSet = (clips: string[]) => new Set(clips.filter((n) => n !== IDLE && n !== KNOCKED && !PLAY_CLIPS.includes(n)))
 /** samples of the waveform along a shrimp's body */
 const WAVE = 16
 
@@ -42,7 +50,7 @@ interface PhillState extends Body {
   th: number
   /** seconds since he arrived (he flies in from deep in the nebula) */
   age: number
-  /** every clip but idle and the knock, and what's left of this round of them (shuffled) */
+  /** his dances (danceSet), and what's left of this round of them (shuffled) */
   dances: Set<string>
   bag: string[]
   /** the music's on (with some hysteresis) */
@@ -76,6 +84,80 @@ interface ShrimpState extends Body {
   peak: number
 }
 
+/**
+ * Phill for Play mode: his pose, size, and his foot joints (node, height in the rest pose, where his
+ * soles are at the origin), so the soles can stand on the text; `stand`: how high idle holds them (model units).
+ */
+export interface Rig {
+  pose: Pose
+  height: number
+  dims: Vec3
+  feet: { node: number; rest: number }[]
+  stand: number
+  /** his dances (the rotation) */
+  dances: string[]
+}
+
+/** Play mode drives Phill: where his feet are, which way he faces (yaw) and how tall he is (units); in the trip, rainbow with afterimages (and hidden while it flickers) */
+export interface Drive {
+  feet: Vec3
+  yaw: number
+  size: number
+  trip?: number
+  flicker?: boolean
+}
+
+/**
+ * Something Play mode puts on the page (a shrimp pickup, a UFO's parts, the mushroom), drawn by the cast each
+ * frame in its pass, in the list's order (see-through ones last). Play owns the list (`cast.props`) and
+ * mutates it in place; nothing here moves them.
+ */
+export interface Prop {
+  /** the shrimp, or a model Play uploaded through `cast.voxels` */
+  model: 'shrimp' | ActorModel
+  /** where its middle goes (or, `origin`, its model's own origin: a voxel mesh's bottom middle), its turn and longest side (units) */
+  pos: Vec3
+  anchor?: 'origin'
+  rot: Quat
+  size: number
+  alpha: number
+  glow: Vec3
+  flash: number
+  ambient?: number
+  rim?: number
+  /** a skinned model's pose (its joint matrices: a Pose's `joints`) */
+  joints?: Float32Array | null
+  /** stretched across (x/z) and up (y), e.g. squashed flat */
+  sx?: number
+  sy?: number
+  /** a soft glow just behind it (its diameter, color and strength) */
+  halo: { size: number; color: Vec3; alpha: number } | null
+}
+
+/** The UFO's beam: an open cone of see-through cyan down from `top` (Play fills `cast.beams`) */
+export interface Beam {
+  top: Vec3
+  len: number
+  rTop: number
+  rBot: number
+  alpha: number
+}
+
+/** the trip's afterimages: how many, and how far back each (in snapshots, taken 60 a second) */
+const GHOSTS = 3
+const GHOST_STEP = 8
+const GHOST_SLOTS = GHOSTS * GHOST_STEP + 1
+
+/** a fully saturated hue (HSL 1, 0.5), into out */
+function hueRgb(h: number, out: Vec3, k = 1) {
+  const f = (n: number) => Math.max(0, Math.min(1, n))
+  h = ((h % 1) + 1) % 1
+  out[0] = f(Math.abs(h * 6 - 3) - 1) * k
+  out[1] = f(2 - Math.abs(h * 6 - 2)) * k
+  out[2] = f(2 - Math.abs(h * 6 - 4)) * k
+  return out
+}
+
 const body = (pos: Vec3): Body => ({ pos, vel: [0, 0, 0], rot: [0, 0, 0, 1], spin: [0, 0, 0], free: 0, flash: 0, eaten: false, scale: 1 })
 
 export function createCast(gl: WebGL2RenderingContext, w: World) {
@@ -85,11 +167,21 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
   let phill: PhillState | null = null
   let shrimpModel: ActorModel | null = null
   let shrimpWorld: Float32Array | null = null
+  /** Play mode round 2's enemy: fetched once Play has started (never in the cold open) */
+  let lasagna: ActorModel | null = null, lasagnaLoad: Promise<ActorModel | null> | null = null
   const shrimp: ShrimpState[] = Array.from({ length: 4 }, (_, i) => ({
     ...body([0, 0, -40]), on: false, wait: 3 + i * 6 + rnd() * 6, t: 0, dur: 1, from: [0, 0, 0], to: [0, 0, 0], axis: [0, 1, 0], rate: 0, ang: 0, base: [0, 0, 0, 1], size: 1,
     band: 0, level: 0, wave: new Float32Array(WAVE), ph: 0, span: 32, peak: 0.2,
   }))
   let alpha = 0
+  const props: Prop[] = []
+  const beams: Beam[] = []
+  const origin: Vec3 = [0, 0, 0]
+  /** Play mode owns his position, rotation, size and clip while this is set (the cast keeps drawing him) */
+  let drive: Drive | null = null
+  let rigInfo: Rig | null = null
+  /** handed back from Play mode: he grows from Play's size to his orbit's over GROW s */
+  let growFrom = 0, growT = GROW
   /** the music's bass, smoothed (and zero while it's off) */
   let energy = 0
   let disposed = false
@@ -107,9 +199,9 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
         if (disposed) return
         const a = await R.load(pb, nextTask)
         if (disposed) return
-        const pose = new Pose(a.m)
+        const pose = new Pose(a.m, { noLift: ['jumping'] })
         pose.play(pose.has(IDLE) ? IDLE : a.m.clips[0]?.name ?? '', 0)
-        const dances = new Set(a.m.clips.map((c) => c.name).filter((n) => n !== IDLE && n !== KNOCKED))
+        const dances = danceSet(a.m.clips.map((c) => c.name))
         phill = { ...body([0, params.lift + 3, -40]), a, pose, th: -Math.PI / 2, age: 0, scale: 0.4, dances, bag: [], groove: false, danceT: 0, phase: 0, pump: 0 }
       }
       await nextTask()
@@ -289,9 +381,24 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     const t = w.time, music = w.music, dm = w.danceMix
     energy += (music.bass * dm - energy) * Math.min(1, dt * 3)
 
-    if (phill) {
+    if (phill && drive) {
+      // Play mode has him: the model's origin (between his feet) at drive.feet, turned to drive.yaw
+      const p = phill, k = drive.size / p.a.height, c = p.a.center, cy = Math.cos(drive.yaw), sy = Math.sin(drive.yaw)
+      p.pos[0] = drive.feet[0] + (c[0] * cy + c[2] * sy) * k
+      p.pos[1] = drive.feet[1] + c[1] * k
+      p.pos[2] = drive.feet[2] + (-c[0] * sy + c[2] * cy) * k
+      Q.axis(0, 1, 0, drive.yaw, p.rot)
+      p.vel[0] = p.vel[1] = p.vel[2] = 0
+      p.spin[0] = p.spin[1] = p.spin[2] = 0
+      p.free = 0
+      p.eaten = false
+      p.scale = 1
+      p.pump = 0
+      p.flash = Math.max(0, p.flash - dt * 2.5)
+    } else if (phill) {
       const p = phill, cam = w.cam
       p.age += dt
+      growT = Math.min(GROW, growT + dt)
       p.th += (dt * Math.PI * 2) / Math.max(4, params.lap)
       orbitAt(p.th + 0.01, ahead)
       orbitAt(p.th, target)
@@ -361,6 +468,33 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     return M4x.compose(place, tv, rot, kv)
   }
 
+  /** his size in his orbit (shrunk inside the black hole; growing back from Play mode's) */
+  function orbitSize() {
+    const full = sizeNow() * (phill?.scale ?? 1)
+    if (growT >= GROW) return full
+    const u = growT / GROW, e = u * u * (3 - 2 * u)
+    return Math.exp(Math.log(Math.max(1e-3, growFrom)) + (Math.log(Math.max(1e-3, full)) - Math.log(Math.max(1e-3, growFrom))) * e)
+  }
+
+  /** the trip's afterimages: a ring of his recent placements and poses (16 + the joints' floats each) */
+  let ghostJ = 0, ghostHead = 0, ghostN = 0, ghostLast = -1
+  let ghostModel: Float32Array[] = [], ghostJoints: Float32Array[] = []
+  const rainbow: Vec3 = [0, 0, 0], ghostGlow: Vec3 = [0, 0, 0]
+  function snapGhost(m: Float32Array, joints: Float32Array) {
+    if (ghostJ !== joints.length) {
+      // (sized to his joints once)
+      ghostJ = joints.length
+      const buf = new Float32Array(GHOST_SLOTS * (16 + ghostJ))
+      ghostModel = Array.from({ length: GHOST_SLOTS }, (_, i) => buf.subarray(i * (16 + ghostJ), i * (16 + ghostJ) + 16))
+      ghostJoints = Array.from({ length: GHOST_SLOTS }, (_, i) => buf.subarray(i * (16 + ghostJ) + 16, (i + 1) * (16 + ghostJ)))
+      ghostN = 0
+    }
+    ghostHead = (ghostHead + 1) % GHOST_SLOTS
+    ghostModel[ghostHead].set(m)
+    ghostJoints[ghostHead].set(joints)
+    ghostN = Math.min(GHOST_SLOTS, ghostN + 1)
+  }
+
   const fogCol = hex(NEBULA.base).map((v) => v * 0.8) as Vec3, rimA = hex(SITE.cyan), rimB = hex(SITE.violet)
   const glowShrimp: Vec3 = [1, 0.42, 0.24], glowNow: Vec3 = [0, 0, 0]
   const noGlow: Vec3 = [0, 0, 0]
@@ -389,11 +523,44 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       }
     }
     if (phill) {
-      const p = phill, k = (sizeNow() / p.a.height) * p.scale
-      // a squash-and-stretch bounce on the beat, and the neon rim brightening with the bass
-      R.draw(p.a, placement(p.pos, p.rot, k, p.a.center, 1 - 0.04 * p.pump, 1 + 0.08 * p.pump), p.pose.joints, {
-        alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump), ambient: params.ambient, glow: noGlow,
+      const p = phill, k = (drive ? drive.size : orbitSize()) / p.a.height, trip = drive?.trip ?? 0
+      // a squash-and-stretch bounce on the beat, and the neon rim brightening with the bass; in the trip, rainbow
+      const m = placement(p.pos, p.rot, k, p.a.center, 1 - 0.04 * p.pump, 1 + 0.08 * p.pump)
+      R.draw(p.a, m, p.pose.joints, {
+        alpha: drive?.flicker ? 0 : alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump),
+        ambient: params.ambient, glow: trip > 0.01 ? hueRgb(w.time * 0.25, rainbow, 0.35 * trip) : noGlow,
       })
+      // and his afterimages: his poses 0.13, 0.27 and 0.4 s ago, fading, each a hue further on
+      if (trip > 0.01) {
+        if (w.time - ghostLast >= 1 / 60 || w.time < ghostLast) { ghostLast = w.time; snapGhost(m, p.pose.joints) }
+        for (let i = 0; i < GHOSTS; i++) {
+          const back = (i + 1) * GHOST_STEP
+          if (back >= ghostN) break
+          const slot = (ghostHead - back + GHOST_SLOTS) % GHOST_SLOTS
+          R.draw(p.a, ghostModel[slot], ghostJoints[slot], {
+            alpha: alpha * 0.3 * trip * (1 - i * 0.25), flash: 0, rim: params.rim, ambient: params.ambient,
+            glow: hueRgb(w.time * 0.25 + 0.2 * (i + 1), ghostGlow, 0.6),
+          })
+        }
+      } else ghostN = 0
+    }
+    // Play mode's props, then its beams and the props' halos (no depth writes: last; the halos a little behind them)
+    if (!props.length && !beams.length) return
+    for (const pr of props) {
+      if (pr.alpha <= 0.002 || pr.size <= 1e-4) continue
+      const shrimp = pr.model === 'shrimp', a = shrimp ? shrimpModel : (pr.model as ActorModel)
+      if (!a || (shrimp && !shrimpWorld)) continue
+      const m = placement(pr.pos, pr.rot, pr.size / a.extent, pr.anchor === 'origin' ? origin : a.center, pr.sx ?? 1, pr.sy ?? 1)
+      R.draw(a, shrimp ? M4x.mulInto(model, m, shrimpWorld!) : m, pr.joints ?? null, {
+        alpha: alpha * pr.alpha, flash: pr.flash, rim: params.rim * (pr.rim ?? 0.8), ambient: pr.ambient ?? 0.7, glow: pr.glow, fog: 0,
+      })
+    }
+    for (const b of beams) R.beam(b.top, b.len, b.rTop, b.rBot, b.alpha * alpha, w.time)
+    const fwd = w.cam.fwd
+    for (const pr of props) {
+      if (!pr.halo || pr.alpha <= 0.002) continue
+      for (let c = 0; c < 3; c++) tv[c] = pr.pos[c] + fwd[c] * 0.08
+      R.halo(tv, pr.halo.size, pr.halo.color, pr.halo.alpha * pr.alpha * alpha, w.cam.right, w.cam.up)
     }
   }
 
@@ -409,7 +576,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       if (tp > 0 && Math.abs(x) < w.pageW / 2 && Math.abs(y) < w.pageH / 2) tPage = tp
     }
     const cands: [Body, number][] = []
-    if (phill && !phill.eaten) cands.push([phill, sizeNow() * 0.42 * phill.scale])
+    if (phill && !phill.eaten && !drive) cands.push([phill, sizeNow() * 0.42 * phill.scale])
     for (const s of shrimp) if (s.on && !s.eaten) cands.push([s, s.size * 0.5])
     let best: Body | null = null, bt = Math.min(tPage, Infinity)
     for (const [b, r] of cands) {
@@ -428,7 +595,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
    * stage since (eaten, or a shrimp whose pass ended).
    */
   function click(target: object, ray: Ray) {
-    const b: Body | undefined = target === phill ? phill : shrimp.find((s) => s === target && s.on)
+    const b: Body | undefined = target === phill ? (drive ? undefined : phill) : shrimp.find((s) => s === target && s.on)
     if (!b || b.eaten) return
     const side = Math.abs(b.pos[0]) > 0.5 ? Math.sign(b.pos[0]) : rnd() < 0.5 ? -1 : 1
     knock(b, [side * 0.8 + ray.dir[0] * 0.3, b.pos[1] * 0.06 + 0.25, b.pos[2] > 0 ? 0.35 : -0.6])
@@ -436,7 +603,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
 
   /** Chaos: everyone flies. */
   function kickAll() {
-    const bodies: Body[] = [...(phill ? [phill] : []), ...shrimp.filter((s) => s.on)]
+    const bodies: Body[] = [...(phill && !drive ? [phill] : []), ...shrimp.filter((s) => s.on)]
     for (const b of bodies) knock(b, [b.pos[0] || rnd() - 0.5, b.pos[1] || rnd() - 0.5, 1], 0.9)
   }
 
@@ -453,11 +620,72 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     load,
     update,
     draw,
+    /** Play mode's things on the page and the UFOs' beams (it fills and moves them; the cast draws them) */
+    props,
+    beams,
+    /** upload a voxel mesh as a model for Play's props (null before the cast has loaded) */
+    voxels: (v: VoxelMesh): ActorModel | null => (R ? R.addVoxels(v) : null),
+    /** Play mode round 2's lasagna: fetch and upload it once (a step per frame); null if it fails (Play goes on without it) */
+    loadLasagna: (nextTask: () => Promise<void>) => {
+      lasagnaLoad ??= (async () => {
+        const r = await fetch('/resume/lasagna.glb')
+        if (!r.ok) throw new Error(`/resume/lasagna.glb: ${r.status}`)
+        const buf = await r.arrayBuffer()
+        await nextTask()
+        if (disposed || !R) return null
+        lasagna = await R.load(buf, nextTask)
+        return lasagna
+      })().catch((err) => { if (!disposed) console.warn('The lasagna failed to load', err); return null })
+      return lasagnaLoad
+    },
+    lasagna: () => lasagna,
+    /** a pose for a skinned model (its own clips, crossfades and the jump's hip clamp) */
+    pose: (a: ActorModel, noLift: string[] = []) => new Pose(a.m, { noLift }),
     /** the body under the ray (Phill or a shrimp), if any */
     hit: (ray: Ray): object | null => hit(ray),
     click,
     kickAll,
     dispose,
+    /** Phill's model and pose for Play mode (null until he's loaded) */
+    rig: (): Rig | null => {
+      if (!phill) return null
+      if (!rigInfo) {
+        // his foot joints' heights in the rest pose (where his soles are at the origin), and how high idle holds them
+        const m = phill.a.m, rest = new Pose(m), idle = new Pose(m)
+        idle.play(IDLE, 0)
+        idle.update(0)
+        const feet = (m.joints ?? []).filter((n) => /Foot|Toe/.test(m.nodes[n].name)).map((node) => ({ node, rest: rest.world[node * 16 + 13] }))
+        const stand = feet.length ? Math.min(...feet.map((f) => idle.world[f.node * 16 + 13] - f.rest)) : 0
+        rigInfo = { pose: phill.pose, height: phill.a.height, dims: phill.a.dims, feet, stand, dances: [...phill.dances] }
+      }
+      return rigInfo
+    },
+    /**
+     * Play mode takes Phill (it moves, turns, sizes and poses him; the cast keeps drawing him, and
+     * clicks, Chaos and the black hole leave him be), or hands him back (null): he drifts back to his orbit.
+     */
+    drive: (d: Drive | null, hop = false) => {
+      if (!d && drive && phill) {
+        phill.pose.play(IDLE, 0.3)
+        if (hop) {
+          // a hop up and back out toward his orbit (its spring takes him home), growing on the way
+          const p = phill
+          p.vel[0] = Math.sign(p.pos[0] || 1) * 2
+          p.vel[1] = 5
+          p.vel[2] = 2.5
+          growFrom = drive.size
+          growT = 0
+        }
+      }
+      drive = d
+    },
+    /** where he is and how big (feet, yaw, height in units), for Play mode's entrance */
+    place: (): Drive | null => {
+      if (!phill) return null
+      const p = phill, size = drive ? drive.size : orbitSize(), k = size / p.a.height, c = p.a.center
+      const yaw = 2 * Math.atan2(p.rot[1], p.rot[3]), cy = Math.cos(yaw), sy = Math.sin(yaw)
+      return { feet: [p.pos[0] - (c[0] * cy + c[2] * sy) * k, p.pos[1] - c[1] * k, p.pos[2] - (-c[0] * sy + c[2] * cy) * k], yaw, size }
+    },
     /** dev: skip to the next dance */
     nextDance: () => { if (phill) nextDance(phill, 0.4) },
     /** dev: the state, for scripted checks */

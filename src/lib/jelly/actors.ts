@@ -4,10 +4,11 @@
  * own pass, so the page hides whatever passes behind it and the fog matches the words.
  */
 
-import { compileAll, texFrom, type Program } from './gl'
+import { attr, compileAll, texFrom, type Program } from './gl'
 import { bounds, readGltf, restLocals, worldMatrices, type Clip, type GltfModel, type Track } from './gltf'
 import { M4x, Q, type Vec3 } from './math'
 import * as SH from './shaders'
+import type { VoxelMesh } from './voxels'
 
 export const MAX_JOINTS = 32
 
@@ -19,8 +20,9 @@ export interface ActorModel {
   itype: number
   tex: WebGLTexture
   glow: WebGLTexture | null
-  /** the rest pose's bounds center, height and largest extent, in model units */
+  /** the rest pose's bounds center, size (x, y, z), height and largest extent, in model units */
   center: Vec3
+  dims: Vec3
   height: number
   extent: number
   /** for a wiggle, in the mesh's own space: its longest axis, its thinnest (the way it bends), and its span along the first */
@@ -58,9 +60,16 @@ export interface DrawLook {
 const ATTRS = { POSITION: 'aPos', NORMAL: 'aNormal', TEXCOORD_0: 'aUv', JOINTS_0: 'aJoints', WEIGHTS_0: 'aWeights' } as const
 
 export function createActorRenderer(gl: WebGL2RenderingContext) {
-  const [CAST] = compileAll(gl, [[SH.CAST_VS, SH.CAST_FS]])
+  const [CAST, HALO, BEAM] = compileAll(gl, [[SH.CAST_VS, SH.CAST_FS], [SH.HALO_VS, SH.HALO_FS], [SH.BEAM_VS, SH.BEAM_FS]])
   const models: ActorModel[] = []
   let gone = false
+  const haloVAO = gl.createVertexArray()!
+  const haloBuf = attr(gl, HALO, haloVAO, 'aCorner', 2, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))
+  // the beam: an open cone, a strip around it (32 sides), each vertex its turn (0…1) and height (0 bottom, 1 top)
+  const beamVAO = gl.createVertexArray()!
+  const beamBuf = attr(gl, BEAM, beamVAO, 'aCU', 2, Float32Array.from({ length: 33 * 4 }, (_, i) => (i % 2 ? (i % 4 === 1 ? 0 : 1) : Math.floor(i / 4) / 32)))
+  gl.bindVertexArray(null)
+  let mvp: Float32Array = new Float32Array(16)
 
   /** Read and upload a GLB; the slow parts (meshopt, image decode) don't block the main thread for long. */
   async function load(buf: ArrayBuffer, ready: () => Promise<void>): Promise<ActorModel> {
@@ -68,6 +77,20 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     await ready()
     // closed while it decoded: don't upload into a context that's going away
     if (gone) { m.baseColor?.close(); m.glow?.close(); throw new Error('The cast was disposed while loading') }
+    const am = upload(m, m.baseColor, m.glow, false)
+    m.baseColor?.close()
+    m.glow?.close()
+    return am
+  }
+
+  /** A voxel mesh (round 2's UFO and mushroom): its palette textures are sampled at texel centers, so NEAREST. */
+  function addVoxels(v: VoxelMesh): ActorModel {
+    const img = (t: VoxelMesh['base']) => new ImageData(new Uint8ClampedArray(t.data), t.width, t.height)
+    return upload(v.model, img(v.base), v.glow ? img(v.glow) : null, true)
+  }
+
+  /** Upload a model: one VAO, its textures, its rest-pose bounds. */
+  function upload(m: GltfModel, base: TexImageSource | null, glowImg: TexImageSource | null, nearest: boolean): ActorModel {
     const vao = gl.createVertexArray()!, bufs: WebGLBuffer[] = []
     gl.bindVertexArray(vao)
     for (const [name, attr] of Object.entries(ATTRS) as [keyof typeof ATTRS, string][]) {
@@ -85,16 +108,21 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.indices, gl.STATIC_DRAW)
     gl.bindVertexArray(null)
-    const tex = m.baseColor ? texFrom(gl, m.baseColor) : texFrom(gl, new ImageData(new Uint8ClampedArray([255, 255, 255, 255]), 1, 1))
-    const glow = m.glow ? texFrom(gl, m.glow) : null
-    m.baseColor?.close()
-    m.glow?.close()
+    const tex = texFrom(gl, base ?? new ImageData(new Uint8ClampedArray([255, 255, 255, 255]), 1, 1))
+    const glow = glowImg ? texFrom(gl, glowImg) : null
+    if (nearest) for (const t of [tex, glow]) {
+      if (!t) continue
+      gl.bindTexture(gl.TEXTURE_2D, t)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    }
     // the rest pose's bounds (skinned: through the joints)
     const n = m.nodes.length, local = restLocals(m, new Float32Array(n * 16)), world = worldMatrices(m, local, new Float32Array(n * 16))
     const b = bounds(m, world, m.joints ? jointMatrices(m, world, new Float32Array(m.joints.length * 16)) : null)
     const am: ActorModel = {
       m, vao, bufs, count: m.indices.length, itype: m.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, tex, glow,
       center: [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2],
+      dims: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]],
       height: b.max[1] - b.min[1],
       extent: Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]),
       bend: bendAxes(m.positions),
@@ -114,6 +142,7 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.uniform3fv(u.uRimA, f.rimA); gl.uniform3fv(u.uRimB, f.rimB)
     gl.uniform1i(u.uTex, 0); gl.uniform1i(u.uGlowTex, 1)
     fogBase = f.fog
+    mvp = f.mvp
   }
   let fogBase = 0
 
@@ -148,9 +177,45 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.bindVertexArray(null)
   }
 
+  /** A soft glow facing the camera at c (size: its diameter); after the models (it doesn't write depth), then the models' program is back. */
+  function halo(c: Vec3, size: number, col: Vec3, a: number, right: Vec3, up: Vec3) {
+    if (a <= 0.002) return
+    const u = HALO.u
+    gl.useProgram(HALO.p)
+    gl.depthMask(false)
+    gl.uniformMatrix4fv(u.uMVP, false, mvp); gl.uniform3fv(u.uC, c); gl.uniform3fv(u.uRight, right); gl.uniform3fv(u.uUp, up)
+    gl.uniform1f(u.uSize, size); gl.uniform3fv(u.uCol, col); gl.uniform1f(u.uA, a)
+    gl.bindVertexArray(haloVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.bindVertexArray(null)
+    gl.depthMask(true)
+    gl.useProgram(CAST.p)
+  }
+
+  /**
+   * The UFO's beam: an open cone of see-through cyan from `top` down `len`, narrow at the top (rTop) and wide
+   * at the bottom (rBot), rings running down it. Alpha-blended, not additive (additive vanishes on white paper);
+   * after the models (no depth writes), then the models' program is back.
+   */
+  function beam(top: Vec3, len: number, rTop: number, rBot: number, a: number, t: number) {
+    if (a <= 0.002 || len <= 0.001) return
+    const u = BEAM.u
+    gl.useProgram(BEAM.p)
+    gl.depthMask(false)
+    gl.uniformMatrix4fv(u.uMVP, false, mvp); gl.uniform3fv(u.uTop, top); gl.uniform1f(u.uLen, len)
+    gl.uniform1f(u.uRTop, rTop); gl.uniform1f(u.uRBot, rBot); gl.uniform1f(u.uA, a); gl.uniform1f(u.uT, t)
+    gl.bindVertexArray(beamVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 33 * 2); gl.bindVertexArray(null)
+    gl.depthMask(true)
+    gl.useProgram(CAST.p)
+  }
+
   function dispose() {
     gone = true
     gl.deleteProgram(CAST.p)
+    gl.deleteProgram(HALO.p)
+    gl.deleteProgram(BEAM.p)
+    gl.deleteVertexArray(haloVAO)
+    gl.deleteBuffer(haloBuf)
+    gl.deleteVertexArray(beamVAO)
+    gl.deleteBuffer(beamBuf)
     for (const a of models) {
       gl.deleteVertexArray(a.vao)
       for (const b of a.bufs) gl.deleteBuffer(b)
@@ -160,7 +225,7 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     models.length = 0
   }
 
-  return { load, begin, draw, dispose, program: CAST as Program }
+  return { load, addVoxels, begin, draw, halo, beam, dispose, program: CAST as Program }
 }
 
 export type ActorRenderer = ReturnType<typeof createActorRenderer>
@@ -204,7 +269,9 @@ interface Playing {
 
 /**
  * A skinned model's animation: the current clip and the one fading out under it. The root
- * joint's sideways travel is held at rest (he dances in place; his orbit moves him).
+ * joint's sideways travel is held at rest (he dances in place; his orbit moves him). Clips
+ * named in `noLift` never raise the root above its standing height (idle's at t = 0): the
+ * jump clip lifts his hips itself, but in Play mode the physics lifts him (crouches still go down).
  */
 export class Pose {
   readonly local: Float32Array
@@ -221,8 +288,10 @@ export class Pose {
   private fade = 1
   private fadeDur = 0.25
   private root: number
+  private noLift: Set<string>
+  private standY: number
 
-  constructor(private m: GltfModel) {
+  constructor(private m: GltfModel, opts: { noLift?: string[] } = {}) {
     const n = m.nodes.length
     this.local = new Float32Array(n * 16)
     this.world = new Float32Array(n * 16)
@@ -231,6 +300,10 @@ export class Pose {
     this.T2 = new Float32Array(n * 3); this.R2 = new Float32Array(n * 4); this.S2 = new Float32Array(n * 3)
     const js = new Set(m.joints ?? [])
     this.root = m.joints?.find((j) => !js.has(m.nodes[j].parent)) ?? -1
+    this.noLift = new Set(opts.noLift)
+    const at = new Float32Array(3), idle = m.clips.find((c) => c.name === 'idle')?.tracks.find((tr) => tr.node === this.root && tr.path === 'translation')
+    if (idle) sampleTrack(idle, 0, at, 0)
+    this.standY = idle ? at[1] : this.root >= 0 ? m.nodes[this.root].t[1] : 0
     this.update(0)
   }
 
@@ -240,6 +313,16 @@ export class Pose {
 
   get clip() {
     return this.cur?.clip.name ?? null
+  }
+
+  /** the current clip's time (s) */
+  get time() {
+    return this.cur?.t ?? 0
+  }
+
+  /** Set the current clip's time (clamped to the clip): scrub with seek(t) then update(dt, 0). */
+  seek(t: number) {
+    if (this.cur) this.cur.t = Math.min(this.cur.clip.duration, Math.max(0, t))
   }
 
   /** how far through its clip the current one is (0…1; it drops back when a loop comes round) */
@@ -268,7 +351,12 @@ export class Pose {
       else if (tr.path === 'translation') sampleTrack(tr, p.t, T, tr.node * 3)
       else sampleTrack(tr, p.t, S, tr.node * 3)
     }
-    if (this.root >= 0) { const r = this.m.nodes[this.root].t; T[this.root * 3] = r[0]; T[this.root * 3 + 2] = r[2] }
+    if (this.root >= 0) {
+      const r = this.m.nodes[this.root].t, o = this.root * 3
+      T[o] = r[0]
+      T[o + 2] = r[2]
+      if (this.noLift.has(p.clip.name)) T[o + 1] = Math.min(T[o + 1], this.standY)
+    }
   }
 
   /** Advance the clips by dt (rate: playback speed) and rebuild the joint matrices. */

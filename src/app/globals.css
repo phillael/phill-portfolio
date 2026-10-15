@@ -320,6 +320,24 @@ html.jelly-lock {
   visibility: hidden;
   transition: opacity 0.4s ease, visibility 0s linear 0.4s;
 }
+/* Play mode on the 3D resume: a score pop ("+100 +1 IMPACT", "+500", "−250") rises and fades where it happened */
+@keyframes jelly-pop {
+  from { opacity: 1; transform: translate(-50%, -100%); }
+  to { opacity: 0; transform: translate(-50%, calc(-100% - 40px)); }
+}
+.jelly-pop {
+  animation: jelly-pop 0.8s ease-out forwards;
+}
+/* playing on a touch screen, the site's ♫ would sit under the thumbs: it hides (the Play HUD has a ♫ remote) */
+html.jelly-play-touch .music-fab {
+  visibility: hidden;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jelly-pop {
+    animation: none;
+  }
+}
 
 .glow-layer {
   position: absolute;

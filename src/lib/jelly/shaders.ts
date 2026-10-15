@@ -7,19 +7,20 @@
  */
 export const HSV = `vec3 hsv(float h,float s,float v){ vec3 k=clamp(abs(mod(h*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0,0.0,1.0); return v*mix(vec3(1.0),k,s); }`
 export const BODY_VS = `#version 300 es
-in vec3 aPos; in vec2 aUv; in vec2 aLocal; in vec4 aRect; in float aJig; in float aSeed; in float aVis; in float aHl;
+in vec3 aPos; in vec2 aUv; in vec2 aLocal; in vec4 aRect; in float aJig; in float aSeed; in float aVis; in float aHl; in vec2 aGlow;
 uniform mat4 uMVP; uniform float uLift, uLayerZ;
-out vec2 vUv; out vec2 vLocal; out vec4 vRect; out float vJig; out float vSeed; out vec3 vWorld; out float vVis; out float vHl;
+out vec2 vUv; out vec2 vLocal; out vec4 vRect; out float vJig; out float vSeed; out vec3 vWorld; out float vVis; out float vHl; out vec2 vGlow;
 void main(){
-  vUv=aUv; vLocal=aLocal; vRect=aRect; vJig=aJig; vSeed=aSeed; vVis=aVis; vHl=aHl;
+  vUv=aUv; vLocal=aLocal; vRect=aRect; vJig=aJig; vSeed=aSeed; vVis=aVis; vHl=aHl; vGlow=aGlow;
   vec3 p = aPos; p.z += uLift + uLayerZ;
   vWorld = p; gl_Position = uMVP*vec4(p,1.0);
 }`
 export const BODY_FS = `#version 300 es
 precision highp float; precision highp int;
-in vec2 vUv; in vec2 vLocal; in vec4 vRect; in float vJig; in float vSeed; in vec3 vWorld; in float vVis; in float vHl;
-uniform float uSearch; uniform vec3 uGlowA, uGlowB;
+in vec2 vUv; in vec2 vLocal; in vec4 vRect; in float vJig; in float vSeed; in vec3 vWorld; in float vVis; in float vHl; in vec2 vGlow;
+uniform float uSearch; uniform vec3 uGlowA, uGlowB, uCoin;
 uniform sampler2D uAtlas; uniform float uShroom, uMelt, uDrip, uTime, uHue, uGummy, uTextFrac; uniform vec3 uJelly;
+uniform float uHeat, uTripMelt, uPsy, uPpu;
 uniform vec3 uEye, uFogCol; uniform float uFog, uFogStart, uFogEnd;
 uniform int uPass, uInkMode; uniform float uShine, uLayerShade, uRot; uniform vec2 uTexel; uniform vec3 uLight;
 uniform sampler2D uSky;
@@ -28,10 +29,59 @@ ${HSV}
 vec4 ink(vec2 uv){ return texture(uAtlas, clamp(uv, vRect.xy, vRect.zw)); }
 vec3 skyLook(vec3 d){ float c = cos(uRot), s = sin(uRot); d.xz = mat2(c, -s, s, c)*d.xz;
   return texture(uSky, vec2(atan(d.x, -d.z)/6.2831853 + 0.5, 0.5 - asin(clamp(d.y, -1.0, 1.0))/3.14159265)).rgb; }
+float h1(float n){ return fract(sin(n*12.9898)*43758.5453); }
+float vn(float x){ float i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f); return mix(h1(i), h1(i + 1.0), f); }
+// the trip's molten words (the mockup's, its linear colors): heated metal, deep red → orange → yellow → white-hot,
+// and the psychedelic kind (the white-hot core stays, the mid-band takes the neon hue, the edges cool to violet)
+vec3 molten(float T){
+  vec3 c = mix(vec3(0.1, 0.0, 0.0), vec3(0.8, 0.05, 0.0), smoothstep(0.0, 0.3, T));
+  c = mix(c, vec3(1.0, 0.3, 0.02), smoothstep(0.25, 0.55, T));
+  c = mix(c, vec3(1.0, 0.72, 0.18), smoothstep(0.5, 0.8, T));
+  return mix(c, vec3(1.0, 0.96, 0.82), smoothstep(0.8, 1.0, T));
+}
+vec3 psyMolten(float T, float h){
+  vec3 c = mix(vec3(0.1, 0.0, 0.22), hsv(h, 0.9, 1.0), smoothstep(0.05, 0.5, T));
+  c = mix(c, hsv(h + 0.12, 0.45, 1.0), smoothstep(0.55, 0.85, T));
+  return mix(c, vec3(1.0, 0.97, 0.9), smoothstep(0.86, 1.0, T));
+}
 void main(){
   if(vVis < 0.01) discard;
-  vec4 t = ink(vUv); float a = t.a; vec3 c = t.rgb;
-  float m = uShroom*uMelt;
+  // the trip: sizes in the mockup's page texels (220 a unit) → atlas uv; px, py: where this is in them (fixed to the letters)
+  vec2 tx = uTexel/1.5*(uPpu/220.0);
+  float px = vUv.x/tx.x, py = vUv.y/tx.y, mt = uTripMelt;
+  vec2 uv = vUv;
+  if(mt > 0.001){
+    uv.x += mt*tx.x*0.8*sin(py*0.05 + uTime*6.0); // a faint heat shimmer
+    uv.y -= mt*tx.y*7.0*vn(px/23.0 + 7.0)*(0.85 + 0.15*sin(uTime*0.7 + px*0.02)); // each stretch of letters slumps its own amount
+  }
+  // the forge glow (how much ink is around: the Finder's blurred copy) and, in the trip's own pass, just that on the paper
+  float h = fract(uTime*0.06 + vWorld.x*0.05 + vWorld.y*0.08), band = 0.5 + 0.5*sin(uTime*0.8 + vWorld.x*1.3 - vWorld.y*0.9);
+  float psy = uPsy*(0.1 + 0.8*band*band);
+  // (one tap of a blurred mip: the mockup averaged a ring 4–10 texels out; ~0.3 inside a word, as there)
+  float glow = uHeat > 0.001 ? textureLod(uAtlas, clamp(uv, vRect.xy, vRect.zw), 2.8 + log2(uPpu/220.0)).a : 0.0;
+  if(uPass == 2){
+    vec3 glowC = pow(mix(vec3(1.0, 0.22, 0.02), hsv(h + 0.05, 0.9, 1.0), psy), vec3(0.4545));
+    // (a wider blur than the words' own glow: the haze reaches past the letters, as the mockup's ring did)
+    float haze = textureLod(uAtlas, clamp(uv, vRect.xy, vRect.zw), 3.8 + log2(uPpu/220.0)).a;
+    vec3 add = glowC*min(1.0, haze*1.6)*0.45*uHeat*uShroom*vVis;
+    if(max(add.r, max(add.g, add.b)) < 0.004) discard;
+    o = vec4(add, 0.0); return;
+  }
+  vec4 t = ink(uv); float a = t.a; vec3 c = t.rgb;
+  float ink0 = a;
+  // the trip's drips: thin strands every 4 texels, mostly short and now and then long, narrowing to a point, cooling toward the tip
+  float drip = 0.0, dripT = 0.0;
+  if(mt > 0.001 && uPass == 0){
+    float across = abs(fract(px/4.0) - 0.5)*2.0, n = h1(floor(px/4.0) + 3.0), n5 = n*n*n*n*n;
+    float len = mt*tx.y*(3.0 + 80.0*n5)*(0.8 + 0.2*sin(uTime*1.1 + n*40.0));
+    for(int k = 1; k <= 14; k++){
+      float f = float(k)/14.0;
+      if(across > 1.0 - f*0.75) continue;
+      float s = ink(uv - vec2(0.0, f*len)).a*(1.0 - f*0.65);
+      if(s > drip){ drip = s; dripT = 1.0 - f; }
+    }
+  }
+  float m = uShroom*uMelt*(1.0 - step(0.001, uHeat));
   if(m > 0.01){
     float n = fract(sin(floor(vLocal.x*26.0 + vSeed*50.0)*12.9898)*43758.5453);
     float len = uDrip*m*(0.15 + n*0.85)*(0.7 + 0.3*sin(uTime*0.8 + vSeed*6.28 + vLocal.x*9.0));
@@ -68,7 +118,16 @@ void main(){
     c = mix(c, mix(c*0.45, iri*0.9, 0.85), uShine) + vec3(spec)*0.6*uShine;
   }
   vec3 neon = hsv(fract(uTime*uHue + vWorld.x*0.05 + vWorld.y*0.08 + vSeed*0.15), 0.8, 1.0);
-  c = mix(c, neon*1.15, uShroom);
+  vec3 shroomC = neon*1.15;
+  if(uHeat > 0.001){
+    // molten: white-hot inside thick strokes (the ink around it; the atlas's glyphs are softer than the mockup's page,
+    // so ±2.5 texels where it took ±1.5, or every stroke reads white-hot), cooler at their edges and down the drips
+    float core = 0.25*(ink(uv + vec2(2.5*tx.x, 0.0)).a + ink(uv - vec2(2.5*tx.x, 0.0)).a + ink(uv + vec2(0.0, 2.5*tx.y)).a + ink(uv - vec2(0.0, 2.5*tx.y)).a);
+    float T = clamp(max(ink0*(0.3 + 0.5*core*core + 0.35*glow), drip*(0.25 + 0.5*dripT)) + 0.07*sin(uTime*2.3 + vWorld.x*3.0 + vWorld.y*2.0), 0.0, 1.0);
+    shroomC = mix(shroomC, pow(mix(molten(T), psyMolten(T, h), psy)*1.3, vec3(0.4545)), uHeat);
+    a = max(a, drip);
+  }
+  c = mix(c, shroomC, uShroom);
   vec2 q = vec2(abs(vLocal.x-0.5)*2.0, abs(vLocal.y/uTextFrac-0.5)*2.0);
   float edge = max(q.x, q.y);
   float slab = (1.0 - smoothstep(0.82, 1.0, edge)) * step(vLocal.y, uTextFrac*1.08);
@@ -84,6 +143,16 @@ void main(){
     float halo = smoothstep(0.0, 0.45, ga)*vHl;
     vec3 gc = mix(uGlowA, uGlowB, 0.5 + 0.5*sin(uTime*1.6 + vSeed*6.28));
     col = mix(gc*(0.9 + 0.5*halo), col*0.85, a);
+    cov = max(cov, halo*0.95);
+  }
+  // Play mode: an Impact coin glows green and pulses gently; a reached checkpoint's title or the finish line glows cyan (neither lifts the word)
+  if((vGlow.x > 0.01 || vGlow.y > 0.01) && uPass == 0){
+    float ga = max(textureLod(uAtlas, clamp(vUv, vRect.xy, vRect.zw), 2.6).a, textureLod(uAtlas, clamp(vUv, vRect.xy, vRect.zw), 3.6).a*0.8);
+    float pulse = 0.75 + 0.25*sin(uTime*3.2 + vSeed*6.28);
+    float hc = smoothstep(0.0, 0.45, ga)*vGlow.x*pulse, hlit = smoothstep(0.0, 0.45, ga)*vGlow.y;
+    vec3 gc = (uCoin*hc + uGlowA*hlit)/max(hc + hlit, 1e-3);
+    float halo = max(hc, hlit);
+    col = mix(gc*(0.9 + 0.5*halo), mix(col, uCoin*0.55, 0.35*vGlow.x), a);
     cov = max(cov, halo*0.95);
   }
   // Words flying into the distance fade into the nebula
@@ -127,6 +196,7 @@ precision highp float;
 in vec2 vUv; in vec3 vWorld; in vec3 vN; in float vSide;
 uniform float uShroom, uTime, uHue, uAspect, uGrain, uRot, uReveal, uDim; uniform sampler2D uBack, uGrainTex, uSky; uniform int uFinish;
 uniform vec3 uEye, uLight, uScan;
+uniform vec4 uArtRect; uniform vec2 uArtSize; uniform float uArtOff, uArtGray, uArtDim, uArtCursor, uArtPress; uniform sampler2D uArtTex;
 out vec4 o;
 ${HSV}
 vec3 skyLook(vec3 d){ float c = cos(uRot), s = sin(uRot); d.xz = mat2(c, -s, s, c)*d.xz;
@@ -148,6 +218,26 @@ void main(){
     o = vec4(c, 1.0); return;
   }
   vec3 base = texture(uBack, vUv).rgb;
+  // PLAYER 1 START, printed on the paper (q: art pixels, y down): the blink's off frame (a small overlay
+  // texture), grayed (unavailable), pressed (the art drops a pixel), dimmed (playing), and its cursor
+  vec2 q = (vUv - uArtRect.xy)/(uArtRect.zw - uArtRect.xy)*uArtSize, qs = q - vec2(0.0, uArtPress);
+  vec3 artOn = texture(uBack, uArtRect.xy + qs/uArtSize*(uArtRect.zw - uArtRect.xy)).rgb;
+  vec3 artOff = texture(uArtTex, clamp(qs/uArtSize, 0.0, 1.0)).rgb;
+  float artInk = 0.0;
+  if(q.x >= 0.0 && q.x <= uArtSize.x && q.y >= 0.0 && q.y <= uArtSize.y + uArtPress){
+    base = qs.y >= 0.0 && uArtOff > 0.5 ? artOff : artOn;
+    float v = dot(base, vec3(0.3, 0.59, 0.11));
+    base = mix(base, vec3(1.0 - (1.0 - v)*0.45), uArtGray);
+    artInk = max(1.0 - smoothstep(0.45, 0.85, dot(base, vec3(0.299, 0.587, 0.114))),
+                 smoothstep(0.15, 0.4, max(base.r, max(base.g, base.b)) - min(base.r, min(base.g, base.b))));
+    base = mix(base, vec3(1.0), uArtDim*0.55);
+  }
+  if(uArtCursor > 0.0){ // pixel corner brackets 3 art px outside it: electric cyan with a darker inner edge (a retro menu cursor)
+    vec2 p = floor(q) + 0.5, lo = vec2(-3.0), hi = uArtSize + 3.0, dl = p - lo, dh = hi - p;
+    float onX = min(dl.x, dh.x), onY = min(dl.y, dh.y);
+    if(p.x > lo.x && p.y > lo.y && p.x < hi.x && p.y < hi.y && ((onX < 2.0 && onY < 7.0) || (onY < 2.0 && onX < 7.0)))
+      base = mix(base, (onX < 1.0 || onY < 1.0) ? vec3(0.0, 0.86, 0.95) : vec3(0.0, 0.73, 0.8), uArtCursor);
+  }
   vec2 guv = vUv*vec2(1.0, uAspect)*1.6;
   vec3 g = texture(uGrainTex, guv).rgb; // r: fine grain, g: fibers, b: mottling
   vec3 V = normalize(uEye - vWorld), L = normalize(uLight);
@@ -168,9 +258,11 @@ void main(){
     vec3 env = skyLook(reflect(-V, normalize(n + vec3(0.0, (streak - 0.5)*0.2, 0.0))));
     base = base*metal + env*0.28 + vec3(spec)*0.3;
   }
-  base *= 1.0 + 0.55*(dot(NG, L) - L.z); // the curves catch the light (flat = exactly the PDF)
+  float shade = 1.0 + 0.55*(dot(NG, L) - L.z);
+  base *= shade; // the curves catch the light (flat = exactly the PDF)
   vec3 paper = mix(base, vec3(0.07, 0.03, 0.11), uShroom*0.92);
   vec3 neon = hsv(fract(uTime*uHue + vWorld.x*0.05 + vWorld.y*0.08), 0.8, 1.0);
+  paper = mix(paper, neon*1.15*shade, uShroom*artInk); // shroom mode: the art's ink goes neon, like the words
   float edge = min(min(vUv.x, 1.0-vUv.x), min(vUv.y, 1.0-vUv.y)*uAspect)*8.5;
   paper = mix(paper, paper*vec3(0.2, 0.23, 0.36), uDim*0.85);
   paper += uScan*(exp(-dy*28.0)*1.6 + exp(-dy*5.0)*0.25)*step(-1e8, uReveal)*step(uReveal, 1e8);
@@ -397,7 +489,7 @@ void main(){
   float fres = pow(1.0 - max(dot(n, V), 0.0), 2.2);
   vec3 c = base*(uAmbient + (1.0 - uAmbient)*diff);
   c += mix(uRimB, uRimA, 0.5 + 0.5*n.y)*fres*uRim;
-  if(uHasGlow) c += texture(uGlowTex, vUv).rgb*uGlowCol;
+  c += (uHasGlow ? texture(uGlowTex, vUv).rgb : base)*uGlowCol; // (no glow map: Meshy's is the base color itself)
   vec3 neon = hsv(fract(uTime*uHue + vWorld.x*0.05 + vWorld.y*0.08), 0.8, 1.0);
   c = mix(c, c*0.45 + neon*(0.35 + 0.65*fres), uShroom*0.65);
   c += vec3(0.9, 0.95, 1.0)*uFlash;
@@ -405,4 +497,28 @@ void main(){
   c = mix(c, uFogCol, fd);
   float a = uAlpha*(1.0 - 0.85*fd);
   o = vec4(c*a, a);
+}`
+
+// A soft round glow facing the camera (Play mode's shrimp pickups wear one): premultiplied, fading to its edge
+export const HALO_VS = `#version 300 es
+in vec2 aCorner; uniform mat4 uMVP; uniform vec3 uC, uRight, uUp; uniform float uSize; out vec2 vP;
+void main(){ vP = aCorner; gl_Position = uMVP*vec4(uC + (uRight*aCorner.x + uUp*aCorner.y)*uSize*0.5, 1.0); }`
+export const HALO_FS = `#version 300 es
+precision highp float; in vec2 vP; uniform vec3 uCol; uniform float uA; out vec4 o;
+void main(){ float r = length(vP); if(r > 1.0) discard; float a = (1.0 - r)*uA; o = vec4(uCol*a, a); }`
+
+// The UFO's beam: an open cone of see-through cyan with rings running down it (alpha-blended: additive vanishes on white
+// paper). aCU: its turn (0…1) and height (0 bottom, 1 top). The mockup's linear colors, in sRGB here.
+export const BEAM_VS = `#version 300 es
+in vec2 aCU; uniform mat4 uMVP; uniform vec3 uTop; uniform float uLen, uRTop, uRBot; out float vV;
+void main(){
+  float a = aCU.x*6.2831853, v = aCU.y, r = mix(uRBot, uRTop, v);
+  vV = v; gl_Position = uMVP*vec4(uTop + vec3(cos(a)*r, -(1.0 - v)*uLen, sin(a)*r), 1.0);
+}`
+export const BEAM_FS = `#version 300 es
+precision highp float; in float vV; uniform float uA, uT; out vec4 o;
+void main(){
+  float rings = 0.5 + 0.5*sin(vV*70.0 + uT*16.0);
+  float a = (0.16 + 0.22*rings)*(0.45 + 0.55*vV)*uA;
+  o = vec4(mix(vec3(0.0, 0.86, 0.95), vec3(0.77, 0.98, 1.0), rings)*a, a);
 }`

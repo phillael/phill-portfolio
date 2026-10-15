@@ -202,3 +202,88 @@ export const CAST_CONFIG: Readonly<CastConfig> = Object.freeze({
   phill: true, size: 3.4, phoneScale: 0.55, phoneLift: 0, orbitX: 2.4, orbitZ: 4.2, tilt: 3.6, lift: 0.2, lap: 34, face: 0.3, bob: 0.25, danceRate: 1,
   danceSwitch: 16, pump: 1, ambient: 0.62, rim: 0.7, shrimp: 3, shrimpSize: 2.6, shrimpGap: 9, shrimpSpeed: 0.75, shrimpPulse: 1, shrimpWiggle: 1,
 })
+
+/**
+ * Play mode (the Career Climb): Phill's controller, smash and camera. Starting values from the
+ * plan; tune them at /resume?tune while playing (dev only) and paste the Copy output here.
+ */
+export interface PlayConfig {
+  /** his height in Play (units; 3.4 in orbit) */
+  size: number
+  /** run: top speed (units/s), acceleration and deceleration (units/s²), the share of control in the air */
+  runSpeed: number
+  accel: number
+  decel: number
+  air: number
+  /** a held jump's apex and a tapped one's (units), and the seconds to the apex */
+  jumpHeight: number
+  tapHeight: number
+  apexTime: number
+  /** gravity × while falling, and the terminal speed (units/s) */
+  fallMul: number
+  maxFall: number
+  /** seconds: jump after leaving a ledge, a jump pressed early, and a drop-through's pass */
+  coyote: number
+  buffer: number
+  dropTime: number
+  /** a ground-pound's fall speed (units/s) */
+  poundSpeed: number
+  /** the smash: its reach ahead of him (units), the attack clip's strike window [a, b] (s) and its hit frame (s), and the cooldown (s) */
+  reach: number
+  strike: readonly [number, number]
+  hit: number
+  smashCooldown: number
+  /** the smash's hit-stop (s) and camera shake (units at the camera's target, ~0.3 s decay) */
+  hitStop: number
+  shake: number
+  /** his on-screen height (px) */
+  pxDesktop: number
+  pxPhone: number
+  /** the camera's lead (units), tilt (rad) and yaw lean toward his run direction (rad) */
+  lookAhead: number
+  tilt: number
+  lean: number
+  /** the jelly: landing impulse per unit/s of fall, the standing push, the push on words he passes through */
+  squash: number
+  weight: number
+  wake: number
+  /** how far he turns toward the camera from side-on (rad) */
+  face: number
+  /** how far his soles sink into the line's tallest glyphs (units), so he walks on the text */
+  sink: number
+  /** seconds standing still (music on) before he dances */
+  idleDance: number
+  /** the walk clip's playback rate at full speed */
+  runRate: number
+}
+
+export const PLAY_CONFIG: Readonly<PlayConfig> = Object.freeze({
+  size: 0.5, runSpeed: 2.6, accel: 18, decel: 22, air: 0.65, jumpHeight: 1.0, tapHeight: 0.45, apexTime: 0.36, fallMul: 1.6, maxFall: 9,
+  coyote: 0.1, buffer: 0.12, dropTime: 0.22, poundSpeed: 10,
+  // the attack's first swing, a llama chopped overhead: raised behind him at 0.45 s, fastest at 0.6 s, landing in
+  // front at chest height at 0.67 s (his hand furthest forward), followed through by 0.8 s
+  reach: 0.42, strike: [0.45, 0.8] as const, hit: 0.67, smashCooldown: 0.32,
+  hitStop: 0.06, shake: 0.35, pxDesktop: 90, pxPhone: 60, lookAhead: 0.6, tilt: 0.08, lean: 0.06,
+  squash: 0.12, weight: 2, wake: 1.2, face: 0.35, sink: 0.012, idleDance: 1.5, runRate: 1.6,
+})
+
+/**
+ * Play mode round 2's numbers (agreed with Phill on 2026-10-15; see the plan's "Round 2 addendum"): what a run
+ * holds, the SCORE's awards, the shrimp's boost, and the trip (eating the mushroom).
+ */
+export const PLAY_R2 = Object.freeze({
+  /** per run (the shrimp are re-rolled on Play again) */
+  shrimp: 5, ufos: 3, lasagnas: 2,
+  /** points: an Impact coin, a shrimp, a UFO smashed, the mushroom eaten, a lasagna beaten, and a kick taken */
+  points: Object.freeze({ coin: 100, shrimp: 500, ufo: 200, mushroom: 1000, lasagna: 300, hurt: -250 }),
+  /** the finish's time bonus: this many points a second under `par` (s) */
+  bonusPerSec: 100, par: 60,
+  /** a shrimp: run speed ×(1 + boost) for boostTime s; a second stacks once */
+  boost: 0.35, boostTime: 8, boostStack: 2,
+  /** the trip: how long, its last flickering seconds (Hz, under 3) and the look easing out (s) */
+  trip: 12, tripFlicker: 2, flickerHz: 2.5, tripEaseOut: 1,
+  /** moon jumps in the trip */
+  moonJump: 1.5, moonGravity: 0.6,
+})
+
+export type AwardKind = keyof typeof PLAY_R2.points

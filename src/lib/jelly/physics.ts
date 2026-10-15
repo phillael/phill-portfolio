@@ -14,7 +14,7 @@ const gtmp = [0, 0, 0]
 
 export function step(w: World, dt: number) {
   const { s, pos, vel, home, off, frc, inv, sa, sb, srest, sk, vis } = w
-  const melt = w.shroomAmt * s.melt
+  const melt = w.meltAmt * s.melt
   const K = s.stiffness * (1 - 0.72 * melt), D = s.damping, DT = D * 0.4
   frc.fill(0)
   for (let q = 0; q < w.NS; q++) {
@@ -170,7 +170,7 @@ export function loosen(w: World, bd: Body) {
   const { pos, vel, s } = w
   bd.state = LOOSE
   bd.strength = 0
-  bd.timer = s.floatTime * (0.75 + 0.5 * Math.random()) * (1 + w.shroomAmt * s.melt * 0.5)
+  bd.timer = s.floatTime * (0.75 + 0.5 * Math.random()) * (1 + w.meltAmt * s.melt * 0.5)
   bd.escaped = s.space === 'fly' || (s.space === 'float' && Math.random() < s.escape)
   if (bd.escaped) {
     // Toward the camera (gets bigger) or out past the page edge into the distance (gets smaller)
@@ -416,7 +416,7 @@ export function updateStates(w: World, dt: number) {
       bd.strength = 1
       // dancing words lag their targets, and scrolling sloshes them; neither should tear them loose
       if (md > s.breakDist * (1 + 1.6 * w.danceMix * Math.min(1.5, s.dance) + 2 * w.navCalm)) loosen(w, bd)
-      else if (w.shroomAmt > 0.5 && Math.random() < s.dropRate * w.shroomAmt * dt * 0.04) loosen(w, bd)
+      else if (w.shroomAmt > 0.5 && !w.noDrops && Math.random() < s.dropRate * w.shroomAmt * dt * 0.04) loosen(w, bd) // (never while playing)
     } else if (bd.state === LOOSE) {
       bd.timer -= dt
       // Escapees burst when they reach the camera or get far away

@@ -10,6 +10,7 @@ import { galaxySlots } from './galaxy'
 import { hex, lcg, type Vec3 } from './math'
 import type { MusicFeatures } from './music'
 import type { Sfx } from './sfx'
+import type { Swell } from './trip'
 import type { BodySpec } from './snapshot'
 import { wordToken } from './finder'
 
@@ -19,9 +20,11 @@ export interface Body {
   yTop: number
   yBot: number
   cols: number
-  /** its lattice particles: [p0, p1) */
+  /** its lattice particles: [p0, p1), and its springs: [s0, s1) */
   p0: number
   p1: number
+  s0: number
+  s1: number
   b: BodySpec
   state: number
   /** home-spring strength (0 while loose) */
@@ -43,6 +46,11 @@ export interface Body {
   /** Finder highlight, eased toward hlT */
   hl: number
   hlT: number
+  /** Play mode's glows, eased toward their targets: an Impact coin (green, pulsing) and a lit line (cyan); neither lifts the word */
+  coin: number
+  coinT: number
+  lit: number
+  litT: number
   /** the entrance's own re-form time (0 = a normal re-form) */
   rt: number
 }
@@ -64,6 +72,9 @@ export interface Camera {
   halfH: number
   canPan: boolean
   mom: { x: number; y: number } | null
+  /** a jolt on top of the eased camera (Play mode's smash shake), and a roll about its view (the trip's sway; rad) */
+  shake: { x: number; y: number }
+  roll: number
 }
 
 export interface Intro {
@@ -86,7 +97,20 @@ export interface World {
   pageH: number
   pageBottom: number
   time: number
+  /** the shroom look: the user's 🍄 or Play's trip, whichever is more (eased) */
   shroomAmt: number
+  /** Play's trip: its look (Play sets the target; the engine eases tripAmt toward it), and no random word drops while playing */
+  trip: number
+  tripAmt: number
+  noDrops: boolean
+  /** how soft the words' springs are (the user's 🍄 only: the trip is a look, so the text stays readable and walkable) */
+  meltAmt: number
+  /** the trip's molten words (Play sets them): the heat (0…1) and the drips' melt (0…1) */
+  heat: number
+  tripMelt: number
+  /** the trip's swelling words (Play fills this each frame; the words' targets and springs follow it), and the words whose springs are scaled */
+  swells: Swell[]
+  swollen: Set<number>
   danceMix: number
   /** 1 while scrolling/panning/zooming/rotating, fading over ~0.5 s: words hold on tighter */
   navCalm: number
@@ -105,6 +129,8 @@ export interface World {
   sa: Int32Array
   sb: Int32Array
   srest: Float32Array
+  /** the springs' rest lengths as built (a swelling word scales its own, then gets these back) */
+  srest0: Float32Array
   sk: Float32Array
   NPT: number
   ptLu: Float32Array
@@ -140,10 +166,10 @@ export function createWorld(s: JellyState, low: boolean, sfx: Sfx, music: MusicF
   return {
     s, low, sfx, music, rnd: lcg(7),
     pageW: 8.5, pageH: 11, pageBottom: -5.5, // Letter until the resume loads, so the camera doesn't move when it does
-    time: 0, shroomAmt: 0, danceMix: 0, navCalm: 0,
+    time: 0, shroomAmt: 0, trip: 0, tripAmt: 0, noDrops: false, meltAmt: 0, heat: 0, tripMelt: 0, swells: [], swollen: new Set(), danceMix: 0, navCalm: 0,
     bodies: [], NP: 0, NS: 0,
     pos: F0, vel: F0, home: F0, off: F0, frc: F0, inv: F0, pBody: new Int32Array(0), vis: F0,
-    sa: new Int32Array(0), sb: new Int32Array(0), srest: F0, sk: F0,
+    sa: new Int32Array(0), sb: new Int32Array(0), srest: F0, srest0: F0, sk: F0,
     NPT: 0, ptLu: F0, ptLv: F0, ptPos: F0, ptVel: F0, ptHome: F0, ptCol: F0, ptAlpha: F0, ptAge: F0, ptGal: F0, ptPrev: F0, ptSV: F0, ptTail: F0,
     burstQueue: new Set(),
     finger: { active: false, eye: [0, 0, 0], dir: [0, 0, -1], vel: [0, 0, 0], last: null },
@@ -153,7 +179,7 @@ export function createWorld(s: JellyState, low: boolean, sfx: Sfx, music: MusicF
     bend: new BendTable(),
     cam: {
       eye: [0, 0, 15], target: [0, 0, 0], right: [1, 0, 0], up: [0, 1, 0], fwd: [0, 0, -1], mvp: new Float32Array(16), aspect: 1,
-      x: null, y: null, scrollX: 0, scrollY: Infinity, zoom: null, halfW: 1, halfH: 1, canPan: false, mom: null,
+      x: null, y: null, scrollX: 0, scrollY: Infinity, zoom: null, halfW: 1, halfH: 1, canPan: false, mom: null, shake: { x: 0, y: 0 }, roll: 0,
     },
     ripples: [], rippleSide: 1,
     searchAmt: 0, searchN: 0, actLoose: 0, actBurst: 0,
@@ -190,7 +216,7 @@ export function* physicsSteps(w: World, list: BodySpec[], batch = 160): Generato
     const b = list[bi], q = quads[bi], kind = b.st.kind
     const kMul = kind === 'heading' ? 1.8 : kind === 'bold' ? 1 / w.s.boldSoft : 1
     const im = kind === 'heading' ? 0.6 : 1
-    const idx = (i: number, j: number) => q.p0 + j * q.cols + i
+    const idx = (i: number, j: number) => q.p0 + j * q.cols + i, s0 = A.length
     for (let j = 0; j < ROWS; j++) for (let i = 0; i < q.cols; i++) {
       const p = idx(i, j), o = p * 3
       const x = q.x0 + ((q.x1 - q.x0) * i) / (q.cols - 1), y = q.yTop - ((q.yTop - q.yBot) * j) / (ROWS - 1), z = 0.012 + (bi % 7) * 0.0006
@@ -217,13 +243,13 @@ export function* physicsSteps(w: World, list: BodySpec[], batch = 160): Generato
     for (let p = q.p0; p < q.p1; p++) { hx += home[p * 3]; hy += home[p * 3 + 1] }
     const { tok, parts } = wordToken(String(b.text))
     bodies.push({
-      ...q, b, state: HOME, strength: 1, timer: 0, jig: 0, seed: w.rnd(), escaped: false, reform: 0, pt0: 0, ptN: 0,
-      hcx: hx / (q.p1 - q.p0), hcy: hy / (q.p1 - q.p0), tok, parts, hl: 0, hlT: 0, rt: 0,
+      ...q, s0, s1: A.length, b, state: HOME, strength: 1, timer: 0, jig: 0, seed: w.rnd(), escaped: false, reform: 0, pt0: 0, ptN: 0,
+      hcx: hx / (q.p1 - q.p0), hcy: hy / (q.p1 - q.p0), tok, parts, hl: 0, hlT: 0, coin: 0, coinT: 0, lit: 0, litT: 0, rt: 0,
     })
   }
   Object.assign(w, {
     bodies, NP, NS: A.length, pos, vel, home, off, frc, inv, pBody, vis,
-    sa: Int32Array.from(A), sb: Int32Array.from(B), srest: Float32Array.from(RL), sk: Float32Array.from(KM),
+    sa: Int32Array.from(A), sb: Int32Array.from(B), srest: Float32Array.from(RL), srest0: Float32Array.from(RL), sk: Float32Array.from(KM),
   })
   w.burstQueue.clear()
 }
@@ -245,7 +271,7 @@ export interface AtlasRect {
  * one batch of words per step, so a cold load never blocks a frame for long; the seeded
  * random numbers are drawn in the same order as building it in one go.
  */
-export function* atlasSteps(w: World, list: BodySpec[], snapText: CanvasImageSource, batch = 120): Generator<void, { atlas: HTMLCanvasElement; rects: AtlasRect[] }> {
+export function* atlasSteps(w: World, list: BodySpec[], snapText: CanvasImageSource, batch = 120): Generator<void, { atlas: HTMLCanvasElement; rects: AtlasRect[]; ppu: number }> {
   const AW = 4096
   let ppu = 230, ok = false, AH = 4096
   let rects: AtlasRect[] = []
@@ -305,7 +331,7 @@ export function* atlasSteps(w: World, list: BodySpec[], snapText: CanvasImageSou
     ptPrev: new Float32Array(NPT * 3), ptSV: new Float32Array(NPT * 3), ptTail: new Float32Array(NPT * 3),
     ptGal: galaxySlots(NPT, w.rnd),
   })
-  return { atlas, rects }
+  return { atlas, rects, ppu }
 }
 
 /** Bilinear lookup into a body's lattice (positions or homes) at local (lu, lv). */

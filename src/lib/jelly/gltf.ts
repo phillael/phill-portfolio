@@ -224,21 +224,26 @@ export function restLocals(m: GltfModel, local: Float32Array) {
   return local
 }
 
-/** The bounds of the mesh under the given world matrices (skinned: joint matrices; static: its node). */
-export function bounds(m: GltfModel, world: Float32Array, jointMats: Float32Array | null) {
+/**
+ * The bounds of the mesh under the given world matrices (skinned: joint matrices; static: its node).
+ * `only`: just the vertices skinned mostly to these joints (skin joint indexes), e.g. his feet.
+ */
+export function bounds(m: GltfModel, world: Float32Array, jointMats: Float32Array | null, only?: Set<number>) {
   const P = m.positions, mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity], p = [0, 0, 0]
   const J = m.attrs.JOINTS_0, W = m.attrs.WEIGHTS_0
   const n = P.length / 3, jf = jointMats && J ? readInts(J, n) : null, wf = jointMats && W ? readWeights(W, n) : null
   for (let v = 0; v < n; v++) {
     let x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2]
     if (jf && wf && jointMats) {
-      let sx = 0, sy = 0, sz = 0, ws = 0
+      let sx = 0, sy = 0, sz = 0, ws = 0, top = -1, tw = 0
       for (let k = 0; k < 4; k++) {
         const wt = wf[v * 4 + k]
         if (!wt) continue
+        if (wt > tw) { tw = wt; top = jf[v * 4 + k] }
         M4x.point(jointMats, x, y, z, p, jf[v * 4 + k] * 16)
         sx += p[0] * wt; sy += p[1] * wt; sz += p[2] * wt; ws += wt
       }
+      if (only && !only.has(top)) continue
       x = sx / ws; y = sy / ws; z = sz / ws
     } else {
       M4x.point(world, x, y, z, p, m.meshNode * 16)

@@ -6,10 +6,11 @@
  * needs WebGL2, which tests don't have; that's checked in the browser.
  */
 
-import { readFileSync } from 'fs'
+import { readFileSync, statSync } from 'fs'
 import path from 'path'
 import { Pose, bendAxes, jointMatrices, sampleTrack } from '@/lib/jelly/actors'
-import { CAST_CONFIG } from '@/lib/jelly/config'
+import { danceSet, PLAY_CLIPS } from '@/lib/jelly/cast'
+import { CAST_CONFIG, PLAY_CONFIG } from '@/lib/jelly/config'
 import { bounds, parseGlb, readGltf, restLocals, worldMatrices, type GltfModel, type Track } from '@/lib/jelly/gltf'
 
 const closed = jest.fn()
@@ -31,11 +32,13 @@ describe('readGltf: Phill', () => {
   let m: GltfModel
   beforeAll(async () => { m = await readGltf(glb('phill.glb')) })
 
-  it('has his 24-bone skin, his own clips and the dances borrowed from the other characters', () => {
+  it('has his 24-bone skin, his own clips, the dances borrowed from the other characters and the jump', () => {
     expect(m.joints).toHaveLength(24)
     expect(m.ibm).toHaveLength(24 * 16)
-    expect(m.clips.map((c) => c.name).sort()).toEqual(['dance', 'die', 'garlic', 'human', 'idle', 'lasagna', 'moose', 'zombie'])
-    const own = new Set(['dance', 'die', 'idle'])
+    expect(m.clips.map((c) => c.name).sort()).toEqual(
+      ['attack', 'dance', 'die', 'garlic', 'human', 'idle', 'jumping', 'lasagna', 'moose', 'walk', 'zombie'],
+    )
+    const own = new Set(['attack', 'dance', 'die', 'idle', 'walk'])
     for (const c of m.clips) {
       expect(c.duration).toBeGreaterThan(1)
       // his own: translation, rotation and scale for each bone; the borrowed ones: each bone's rotation and the hips' height
@@ -60,12 +63,37 @@ describe('readGltf: Phill', () => {
     expect(b.min[1]).toBeCloseTo(0, 1) // feet at the origin
   })
 
+  it("knows where his soles are from his foot joints (the idle stance holds him a little up)", () => {
+    const feet = m.joints!.filter((n) => /Foot|Toe/.test(m.nodes[n].name))
+    const skin = new Set(m.joints!.map((n, j) => (feet.includes(n) ? j : -1)).filter((j) => j >= 0))
+    expect(feet).toHaveLength(4)
+    const rest = new Pose(m), idle = new Pose(m)
+    idle.play('idle', 0)
+    idle.update(0)
+    // in his rest pose his soles are at the origin; in idle, ~0.06 above it, and the foot joints agree
+    expect(bounds(m, rest.world, rest.joints, skin).min[1]).toBeCloseTo(0, 1)
+    const soles = bounds(m, idle.world, idle.joints, skin).min[1]
+    expect(soles).toBeGreaterThan(0.03)
+    expect(Math.min(...feet.map((n) => idle.world[n * 16 + 13] - rest.world[n * 16 + 13]))).toBeCloseTo(soles, 1)
+  })
+
   it('decodes rotation keys to unit quaternions', () => {
     for (const c of m.clips) for (const t of c.tracks) if (t.path === 'rotation') {
       for (let k = 0; k < t.values.length; k += 4) {
         expect(Math.hypot(t.values[k], t.values[k + 1], t.values[k + 2], t.values[k + 3])).toBeCloseTo(1, 2)
       }
     }
+  })
+})
+
+describe('readGltf: the lasagna (Play mode round 2)', () => {
+  it("is Number Slayers' lasagna on Phill's 24-bone rig, with its own idle, walk, attack and die and Play's jump; under 700 KB", async () => {
+    const m = await readGltf(glb('lasagna.glb'))
+    expect(m.joints).toHaveLength(24)
+    expect(m.clips.map((c) => c.name).sort()).toEqual(['attack', 'die', 'idle', 'jumping', 'walk'])
+    const jump = m.clips.find((c) => c.name === 'jumping')!
+    expect(jump.duration).toBeCloseTo(1.93, 1)
+    expect(statSync(path.join(process.cwd(), 'public/resume/lasagna.glb')).size).toBeLessThanOrEqual(700 * 1024)
   })
 })
 
@@ -164,6 +192,75 @@ describe('Pose', () => {
       expect(x).toBeCloseTo(rest[0], 4)
       expect(z).toBeCloseTo(rest[2], 4)
     }
+  })
+})
+
+describe('Pose: scrubbing and the jump', () => {
+  let m: GltfModel
+  let hips: number
+  beforeAll(async () => {
+    m = await readGltf(glb('phill.glb'))
+    hips = m.joints!.find((j) => !m.joints!.includes(m.nodes[j].parent))!
+  })
+  const hipsY = (p: Pose) => p.world[hips * 16 + 13]
+  const at = (p: Pose, t: number) => { p.seek(t); p.update(0, 0); return hipsY(p) }
+
+  it('seeks the current clip to a time and holds it there at rate 0', () => {
+    const p = new Pose(m), q = new Pose(m)
+    p.play('jumping', 0)
+    q.play('jumping', 0)
+    p.seek(0.8)
+    expect(p.time).toBeCloseTo(0.8, 6)
+    p.update(0.5, 0) // rate 0: the clip doesn't advance
+    expect(p.time).toBeCloseTo(0.8, 6)
+    q.update(0.8)
+    for (let i = 0; i < p.joints.length; i++) expect(p.joints[i]).toBeCloseTo(q.joints[i], 4)
+    p.seek(99)
+    expect(p.time).toBeCloseTo(m.clips.find((c) => c.name === 'jumping')!.duration, 6)
+    p.seek(-1)
+    expect(p.time).toBe(0)
+  })
+
+  it("clamps the jump's hip lift to his standing height (physics lifts him), keeping the crouches", () => {
+    const stand = new Pose(m)
+    stand.play('idle', 0)
+    stand.update(0)
+    const standY = hipsY(stand)
+    const free = new Pose(m), clamped = new Pose(m, { noLift: ['jumping'] })
+    free.play('jumping', 0)
+    clamped.play('jumping', 0)
+    const dur = m.clips.find((c) => c.name === 'jumping')!.duration
+    let freeMax = -Infinity
+    for (let t = 0; t <= dur; t += 0.05) {
+      freeMax = Math.max(freeMax, at(free, t))
+      expect(at(clamped, t)).toBeLessThanOrEqual(standY + 1e-4)
+    }
+    expect(freeMax).toBeGreaterThan(standY + 0.3) // the clip lifts his hips about half a body
+    expect(at(clamped, 0.35)).toBeLessThan(standY - 0.2) // the wind-up crouch stays
+    expect(at(clamped, 1.35)).toBeLessThan(standY - 0.2) // and the landing one
+    // other clips aren't clamped
+    clamped.play('dance', 0)
+    expect(Number.isFinite(at(clamped, 1))).toBe(true)
+  })
+})
+
+describe('the dance rotation', () => {
+  it("leaves out idle, the knock and Play mode's clips (by name)", async () => {
+    const m = await readGltf(glb('phill.glb'))
+    const d = danceSet(m.clips.map((c) => c.name))
+    expect([...PLAY_CLIPS].sort()).toEqual(['attack', 'jumping', 'walk'])
+    for (const n of ['idle', 'die', 'walk', 'attack', 'jumping']) expect(d.has(n)).toBe(false)
+    expect([...d].sort()).toEqual(['dance', 'garlic', 'human', 'lasagna', 'moose', 'zombie'])
+  })
+})
+
+describe('PLAY_CONFIG', () => {
+  it("is frozen; the smash's strike sits inside the attack clip, the hit inside the strike", async () => {
+    const m = await readGltf(glb('phill.glb'))
+    expect(Object.isFrozen(PLAY_CONFIG)).toBe(true)
+    const [a, b] = PLAY_CONFIG.strike
+    expect(0 <= a && a < PLAY_CONFIG.hit && PLAY_CONFIG.hit < b).toBe(true)
+    expect(b).toBeLessThanOrEqual(m.clips.find((c) => c.name === 'attack')!.duration)
   })
 })
 

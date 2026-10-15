@@ -22,7 +22,11 @@ const engine = {
   resetView: jest.fn(), zoomBy: jest.fn(), setNavMode: jest.fn(), setUiInsets: jest.fn(), panKey: jest.fn(),
   navView: jest.fn(() => ({ fit: true, left: 0, top: 0, width: 1, height: 1 })), navTo: jest.fn(),
   drawMiniMap: jest.fn(), onFrame: jest.fn(() => () => {}), gesture: jest.fn(), holeAtCursor: jest.fn(),
-  releaseHoleKey: jest.fn(),
+  releaseHoleKey: jest.fn(), startQuad: jest.fn(() => null), setStartArt: jest.fn(), pressStart: jest.fn(),
+  play: {
+    enter: jest.fn(() => Promise.resolve('on')), exit: jest.fn(), input: { left: false, right: false, jump: false, down: false, smash: false, pressed: new Set() },
+    params: {}, state: jest.fn(() => null), onEvent: jest.fn(() => () => {}), isOn: jest.fn(() => false),
+  },
 }
 // the real engine reports onOpen once its entrance starts; the mock does it on openDirect
 type Callbacks = { onOpen?: () => void; onLanded?: () => void; onClosed?: () => void }

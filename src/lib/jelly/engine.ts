@@ -8,18 +8,21 @@
  *   engine.dispose()
  */
 
+import { bendZ } from './bend'
 import { introCam, revealY, startIntro, updateIntro } from './intro'
 import { planeZ, resetView, stepMomentum, updateCamera, zoomCenter, type Ray, type UiInsets } from './camera'
-import { HOME, LOOSE, initialState } from './config'
+import { HOME, LOOSE, PLAY_CONFIG, initialState, type PlayConfig } from './config'
 import { onBeat, updateBend, updateTargets } from './dance'
 import { countMatches, findMatches } from './finder'
 import { attachInput } from './input'
-import { lcg } from './math'
+import { lcg, type Vec3 } from './math'
 import { MusicFeatures, type MusicInput } from './music'
+import { paintStart, startArtBox } from './pixelArt'
 import { burstAll, chaos, collide, healAll, releaseHole, shakeIt, startHole, step, updateParticles, updateStates } from './physics'
 import type { Cast } from './cast'
+import type { Play, PlayEvent, PlayInput } from './play'
 import { createRenderer } from './render'
-import { createSfx } from './sfx'
+import { createSfx, playEventSound } from './sfx'
 import { snapshotBodies, type LoadedSnapshot } from './snapshot'
 import { atlasSteps, createWorld, hidden, physicsSteps, type World } from './world'
 import {
@@ -61,6 +64,11 @@ export interface NavView {
   height: number
 }
 
+/** PLAYER 1 START's state, as its button knows it (playing and shroom mode the engine knows itself) */
+export type StartArtStatus = 'ready' | 'loading' | 'unavailable'
+/** `play.enter()`: on; not now (the resume isn't open and settled: try again); or Phill or Play's code failed to load */
+export type PlayEnter = 'on' | 'later' | 'failed'
+
 export interface JellyStats {
   words: number
   home: number
@@ -70,6 +78,9 @@ export interface JellyStats {
   fps: number
   loaded: boolean
 }
+
+/** PLAYER 1 START's art pixel, in texels of the page's backing (220 a unit) */
+const ART_PX = 4
 
 export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onClosed }: JellyEngineOptions) {
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true })
@@ -86,6 +97,14 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   // the cast (Phill, the shrimp): its own chunk, fetched once the page has printed (the cold open never waits on it)
   let cast: Cast | null = null
   let castStarted = false
+  let castLoad: Promise<boolean> | null = null
+  // Play mode: its own chunk, loaded on the first Play. The keys (or the touch pads) write its input
+  let play: Play | null = null
+  let playing = false
+  const playInput: PlayInput = { left: false, right: false, jump: false, down: false, smash: false, pressed: new Set() }
+  const playParams: PlayConfig = { ...PLAY_CONFIG }
+  // Play mode's sounds (silent unless Sound is on; the audio starts on the Play gesture)
+  const playListeners = new Set<(e: PlayEvent) => void>([(e) => playEventSound(sfx, e)])
 
   const ui: UiInsets = { top: 0.1, bot: 0.1 }
   let loaded: LoadedSnapshot | null = null
@@ -102,13 +121,23 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   let holeMode = false
   let lastRay: Ray | null = null
   let back: HTMLCanvasElement | null = null
+  /** the user's 🍄, eased (the look is this or Play's trip, whichever is more) */
+  let userShroom = 0
+  /** PLAYER 1 START printed on the paper: its box (world units, at the page's rest), and what its button says */
+  let startBox: { x0: number; x1: number; top: number; bottom: number } | null = null
+  let startStatus: StartArtStatus = 'ready', startCursor = false, startPress = 0
+  const quad = new Float32Array(8)
   const frameListeners = new Set<() => void>()
 
   // ---- size: device pixels, DPR capped at 2 ----
   let dpr = 1
+  /** the canvas's CSS size (kept here so per-frame code never reads layout) */
+  let cssW = 1, cssH = 1
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1)
     const r = canvas.getBoundingClientRect()
+    cssW = Math.max(1, r.width)
+    cssH = Math.max(1, r.height)
     canvas.width = Math.max(1, Math.round(r.width * dpr))
     canvas.height = Math.max(1, Math.round(r.height * dpr))
     renderer.setDpr(dpr)
@@ -149,10 +178,10 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
       if (disposed) return
       step = steps.next()
     } while (!step.done)
-    const { atlas, rects } = step.value
+    const { atlas, rects, ppu } = step.value
     await nextTask()
     if (disposed) return
-    renderer.buildGPU(atlas, rects)
+    renderer.buildGPU(atlas, rects, ppu)
     await nextTask()
     if (disposed) return
     // the page's backing: white paper plus the decorations at their place in the margins
@@ -164,7 +193,19 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     g.fillStyle = '#ffffff'
     g.fillRect(0, 0, back.width, back.height)
     g.drawImage(snapshot.decor, snap.page.marginX * PP, snap.page.marginY * PP, (snap.content.w / 96) * PP, (snap.content.h / 96) * PP)
+    // PLAYER 1 START, printed in the top right: its right edge on the content's, centered on the name's line
+    // (one art pixel = 4 texels); its blink's off frame goes in a small texture of its own (no re-upload of the page)
+    const [ax, ay, aw, ah] = startArtBox(snap.page.marginX * PP + (snap.content.w / 96) * PP, (snap.page.marginY + 16.5 / 96) * PP, ART_PX)
+    const off = document.createElement('canvas')
+    off.width = aw
+    off.height = ah
+    const og = off.getContext('2d')!
+    og.drawImage(back, ax, ay, aw, ah, 0, 0, aw, ah)
+    paintStart(og, aw, ah / 2, ART_PX, { on: false })
+    const art = paintStart(g, ax + aw, ay + ah / 2, ART_PX, { on: true })
     renderer.buildBacking(back)
+    renderer.buildStartArt(off, [ax / back.width, ay / back.height, (ax + aw) / back.width, (ay + ah) / back.height], art.size)
+    startBox = { x0: ax / PP - w.pageW / 2, x1: (ax + aw) / PP - w.pageW / 2, top: w.pageH / 2 - ay / PP, bottom: w.pageH / 2 - (ay + ah) / PP }
     w.cam.scrollY = Infinity
     w.cam.y = null
     w.cam.scrollX = 0
@@ -226,6 +267,7 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
    */
   function close(img: HTMLImageElement) {
     if (cl) return true
+    exitPlay(true) // closing while playing: leave Play first, instantly
     if (diss) {
       if (!loaded) return false // still waiting for the resume: fade out instead of waiting on the handoff
       pendingClose = img
@@ -346,7 +388,13 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     nextTask().then(() => { if (!disposed) sfx.prepare() })
   }
 
-  const enabled = () => open && !!loaded
+  /** the resume is open, has printed and isn't mid-transition */
+  const settledNow = () => open && !!loaded && !w.intro && !cl && !diss
+  /** Play pressed during the entrance waits for the page to settle (resolved by the frame loop, or by dispose) */
+  let settleWaiters: (() => void)[] = []
+  const whenSettled = () => (settledNow() ? Promise.resolve() : new Promise<void>((r) => settleWaiters.push(r)))
+  /** page gestures (off while playing) */
+  const enabled = () => open && !!loaded && !playing
   const input = attachInput({
     w, canvas, ui, enabled,
     navMode: () => navMode,
@@ -365,7 +413,11 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     const dt = Math.min(0.033, (now - last) / 1000) * timeScale
     last = now
     w.time += dt
-    w.shroomAmt += ((s.shroom ? 1 : 0) - w.shroomAmt) * Math.min(1, dt * 1.2)
+    userShroom += ((s.shroom ? 1 : 0) - userShroom) * Math.min(1, dt * 1.2)
+    w.tripAmt += ((playing ? w.trip : 0) - w.tripAmt) * Math.min(1, dt * 6)
+    w.shroomAmt = Math.max(userShroom, w.tripAmt)
+    w.meltAmt = userShroom
+    w.noDrops = playing
     for (let a = 0; a < 3; a++) w.finger.vel[a] *= 0.88
     updateIntro(w, dt, () => {
       if (!pendingFind) return
@@ -374,12 +426,17 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
       onFind?.(q, find(q)) // a deep link: light it up once the page has landed
     })
     stepMomentum(w, dt)
+    if (playing) play?.update(dt) // before the camera: Play steers it
     if (w.cam.mom) w.navCalm = 1
     w.navCalm = Math.max(0, w.navCalm - dt * 2)
     updateCamera(w, dt, canvas.width, canvas.height, ui, introCam(w, open, cl ? cl.cam : null))
     for (const f of frameListeners) f()
     w.hole.amt = w.hole.on ? w.hole.amt + (1 - w.hole.amt) * Math.min(1, dt * 0.9) : Math.max(0, w.hole.amt - dt * 5)
-    for (const bd of w.bodies) { bd.hl += (bd.hlT - bd.hl) * Math.min(1, dt * 5); if (bd.hl < 1e-3 && !bd.hlT) bd.hl = 0 }
+    for (const bd of w.bodies) {
+      bd.hl += (bd.hlT - bd.hl) * Math.min(1, dt * 5); if (bd.hl < 1e-3 && !bd.hlT) bd.hl = 0
+      bd.coin += (bd.coinT - bd.coin) * Math.min(1, dt * 4); if (bd.coin < 1e-3 && !bd.coinT) bd.coin = 0
+      bd.lit += (bd.litT - bd.lit) * Math.min(1, dt * 5); if (bd.lit < 1e-3 && !bd.litT) bd.lit = 0
+    }
     features.update(dt, music?.() ?? null)
     updateBend(w)
     updateTargets(w, dt)
@@ -421,19 +478,30 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     const sky = cl && cl.landed ? 1 - smooth(cl.fade) : smooth(skyLin)
     // the cast: on stage once the page has printed (and off it while the resume closes or replays its intro).
     // Its models are ~900 KB, so a visitor who asked to save data doesn't get them.
-    const settled = open && !!loaded && !w.intro && !cl && !diss
+    const settled = settledNow()
+    if (settled && settleWaiters.length) { const ws = settleWaiters; settleWaiters = []; ws.forEach((f) => f()) }
     if (settled && !castStarted) {
       castStarted = true
       const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData
-      if (!saveData) {
-        import('./cast')
-          .then(({ createCast }) => { if (disposed) return; cast = createCast(gl!, w); return cast.load(nextTask) })
-          .catch((err) => console.warn('The resume cast failed to load', err))
-      }
+      if (!saveData) loadCast()
     }
     cast?.update(dt, settled)
+    if (startBox) startArtLook(dt)
     renderer.render(sky, revealY(w, cl ? cl.reveal : null), !hp.cover, hp.show ? hp : null, !!loaded, cast?.draw)
   }
+  /** PLAYER 1 START's look this frame: the ▶ blinks at 2 Hz (steady while playing, in shroom mode or unavailable) */
+  function startArtLook(dt: number) {
+    const a = renderer.startArt, gone = startStatus === 'unavailable'
+    const ease = (v: number, to: number, k: number) => v + (to - v) * Math.min(1, dt * k)
+    a.off = gone ? 1 : playing || w.shroomAmt > 0.5 ? 0 : Math.floor(w.time * 2) % 2
+    a.gray = ease(a.gray, gone ? 1 : 0, 6)
+    a.dim = ease(a.dim, playing ? 1 : 0, 6)
+    const c = ease(a.cursor, startCursor && !playing && !gone ? 1 : 0, 15)
+    a.cursor = c > 0.02 ? c : 0
+    startPress = Math.max(0, startPress - dt)
+    a.press = startPress > 0 ? 1 : 0
+  }
+
   function startLoop() {
     if (raf) return
     last = performance.now()
@@ -447,6 +515,95 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
   document.addEventListener('visibilitychange', onVisibility)
   if (!document.hidden) startLoop()
 
+  /** The cast's chunk and models, once (Play asks for them even with Save-Data); false if Phill didn't load. */
+  function loadCast() {
+    castLoad ??= import('./cast')
+      .then(async ({ createCast }) => {
+        if (disposed) return false
+        cast = createCast(gl!, w)
+        await cast.load(nextTask)
+        return !disposed && !!cast.rig()
+      })
+      .catch((err) => { console.warn('The resume cast failed to load', err); return false })
+    return castLoad
+  }
+
+  const emitPlay = (e: PlayEvent) => playListeners.forEach((f) => f(e))
+
+  /** a world point on screen: CSS px from the canvas's top left (null: behind the camera) */
+  function project(p: Vec3): [number, number] | null {
+    const m = w.cam.mvp, ww = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15]
+    if (ww <= 1e-6) return null
+    return [
+      (((m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12]) / ww) * 0.5 + 0.5) * cssW,
+      (1 - (((m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]) / ww) * 0.5 + 0.5)) * cssH,
+    ]
+  }
+
+  /**
+   * PLAYER 1 START's four corners on screen (top left, top right, bottom right, bottom left; CSS px), on the
+   * bent page as drawn this frame; null when it's behind the camera, turned away, degenerate or off screen.
+   */
+  function startQuad() {
+    if (!startBox) return null
+    const { x0, x1, top, bottom } = startBox, hw = w.pageW / 2, hh = w.pageH / 2
+    const xs = [x0, x1, x1, x0], ys = [top, top, bottom, bottom]
+    for (let i = 0; i < 4; i++) {
+      const p = project([xs[i], ys[i], bendZ(w.bend.p, hw, hh, xs[i], ys[i])])
+      if (!p) return null
+      quad[i * 2] = p[0]
+      quad[i * 2 + 1] = p[1]
+    }
+    // the signed area (y down: clockwise is the front) and the bounds
+    let area = 0, l = Infinity, r = -Infinity, t = Infinity, b = -Infinity
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 1) % 4, x = quad[i * 2], y = quad[i * 2 + 1]
+      area += x * quad[j * 2 + 1] - quad[j * 2] * y
+      l = Math.min(l, x); r = Math.max(r, x); t = Math.min(t, y); b = Math.max(b, y)
+    }
+    if (area / 2 < 4 || r < 0 || b < 0 || l > cssW || t > cssH) return null
+    return quad
+  }
+
+  /**
+   * Play as Phill: loads the cast (if it hasn't yet) and Play's chunk, then he takes the bottom line.
+   * Resolves to whether Play started (false: the resume isn't settled, or loading failed).
+   */
+  /** Enter Play: 'on', 'later' (not now: the resume isn't open and settled; try again) or 'failed' (Phill or Play's code didn't load) */
+  async function enterPlay(): Promise<PlayEnter> {
+    if (playing) return 'on'
+    if (!open || cl) return 'later'
+    const [ok, mod] = await Promise.all([
+      loadCast(),
+      import('./play').catch((err) => { console.warn('Play mode failed to load', err); return null }),
+      whenSettled(), // (pressed during the entrance: once it has printed)
+    ])
+    if (!ok || !mod || !cast) return disposed ? 'later' : 'failed'
+    if (disposed || !settledNow()) return 'later'
+    // a frame each: build Play (the level, his rig), then start it (the Play HUD mounts and lays out after that)
+    if (!play) {
+      await nextTask()
+      if (disposed || !settledNow()) return 'later'
+      play ??= mod.createPlay({ w, cast, params: playParams, input: playInput, viewH: () => cssH, ui, emit: emitPlay })
+      await nextTask()
+      if (disposed || !settledNow()) return 'later'
+    }
+    if (playing) return 'on'
+    if (w.hole.on) releaseHole(w)
+    find('')
+    playing = true
+    play.enter()
+    void cast.loadLasagna(nextTask) // round 2's enemy: only now that Play has started
+    return 'on'
+  }
+
+  /** Leave Play (he hops back to his orbit; instant: no hop, e.g. the resume is closing) */
+  function exitPlay(instant = false) {
+    if (!playing) return
+    playing = false
+    play?.exit(instant)
+  }
+
   function stats(): JellyStats {
     let home = 0, loose = 0, bursting = 0
     for (const bd of w.bodies) { if (bd.state === HOME) home++; else if (bd.state === LOOSE) loose++; else if (hidden(bd)) bursting++ }
@@ -455,6 +612,8 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
 
   function dispose() {
     disposed = true
+    settleWaiters.forEach((f) => f())
+    settleWaiters = []
     stopLoop()
     document.removeEventListener('visibilitychange', onVisibility)
     ro.disconnect()
@@ -498,13 +657,49 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
     setTilt,
     /** called every frame, right after the camera moves (mutate the DOM; never set React state) */
     onFrame: (f: () => void) => { frameListeners.add(f); return () => { frameListeners.delete(f) } },
+    /** a world point on screen: CSS px from the canvas's top left (null: behind the camera); read it in onFrame */
+    project,
+    /** PLAYER 1 START's projected corners (read it in onFrame; the array is reused) */
+    startQuad,
+    /** its button's state: ready / loading / unavailable, and the cursor (hover or keyboard focus) */
+    setStartArt: ({ status, cursor }: { status?: StartArtStatus; cursor?: boolean }) => {
+      if (status) startStatus = status
+      if (cursor !== undefined) startCursor = cursor
+    },
+    /** pressed: the art drops a pixel for 120 ms */
+    pressStart: () => { startPress = 0.12 },
     gesture: unlockAudio,
+    /** Play mode (the Career Climb) */
+    play: {
+      enter: enterPlay,
+      exit: exitPlay,
+      /** after the finish: the page heals, the clock and coins reset, he drops back onto the name */
+      again: () => { if (playing) play?.again() },
+      /** written by the keys and the touch pads (a plain object: never React state) */
+      input: playInput,
+      /** the live tuning (dev: /resume?tune) */
+      params: playParams,
+      /** where he is (read it in onFrame; null when not playing) */
+      state: () => (playing && play ? play.state() : null),
+      onEvent: (f: (e: PlayEvent) => void) => { playListeners.add(f); return () => { playListeners.delete(f) } },
+      isOn: () => playing,
+      /** the level for the HUD's climb meter: the page's top (the name) and bottom, and the checkpoints' heights (world y) */
+      levelInfo: () => {
+        if (!play) return null
+        const lv = play.level
+        return {
+          top: lv.lines[lv.start].inkTop,
+          bottom: lv.lines[lv.finish].bottom,
+          checkpoints: lv.checkpoints.map((c) => ({ year: c.year, title: c.title, y: lv.lines[c.line].inkTop })),
+        }
+      },
+    },
     stats,
     dispose,
   }
 
   // dev only: a handle for scripted checks in the browser, like the playground's
-  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, get cast() { return cast }, diss: () => diss, closing: () => cl, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
+  const debug = process.env.NODE_ENV !== 'production' ? { ...api, w, hp, get cast() { return cast }, get playDev() { return play }, diss: () => diss, closing: () => cl, intro: () => w.intro, cam: w.cam, setTimeScale: (k: number) => { timeScale = k } } : null
   if (debug) (window as unknown as { __jelly?: unknown }).__jelly = debug
 
   return api

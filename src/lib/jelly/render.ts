@@ -57,15 +57,16 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
   gl.bindVertexArray(null)
 
   let skyTex: WebGLTexture | null = null, cloudTex: WebGLTexture | null = null, grainTex: WebGLTexture | null = null
-  let backTex: WebGLTexture | null = null, atlasTex: WebGLTexture | null = null
-  let atlasW = 1, atlasH = 1
+  let backTex: WebGLTexture | null = null, atlasTex: WebGLTexture | null = null, artTex: WebGLTexture | null = null
+  let atlasW = 1, atlasH = 1, atlasPpu = 230
   let starVAO: WebGLVertexArrayObject | null = null, starCount = 0
   let mistVAO: WebGLVertexArrayObject | null = null, mistBuf: WebGLBuffer | null = null, mistData = new Float32Array(0)
   let mistInst: Mist[] = []
   let bodyVAO: WebGLVertexArrayObject | null = null, ptVAO: WebGLVertexArrayObject | null = null, pageVAO: WebGLVertexArrayObject | null = null
-  let posBuf: WebGLBuffer, jigBuf: WebGLBuffer, visBuf: WebGLBuffer, hlBuf: WebGLBuffer
+  let posBuf: WebGLBuffer, jigBuf: WebGLBuffer, visBuf: WebGLBuffer, hlBuf: WebGLBuffer, glowBuf: WebGLBuffer
   let ptPosBuf: WebGLBuffer, ptTailBuf: WebGLBuffer, ptAlphaBuf: WebGLBuffer, ptAgeBuf: WebGLBuffer
-  let jigData = new Float32Array(0), hlData = new Float32Array(0), idxCount = 0, pageCount = 0
+  let jigData = new Float32Array(0), hlData = new Float32Array(0), glowData = new Float32Array(0), idxCount = 0, pageCount = 0
+  let glowsShown = false
   const buffers: WebGLBuffer[] = []
   const track = (b: WebGLBuffer) => { buffers.push(b); return b }
 
@@ -168,13 +169,15 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
   }
 
   /** Upload the words (lattices + atlas), their sparks and the paper sheet. */
-  function buildGPU(atlas: HTMLCanvasElement, rects: AtlasRect[]) {
+  function buildGPU(atlas: HTMLCanvasElement, rects: AtlasRect[], ppu = 230) {
+    atlasPpu = ppu
     const NP = w.NP, NPT = w.NPT
     if (bodyVAO) gl.deleteVertexArray(bodyVAO)
     bodyVAO = gl.createVertexArray()!
     const uv = new Float32Array(NP * 2), local = new Float32Array(NP * 2), rect = new Float32Array(NP * 4), sd = new Float32Array(NP)
     jigData = new Float32Array(NP)
     hlData = new Float32Array(NP)
+    glowData = new Float32Array(NP * 2)
     const idx: number[] = []
     w.bodies.forEach((bd, bi) => {
       const r = rects[bi]
@@ -195,6 +198,7 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     jigBuf = track(attr(gl, BODY, bodyVAO, 'aJig', 1, jigData, gl.DYNAMIC_DRAW)); track(attr(gl, BODY, bodyVAO, 'aSeed', 1, sd))
     visBuf = track(attr(gl, BODY, bodyVAO, 'aVis', 1, w.vis, gl.DYNAMIC_DRAW))
     hlBuf = track(attr(gl, BODY, bodyVAO, 'aHl', 1, hlData, gl.DYNAMIC_DRAW))
+    glowBuf = track(attr(gl, BODY, bodyVAO, 'aGlow', 2, glowData, gl.DYNAMIC_DRAW))
     const ib = track(gl.createBuffer()!)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(idx), gl.STATIC_DRAW)
@@ -242,9 +246,20 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     gl.bindVertexArray(null)
   }
 
-  /** The page's backing: white paper plus the snapshot's decorations (tint bars, rules, bullets). */
+  /** The page's backing: white paper plus the snapshot's decorations (tint bars, rules, bullets) and PLAYER 1 START. */
   function buildBacking(back: HTMLCanvasElement) {
     backTex = texFrom(gl, back, backTex)
+  }
+
+  /**
+   * PLAYER 1 START printed on the paper: where it is (page UVs, y down: x0, y0, x1, y1), its size in art
+   * pixels, and its blink's off frame (just the art's box). `startArt` is its look, set every frame.
+   */
+  const startArt = { rect: [-2, -2, -1, -1], size: [1, 1], off: 0, gray: 0, dim: 0, cursor: 0, press: 0 }
+  function buildStartArt(off: HTMLCanvasElement, rect: number[], size: number[]) {
+    artTex = texFrom(gl, off, artTex)
+    startArt.rect = rect
+    startArt.size = size
   }
 
   /** The comet program's uniforms, for the resume's sparks and the hero pool (photo colors heating into the comet ramp). */
@@ -351,13 +366,24 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
       gl.uniform1f(pu.uThick, s.paperThick); gl.uniform2f(pu.uHalf, w.pageW / 2, w.pageH / 2)
       gl.uniform1f(pu.uBendA, bend.a); gl.uniform1f(pu.uBendC, bend.c); gl.uniform1f(pu.uBendT, bend.t); gl.uniform1f(pu.uBendS, bend.s)
       gl.uniform1f(pu.uReveal, reveal); gl.uniform1f(pu.uDim, w.searchAmt); gl.uniform3fv(pu.uScan, hex(SITE.cyan))
+      const art = startArt
+      gl.uniform4fv(pu.uArtRect, art.rect); gl.uniform2fv(pu.uArtSize, art.size); gl.uniform1f(pu.uArtOff, art.off); gl.uniform1f(pu.uArtGray, art.gray)
+      gl.uniform1f(pu.uArtDim, art.dim); gl.uniform1f(pu.uArtCursor, art.cursor); gl.uniform1f(pu.uArtPress, art.press)
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, artTex ?? backTex); gl.uniform1i(pu.uArtTex, 3)
       gl.bindVertexArray(pageVAO); gl.drawElements(gl.TRIANGLES, pageCount, gl.UNSIGNED_INT, 0)
 
-      for (const bd of w.bodies) { const v = bd.jig, h = bd.hl; for (let i = bd.p0; i < bd.p1; i++) { jigData[i] = v; hlData[i] = h } }
+      let glows = false
+      for (const bd of w.bodies) {
+        const v = bd.jig, h = bd.hl, c = bd.coin, l = bd.lit
+        if (c || l) glows = true
+        for (let i = bd.p0; i < bd.p1; i++) { jigData[i] = v; hlData[i] = h; glowData[i * 2] = c; glowData[i * 2 + 1] = l }
+      }
       gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, w.pos)
       gl.bindBuffer(gl.ARRAY_BUFFER, jigBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, jigData)
       gl.bindBuffer(gl.ARRAY_BUFFER, visBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, w.vis)
       gl.bindBuffer(gl.ARRAY_BUFFER, hlBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, hlData)
+      if (glows || glowsShown) { gl.bindBuffer(gl.ARRAY_BUFFER, glowBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, glowData) } // (all zero: no upload)
+      glowsShown = glows
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
       gl.useProgram(BODY.p)
       const u = BODY.u
@@ -372,6 +398,10 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
       gl.uniform1i(u.uInkMode, INK_FINISH_INDEX[s.inkFinish]); gl.uniform1f(u.uShine, s.shine)
       gl.uniform2f(u.uTexel, 1.5 / atlasW, 1.5 / atlasH); gl.uniform3fv(u.uLight, LIGHT); gl.uniform1f(u.uRot, skyRot)
       gl.uniform1f(u.uSearch, w.searchAmt); gl.uniform3fv(u.uGlowA, hex(SITE.cyan)); gl.uniform3fv(u.uGlowB, hex(SITE.purple))
+      gl.uniform3fv(u.uCoin, hex(SITE.green))
+      // the trip's molten words (their heat and drips fade with the trip's look); the atlas's px a unit, for the mockup's sizes (page texels, 220 a unit)
+      const heat = w.heat * w.tripAmt
+      gl.uniform1f(u.uHeat, heat); gl.uniform1f(u.uTripMelt, w.tripMelt * w.tripAmt); gl.uniform1f(u.uPsy, 1); gl.uniform1f(u.uPpu, atlasPpu)
       // Raised letters: lift the face and fill the gap with darker stacked copies (fewer on phones)
       const thick = s.textDepth * 0.05, layers = s.textDepth > 0 ? Math.min(w.low ? 2 : 6, Math.max(1, Math.round(s.textDepth * 6))) : 0
       gl.uniform1f(u.uLift, thick)
@@ -382,6 +412,12 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
         gl.drawElements(gl.TRIANGLES, idxCount, gl.UNSIGNED_INT, 0)
       }
       gl.uniform1i(u.uPass, 0); gl.uniform1f(u.uLayerZ, 0)
+      if (heat > 0.001) {
+        // the forge glow on the paper around the words: added under the ink, writing no depth (the empty parts of a word's quad mustn't hide what passes behind)
+        gl.depthMask(false); gl.uniform1i(u.uPass, 2)
+        gl.drawElements(gl.TRIANGLES, idxCount, gl.UNSIGNED_INT, 0)
+        gl.depthMask(true); gl.uniform1i(u.uPass, 0)
+      }
       gl.drawElements(gl.TRIANGLES, idxCount, gl.UNSIGNED_INT, 0)
       if (cast) { gl.bindVertexArray(null); cast(); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA) }
 
@@ -447,10 +483,10 @@ export function createRenderer(gl: WebGL2RenderingContext, w: World) {
     for (const b of [...buffers, ...heroOwn]) gl.deleteBuffer(b)
     if (heroVAO) gl.deleteVertexArray(heroVAO)
     gl.deleteBuffer(linkBuf)
-    for (const t of [skyTex, cloudTex, grainTex, backTex, atlasTex]) if (t) gl.deleteTexture(t)
+    for (const t of [skyTex, cloudTex, grainTex, backTex, atlasTex, artTex]) if (t) gl.deleteTexture(t)
   }
 
-  return { bakeSky, buildStars, buildGPU, buildBacking, buildHero, render, setDpr, dispose }
+  return { bakeSky, buildStars, buildGPU, buildBacking, buildStartArt, startArt, buildHero, render, setDpr, dispose }
 }
 
 export type Renderer = ReturnType<typeof createRenderer>

@@ -1,7 +1,12 @@
 /**
  * Sound effects, all synthesized with Web Audio (no files): the black hole's drone,
- * gulps and boom, and the entrance whoosh. Clicks are silent (Phill: no musical notes).
+ * gulps and boom, the entrance whoosh, and Play mode's jump, land, smash, coin and finish.
+ * Clicks are silent (Phill: no musical notes); Play mode's sounds only come from playing.
+ * Play mode round 2's cues (the shrimp, the UFO and its mushroom, the trip, the lasagna) are
+ * placeholders: the sounds PR replaces them with recorded ones.
  */
+
+import type { PlayEvent } from './play'
 
 export interface Sfx {
   /** the audio graph and the whoosh (on a gesture, or as the resume opens) */
@@ -13,6 +18,26 @@ export interface Sfx {
   hole(amt: number): void
   gulp(): void
   boom(): void
+  /** Play mode: a jump, a landing (fall speed, units/s), a smash, a coin collected, the finish */
+  jump(): void
+  land(speed: number): void
+  smash(): void
+  coin(): void
+  finish(): void
+  /** Play mode round 2 (placeholders until the sounds PR): a shrimp eaten, a UFO hit, its beam (`delay` s from now), its mushroom appearing */
+  shrimp(): void
+  ufoHit(): void
+  beam(delay?: number): void
+  mushroomAppear(): void
+  /** the trip starting and wearing off */
+  powerUp(): void
+  powerDown(): void
+  /** the lasagna: its "!", stomped, his kick taken, a TINK off the giant, and the giant's steps (`near` 0…1: quieter further off) */
+  enemyAlert(): void
+  stomp(): void
+  kicked(): void
+  tink(): void
+  giantStep(near: number): void
   dispose(): void
 }
 
@@ -178,6 +203,159 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }):
     s.stop(t + 1)
   }
 
+  /** a tone: an oscillator from f0 to f1 over len s, gain g, starting at t */
+  function tone(type: OscillatorType, f0: number, f1: number, len: number, g: number, t = ac!.currentTime) {
+    const o = ac!.createOscillator(), a = ac!.createGain()
+    o.type = type
+    o.frequency.setValueAtTime(f0, t)
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + len)
+    a.gain.setValueAtTime(0.0001, t)
+    a.gain.exponentialRampToValueAtTime(g, t + 0.008)
+    a.gain.exponentialRampToValueAtTime(0.0001, t + len)
+    o.connect(a)
+    a.connect(mix)
+    o.start(t)
+    o.stop(t + len + 0.05)
+  }
+
+  /** a short noise burst through a filter */
+  function crunch(type: BiquadFilterType, f: number, len: number, g: number, t = ac!.currentTime) {
+    prepare()
+    const s = ac!.createBufferSource(), bp = ac!.createBiquadFilter(), a = ac!.createGain()
+    s.buffer = noiseBuf
+    bp.type = type
+    bp.frequency.setValueAtTime(f, t)
+    bp.frequency.exponentialRampToValueAtTime(f * 0.3, t + len)
+    a.gain.setValueAtTime(g, t)
+    a.gain.exponentialRampToValueAtTime(0.0001, t + len)
+    s.connect(bp)
+    bp.connect(a)
+    a.connect(mix)
+    s.start(t, Math.random() * 0.5)
+    s.stop(t + len + 0.05)
+  }
+
+  /** a short rising blip */
+  function jump() {
+    if (live()) tone('square', 310, 760, 0.1, 0.06)
+  }
+
+  /** a soft thud, louder the faster he fell (a gentle step makes none) */
+  function land(speed: number) {
+    const k = Math.min(1, (speed - 1.5) / 7)
+    if (!live() || k <= 0) return
+    tone('sine', 150, 55, 0.14, 0.28 * k)
+    crunch('lowpass', 700, 0.06, 0.12 * k)
+  }
+
+  /** a crunchy pop: a filtered noise crack over a falling punch */
+  function smash() {
+    if (!live()) return
+    crunch('bandpass', 2200, 0.13, 0.5)
+    tone('square', 240, 70, 0.12, 0.12)
+  }
+
+  /** a bright two-note chime */
+  function coin() {
+    if (!live()) return
+    const t = ac!.currentTime
+    tone('triangle', 988, 988, 0.22, 0.13, t)
+    tone('triangle', 1319, 1319, 0.34, 0.13, t + 0.075)
+  }
+
+  /** a short flourish up a major chord */
+  function finish() {
+    if (!live()) return
+    const t = ac!.currentTime
+    ;[523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone('triangle', f, f, i === 3 ? 0.7 : 0.18, 0.12, t + i * 0.085))
+    tone('sine', 1046.5, 1046.5, 0.9, 0.06, t + 0.255)
+  }
+
+  // ---- Play mode round 2: placeholder synth cues (the sounds PR replaces them with recorded ones) ----
+
+  /** a bubbly run up: the shrimp */
+  function shrimp() {
+    if (!live()) return
+    const t = ac!.currentTime
+    ;[659.25, 830.61, 987.77, 1318.5].forEach((f, i) => tone('sine', f, f * 1.06, 0.11, 0.11, t + i * 0.045))
+  }
+
+  /** a metallic clang that warbles: a UFO hit */
+  function ufoHit() {
+    if (!live()) return
+    const t = ac!.currentTime
+    tone('square', 880, 420, 0.25, 0.07, t)
+    tone('triangle', 1760, 1240, 0.3, 0.06, t)
+    crunch('highpass', 5000, 0.08, 0.18, t)
+  }
+
+  /** a rising sci-fi sweep: the beam */
+  function beam(delay = 0) {
+    if (!live()) return
+    const t = ac!.currentTime + delay
+    tone('sine', 220, 880, 0.9, 0.05, t)
+    tone('sine', 330, 1320, 0.9, 0.03, t + 0.04)
+  }
+
+  /** a quick ladder up: the mushroom appearing */
+  function mushroomAppear() {
+    if (!live()) return
+    const t = ac!.currentTime
+    ;[392, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone('square', f, f, 0.07, 0.045, t + i * 0.05))
+  }
+
+  /** a fast warbling rise: the trip starts */
+  function powerUp() {
+    if (!live()) return
+    const t = ac!.currentTime
+    for (let i = 0; i < 8; i++) tone('triangle', 262 * 2 ** (i / 6), 262 * 2 ** ((i + 1.5) / 6), 0.09, 0.08, t + i * 0.055)
+  }
+
+  /** the same, falling: the trip wears off */
+  function powerDown() {
+    if (!live()) return
+    const t = ac!.currentTime
+    for (let i = 0; i < 6; i++) tone('triangle', 784 * 2 ** (-i / 5), 784 * 2 ** (-(i + 1.5) / 5), 0.1, 0.07, t + i * 0.07)
+  }
+
+  /** two sharp beeps: "!" */
+  function enemyAlert() {
+    if (!live()) return
+    const t = ac!.currentTime
+    tone('square', 1175, 1175, 0.06, 0.05, t)
+    tone('square', 1568, 1568, 0.08, 0.05, t + 0.08)
+  }
+
+  /** a squishy thump: a stomp */
+  function stomp() {
+    if (!live()) return
+    tone('square', 320, 90, 0.12, 0.1)
+    crunch('lowpass', 900, 0.1, 0.3)
+  }
+
+  /** a falling buzz: kicked */
+  function kicked() {
+    if (!live()) return
+    tone('sawtooth', 420, 110, 0.28, 0.08)
+    crunch('bandpass', 1200, 0.08, 0.25)
+  }
+
+  /** a bright ping: TINK */
+  function tink() {
+    if (!live()) return
+    const t = ac!.currentTime
+    tone('triangle', 2637, 2600, 0.35, 0.09, t)
+    tone('sine', 3951, 3900, 0.22, 0.05, t)
+  }
+
+  /** a low, quiet thud: the giant's step (nothing when it's far) */
+  function giantStep(near: number) {
+    const k = Math.max(0, Math.min(1, near))
+    if (!live() || k < 0.05) return
+    tone('sine', 70, 38, 0.18, 0.12 * k)
+    crunch('lowpass', 300, 0.08, 0.06 * k)
+  }
+
   function dispose() {
     drone = null
     if (ac) ac.close().catch(() => {})
@@ -185,5 +363,31 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }):
     noiseBuf = null
   }
 
-  return { init, prepare, setVolume, intro, hole, gulp, boom, dispose }
+  return {
+    init, prepare, setVolume, intro, hole, gulp, boom, jump, land, smash, coin, finish,
+    shrimp, ufoHit, beam, mushroomAppear, powerUp, powerDown, enemyAlert, stomp, kicked, tink, giantStep, dispose,
+  }
+}
+
+/** Play mode's events → their sounds (each silent unless Sound is on; Play is the only source) */
+export function playEventSound(sfx: Sfx, e: PlayEvent) {
+  switch (e.type) {
+    case 'jump': return sfx.jump()
+    case 'land': return sfx.land(e.speed)
+    case 'smash': if (e.bodies.length) sfx.smash(); return
+    case 'coin': return sfx.coin()
+    case 'finish': return sfx.finish()
+    case 'shrimp': return sfx.shrimp()
+    case 'ufo': sfx.ufoHit(); sfx.beam(0.3); return // (its beam opens 0.3 s after the hit)
+    case 'mushroom': return sfx.mushroomAppear()
+    case 'trip': return sfx.powerUp()
+    case 'tripEnd': return sfx.powerDown()
+    case 'giantStep': return sfx.giantStep(e.near)
+    case 'enemy':
+      if (e.what === 'alert' || e.what === 'huge') sfx.enemyAlert()
+      else if (e.what === 'stomped') sfx.stomp()
+      else if (e.what === 'smashed') sfx.smash()
+      else if (e.what === 'hurt') sfx.kicked()
+      else if (e.what === 'tink' || e.what === 'bounce') sfx.tink()
+  }
 }

@@ -51,3 +51,6 @@ coverage
 docs/design/jelly-resume/rezmancer-snapshot.js
 # Local playground backups
 docs/design/jelly-resume/playground-v*.html
+
+# Round 2 mockup: local-only copies (Number Slayers models, a paid sound); never commit
+docs/design/jelly-resume/play-mode/round2/_local/

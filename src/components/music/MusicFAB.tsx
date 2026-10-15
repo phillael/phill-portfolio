@@ -51,6 +51,7 @@ const MusicFAB = ({
     <motion.button
       ref={ref}
       className={`
+        music-fab
         fixed bottom-4 right-4 md:bottom-6 md:right-6
         w-11 h-11 md:w-14 md:h-14
         rounded-full

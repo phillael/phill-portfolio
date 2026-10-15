@@ -100,6 +100,8 @@ export type PlayEvent =
    * huge ("!!"), shrugged off a smash ("TINK!") or a stomp (he bounced off its head), and shrank back after
    */
   | { type: 'enemy'; what: 'alert' | 'stomped' | 'smashed' | 'hurt' | 'huge' | 'tink' | 'bounce' | 'shrunk'; at: Vec3 }
+  /** a giant's footfall (for its sound): how near it is (0…1) */
+  | { type: 'giantStep'; near: number }
   /** points won (or a kick's lost: negative), why, where (world), and the score now */
   | { type: 'score'; why: AwardKind; points: number; at: Vec3; score: number }
   /** a checkpoint reached: its line and where its title ends (world, on the ink: the flag's spot) */
@@ -196,7 +198,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   /** kicked lately: he can't be hurt again, and flickers (2.5 Hz); knocked back: no steering or braking for a moment */
   let invT = 0, knockT = 0
   /** the trip's giant: dropping in this long from now (s; −1: not), how far the camera has pulled back for it (0…1), its steps' bob */
-  let giantDropT = -1, giantView = 0, giantStep = 0
+  let giantDropT = -1, giantView = 0, giantStep = 0, stepPhase = 0
   const enemyWorld: EnemyWorld = { ground: (gx, maxY, out) => surfaceAt(w, level, gx, 0.06, maxY, out), pageW: w.pageW, pageBottom: w.pageBottom }
   const foeEvents: EnemyEvent[] = []
   /** dev: a posed lasagna (showLasagna) */
@@ -590,7 +592,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     knockT = Math.max(0, knockT - dt)
     if (live) spawnFoe()
     if (giantDropT >= 0 && (giantDropT -= dt) < 0 && tripT >= 0 && live) dropIn()
-    let view = 0
+    let view = 0, stepNear = 0
     giantStep = 0
     for (let i = foes.length - 1; i >= 0; i--) {
       const f = foes[i], e = f.e, a = f.prop.model as { extent: number; height: number }
@@ -631,7 +633,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       if (e.S > 1.5) {
         const near = Math.max(0, Math.min(1, 2 - Math.max(Math.abs(e.x - x) / (2 * w.cam.halfW), Math.abs(e.y - y) / (2 * w.cam.halfH))))
         view = Math.max(view, ((e.S - 1) / 3) * near)
-        if (e.S > 2 && e.clip === 'walk' && e.clipT < 0) giantStep = Math.max(giantStep, near * Math.abs(Math.sin(w.time * 7)))
+        if (e.S > 2 && e.clip === 'walk' && e.clipT < 0) { giantStep = Math.max(giantStep, near * Math.abs(Math.sin(w.time * 7))); stepNear = Math.max(stepNear, near) }
       }
       // its pose: a clip held at a time (the jump, its kick, the knock) or looping at a rate
       if (e.clipT >= 0) { f.pose.play(e.clip, 0.08); f.pose.seek(e.clipT); f.pose.update(dt, 0) }
@@ -646,6 +648,10 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       f.prop.sy = sy
     }
     giantView += (Math.min(1, view) - giantView) * Math.min(1, dt * 2)
+    // a footfall each time the bob comes down (every ~0.45 s while it walks)
+    const ph = Math.floor((w.time * 7) / Math.PI)
+    if (ph !== stepPhase && stepNear > 0) emit({ type: 'giantStep', near: stepNear })
+    stepPhase = ph
   }
 
   // ---- the trip's swelling words ----

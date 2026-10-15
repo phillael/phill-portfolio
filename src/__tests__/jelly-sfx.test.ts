@@ -4,7 +4,8 @@
  * AudioContext records which sources get started.
  */
 
-import { createSfx } from '@/lib/jelly/sfx'
+import { createSfx, playEventSound } from '@/lib/jelly/sfx'
+import type { PlayEvent } from '@/lib/jelly/play'
 
 const started: string[] = []
 const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {} })
@@ -73,5 +74,77 @@ describe("Play mode's sounds", () => {
     const early = createSfx(() => ({ soundOn: true, volume: 0.7 }))
     play(early) // (no init yet)
     expect(started).toHaveLength(0)
+  })
+})
+
+describe("round 2's placeholder sounds (synth stand-ins until the sounds PR)", () => {
+  const at: [number, number, number] = [0, 0, 0]
+  /** every new event, and the cue it plays */
+  const EVENTS: [string, PlayEvent][] = [
+    ['shrimp pickup', { type: 'shrimp', index: 0, at, shrimp: 1, total: 5 }],
+    ['UFO hit (and its beam)', { type: 'ufo', index: 0, at }],
+    ['mushroom appears', { type: 'mushroom', at }],
+    ['power-up (the trip)', { type: 'trip', at }],
+    ['power-down (the trip over)', { type: 'tripEnd' }],
+    ['enemy alert', { type: 'enemy', what: 'alert', at }],
+    ['the giant grew', { type: 'enemy', what: 'huge', at }],
+    ['stomp', { type: 'enemy', what: 'stomped', at }],
+    ['lasagna smashed', { type: 'enemy', what: 'smashed', at }],
+    ['kicked', { type: 'enemy', what: 'hurt', at }],
+    ['TINK', { type: 'enemy', what: 'tink', at }],
+    ['a bounce off its head', { type: 'enemy', what: 'bounce', at }],
+    ["the giant's steps", { type: 'giantStep', near: 1 }],
+  ]
+
+  it.each(EVENTS)('%s: a sound with Sound on', (_, e) => {
+    const sfx = createSfx(() => ({ soundOn: true, volume: 0.7 }))
+    sfx.init()
+    sfx.prepare()
+    started.length = 0
+    playEventSound(sfx, e)
+    expect(started.length).toBeGreaterThan(0)
+  })
+
+  it('none with Sound off, or before a gesture', () => {
+    const off = createSfx(() => ({ soundOn: false, volume: 0.7 }))
+    off.init()
+    off.prepare()
+    for (const [, e] of EVENTS) playEventSound(off, e)
+    const early = createSfx(() => ({ soundOn: true, volume: 0.7 }))
+    for (const [, e] of EVENTS) playEventSound(early, e)
+    expect(started).toHaveLength(0)
+  })
+
+  it("the giant's steps are quiet, and silent when it's far", () => {
+    const gains: number[] = []
+    const sfx = createSfx(() => ({ soundOn: true, volume: 0.7 }))
+    sfx.init()
+    sfx.prepare()
+    const spy = jest.spyOn(FakeAudioContext.prototype, 'createGain').mockImplementation(function (this: FakeAudioContext) {
+      const g = node('gain')
+      Object.assign(g.gain, { exponentialRampToValueAtTime: (v: number) => { gains.push(v) } })
+      return g
+    })
+    started.length = 0
+    playEventSound(sfx, { type: 'giantStep', near: 0 })
+    expect(started).toHaveLength(0)
+    playEventSound(sfx, { type: 'giantStep', near: 1 })
+    expect(started.length).toBeGreaterThan(0)
+    expect(Math.max(...gains)).toBeLessThanOrEqual(0.15)
+    spy.mockRestore()
+  })
+
+  it('the old events still play theirs (jump, land, smash with words, coin, finish)', () => {
+    const sfx = createSfx(() => ({ soundOn: true, volume: 0.7 }))
+    sfx.init()
+    sfx.prepare()
+    for (const e of [{ type: 'jump' }, { type: 'land', line: 0, speed: 6 }, { type: 'smash', bodies: [1], coins: [], pound: false }, { type: 'coin', body: 1, at, coins: 1, total: 27 }] as PlayEvent[]) {
+      started.length = 0
+      playEventSound(sfx, e)
+      expect(started.length).toBeGreaterThan(0)
+    }
+    started.length = 0
+    playEventSound(sfx, { type: 'smash', bodies: [], coins: [], pound: false })
+    expect(started).toHaveLength(0) // (a smash at nothing: silent)
   })
 })

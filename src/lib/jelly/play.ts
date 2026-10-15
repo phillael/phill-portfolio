@@ -313,7 +313,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     ufos.clear()
     clearFoes()
     tripT = -1
-    w.trip = 0
+    w.trip = w.heat = w.tripMelt = 0 // (the look eases out with the engine's trip amount)
     w.cam.roll = 0
     swelling.length = 0
     w.swells.length = 0

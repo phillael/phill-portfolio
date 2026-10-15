@@ -161,37 +161,46 @@ Order matters: each task builds on the ones before it. One task ≈ one commit (
   - *Done 2026-10-14:* `CLAUDE.md` (a Play mode key-file entry; `phill.glb` with Play's clips; gotchas: `handHeld` + `fbx2glb.py`, per-frame code never reads layout, `setTimeScale(0)` blanks the sparks), `HANDOFF.md` ("Play mode: read the resume walking down it": what, files, clips, the feel-check decisions, measured, later ideas; the cast section's sizes), the `actors.mjs` header (`handHeld`; `fbx2glb.py` and the jump were already there since T1), `package.json` 1.4.0 → **1.5.0**. Gates: `npx tsc --noEmit` exit 0 · `npm run lint` exit 0 (no warnings) · `npx jest --no-watchman` **51 suites / 520 tests passed** (6.4 s; was 47 / 478 at T0) · `npm run build` exit 0.
 
 - [ ] **T15: PR text. STOP before pushing and ask Phill.** Write the PR title/body here (summary, what's in it, measurements, screenshots list, test plan, `🤖 Generated with [Claude Code](https://claude.com/claude-code)` at the end). On Phill's go only: `git push -u origin feat/jelly-play-mode` + `gh pr create --base master`.
-  - *PR text (written 2026-10-14; waiting for Phill's go to push):*
+  - *PR text (written 2026-10-14, rewritten 2026-10-15 with Round 2 at T29; waiting for Phill's go to push):*
 
 ```markdown
 # Jelly Resume: Play mode (read the resume walking down it) · v1.5.0
 
 ## Summary
-Phill can now play his own resume. **🎮 Play** (first in the HUD bar, or **J**) or **PLAYER 1 START** (an arcade button on the page beside the name) shrinks him out of his orbit and drops him onto his name; you read the resume walking down it to the bottom line, Mario style. Every line is a one-way platform, the words wobble under his feet, Space smashes words into comet sparks, the 27 Impact numbers are coins, the six roles are checkpoints, and the bottom line is THE END (time, Impact, best). Phones get on-screen pads.
+Phill can now play his own resume. **🎮 Play** (first in the HUD bar, or **J**) or **PLAYER 1 START** (an arcade button printed on the paper, top right) shrinks him out of his orbit and drops him onto his name; you read the resume walking down it to the bottom line, Mario style. Every line is a one-way platform, the words wobble under his feet, Space smashes words into comet sparks, the 27 Impact numbers are coins, the six roles are checkpoints, and the bottom line is THE END. Round 2 makes it a little arcade game: a **SCORE**, **shrimp** to grab (points and a speed boost), **UFOs** that beam down a **mushroom**, the **trip** it starts (psychedelic molten words that swell and shove, moon jumps, rainbow Phill), and an enemy, the **Number Slayers lasagna**: stomp it or smash it, and in the trip it turns into a 4× giant you can't hurt, so you run. Phones get on-screen pads.
 
 ## What's in it
-- **The game** (`src/lib/jelly/play.ts`, its own lazy 14 KB chunk): run / variable jump / coyote time / jump buffer / one-way landing / ↓ drop-through, smash (the attack clip's llama chop, a hit-stop, a camera shake), ↓-in-the-air ground-pound, falling off the page (a flail, back at the last checkpoint), a follow camera (~90 px tall on desktop, ~60 on phones), the jelly (landing squash, standing weight, a wake through lines), an idle dance with the music on, and the dive in / hop out.
-- **The level** (`platforms.ts`): 47 visual lines from the snapshot, standing on their tallest glyphs; the rules (`playRun.ts`): the clock from the first move, coins, checkpoints newest first, the finish, the best time in `localStorage`.
-- **The HUD** (`JellyPlayHud.tsx`): stats, the climb meter, an always-on key legend, checkpoint toasts and flags, "+1 IMPACT", the finish card, ✕ Exit (Esc), a polite live region; `JellyPlayerStart.tsx` (PLAYER 1 START); `JellyTouchPads.tsx` (◀ ▶ / A B ▼, multi-touch; the site's ♫ hides behind a ♫ remote while playing on touch).
-- **Model:** `phill.glb` keeps the game's `walk` and `attack` and gains a retargeted Mixamo `jumping` (`tools/fbx2glb.py` → `actors.mjs`); `actors.mjs` re-skins what he holds in his left hand to the hand (it stretched a sliver to his knee in the jump and in some dances). 800 KB.
-- **Sound:** synthesized jump, land, smash, coin and finish (only with Sound on).
-- **Feel-check changes (Phill):** walk down instead of climbing up; Space smashes, W/↑ jump; soles on the text; standing weight 2; a crisper shake; controls always visible; a labeled Exit; PLAYER 1 START on the page.
+- **The game** (`src/lib/jelly/play.ts`, its own lazy chunk): run / variable jump / coyote time / jump buffer / one-way landing / ↓ drop-through, smash (the attack clip's llama chop, a hit-stop, a camera shake), ↓-in-the-air ground-pound, falling off the page (a flail, back at the last checkpoint), a follow camera (~90 px tall on desktop, ~60 on phones), the jelly (landing squash, standing weight, a wake through lines), an idle dance with the music on, and the dive in / hop out.
+- **The level** (`platforms.ts`): 47 visual lines from the snapshot, standing on their tallest glyphs; the rules (`playRun.ts`): the clock from the first move, coins, checkpoints newest first, the finish, the best time and the best score in `localStorage`.
+- **Round 2** (pure rules with tests: `pickups.ts`, `hitboxes.ts`, `enemies.ts`, `trip.ts`; runtime: `ufos.ts`, `play.ts`):
+  - **SCORE:** coin 100, shrimp 500, UFO 200, mushroom 1,000, lasagna 300, hurt −250 (never below 0), +100 a second under 1:00 at the finish; ★ in the stats, "+N" pops, THE END shows score, best and shrimp.
+  - **Shrimp** (5 a run, re-rolled on Play again): +500, +35% speed for 8 s (stacks to +70%), the SHRIMP! overlay (`JellyShrimpShow.tsx`, its own chunk with `Rubik Pixels`).
+  - **UFOs** (3) and the **mushroom:** voxel models built in code from pixel grids (`pixelArt.ts`, `voxels.ts`): chasing rim lights, a see-through dome with a passenger, a beam; the mushroom walks the live lines.
+  - **The trip** (12 s): psychedelic molten words (`BODY_FS`: forge and rainbow bands, white-hot cores, drips, a forge glow pass), swelling words written into the lattice (he rides them), moon jumps, rainbow Phill with three afterimages, the view breathing and rolling, a 2.5 Hz flicker as it ends. The user's 🍄 and the site's shroom mode are untouched.
+  - **The lasagna** (`public/resume/lasagna.glb`, 518 KB, loaded only after Play starts): patrols, notices him ("!"), jumps a line toward him, charges, kicks (−250, knockback, 1.5 s safe). Stomp it from the line above or smash it (+300). In the trip: a 4× giant (TINK!, head bounces, its feet and kick hurt, it chases slower than his run, the camera pulls back), shrinking back when the trip ends.
+  - **PLAYER 1 START on the paper:** painted into the page texture, so it tilts, bends, blinks and goes neon with the sheet; a transparent ≥ 44 px button over its projected corners.
+- **The HUD** (`JellyPlayHud.tsx`): stats (time, Impact, ★, 🍤 + boost bar, 🍄 trip pill), the climb meter, an always-on key legend, checkpoint toasts and flags, pops, the finish card, ✕ Exit (Esc), a polite live region (shrimp, the trip, the lasagna); `JellyPlayerStart.tsx`; `JellyTouchPads.tsx` (◀ ▶ / A B ▼, multi-touch; the site's ♫ hides behind a ♫ remote while playing on touch).
+- **Models:** `phill.glb` keeps the game's `walk` and `attack` and gains a retargeted Mixamo `jumping`; the lasagna gets the same jump (`tools/fbx2glb.py` → `tools/actors.mjs`, which rebuilds all three byte-identically).
+- **Sound:** synthesized jump, land, smash, coin, finish, and placeholder cues for every Round 2 event (only with Sound on). Recorded sounds are a follow-up PR (the CC0 candidates and an audition page are in `docs/design/jelly-resume/play-mode/round2/`, not served).
+- **Design docs:** the plan with every decision and measurement (`docs/plans/2026-10-14-jelly-play-mode-plan.md`), the Round 1 and Round 2 mockups.
 
-## Measured (production build, music on)
-| | entering Play | playing |
+## Measured (production build, a fresh isolated context, music on)
+| | desktop 1440 × 900 | phone 390 × 844, 4× CPU |
 |---|---|---|
-| desktop 1440 × 900 | 119.2 fps, worst gap 18.2 ms | 120.0 fps, worst 9.4 ms |
-| phone 390 × 844, 4× CPU | 98.2 fps, worst gap 65.2 ms | 99.1 fps, worst 18.5 ms |
+| entering Play | 119.2 fps, worst gap 18.2 ms | 98.2 fps, worst gap 65.2 ms |
+| playing | 120.0 fps, worst 9.4 ms | 99.1 fps, worst 18.5 ms |
+| **worst case** (the trip + the giant chasing + SHRIMP!) | **120.2 fps**, worst 11–15 ms | **75–82 frames/s** (102–113 drawn), worst 29–46 ms, nothing over 50 ms |
 
-Nothing about Play loads until it's pressed. Reduced motion is unchanged (the engine never loads).
+Nothing about Play loads until it's pressed (the Play chunk 15.7 KB sent, `lasagna.glb` 403 KB, the SHRIMP! chunk and its font, all on Play). Reduced motion is unchanged (the engine never loads).
 
 ## Screenshots
-Desktop: the resume with PLAYER 1 START · playing (stats, meter, legend) · a checkpoint toast and flag · a smash with comet sparks · THE END card. Phone: playing with pads · landscape · the stacked finish card.
+Desktop: the resume with PLAYER 1 START on the paper (and its focus brackets) · playing (stats with ★ and 🍤, meter, legend) · a shrimp and SHRIMP! · a UFO beaming down the mushroom · the trip (molten words, swelling words, rainbow Phill) · the lasagna's "!" and a stomp · the giant and TINK! · THE END card with the score. Phone: playing with pads · the trip · the stacked finish card.
 
 ## Test plan
-- [x] `npx tsc --noEmit`, `npm run lint` (no warnings), `npx jest --no-watchman` (51 suites / 521 tests), `npm run build`
-- [x] Browser (dev): run/jump/drop numbers, smash/pound/fall-off, coins/checkpoints/finish/best, entrance/exit ×3, edge cases (music, shroom mode, resize, hidden tab, closing while playing, lost context, Save-Data, early Play, a failed cast, knocked/eaten)
-- [x] Production acceptance (headless Chrome on the GPU): Play loads on demand, a full run to THE END, Play again, Esc layering, phone portrait/landscape with touch, reduced motion, no console errors
+- [x] `npx tsc --noEmit`, `npm run lint` (no warnings), `npx jest --no-watchman` (55 suites / 603 tests), `npm run build`
+- [x] Browser (dev): Round 1's movement, smash/pound/fall-off, coins/checkpoints/finish/best and edge cases; Round 2's score, shrimp, UFO + beam + mushroom, the trip (look, swells, moon jumps), the lasagna (stomp, smash, kick), the giant (grow, drop-in, TINK, moon jump over it, shrink then stomp), sounds (Sound on/off)
+- [x] Edges: Play again mid-trip, leaving mid-trip, a hidden tab, a resize, a lost context, Save-Data, `lasagna.glb` failing, reduced motion
+- [ ] Production acceptance (Round 1 and Round 2 lists in the plan), no console errors
 - [ ] Phill plays it on a real phone
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
@@ -376,7 +385,8 @@ Order matters top to bottom (T17 needs T16's art; T20 needs T16's voxels; T21–
     | phone 2 (trip 44/45, giant 39/45, swells ~2.3, SHRIMP! 33/45) | 112.7 fps | **75.5/s** | 45.9 ms (44.2) | one, 39.4 ms (the second giant growing as SHRIMP! mounts) | 99% |
 
     Budgets met (desktop ≥ 110, phone ≥ 50, nothing over 100 ms; no gap over 50 ms in any run). **Headroom note:** at 4× CPU the phone's main thread is saturated in the worst case (75–82 updates/s; Round 1's playing run had 99 drawn fps), so a slower real phone would drop frames here first; the candidates if it ever matters are the Stop conditions' (fewer swells, a cheaper molten glow, fewer afterimages). Traces deleted after reading (40 MB each).
-- [ ] **T29: docs + PR text.** `CLAUDE.md` (Key Files: `pixelArt.ts`, `voxels.ts`, `enemies.ts`, `hitboxes.ts`, `lasagna.glb`; gotchas found), `HANDOFF.md` (a "Play mode, round 2" section), the T15 PR text rewritten to include Round 2 (and its measurements), version stays **1.5.0**. All four gates green (the full Jest suite). Then T15 (Phill's go).
+- [x] **T29: docs + PR text.** `CLAUDE.md` (Key Files: `pixelArt.ts`, `voxels.ts`, `enemies.ts`, `hitboxes.ts`, `lasagna.glb`; gotchas found), `HANDOFF.md` (a "Play mode, round 2" section), the T15 PR text rewritten to include Round 2 (and its measurements), version stays **1.5.0**. All four gates green (the full Jest suite). Then T15 (Phill's go).
+  - *Done 2026-10-15:* `CLAUDE.md`: `public/resume/` lists `lasagna.glb` (fetched only once Play starts); a "Play mode, round 2" key-file entry (the score, the pure rule modules and their tests, `ufos.ts`, `pixelArt.ts`/`voxels.ts`, `cast.props`/`beams`, the trip's `BODY_FS` and the springs, PLAYER 1 START in the page texture + `startQuad()`, `JellyShrimpShow.tsx` and its font, the placeholder sounds and `playEventSound`, how `lasagna.glb` is built); gotchas: Play's DOM pops run on CSS time (pause them for screenshots), a running Play survives a hot reload (reload; the dev handles), measuring Play's worst case needs a local build that keeps the debug object. `HANDOFF.md`: "Play mode, round 2" (what, files, Phill's picks, what was decided while building, measured, next: the sounds PR). The T15 PR text rewritten (summary, Round 2's pieces, the measurement table with the worst case, screenshots list, test plan; production acceptance left unticked until it runs). Version **1.5.0** (unchanged). Gates: `npx tsc --noEmit` exit 0 · `npm run lint` exit 0 (no warnings) · `npx jest --no-watchman` **55 suites / 603 tests passed** (6.3 s; 51 / 520 at T14) · `npm run build` exit 0. Branch: 36 commits ahead of `origin/master` before this one, nothing pushed; no audio in `public/` from this branch (its 43 audio files are the CC0 audition candidates under `docs/`, as planned).
 
 ### Per-task verification (Round 2)
 

@@ -28,3 +28,16 @@ export const bodyBox = (x: number, y: number): Box => ({ x0: x - 0.1, x1: x + 0.
 
 /** the mushroom: ±0.13 around its feet, 0.28 tall */
 export const mushroomBox = (x: number, y: number): Box => ({ x0: x - 0.13, x1: x + 0.13, y0: y, y1: y + 0.28 })
+
+/** his feet (a stomp: live only while he's falling) */
+export const feetBox = (x: number, y: number): Box => ({ x0: x - 0.11, x1: x + 0.11, y0: y - 0.02, y1: y + 0.07 })
+
+/** the lasagna (S: its size, 1, or 4 as the trip's giant): its body, from its feet */
+export const lasagnaBody = (x: number, y: number, S: number): Box => ({ x0: x - 0.15 * S, x1: x + 0.15 * S, y0: y, y1: y + 0.3 * S })
+
+/** its kick, in front of it (live only in the kick window) */
+export const lasagnaKick = (x: number, y: number, dir: number, S: number): Box =>
+  dir > 0 ? { x0: x + 0.05 * S, x1: x + 0.34 * S, y0: y, y1: y + 0.16 * S } : { x0: x - 0.34 * S, x1: x - 0.05 * S, y0: y, y1: y + 0.16 * S }
+
+/** the giant's feet (they trample) */
+export const trampleBox = (x: number, y: number, S: number): Box => ({ x0: x - 0.1 * S, x1: x + 0.1 * S, y0: y, y1: y + 0.1 * S })

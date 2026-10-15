@@ -127,6 +127,9 @@ export interface Prop {
   rim?: number
   /** a skinned model's pose (its joint matrices: a Pose's `joints`) */
   joints?: Float32Array | null
+  /** stretched across (x/z) and up (y), e.g. squashed flat */
+  sx?: number
+  sy?: number
   /** a soft glow just behind it (its diameter, color and strength) */
   halo: { size: number; color: Vec3; alpha: number } | null
 }
@@ -547,7 +550,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
       if (pr.alpha <= 0.002 || pr.size <= 1e-4) continue
       const shrimp = pr.model === 'shrimp', a = shrimp ? shrimpModel : (pr.model as ActorModel)
       if (!a || (shrimp && !shrimpWorld)) continue
-      const m = placement(pr.pos, pr.rot, pr.size / a.extent, pr.anchor === 'origin' ? origin : a.center)
+      const m = placement(pr.pos, pr.rot, pr.size / a.extent, pr.anchor === 'origin' ? origin : a.center, pr.sx ?? 1, pr.sy ?? 1)
       R.draw(a, shrimp ? M4x.mulInto(model, m, shrimpWorld!) : m, pr.joints ?? null, {
         alpha: alpha * pr.alpha, flash: pr.flash, rim: params.rim * (pr.rim ?? 0.8), ambient: pr.ambient ?? 0.7, glow: pr.glow, fog: 0,
       })

@@ -295,6 +295,20 @@ describe('playing', () => {
     engine.onFrame.mockImplementation(() => () => {})
   })
 
+  it('the lasagna: a "!" where it noticed him, and the live region (charging, stomped, smashed, kicked)', async () => {
+    await startPlaying()
+    const live = document.querySelector('p[aria-live="polite"]')!
+    act(() => fire({ type: 'enemy', what: 'alert', at: [0, 0, 0] }))
+    expect(screen.getByText('!').closest('[data-alert]')).not.toBeNull()
+    expect(live).toHaveTextContent('A lasagna is charging')
+    act(() => fire({ type: 'enemy', what: 'stomped', at: [0, 0, 0] }))
+    expect(live).toHaveTextContent('Lasagna stomped, 300 points')
+    act(() => fire({ type: 'enemy', what: 'smashed', at: [0, 0, 0] }))
+    expect(live).toHaveTextContent('Lasagna smashed, 300 points')
+    act(() => fire({ type: 'enemy', what: 'hurt', at: [0, 0, 0] }))
+    expect(live).toHaveTextContent('Kicked, minus 250')
+  })
+
   it('writes ★ SCORE (6 digits) and the shrimp into the stats through refs, ≤ 10×/s', async () => {
     const frames = new Set<() => void>()
     engine.onFrame.mockImplementation(((f: () => void) => { frames.add(f); return () => { frames.delete(f) } }) as never)

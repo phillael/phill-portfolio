@@ -10,7 +10,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import dynamic from 'next/dynamic'
 import type { JellyEngine } from '@/lib/jelly/engine'
-import type { AwardKind } from '@/lib/jelly/config'
 import type { PlayEvent } from '@/lib/jelly/play'
 import type { RunResult } from '@/lib/jelly/playRun'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -41,9 +40,11 @@ const TOAST_MS = 2500
 const TOAST_QUICK_MS = 1200
 const POP_MS = 900
 const ANNOUNCE_COINS_MS = 1500
+const ANNOUNCE_ALERT_MS = 4000
 
 interface Toast { key: number; year: number; title: string }
-interface Pop { key: number; x: number; y: number; points: number; why: AwardKind }
+/** a pop where something happened: a score (+N; a coin's says +1 IMPACT too; a kick's is red) or an alert ("!") */
+interface Pop { key: number; x: number; y: number; text: string; kind: 'coin' | 'score' | 'bad' | 'alert' }
 interface Flag { key: number; at: [number, number, number] }
 
 interface JellyPlayHudProps {
@@ -78,7 +79,13 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
 
   // Play's events: the toast, flags, pops, the finish card and the announcements (no per-frame state)
   useEffect(() => {
-    let key = 0, lastCoinSay = -Infinity
+    let key = 0, lastCoinSay = -Infinity, lastAlertSay = -Infinity
+    const pop = (where: [number, number, number], text: string, kind: Pop['kind']) => {
+      const at = engine.project(where), k = ++key
+      if (!at) return
+      setPops((p) => [...p, { key: k, x: at[0], y: at[1], text, kind }])
+      later(() => setPops((p) => p.filter((q) => q.key !== k)), POP_MS)
+    }
     const timers = new Set<ReturnType<typeof setTimeout>>()
     const later = (f: () => void, ms: number) => { const t = setTimeout(() => { timers.delete(t); f() }, ms); timers.add(t) }
     // checkpoint toasts take turns (a drop can pass two at once); their announcements go out together
@@ -100,11 +107,13 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
         if (!said.length) queueMicrotask(() => { setMessage(said.length > 1 ? `Checkpoints: ${said.join('; ')}` : `Checkpoint: ${said[0]}`); said = [] })
         said.push(`${e.year}, ${e.title}`)
       } else if (e.type === 'score') {
-        const at = engine.project(e.at), k = ++key
-        if (at) {
-          setPops((p) => [...p, { key: k, x: at[0], y: at[1], points: e.points, why: e.why }])
-          later(() => setPops((p) => p.filter((q) => q.key !== k)), POP_MS)
-        }
+        pop(e.at, e.points > 0 ? `+${e.points}` : `−${-e.points}`, e.why === 'coin' ? 'coin' : e.points < 0 ? 'bad' : 'score')
+      } else if (e.type === 'enemy') {
+        if (e.what === 'alert') {
+          pop(e.at, '!', 'alert')
+          const now = performance.now()
+          if (now - lastAlertSay > ANNOUNCE_ALERT_MS) { lastAlertSay = now; setMessage('A lasagna is charging') }
+        } else setMessage(e.what === 'stomped' ? 'Lasagna stomped, 300 points' : e.what === 'smashed' ? 'Lasagna smashed, 300 points' : 'Kicked, minus 250')
       } else if (e.type === 'coin') {
         const now = performance.now()
         if (now - lastCoinSay > ANNOUNCE_COINS_MS || e.coins === e.total) {
@@ -296,13 +305,14 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
         <div
           key={p.key}
           aria-hidden="true"
-          data-coin={p.why === 'coin' || undefined}
-          data-bad={p.points < 0 || undefined}
-          className="jelly-pop pointer-events-none absolute z-[3] flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[rgba(255,210,74,0.6)] bg-[rgba(8,10,16,0.82)] px-2 pb-1 pt-1.5 font-pixel text-[12px] leading-none text-[#ffd24a] [text-shadow:0_0_4px_rgba(255,210,74,0.8)] data-[bad]:border-[rgba(255,59,92,0.7)] data-[coin]:border-[rgba(0,255,43,0.6)] data-[bad]:text-[#ff6b86] data-[coin]:text-[#00ff2b] data-[bad]:[text-shadow:0_0_4px_rgba(255,59,92,0.9)] data-[coin]:[text-shadow:0_0_4px_rgba(0,255,43,0.9)]"
+          data-coin={p.kind === 'coin' || undefined}
+          data-bad={p.kind === 'bad' || undefined}
+          data-alert={p.kind === 'alert' || undefined}
+          className="jelly-pop pointer-events-none absolute z-[3] flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[rgba(255,210,74,0.6)] bg-[rgba(8,10,16,0.82)] px-2 pb-1 pt-1.5 font-pixel text-[12px] leading-none text-[#ffd24a] [text-shadow:0_0_4px_rgba(255,210,74,0.8)] data-[alert]:border-0 data-[bad]:border-[rgba(255,59,92,0.7)] data-[coin]:border-[rgba(0,255,43,0.6)] data-[alert]:bg-transparent data-[alert]:text-[20px] data-[bad]:text-[#ff6b86] data-[coin]:text-[#00ff2b] data-[alert]:[text-shadow:0_0_10px_rgba(255,210,74,0.9),2px_2px_0_rgba(0,0,0,0.7)] data-[bad]:[text-shadow:0_0_4px_rgba(255,59,92,0.9)] data-[coin]:[text-shadow:0_0_4px_rgba(0,255,43,0.9)]"
           style={{ left: p.x, top: p.y }}
         >
-          <span>{p.points > 0 ? `+${p.points}` : `−${-p.points}`}</span>
-          {p.why === 'coin' && <small className="text-[9px]">+1 IMPACT</small>}
+          <span>{p.text}</span>
+          {p.kind === 'coin' && <small className="text-[9px]">+1 IMPACT</small>}
         </div>
       ))}
 

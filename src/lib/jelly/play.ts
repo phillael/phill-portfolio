@@ -13,6 +13,7 @@ import { resetView, type UiInsets } from './camera'
 import { FOV, LOOSE, PAD_TOP, PAD_X, PLAY_R2, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
 import { lcg, Q, type Vec3 } from './math'
 import { burst, healAll } from './physics'
+import { createLasagna, lasagnaLines, smashLasagna, squashShape, stepLasagna, type EnemyEvent, type EnemyWorld, type Lasagna } from './enemies'
 import { smashBox } from './hitboxes'
 import { Boost, placeShrimp, touchesShrimp, type ShrimpSpot } from './pickups'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
@@ -94,6 +95,8 @@ export type PlayEvent =
   | { type: 'trip'; at: Vec3 }
   /** the trip wore off */
   | { type: 'tripEnd' }
+  /** the lasagna: it noticed him ("!"), was stomped or smashed, or kicked him */
+  | { type: 'enemy'; what: 'alert' | 'stomped' | 'smashed' | 'hurt'; at: Vec3 }
   /** points won (or a kick's lost: negative), why, where (world), and the score now */
   | { type: 'score'; why: AwardKind; points: number; at: Vec3; score: number }
   /** a checkpoint reached: its line and where its title ends (world, on the ink: the flag's spot) */
@@ -184,6 +187,13 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   const ufos = createUfos({ w, level, cast, emit: (e) => { if (e.type === 'trip') tripT = 0; emit(e) }, award: (why, at) => award(why, at) })
   /** seconds into the trip (-1: none); another mushroom starts it over */
   let tripT = -1
+  /** the run's lasagnas: the lines they wait on, and the one out now (its pose and prop) */
+  let lasagnaPlan: number[] = []
+  const foes: { e: Lasagna; pose: ReturnType<Cast['pose']>; prop: Prop }[] = []
+  /** kicked lately: he can't be hurt again, and flickers (2.5 Hz); knocked back: no steering or braking for a moment */
+  let invT = 0, knockT = 0
+  const enemyWorld: EnemyWorld = { ground: (gx, maxY, out) => surfaceAt(w, level, gx, 0.06, maxY, out), pageW: w.pageW, pageBottom: w.pageBottom }
+  const foeEvents: EnemyEvent[] = []
   /** dev: a posed lasagna (showLasagna) */
   let devLas: { prop: Prop } | null = null
   /** the trip's swelling words (up to 3), and the wait for the next */
@@ -275,6 +285,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     w.swells.length = 0
     rollShrimp()
     ufos.roll(shrimp.map((s) => s.spot.line))
+    clearFoes()
+    lasagnaPlan = lasagnaLines(level.lines, level.start, level.finish, PLAY_R2.lasagnas, lcg(Math.floor(Math.random() * 2 ** 31)), [...shrimp.map((s) => s.spot.line), ...ufos.state().ufos.map((u) => u.line)])
     for (const bi of level.coins) w.bodies[bi].coinT = 1
     for (const l of lits) for (const bi of l.bodies) w.bodies[bi].litT = 0
     lits.length = 0
@@ -292,6 +304,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     stopFireworks()
     clearShrimp()
     ufos.clear()
+    clearFoes()
     tripT = -1
     w.trip = 0
     w.cam.roll = 0
@@ -316,7 +329,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     drive.size = P.size
     // the trip: rainbow Phill with afterimages (the cast), flickering as it wears off
     drive.trip = w.tripAmt
-    drive.flicker = tripT >= 0 && tripFlicker(tripT)
+    drive.flicker = (tripT >= 0 && tripFlicker(tripT)) || (invT > 0 && Math.floor(invT / 0.2) % 2 === 1) // (both 2.5 Hz)
     if (introT < INTRO) {
       // diving in: along an arc from where he was (up and out in front of the page, then down onto the name), shrinking
       const u = introT / INTRO, t = Math.pow(u, 1.3), e = u * u * (3 - 2 * u)
@@ -424,9 +437,16 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       }
       burst(w, bd)
     }
-    // a UFO in the swing (not a pound)
+    // a UFO or a lasagna in the swing (not a pound)
     const ufo = !pound && ufos.smash(smashBox(x, y, facing, P.size, P.reach))
-    if (hit.length || ufo) {
+    let foe = false
+    if (!pound) for (const f of foes) if (smashLasagna(f.e, smashBox(x, y, facing, P.size, P.reach), facing)) {
+      foe = true
+      const at: Vec3 = [f.e.x, f.e.y + 0.3, f.prop.pos[2]]
+      award('lasagna', at)
+      emit({ type: 'enemy', what: 'smashed', at })
+    }
+    if (hit.length || ufo || foe) {
       hitStopT = P.hitStop
       shakeT = SHAKE
       shakePh = Math.random() * 100
@@ -483,6 +503,76 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       award('shrimp', at)
       emit({ type: 'shrimp', index, at, shrimp: run.shrimp, total: run.shrimpTotal })
     })
+  }
+
+  // ---- the lasagna: 2 a run, one at a time, waiting on lines down the page ----
+  function clearFoes() {
+    for (const f of foes) { const i = cast.props.indexOf(f.prop); if (i >= 0) cast.props.splice(i, 1) }
+    foes.length = 0
+    invT = knockT = 0
+  }
+
+  /** the next one comes out on its line when he's within 1.5 screens above it, as far across the line from him as it goes */
+  function spawnFoe() {
+    const a = cast.lasagna()
+    if (!a || foes.length || !lasagnaPlan.length) return
+    const line = lasagnaPlan[0], l = level.lines[line]
+    if (l.inkTop >= y || y - l.inkTop > 3 * w.cam.halfH) return
+    lasagnaPlan.shift()
+    const words = l.bodies.map((bi) => w.bodies[bi]).filter((bd) => solid(bd) && Math.abs((bd.x0 + bd.x1) / 2) < w.pageW / 2 - 0.4)
+    if (!words.length) return
+    const bd = words.reduce((b, c) => (Math.abs((c.x0 + c.x1) / 2 - x) > Math.abs((b.x0 + b.x1) / 2 - x) ? c : b))
+    const fx = (bd.x0 + bd.x1) / 2, e = createLasagna(fx, l.inkTop, line, fx > x ? -1 : 1)
+    const pose = cast.pose(a, ['jumping'])
+    pose.play('walk', 0)
+    const prop: Prop = { model: a, anchor: 'origin', pos: [fx, l.inkTop, 0], rot: [0, 0, 0, 1], size: 0, alpha: 1, glow: [0, 0, 0], flash: 0, joints: pose.joints, halo: null, ambient: 0.6 }
+    foes.push({ e, pose, prop })
+    cast.props.push(prop)
+  }
+
+  /** each frame: its rules, what they did to him (and he to it), and its pose and place */
+  function stepFoes(dt: number, live: boolean) {
+    invT = Math.max(0, invT - dt)
+    knockT = Math.max(0, knockT - dt)
+    if (live) spawnFoe()
+    for (let i = foes.length - 1; i >= 0; i--) {
+      const f = foes[i], e = f.e, a = f.prop.model as { extent: number; height: number }
+      foeEvents.length = 0
+      stepLasagna(e, dt, { x, y, vy, line: grounded ? ground.line : -1, falling: live && !grounded && vy < 0 && flailT < 0, inv: !live || invT > 0 || flailT >= 0 }, enemyWorld, foeEvents)
+      for (const ev of foeEvents) {
+        const at: Vec3 = [e.x, e.y + 0.3 * e.S, f.prop.pos[2]]
+        if (ev.kind === 'alert') emit({ type: 'enemy', what: 'alert', at: [e.x, e.y + 0.42 * e.S, at[2]] })
+        else if (ev.kind === 'stomped') {
+          // he bounces off it; +300
+          award('lasagna', at)
+          emit({ type: 'enemy', what: 'stomped', at })
+          vy = 2.2
+          pounding = false
+          grounded = false
+        } else if (ev.kind === 'hurt') {
+          // knocked back, 1.5 s safe (flickering); −250
+          award('hurt', [x, y + 0.55, z])
+          emit({ type: 'enemy', what: 'hurt', at: [x, y + 0.55, z] })
+          vx = -Math.sign(e.x - x || -facing) * 1.9
+          vy = 1.2
+          grounded = false
+          invT = 1.5
+          knockT = 0.3
+        }
+      }
+      if (e.state === 'gone') { const k = cast.props.indexOf(f.prop); if (k >= 0) cast.props.splice(k, 1); foes.splice(i, 1); continue }
+      // its pose: a clip held at a time (the jump, its kick, the knock) or looping at a rate
+      if (e.clipT >= 0) { f.pose.play(e.clip, 0.08); f.pose.seek(e.clipT); f.pose.update(dt, 0) }
+      else { f.pose.play(e.clip, 0.12); f.pose.update(dt, e.rate) }
+      const [sx, sy] = squashShape(e)
+      f.prop.pos[0] = e.x
+      f.prop.pos[1] = e.y
+      f.prop.pos[2] = w.bend.at(e.x, e.y) + 0.11 * e.S
+      Q.mul(Q.axis(0, 1, 0, e.dir * (Math.PI / 2 - P.face), f.prop.rot), Q.axis(0, 0, 1, e.spin, spin), f.prop.rot)
+      f.prop.size = a.extent * ((0.32 * e.S) / a.height) * e.squash
+      f.prop.sx = sx
+      f.prop.sy = sy
+    }
   }
 
   // ---- the trip's swelling words ----
@@ -717,6 +807,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     if (!on || dt <= 0) return
     stepShrimp(dt)
     stepSwells(dt)
+    stepFoes(dt, introT >= INTRO && !run.finished)
     ufos.update(dt, x, y, introT >= INTRO && flailT < 0 && !run.finished)
     // the trip: the clock and its look; moon jumps (×1.5 high, ×0.6 gravity) while it lasts
     if (tripT >= 0 && (tripT += dt) >= PLAY_R2.trip) { tripT = -1; emit({ type: 'tripEnd' }) }
@@ -805,9 +896,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     landT += dt
 
     // run: accelerate toward the held direction, brake without one (less control in the air; none in a ground-pound)
-    const dir = pounding || !live ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0)
+    const dir = pounding || !live || knockT > 0 ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0)
     if (dir) facing = dir
-    const ctl = pounding ? 100 : grounded ? 1 : P.air
+    const ctl = knockT > 0 ? 0 : pounding ? 100 : grounded ? 1 : P.air // (knocked back: it carries him)
     const rate = (dir ? (vx * dir < 0 ? P.decel + P.accel : P.accel) : P.decel) * ctl
     const tv = dir * P.runSpeed * boost.mul
     vx = vx < tv ? Math.min(tv, vx + rate * dt) : Math.max(tv, vx - rate * dt)
@@ -937,6 +1028,19 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       cast.props.push(prop)
       devLas = { prop }
       return true
+    },
+    /** dev: the lasagnas (the lines they wait on, the one out) and one put out now on a line at x */
+    foes: () => ({ plan: [...lasagnaPlan], out: foes.map((f) => ({ x: +f.e.x.toFixed(2), y: +f.e.y.toFixed(3), line: f.e.line, state: f.e.state, S: f.e.S })), invT }),
+    foeAt: (line: number, at: number, dir = -1) => {
+      if (!on || !cast.lasagna()) return false
+      clearFoes()
+      lasagnaPlan = [line]
+      const keepY = y
+      y = level.lines[line].inkTop + 0.5 // (in range)
+      spawnFoe()
+      y = keepY
+      if (foes[0]) { foes[0].e.x = at; foes[0].e.dir = dir }
+      return foes.length > 0
     },
     /** dev: the swelling words now */
     swells: () => swelling.map((s) => ({ word: w.bodies[s.body].b.text, line: level.lineOf[s.body], a: +s.sw.a.toFixed(3) })),

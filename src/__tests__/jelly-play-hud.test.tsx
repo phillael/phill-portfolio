@@ -16,7 +16,7 @@ let playing = false
 const state: PlayState = {
   x: 0, y: 0, z: 0, vx: 0, vy: 0, grounded: true, facing: 1, line: 0, clip: 'idle', smashing: false, pounding: false, falling: false,
   entering: false, checkpoint: -1, timeMs: 0, started: false, coins: 0, total: 27, finished: false, bestMs: null,
-  score: 0, shrimp: 0, shrimpTotal: 5, bestScore: null,
+  score: 0, shrimp: 0, shrimpTotal: 5, bestScore: null, boost: 0, boostLeft: 0,
 }
 const play = {
   enter: jest.fn(async () => { playing = true; fire({ type: 'enter' }); return true }),
@@ -83,7 +83,7 @@ afterEach(() => {
   jest.clearAllMocks()
   listeners.clear()
   playing = false
-  Object.assign(state, { finished: false, checkpoint: -1, score: 0, shrimp: 0 })
+  Object.assign(state, { finished: false, checkpoint: -1, score: 0, shrimp: 0, boost: 0, boostLeft: 0 })
   play.enter.mockImplementation(async () => { playing = true; fire({ type: 'enter' }); return true })
 })
 
@@ -249,6 +249,30 @@ describe('playing', () => {
     expect(screen.getByText('+500')).toBeInTheDocument()
     act(() => fire({ type: 'score', why: 'hurt', points: -250, at: [0, 0, 0], score: 350 }))
     expect(screen.getByText('−250').closest('div')).toHaveAttribute('data-bad')
+  })
+
+  it('a shrimp: SHRIMP! in rainbow letters with 16 shrimp raining, and the live region', async () => {
+    await startPlaying()
+    act(() => fire({ type: 'shrimp', index: 2, at: [0, 0, 0], shrimp: 3, total: 5 }))
+    const word = await screen.findByText('S', { selector: 'span' })
+    const show = word.closest('[aria-hidden="true"]')!
+    expect(show).toHaveTextContent(/^(🍤){16}SHRIMP$/)
+    expect([...show.querySelectorAll('span')].filter((e) => e.textContent === '🍤')).toHaveLength(16)
+    expect(document.querySelector('p[aria-live="polite"]')).toHaveTextContent('Shrimp! 3 of 5')
+  })
+
+  it('shows the boost draining (+35%) while it lasts', async () => {
+    const frames = new Set<() => void>()
+    engine.onFrame.mockImplementation(((f: () => void) => { frames.add(f); return () => { frames.delete(f) } }) as never)
+    await startPlaying()
+    const bar = screen.getByTestId('jelly-boost')
+    expect(bar).toHaveStyle({ display: 'none' })
+    Object.assign(state, { boost: 0.35, boostLeft: 0.5 })
+    act(() => frames.forEach((f) => f()))
+    expect(bar).not.toHaveStyle({ display: 'none' })
+    expect(bar).toHaveTextContent('+35%')
+    expect((bar.querySelector('[data-fill]') as HTMLElement).style.transform).toBe('scaleX(0.500)')
+    engine.onFrame.mockImplementation(() => () => {})
   })
 
   it('writes ★ SCORE (6 digits) and the shrimp into the stats through refs, ≤ 10×/s', async () => {

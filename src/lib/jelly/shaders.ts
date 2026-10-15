@@ -439,3 +439,11 @@ void main(){
   float a = uAlpha*(1.0 - 0.85*fd);
   o = vec4(c*a, a);
 }`
+
+// A soft round glow facing the camera (Play mode's shrimp pickups wear one): premultiplied, fading to its edge
+export const HALO_VS = `#version 300 es
+in vec2 aCorner; uniform mat4 uMVP; uniform vec3 uC, uRight, uUp; uniform float uSize; out vec2 vP;
+void main(){ vP = aCorner; gl_Position = uMVP*vec4(uC + (uRight*aCorner.x + uUp*aCorner.y)*uSize*0.5, 1.0); }`
+export const HALO_FS = `#version 300 es
+precision highp float; in vec2 vP; uniform vec3 uCol; uniform float uA; out vec4 o;
+void main(){ float r = length(vP); if(r > 1.0) discard; float a = (1.0 - r)*uA; o = vec4(uCol*a, a); }`

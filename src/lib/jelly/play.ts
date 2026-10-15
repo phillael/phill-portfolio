@@ -8,11 +8,12 @@
  * pushes the jelly and steers the camera.
  */
 
-import type { Cast, Drive } from './cast'
+import type { Cast, Drive, Prop } from './cast'
 import { resetView, type UiInsets } from './camera'
-import { FOV, LOOSE, PAD_X, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
-import type { Vec3 } from './math'
+import { FOV, LOOSE, PAD_X, PLAY_R2, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
+import { lcg, Q, type Vec3 } from './math'
 import { burst, healAll } from './physics'
+import { Boost, placeShrimp, touchesShrimp, type ShrimpSpot } from './pickups'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
 import { BEST_SCORE_KEY, bestStore, createRun, type RunResult } from './playRun'
 import { bilerp, hidden, type World } from './world'
@@ -60,6 +61,9 @@ export interface PlayState {
   shrimp: number
   shrimpTotal: number
   bestScore: number | null
+  /** a shrimp's speed boost: how much faster (0, 0.35, 0.7) and how much of it is left (0…1) */
+  boost: number
+  boostLeft: number
 }
 
 export type PlayEvent =
@@ -76,6 +80,8 @@ export type PlayEvent =
   | { type: 'start' }
   /** a coin collected: where it was (world), and the count */
   | { type: 'coin'; body: number; at: Vec3; coins: number; total: number }
+  /** a shrimp eaten (its index in the run's), where (world), and the count */
+  | { type: 'shrimp'; index: number; at: Vec3; shrimp: number; total: number }
   /** points won (or a kick's lost: negative), why, where (world), and the score now */
   | { type: 'score'; why: AwardKind; points: number; at: Vec3; score: number }
   /** a checkpoint reached: its line and where its title ends (world, on the ink: the flag's spot) */
@@ -120,6 +126,11 @@ const LIT = 1.6
 const FIREWORK = 1.8
 /** the entrance: his dive from his orbit onto the name, and the camera's ease from the whole page (s) */
 const INTRO = 0.8
+/** a shrimp pickup: its longest side and how high it hovers over the ink (units), its coral glow and halo */
+const SHRIMP_SIZE = 0.27
+const SHRIMP_HOVER = 0.15
+const SHRIMP_GLOW: Vec3 = [1.3, 0.55, 0.3]
+const SHRIMP_HALO: Vec3 = [1, 0.47, 0.27]
 
 export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayContext) {
   const level: Level = buildLevel(w)
@@ -154,6 +165,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   let introT = INTRO, from: Drive = { feet: [0, 0, 0], yaw: 0, size: P.size }
   const cam0 = { zoom: 1, x: 0, y: 0, tilt: 0, yaw: 0 }
   const arc: Vec3 = [0, 0, 0]
+  /** the run's shrimp: where each hovers, its prop (the cast draws it), and how long since it was eaten (-1: still there) */
+  const shrimp: { spot: ShrimpSpot; prop: Prop; gone: number }[] = []
+  const boost = new Boost()
 
   const foot = () => P.size * 0.12
   const halfDepth = () => (Math.max(rig.dims[0], rig.dims[2]) / 2) * (P.size / rig.height)
@@ -230,9 +244,11 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     emit({ type: 'enter' })
   }
 
-  /** a fresh run: the clock and coins reset, the coins glowing, nothing lit */
+  /** a fresh run: the clock and coins reset, the coins glowing, nothing lit, new shrimp */
   function startRun() {
     run.reset()
+    boost.reset()
+    rollShrimp()
     for (const bi of level.coins) w.bodies[bi].coinT = 1
     for (const l of lits) for (const bi of l.bodies) w.bodies[bi].litT = 0
     lits.length = 0
@@ -248,6 +264,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     for (const bd of w.bodies) bd.coinT = bd.litT = 0
     lits.length = 0
     stopFireworks()
+    clearShrimp()
     cast.drive(null, !instant)
     resetView(w)
     input.left = input.right = input.jump = input.down = input.smash = false
@@ -384,6 +401,51 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   function award(why: AwardKind, at: Vec3) {
     const points = run.award(why)
     if (points) emit({ type: 'score', why, points, at, score: run.score })
+  }
+
+  // ---- shrimp pickups: a run's five, spread down the page; touching one: +500, SHRIMP! and a speed boost ----
+  function clearShrimp() {
+    for (const s of shrimp) { const i = cast.props.indexOf(s.prop); if (i >= 0) cast.props.splice(i, 1) }
+    shrimp.length = 0
+  }
+
+  function rollShrimp() {
+    clearShrimp()
+    for (const spot of placeShrimp(w, level, PLAY_R2.shrimp, lcg(Math.floor(Math.random() * 2 ** 31)))) {
+      const prop: Prop = { model: 'shrimp', pos: [spot.x, 0, 0], rot: [0, 0, 0, 1], size: SHRIMP_SIZE, alpha: 1, glow: SHRIMP_GLOW, flash: 0, halo: { size: 0.42, color: SHRIMP_HALO, alpha: 0.55 } }
+      shrimp.push({ spot, prop, gone: -1 })
+      cast.props.push(prop)
+    }
+  }
+
+  /** they hover over their line, bobbing, spinning and pulsing; an eaten one pops away */
+  const spin: [number, number, number, number] = [0, 0, 0, 1]
+  function stepShrimp(dt: number) {
+    const t = w.time
+    for (const s of shrimp) {
+      const p = s.prop, x = s.spot.x, y = level.lines[s.spot.line].inkTop + SHRIMP_HOVER + 0.025 * Math.sin(t * 2.4 + x)
+      if (s.gone >= 0) s.gone += dt
+      const pop = s.gone >= 0 ? Math.max(0, 1 - s.gone * 4) : 1
+      p.pos[0] = x
+      p.pos[1] = y
+      p.pos[2] = w.bend.at(x, y) + 0.12
+      Q.mul(Q.axis(0, 1, 0, t * 1.6, p.rot), Q.axis(0, 0, 1, 0.25 * Math.sin(t * 1.3), spin), p.rot)
+      p.size = SHRIMP_SIZE * pop * (1 + 0.06 * Math.sin(t * 5))
+      p.alpha = pop > 0 ? 1 : 0
+      p.flash = s.gone >= 0 ? 0.6 * pop : 0
+    }
+  }
+
+  /** his body against the shrimp still there */
+  function eatShrimp() {
+    shrimp.forEach((s, index) => {
+      if (s.gone >= 0 || !touchesShrimp(x, y, s.prop.pos[0], s.prop.pos[1])) return
+      s.gone = 0
+      boost.add()
+      const at: Vec3 = [s.prop.pos[0], s.prop.pos[1], s.prop.pos[2]]
+      award('shrimp', at)
+      emit({ type: 'shrimp', index, at, shrimp: run.shrimp, total: run.shrimpTotal })
+    })
   }
 
   // ---- falling off the page ----
@@ -585,6 +647,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
 
   function update(dt: number) {
     if (!on || dt <= 0) return
+    stepShrimp(dt)
     const g = (2 * P.jumpHeight) / (P.apexTime * P.apexTime), v0 = (2 * P.jumpHeight) / P.apexTime
     if (introT < INTRO) {
       // the entrance (no control yet): the dive clip's fall frames, then a jelly splat on the name
@@ -607,6 +670,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     }
     // the clock (it runs through hit-stops and falls), the glowing titles fading back, the finish's sparks
     run.tick(dt)
+    boost.step(dt)
     for (let i = lits.length - 1; i >= 0; i--) {
       if ((lits[i].t -= dt) > 0) continue
       for (const bi of lits[i].bodies) w.bodies[bi].litT = run.finished && level.lineOf[bi] === level.finish ? 1 : 0
@@ -668,7 +732,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     if (dir) facing = dir
     const ctl = pounding ? 100 : grounded ? 1 : P.air
     const rate = (dir ? (vx * dir < 0 ? P.decel + P.accel : P.accel) : P.decel) * ctl
-    const tv = dir * P.runSpeed
+    const tv = dir * P.runSpeed * boost.mul
     vx = vx < tv ? Math.min(tv, vx + rate * dt) : Math.max(tv, vx - rate * dt)
 
     // ↓ in the air: a ground-pound. Standing: drop through the line; jump (buffered, with coyote time after a ledge)
@@ -735,6 +799,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       for (const cp of run.reach(ground.line)) reached(level.checkpoints.indexOf(cp))
       if (ground.line === level.finish) finishRun()
     }
+    if (live) eatShrimp()
     // off the paper's edge, or below the page: the void
     if (Math.abs(x) > w.pageW / 2 + 0.1 || y < w.pageBottom - 0.2) {
       startFlail()
@@ -767,6 +832,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     smashing: smashT >= 0, pounding, falling: flailT >= 0, entering: introT < INTRO, checkpoint: run.checkpoint,
     timeMs: run.timeMs, started: run.started, coins: run.coins, total: run.total, finished: run.finished, bestMs: run.best(),
     score: run.score, shrimp: run.shrimp, shrimpTotal: run.shrimpTotal, bestScore: run.bestScore(),
+    boost: boost.mul - 1, boostLeft: boost.left,
   })
 
   return {
@@ -779,6 +845,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     again,
     /** dev: put him on a line (index into level.lines) at x */
     place: (line: number, at: number) => { if (on) place(line, at) },
+    /** dev: the run's shrimp (where, and whether eaten) */
+    shrimp: () => shrimp.map((s) => ({ ...s.spot, eaten: s.gone >= 0 })),
   }
 }
 

@@ -4,7 +4,7 @@
  * own pass, so the page hides whatever passes behind it and the fog matches the words.
  */
 
-import { compileAll, texFrom, type Program } from './gl'
+import { attr, compileAll, texFrom, type Program } from './gl'
 import { bounds, readGltf, restLocals, worldMatrices, type Clip, type GltfModel, type Track } from './gltf'
 import { M4x, Q, type Vec3 } from './math'
 import * as SH from './shaders'
@@ -59,9 +59,13 @@ export interface DrawLook {
 const ATTRS = { POSITION: 'aPos', NORMAL: 'aNormal', TEXCOORD_0: 'aUv', JOINTS_0: 'aJoints', WEIGHTS_0: 'aWeights' } as const
 
 export function createActorRenderer(gl: WebGL2RenderingContext) {
-  const [CAST] = compileAll(gl, [[SH.CAST_VS, SH.CAST_FS]])
+  const [CAST, HALO] = compileAll(gl, [[SH.CAST_VS, SH.CAST_FS], [SH.HALO_VS, SH.HALO_FS]])
   const models: ActorModel[] = []
   let gone = false
+  const haloVAO = gl.createVertexArray()!
+  const haloBuf = attr(gl, HALO, haloVAO, 'aCorner', 2, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))
+  gl.bindVertexArray(null)
+  let mvp: Float32Array = new Float32Array(16)
 
   /** Read and upload a GLB; the slow parts (meshopt, image decode) don't block the main thread for long. */
   async function load(buf: ArrayBuffer, ready: () => Promise<void>): Promise<ActorModel> {
@@ -116,6 +120,7 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.uniform3fv(u.uRimA, f.rimA); gl.uniform3fv(u.uRimB, f.rimB)
     gl.uniform1i(u.uTex, 0); gl.uniform1i(u.uGlowTex, 1)
     fogBase = f.fog
+    mvp = f.mvp
   }
   let fogBase = 0
 
@@ -150,9 +155,25 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.bindVertexArray(null)
   }
 
+  /** A soft glow facing the camera at c (size: its diameter); after the models (it doesn't write depth), then the models' program is back. */
+  function halo(c: Vec3, size: number, col: Vec3, a: number, right: Vec3, up: Vec3) {
+    if (a <= 0.002) return
+    const u = HALO.u
+    gl.useProgram(HALO.p)
+    gl.depthMask(false)
+    gl.uniformMatrix4fv(u.uMVP, false, mvp); gl.uniform3fv(u.uC, c); gl.uniform3fv(u.uRight, right); gl.uniform3fv(u.uUp, up)
+    gl.uniform1f(u.uSize, size); gl.uniform3fv(u.uCol, col); gl.uniform1f(u.uA, a)
+    gl.bindVertexArray(haloVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.bindVertexArray(null)
+    gl.depthMask(true)
+    gl.useProgram(CAST.p)
+  }
+
   function dispose() {
     gone = true
     gl.deleteProgram(CAST.p)
+    gl.deleteProgram(HALO.p)
+    gl.deleteVertexArray(haloVAO)
+    gl.deleteBuffer(haloBuf)
     for (const a of models) {
       gl.deleteVertexArray(a.vao)
       for (const b of a.bufs) gl.deleteBuffer(b)
@@ -162,7 +183,7 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     models.length = 0
   }
 
-  return { load, begin, draw, dispose, program: CAST as Program }
+  return { load, begin, draw, halo, dispose, program: CAST as Program }
 }
 
 export type ActorRenderer = ReturnType<typeof createActorRenderer>

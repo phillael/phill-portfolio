@@ -104,6 +104,23 @@ export interface Drive {
   size: number
 }
 
+/**
+ * Something Play mode puts on the page (a shrimp pickup), drawn by the cast each frame in its pass.
+ * Play owns the list (`cast.props`) and mutates it in place; nothing here moves them.
+ */
+export interface Prop {
+  model: 'shrimp'
+  /** its middle (world), turn and longest side (units) */
+  pos: Vec3
+  rot: Quat
+  size: number
+  alpha: number
+  glow: Vec3
+  flash: number
+  /** a soft glow just behind it (its diameter, color and strength) */
+  halo: { size: number; color: Vec3; alpha: number } | null
+}
+
 const body = (pos: Vec3): Body => ({ pos, vel: [0, 0, 0], rot: [0, 0, 0, 1], spin: [0, 0, 0], free: 0, flash: 0, eaten: false, scale: 1 })
 
 export function createCast(gl: WebGL2RenderingContext, w: World) {
@@ -118,6 +135,7 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     band: 0, level: 0, wave: new Float32Array(WAVE), ph: 0, span: 32, peak: 0.2,
   }))
   let alpha = 0
+  const props: Prop[] = []
   /** Play mode owns his position, rotation, size and clip while this is set (the cast keeps drawing him) */
   let drive: Drive | null = null
   let rigInfo: Rig | null = null
@@ -451,6 +469,20 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
         alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump), ambient: params.ambient, glow: noGlow,
       })
     }
+    // Play mode's props, then their halos (no depth writes: last), a little behind them
+    if (!props.length) return
+    for (const pr of props) {
+      if (pr.alpha <= 0.002 || !shrimpModel || !shrimpWorld) continue
+      const a = shrimpModel
+      M4x.mulInto(model, placement(pr.pos, pr.rot, pr.size / a.extent, a.center), shrimpWorld)
+      R.draw(a, model, null, { alpha: alpha * pr.alpha, flash: pr.flash, rim: params.rim * 0.8, ambient: 0.7, glow: pr.glow, fog: 0 })
+    }
+    const fwd = w.cam.fwd
+    for (const pr of props) {
+      if (!pr.halo || pr.alpha <= 0.002) continue
+      for (let c = 0; c < 3; c++) tv[c] = pr.pos[c] + fwd[c] * 0.08
+      R.halo(tv, pr.halo.size, pr.halo.color, pr.halo.alpha * pr.alpha * alpha, w.cam.right, w.cam.up)
+    }
   }
 
   // ---- clicks ----
@@ -509,6 +541,8 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     load,
     update,
     draw,
+    /** Play mode's things on the page (it fills and moves them; the cast draws them) */
+    props,
     /** the body under the ray (Phill or a shrimp), if any */
     hit: (ray: Ray): object | null => hit(ray),
     click,

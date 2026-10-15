@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import dynamic from 'next/dynamic'
 import type { JellyEngine } from '@/lib/jelly/engine'
 import type { AwardKind } from '@/lib/jelly/config'
 import type { PlayEvent } from '@/lib/jelly/play'
@@ -17,6 +18,9 @@ import { BTN, FOCUS, KEY, PANEL, PLAY_BTN } from '@/components/jelly/hudStyles'
 import { RESUME_PDF } from '@/components/jelly/JellyHudBar'
 import JellyTouchPads from '@/components/jelly/JellyTouchPads'
 import { getSiteMusic } from '@/lib/site-music'
+
+/** SHRIMP! (its own chunk with Rubik Pixels: nothing of it loads before Play starts) */
+const JellyShrimpShow = dynamic(() => import('@/components/jelly/JellyShrimpShow'), { ssr: false })
 
 /** 0:24.6 (— when there's none) */
 export const fmtTime = (ms: number | null | undefined) => {
@@ -64,6 +68,9 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
   const coinsRef = useRef<HTMLSpanElement>(null)
   const scoreRef = useRef<HTMLSpanElement>(null)
   const shrimpRef = useRef<HTMLSpanElement>(null)
+  const boostRef = useRef<HTMLSpanElement>(null)
+  const boostFill = useRef<HTMLSpanElement>(null)
+  const boostText = useRef<HTMLSpanElement>(null)
   const yearRef = useRef<HTMLSpanElement>(null)
   const bestRef = useRef<HTMLDivElement>(null)
   const flagEls = useRef(new Map<number, HTMLDivElement>())
@@ -110,6 +117,8 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
           `The end. Score ${r.score}${r.newBestScore ? ', a new best' : ''}. Time ${fmtTime(r.timeMs)}${r.newBest ? ', a new best' : `, best ${fmtTime(r.bestMs)}`}.`
           + ` Impact ${r.coins} of ${r.total}. Shrimp ${r.shrimp} of ${r.shrimpTotal}.`,
         )
+      } else if (e.type === 'shrimp') {
+        setMessage(`Shrimp! ${e.shrimp} of ${e.total}`)
       } else if (e.type === 'start') {
         setMoved(true)
       } else if (e.type === 'again') {
@@ -127,14 +136,17 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
     }
   }, [engine])
 
-  // the stats' text (≤ 10×/s) and the flags (each frame), through refs
+  // the stats' text (≤ 10×/s), the flags and the boost's draining bar (each frame: transforms), through refs
   useEffect(() => {
-    let last = -Infinity, lastText = ''
+    let last = -Infinity, lastText = '', boosting = false
     return engine.onFrame(() => {
       for (const f of flagEls.current) {
         const flag = flags.find((g) => g.key === f[0]), p = flag && engine.project(flag.at)
         if (p) f[1].style.transform = `translate(${p[0].toFixed(1)}px, ${p[1].toFixed(1)}px)`
       }
+      const b = engine.play.state()
+      if (b && (b.boost > 0) !== boosting && boostRef.current) { boosting = b.boost > 0; boostRef.current.style.display = boosting ? '' : 'none' }
+      if (b && boosting && boostFill.current) boostFill.current.style.transform = `scaleX(${b.boostLeft.toFixed(3)})`
       const now = performance.now()
       if (now - last < 100) return
       last = now
@@ -142,7 +154,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       if (!s) return
       const info = engine.play.levelInfo()
       const era = s.checkpoint >= 0 && info ? String(info.checkpoints[s.checkpoint].year) : ''
-      const text = `${fmtTime(s.timeMs)}|${s.coins}/${s.total}|${s.score}|${s.shrimp}|${era}|${fmtTime(s.bestMs)}|${s.finished}`
+      const text = `${fmtTime(s.timeMs)}|${s.coins}/${s.total}|${s.score}|${s.shrimp}|${s.boost}|${era}|${fmtTime(s.bestMs)}|${s.finished}`
       if (text === lastText) return
       lastText = text
       if (timeRef.current) {
@@ -152,6 +164,7 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       if (coinsRef.current) coinsRef.current.textContent = `✦ ${s.coins}/${s.total}`
       if (scoreRef.current) scoreRef.current.textContent = `★ ${fmtScore(s.score)}`
       if (shrimpRef.current) shrimpRef.current.textContent = `🍤 ${s.shrimp}/${s.shrimpTotal}`
+      if (boostText.current) boostText.current.textContent = `+${Math.round(s.boost * 100)}%`
       if (yearRef.current) yearRef.current.textContent = era
       if (bestRef.current) bestRef.current.textContent = `BEST ${fmtTime(s.bestMs)}`
     })
@@ -181,7 +194,16 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
             <small className="ml-1 text-[9px] text-[#7fd98e] [text-shadow:none] max-[820px]:hidden [@media(max-height:559px)]:hidden">IMPACT</small>
           </span>
           <span ref={scoreRef} className="text-[#ffd24a] [text-shadow:0_0_8px_rgba(255,210,74,0.45)]">★ 000000</span>
-          <span ref={shrimpRef} className="text-[#ff9a6c] max-[820px]:hidden">🍤 0/5</span>
+          <span className="inline-flex items-center gap-2 text-[#ff9a6c] max-[820px]:hidden">
+            <span ref={shrimpRef}>🍤 0/5</span>
+            {/* a shrimp's speed boost, draining */}
+            <span ref={boostRef} data-testid="jelly-boost" className="inline-flex items-center gap-1.5 text-[9px] text-[#00ff2b]" style={{ display: 'none' }}>
+              <span ref={boostText}>+35%</span>
+              <span className="relative block h-1 w-10 overflow-hidden rounded-sm bg-[rgba(0,255,43,0.18)]">
+                <span ref={boostFill} data-fill className="absolute inset-0 block origin-left bg-[#00ff2b] shadow-[0_0_6px_#00ff2b]" />
+              </span>
+            </span>
+          </span>
           <span ref={yearRef} className="hidden text-[11px] text-[#80eaff] [@media(max-height:559px)]:inline" />
         </div>
         <div ref={bestRef} className="font-pixel text-[9px] tracking-[0.5px] text-[#7c8798] max-[820px]:hidden [@media(max-height:559px)]:hidden">BEST —</div>
@@ -278,6 +300,8 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
       )}
 
       {result && <FinishCard result={result} onAgain={() => engine.play.again()} onLeave={leave} />}
+
+      <JellyShrimpShow engine={engine} />
 
       <p className="sr-only" aria-live="polite">{message}</p>
     </>

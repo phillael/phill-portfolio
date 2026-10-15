@@ -119,6 +119,8 @@ const JellyPlayHud = ({ engine, topRef, bottomRef }: JellyPlayHudProps) => {
         )
       } else if (e.type === 'shrimp') {
         setMessage(`Shrimp! ${e.shrimp} of ${e.total}`)
+      } else if (e.type === 'mushroom') {
+        setMessage('A mushroom came down from the UFO. Catch it!')
       } else if (e.type === 'start') {
         setMoved(true)
       } else if (e.type === 'again') {

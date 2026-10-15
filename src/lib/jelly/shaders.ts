@@ -447,3 +447,19 @@ void main(){ vP = aCorner; gl_Position = uMVP*vec4(uC + (uRight*aCorner.x + uUp*
 export const HALO_FS = `#version 300 es
 precision highp float; in vec2 vP; uniform vec3 uCol; uniform float uA; out vec4 o;
 void main(){ float r = length(vP); if(r > 1.0) discard; float a = (1.0 - r)*uA; o = vec4(uCol*a, a); }`
+
+// The UFO's beam: an open cone of see-through cyan with rings running down it (alpha-blended: additive vanishes on white
+// paper). aCU: its turn (0…1) and height (0 bottom, 1 top). The mockup's linear colors, in sRGB here.
+export const BEAM_VS = `#version 300 es
+in vec2 aCU; uniform mat4 uMVP; uniform vec3 uTop; uniform float uLen, uRTop, uRBot; out float vV;
+void main(){
+  float a = aCU.x*6.2831853, v = aCU.y, r = mix(uRBot, uRTop, v);
+  vV = v; gl_Position = uMVP*vec4(uTop + vec3(cos(a)*r, -(1.0 - v)*uLen, sin(a)*r), 1.0);
+}`
+export const BEAM_FS = `#version 300 es
+precision highp float; in float vV; uniform float uA, uT; out vec4 o;
+void main(){
+  float rings = 0.5 + 0.5*sin(vV*70.0 + uT*16.0);
+  float a = (0.16 + 0.22*rings)*(0.45 + 0.55*vV)*uA;
+  o = vec4(mix(vec3(0.0, 0.86, 0.95), vec3(0.77, 0.98, 1.0), rings)*a, a);
+}`

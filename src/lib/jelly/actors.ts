@@ -8,6 +8,7 @@ import { attr, compileAll, texFrom, type Program } from './gl'
 import { bounds, readGltf, restLocals, worldMatrices, type Clip, type GltfModel, type Track } from './gltf'
 import { M4x, Q, type Vec3 } from './math'
 import * as SH from './shaders'
+import type { VoxelMesh } from './voxels'
 
 export const MAX_JOINTS = 32
 
@@ -59,11 +60,14 @@ export interface DrawLook {
 const ATTRS = { POSITION: 'aPos', NORMAL: 'aNormal', TEXCOORD_0: 'aUv', JOINTS_0: 'aJoints', WEIGHTS_0: 'aWeights' } as const
 
 export function createActorRenderer(gl: WebGL2RenderingContext) {
-  const [CAST, HALO] = compileAll(gl, [[SH.CAST_VS, SH.CAST_FS], [SH.HALO_VS, SH.HALO_FS]])
+  const [CAST, HALO, BEAM] = compileAll(gl, [[SH.CAST_VS, SH.CAST_FS], [SH.HALO_VS, SH.HALO_FS], [SH.BEAM_VS, SH.BEAM_FS]])
   const models: ActorModel[] = []
   let gone = false
   const haloVAO = gl.createVertexArray()!
   const haloBuf = attr(gl, HALO, haloVAO, 'aCorner', 2, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))
+  // the beam: an open cone, a strip around it (32 sides), each vertex its turn (0…1) and height (0 bottom, 1 top)
+  const beamVAO = gl.createVertexArray()!
+  const beamBuf = attr(gl, BEAM, beamVAO, 'aCU', 2, Float32Array.from({ length: 33 * 4 }, (_, i) => (i % 2 ? (i % 4 === 1 ? 0 : 1) : Math.floor(i / 4) / 32)))
   gl.bindVertexArray(null)
   let mvp: Float32Array = new Float32Array(16)
 
@@ -73,6 +77,20 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     await ready()
     // closed while it decoded: don't upload into a context that's going away
     if (gone) { m.baseColor?.close(); m.glow?.close(); throw new Error('The cast was disposed while loading') }
+    const am = upload(m, m.baseColor, m.glow, false)
+    m.baseColor?.close()
+    m.glow?.close()
+    return am
+  }
+
+  /** A voxel mesh (round 2's UFO and mushroom): its palette textures are sampled at texel centers, so NEAREST. */
+  function addVoxels(v: VoxelMesh): ActorModel {
+    const img = (t: VoxelMesh['base']) => new ImageData(new Uint8ClampedArray(t.data), t.width, t.height)
+    return upload(v.model, img(v.base), v.glow ? img(v.glow) : null, true)
+  }
+
+  /** Upload a model: one VAO, its textures, its rest-pose bounds. */
+  function upload(m: GltfModel, base: TexImageSource | null, glowImg: TexImageSource | null, nearest: boolean): ActorModel {
     const vao = gl.createVertexArray()!, bufs: WebGLBuffer[] = []
     gl.bindVertexArray(vao)
     for (const [name, attr] of Object.entries(ATTRS) as [keyof typeof ATTRS, string][]) {
@@ -90,10 +108,14 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.indices, gl.STATIC_DRAW)
     gl.bindVertexArray(null)
-    const tex = m.baseColor ? texFrom(gl, m.baseColor) : texFrom(gl, new ImageData(new Uint8ClampedArray([255, 255, 255, 255]), 1, 1))
-    const glow = m.glow ? texFrom(gl, m.glow) : null
-    m.baseColor?.close()
-    m.glow?.close()
+    const tex = texFrom(gl, base ?? new ImageData(new Uint8ClampedArray([255, 255, 255, 255]), 1, 1))
+    const glow = glowImg ? texFrom(gl, glowImg) : null
+    if (nearest) for (const t of [tex, glow]) {
+      if (!t) continue
+      gl.bindTexture(gl.TEXTURE_2D, t)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    }
     // the rest pose's bounds (skinned: through the joints)
     const n = m.nodes.length, local = restLocals(m, new Float32Array(n * 16)), world = worldMatrices(m, local, new Float32Array(n * 16))
     const b = bounds(m, world, m.joints ? jointMatrices(m, world, new Float32Array(m.joints.length * 16)) : null)
@@ -168,12 +190,32 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     gl.useProgram(CAST.p)
   }
 
+  /**
+   * The UFO's beam: an open cone of see-through cyan from `top` down `len`, narrow at the top (rTop) and wide
+   * at the bottom (rBot), rings running down it. Alpha-blended, not additive (additive vanishes on white paper);
+   * after the models (no depth writes), then the models' program is back.
+   */
+  function beam(top: Vec3, len: number, rTop: number, rBot: number, a: number, t: number) {
+    if (a <= 0.002 || len <= 0.001) return
+    const u = BEAM.u
+    gl.useProgram(BEAM.p)
+    gl.depthMask(false)
+    gl.uniformMatrix4fv(u.uMVP, false, mvp); gl.uniform3fv(u.uTop, top); gl.uniform1f(u.uLen, len)
+    gl.uniform1f(u.uRTop, rTop); gl.uniform1f(u.uRBot, rBot); gl.uniform1f(u.uA, a); gl.uniform1f(u.uT, t)
+    gl.bindVertexArray(beamVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 33 * 2); gl.bindVertexArray(null)
+    gl.depthMask(true)
+    gl.useProgram(CAST.p)
+  }
+
   function dispose() {
     gone = true
     gl.deleteProgram(CAST.p)
     gl.deleteProgram(HALO.p)
+    gl.deleteProgram(BEAM.p)
     gl.deleteVertexArray(haloVAO)
     gl.deleteBuffer(haloBuf)
+    gl.deleteVertexArray(beamVAO)
+    gl.deleteBuffer(beamBuf)
     for (const a of models) {
       gl.deleteVertexArray(a.vao)
       for (const b of a.bufs) gl.deleteBuffer(b)
@@ -183,7 +225,7 @@ export function createActorRenderer(gl: WebGL2RenderingContext) {
     models.length = 0
   }
 
-  return { load, begin, draw, halo, dispose, program: CAST as Program }
+  return { load, addVoxels, begin, draw, halo, beam, dispose, program: CAST as Program }
 }
 
 export type ActorRenderer = ReturnType<typeof createActorRenderer>

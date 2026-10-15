@@ -16,6 +16,7 @@ import { camDist, type Ray } from './camera'
 import { CAST_CONFIG, FOV, NEBULA, SITE, type CastConfig } from './config'
 import { hex, lcg, M4x, Q, type Quat, type Vec3 } from './math'
 import { LIGHT } from './render'
+import type { VoxelMesh } from './voxels'
 import type { World } from './world'
 
 const IDLE = 'idle'
@@ -105,20 +106,34 @@ export interface Drive {
 }
 
 /**
- * Something Play mode puts on the page (a shrimp pickup), drawn by the cast each frame in its pass.
- * Play owns the list (`cast.props`) and mutates it in place; nothing here moves them.
+ * Something Play mode puts on the page (a shrimp pickup, a UFO's parts, the mushroom), drawn by the cast each
+ * frame in its pass, in the list's order (see-through ones last). Play owns the list (`cast.props`) and
+ * mutates it in place; nothing here moves them.
  */
 export interface Prop {
-  model: 'shrimp'
-  /** its middle (world), turn and longest side (units) */
+  /** the shrimp, or a model Play uploaded through `cast.voxels` */
+  model: 'shrimp' | ActorModel
+  /** where its middle goes (or, `origin`, its model's own origin: a voxel mesh's bottom middle), its turn and longest side (units) */
   pos: Vec3
+  anchor?: 'origin'
   rot: Quat
   size: number
   alpha: number
   glow: Vec3
   flash: number
+  ambient?: number
+  rim?: number
   /** a soft glow just behind it (its diameter, color and strength) */
   halo: { size: number; color: Vec3; alpha: number } | null
+}
+
+/** The UFO's beam: an open cone of see-through cyan down from `top` (Play fills `cast.beams`) */
+export interface Beam {
+  top: Vec3
+  len: number
+  rTop: number
+  rBot: number
+  alpha: number
 }
 
 const body = (pos: Vec3): Body => ({ pos, vel: [0, 0, 0], rot: [0, 0, 0, 1], spin: [0, 0, 0], free: 0, flash: 0, eaten: false, scale: 1 })
@@ -136,6 +151,8 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
   }))
   let alpha = 0
   const props: Prop[] = []
+  const beams: Beam[] = []
+  const origin: Vec3 = [0, 0, 0]
   /** Play mode owns his position, rotation, size and clip while this is set (the cast keeps drawing him) */
   let drive: Drive | null = null
   let rigInfo: Rig | null = null
@@ -469,14 +486,18 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
         alpha, flash: p.flash, rim: params.rim * (1 + 1.2 * energy * params.pump), ambient: params.ambient, glow: noGlow,
       })
     }
-    // Play mode's props, then their halos (no depth writes: last), a little behind them
-    if (!props.length) return
+    // Play mode's props, then its beams and the props' halos (no depth writes: last; the halos a little behind them)
+    if (!props.length && !beams.length) return
     for (const pr of props) {
-      if (pr.alpha <= 0.002 || !shrimpModel || !shrimpWorld) continue
-      const a = shrimpModel
-      M4x.mulInto(model, placement(pr.pos, pr.rot, pr.size / a.extent, a.center), shrimpWorld)
-      R.draw(a, model, null, { alpha: alpha * pr.alpha, flash: pr.flash, rim: params.rim * 0.8, ambient: 0.7, glow: pr.glow, fog: 0 })
+      if (pr.alpha <= 0.002 || pr.size <= 1e-4) continue
+      const shrimp = pr.model === 'shrimp', a = shrimp ? shrimpModel : (pr.model as ActorModel)
+      if (!a || (shrimp && !shrimpWorld)) continue
+      const m = placement(pr.pos, pr.rot, pr.size / a.extent, pr.anchor === 'origin' ? origin : a.center)
+      R.draw(a, shrimp ? M4x.mulInto(model, m, shrimpWorld!) : m, null, {
+        alpha: alpha * pr.alpha, flash: pr.flash, rim: params.rim * (pr.rim ?? 0.8), ambient: pr.ambient ?? 0.7, glow: pr.glow, fog: 0,
+      })
     }
+    for (const b of beams) R.beam(b.top, b.len, b.rTop, b.rBot, b.alpha * alpha, w.time)
     const fwd = w.cam.fwd
     for (const pr of props) {
       if (!pr.halo || pr.alpha <= 0.002) continue
@@ -541,8 +562,11 @@ export function createCast(gl: WebGL2RenderingContext, w: World) {
     load,
     update,
     draw,
-    /** Play mode's things on the page (it fills and moves them; the cast draws them) */
+    /** Play mode's things on the page and the UFOs' beams (it fills and moves them; the cast draws them) */
     props,
+    beams,
+    /** upload a voxel mesh as a model for Play's props (null before the cast has loaded) */
+    voxels: (v: VoxelMesh): ActorModel | null => (R ? R.addVoxels(v) : null),
     /** the body under the ray (Phill or a shrimp), if any */
     hit: (ray: Ray): object | null => hit(ray),
     click,

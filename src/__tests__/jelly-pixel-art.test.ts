@@ -4,7 +4,7 @@
  */
 
 import { mushroom, paintStart, textWidth, ufo, UFO_LIGHTS, type Painter } from '@/lib/jelly/pixelArt'
-import { revolve, voxels, type VoxelMesh } from '@/lib/jelly/voxels'
+import { revolve, ufoParts, voxels, type VoxelMesh } from '@/lib/jelly/voxels'
 
 const MUSHROOM = [
   '................', '.....oooooo.....', '...oovCCCCvoo...', '..ovvvCCCCvvvo..', '.ovvvvCCCCvvvvo.', '.ovvvvCCCCvvvvo.',
@@ -203,5 +203,33 @@ describe('voxels', () => {
     expect(saucer.max[2] * 2).toBeCloseTo(0.42, 6) // the widest row (24 cells) turned into a disc 24 deep
     expect(saucer.glow).not.toBeNull()
     expect(saucer.model.indices).toBeInstanceOf(Uint16Array)
+  })
+})
+
+describe('the UFO, in parts', () => {
+  const parts = ufoParts(0.42 / 24)
+  const cells = (m: VoxelMesh) => new Set(faces(m).filter((f) => f.n[2] === 1).map((f) => `${Math.round(f.c[0] / (0.42 / 24) + 12 - 0.5)},${Math.round(11 - (f.c[1] / (0.42 / 24) - 0.5))}`))
+
+  it('glows only at its beam port (the rim lights are their own meshes)', () => {
+    const glowing = faces(parts.body).filter((f) => Array.from(parts.body.glow!.data.slice(f.texel * 4, f.texel * 4 + 3)).some((v) => v > 0))
+    expect(new Set(glowing.filter((f) => f.n[2] === 1).map((f) => Math.round(11 - (f.c[1] / (0.42 / 24) - 0.5))))).toEqual(new Set([10]))
+  })
+
+  it('has seven rim lights in three groups that chase (the outline cell at the rim end is not one)', () => {
+    expect(parts.lights.map((m) => [...cells(m)].sort())).toEqual([['11,7', '2,7', '20,7'], ['14,7', '5,7'], ['17,7', '8,7']])
+    for (const m of parts.lights) {
+      expect(Array.from(m.base.data.slice(0, 3))).toEqual([0, 0, 0]) // black, lit by its glow: the chase color
+      expect(Array.from(m.glow!.data.slice(0, 3))).toEqual([255, 255, 255])
+    }
+  })
+
+  it('carries its passenger (2 deep) inside a whole glass dome', () => {
+    const passenger = cells(parts.passenger)
+    expect(passenger).toEqual(new Set(['11,2', '12,2', '10,3', '11,3', '12,3', '13,3', '11,4', '12,4']))
+    const glass = cells(parts.glass)
+    for (const c of passenger) expect(glass.has(c)).toBe(true)
+    expect(parts.passenger.max[2] * 2).toBeCloseTo(2 * (0.42 / 24), 6)
+    expect(parts.glass.max[2]).toBeGreaterThan(parts.passenger.max[2])
+    for (const c of glass) expect(cells(parts.body).has(c)).toBe(false)
   })
 })

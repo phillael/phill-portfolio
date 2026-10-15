@@ -12,7 +12,7 @@
 
 import type { GltfModel, VertexAttr } from './gltf'
 import type { Vec3 } from './math'
-import { PAL } from './pixelArt'
+import { PAL, ufo, UFO_LIGHTS } from './pixelArt'
 
 /** RGBA texels, ImageData's layout (in the browser: `new ImageData(data, width, height)`) */
 export interface Texels {
@@ -157,4 +157,32 @@ export function voxels(rows: readonly string[], depthOf: (x: number, y: number, 
     glow: colors.some((e) => e.glows) ? { width: tw, height: th, data: glowData } : null,
     min, max, quads: I.length / 6,
   }
+}
+
+/** the UFO's passenger (the mushroom riding in its dome) */
+const passenger = (x: number, y: number) => (y === 2 && (x === 11 || x === 12)) || (y === 3 && x >= 10 && x <= 13) || (y === 4 && (x === 11 || x === 12))
+/** its glass dome (the passenger's seat is glass too: the dome stays whole when it leaves) */
+const dome = (x: number, y: number, c: string) => passenger(x, y) || (y <= 5 && 'Ccw'.includes(c) && !(y === 5 && (x < 8 || x > 15)))
+/** its rim lights (not the outline cell at the rim's end) */
+const light = (x: number, y: number, c: string) => UFO_LIGHTS(x, y) && c !== 'k'
+
+/**
+ * The UFO (round 2's mushroom carrier), turned like a pot, in parts the cast draws in turn: the body (its
+ * beam port glows), the passenger (2 deep), the see-through glass dome (drawn last, faded), and the rim
+ * lights in three groups (black, lit by their glow: the cast colors each group's glow, so they chase).
+ */
+export function ufoParts(vox: number) {
+  const rows = ufo(), rev = revolve(rows)
+  const body = voxels(rows, rev, { vox, include: (x, y, c) => !dome(x, y, c) && !light(x, y, c), glow: (x, y, c) => y === 10 && c === 'c' })
+  const pass = voxels(rows, () => 2, { vox, include: passenger })
+  const glassRows = rows.map((r, y) => r.split('').map((c, x) => (passenger(x, y) ? 'C' : c)).join(''))
+  const glass = voxels(glassRows, rev, { vox, include: dome })
+  const lightCells: number[] = []
+  rows[7].split('').forEach((c, x) => { if (light(x, 7, c)) lightCells.push(x) })
+  const lights = [0, 1, 2].map((g) => {
+    const m = voxels(rows, rev, { vox, include: (x, y, c) => light(x, y, c) && lightCells.indexOf(x) % 3 === g, glow: () => true })
+    for (let i = 0; i < m.base.data.length; i += 4) { m.base.data.set([0, 0, 0, 255], i); m.glow!.data.set([255, 255, 255, 255], i) }
+    return m
+  })
+  return { body, passenger: pass, glass, lights }
 }

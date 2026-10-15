@@ -13,9 +13,11 @@ import { resetView, type UiInsets } from './camera'
 import { FOV, LOOSE, PAD_X, PLAY_R2, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
 import { lcg, Q, type Vec3 } from './math'
 import { burst, healAll } from './physics'
+import { smashBox } from './hitboxes'
 import { Boost, placeShrimp, touchesShrimp, type ShrimpSpot } from './pickups'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
 import { BEST_SCORE_KEY, bestStore, createRun, type RunResult } from './playRun'
+import { createUfos } from './ufos'
 import { bilerp, hidden, type World } from './world'
 
 export interface PlayInput {
@@ -82,6 +84,10 @@ export type PlayEvent =
   | { type: 'coin'; body: number; at: Vec3; coins: number; total: number }
   /** a shrimp eaten (its index in the run's), where (world), and the count */
   | { type: 'shrimp'; index: number; at: Vec3; shrimp: number; total: number }
+  /** a UFO smashed; its mushroom coming down the beam; the mushroom eaten: the trip */
+  | { type: 'ufo'; index: number; at: Vec3 }
+  | { type: 'mushroom'; at: Vec3 }
+  | { type: 'trip'; at: Vec3 }
   /** points won (or a kick's lost: negative), why, where (world), and the score now */
   | { type: 'score'; why: AwardKind; points: number; at: Vec3; score: number }
   /** a checkpoint reached: its line and where its title ends (world, on the ink: the flag's spot) */
@@ -168,6 +174,8 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   /** the run's shrimp: where each hovers, its prop (the cast draws it), and how long since it was eaten (-1: still there) */
   const shrimp: { spot: ShrimpSpot; prop: Prop; gone: number }[] = []
   const boost = new Boost()
+  /** the run's UFOs and the mushroom (its voxel models are uploaded once, here) */
+  const ufos = createUfos({ w, level, cast, emit, award: (why, at) => award(why, at) })
 
   const foot = () => P.size * 0.12
   const halfDepth = () => (Math.max(rig.dims[0], rig.dims[2]) / 2) * (P.size / rig.height)
@@ -249,6 +257,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     run.reset()
     boost.reset()
     rollShrimp()
+    ufos.roll(shrimp.map((s) => s.spot.line))
     for (const bi of level.coins) w.bodies[bi].coinT = 1
     for (const l of lits) for (const bi of l.bodies) w.bodies[bi].litT = 0
     lits.length = 0
@@ -265,6 +274,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     lits.length = 0
     stopFireworks()
     clearShrimp()
+    ufos.clear()
     cast.drive(null, !instant)
     resetView(w)
     input.left = input.right = input.jump = input.down = input.smash = false
@@ -389,7 +399,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
       }
       burst(w, bd)
     }
-    if (hit.length) {
+    // a UFO in the swing (not a pound)
+    const ufo = !pound && ufos.smash(smashBox(x, y, facing, P.size, P.reach))
+    if (hit.length || ufo) {
       hitStopT = P.hitStop
       shakeT = SHAKE
       shakePh = Math.random() * 100
@@ -648,6 +660,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
   function update(dt: number) {
     if (!on || dt <= 0) return
     stepShrimp(dt)
+    ufos.update(dt, x, y, introT >= INTRO && flailT < 0 && !run.finished)
     const g = (2 * P.jumpHeight) / (P.apexTime * P.apexTime), v0 = (2 * P.jumpHeight) / P.apexTime
     if (introT < INTRO) {
       // the entrance (no control yet): the dive clip's fall frames, then a jelly splat on the name
@@ -845,6 +858,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     again,
     /** dev: put him on a line (index into level.lines) at x */
     place: (line: number, at: number) => { if (on) place(line, at) },
+    /** dev: the run's UFOs and the mushroom, and a mushroom walking from a line */
+    ufos: () => ufos.state(),
+    mushroom: (line: number, at: number, dir: number) => { if (on) ufos.devMushroom(line, at, dir) },
     /** dev: the run's shrimp (where, and whether eaten) */
     shrimp: () => shrimp.map((s) => ({ ...s.spot, eaten: s.gone >= 0 })),
   }

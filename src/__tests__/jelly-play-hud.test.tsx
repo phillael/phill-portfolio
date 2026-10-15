@@ -4,9 +4,10 @@
  * layering. The engine is mocked (WebGL2 isn't in jsdom); Play's events are fired by hand.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import JellyResumeCanvas from '@/components/jelly/JellyResumeCanvas'
 import { fmtTime, meterMode } from '@/components/jelly/JellyPlayHud'
+import type { PlayEnter } from '@/lib/jelly/engine'
 import type { PlayEvent, PlayState } from '@/lib/jelly/play'
 import { registerSiteMusic } from '@/lib/site-music'
 
@@ -19,7 +20,7 @@ const state: PlayState = {
   score: 0, shrimp: 0, shrimpTotal: 5, bestScore: null, boost: 0, boostLeft: 0, trip: 0, tripLeft: 0,
 }
 const play = {
-  enter: jest.fn(async () => { playing = true; fire({ type: 'enter' }); return true }),
+  enter: jest.fn(async (): Promise<PlayEnter> => { playing = true; fire({ type: 'enter' }); return 'on' }),
   exit: jest.fn(() => { if (!playing) return; playing = false; fire({ type: 'exit' }) }),
   again: jest.fn(),
   input: { left: false, right: false, jump: false, down: false, smash: false, pressed: new Set<string>() },
@@ -84,7 +85,8 @@ afterEach(() => {
   listeners.clear()
   playing = false
   Object.assign(state, { finished: false, checkpoint: -1, score: 0, shrimp: 0, boost: 0, boostLeft: 0, trip: 0, tripLeft: 0 })
-  play.enter.mockImplementation(async () => { playing = true; fire({ type: 'enter' }); return true })
+  play.enter.mockImplementation(async () => { playing = true; fire({ type: 'enter' }); return 'on' })
+  Object.assign(play.input, { left: false, right: false, jump: false, down: false, smash: false })
 })
 
 const open = async (...matching: string[]) => {
@@ -102,15 +104,29 @@ describe('starting Play mode', () => {
     expect(btn).toHaveAttribute('aria-keyshortcuts', 'J')
     expect(btn).toHaveAttribute('title', 'Play as Phill (J)')
     expect(btn.parentElement!.firstElementChild).toBe(btn)
-    let done: (ok: boolean) => void = () => {}
-    play.enter.mockImplementationOnce(() => new Promise<boolean>((r) => (done = r)))
+    let done: (r: PlayEnter) => void = () => {}
+    play.enter.mockImplementationOnce(() => new Promise<PlayEnter>((r) => (done = r)))
     fireEvent.click(btn)
     expect(btn).toHaveTextContent('Loading…')
     expect(btn).toHaveAttribute('aria-busy', 'true')
-    await act(async () => done(false))
+    await act(async () => done('failed'))
     expect(btn).toHaveTextContent('Play unavailable')
     expect(btn).toBeDisabled()
     expect(btn).toHaveAttribute('title', "Play mode couldn't load")
+  })
+
+  it('a "not now" (the page stopped being settled while Play loaded, e.g. the intro replayed) leaves Play ready', async () => {
+    await open()
+    const btn = screen.getByRole('button', { name: 'Play (J)' })
+    play.enter.mockImplementationOnce(() => Promise.resolve<PlayEnter>('later'))
+    fireEvent.click(btn)
+    await waitFor(() => expect(btn).not.toHaveAttribute('aria-busy', 'true'))
+    expect(btn).toHaveTextContent('Play (J)')
+    expect(btn).toBeEnabled()
+    expect(engine.setStartArt).toHaveBeenLastCalledWith({ status: 'ready' })
+    play.enter.mockImplementationOnce(async () => { playing = true; fire({ type: 'enter' }); return 'on' })
+    fireEvent.click(btn) // (and it can be pressed again)
+    expect(await screen.findByRole('button', { name: 'Leave Play mode (Esc)' })).toBeInTheDocument()
   })
 
   describe('PLAYER 1 START (printed on the paper)', () => {
@@ -158,12 +174,12 @@ describe('starting Play mode', () => {
       expect(engine.setStartArt).toHaveBeenLastCalledWith({ cursor: true })
       act(() => start.blur())
       expect(engine.setStartArt).toHaveBeenLastCalledWith({ cursor: false })
-      let done: (ok: boolean) => void = () => {}
-      play.enter.mockImplementationOnce(() => new Promise<boolean>((r) => (done = r)))
+      let done: (r: PlayEnter) => void = () => {}
+      play.enter.mockImplementationOnce(() => new Promise<PlayEnter>((r) => (done = r)))
       fireEvent.click(start)
       await waitFor(() => expect(start).toHaveAttribute('aria-busy', 'true'))
       expect(engine.setStartArt).toHaveBeenCalledWith({ status: 'loading' })
-      await act(async () => done(false))
+      await act(async () => done('failed'))
       const off = screen.getByRole('button', { name: "Play mode couldn't load" })
       expect(off).toBe(start)
       expect(off).toBeDisabled()
@@ -222,6 +238,18 @@ describe('playing', () => {
     expect(play.input.pressed.size).toBe(0)
     expect(engine.chaos).not.toHaveBeenCalled()
     expect(engine.holeAtCursor).not.toHaveBeenCalled()
+  })
+
+  it("Space presses a focused button (✕ Exit, the finish card's) instead of smashing", async () => {
+    await startPlaying()
+    const exit = screen.getByRole('button', { name: 'Leave Play mode (Esc)' })
+    exit.focus()
+    const space = createEvent.keyDown(exit, { key: ' ', code: 'Space' })
+    fireEvent(exit, space)
+    expect(play.input.smash).toBe(false)
+    expect(space.defaultPrevented).toBe(false) // (so the button's own Space press goes through)
+    fireEvent.keyDown(window, { key: ' ' }) // (anywhere else it's still the smash)
+    expect(play.input.smash).toBe(true)
   })
 
   it('shows the keys and announces Play, checkpoints and (throttled) coins', async () => {
@@ -445,6 +473,18 @@ describe('touch', () => {
     registerSiteMusic(null)
     fireEvent.click(screen.getByRole('button', { name: 'Leave Play mode (Esc)' }))
     await waitFor(() => expect(document.documentElement).not.toHaveClass('jelly-play-touch'))
+  })
+
+  it('a finger still on a pad when the pads give way (the finish card) lets go: Play again starts still', async () => {
+    await playOnTouch()
+    const right = screen.getByRole('button', { name: 'Run right' }), pad = right.parentElement!
+    jest.spyOn(pad, 'getBoundingClientRect').mockReturnValue({ left: 16, width: 136, top: 0, height: 64, right: 152, bottom: 64, x: 16, y: 0, toJSON: () => ({}) })
+    fireEvent.pointerDown(right, { pointerId: 1, clientX: 130 })
+    fireEvent.pointerDown(screen.getByRole('button', { name: /^Jump/ }), { pointerId: 2 })
+    expect(play.input).toMatchObject({ right: true, jump: true })
+    act(() => fire({ type: 'finish', result: { timeMs: 1000, bestMs: 900, newBest: false, coins: 0, total: 27, score: 5900, bonus: 5900, bestScore: 9000, newBestScore: false, shrimp: 0, shrimpTotal: 5 } }))
+    expect(screen.queryByTestId('jelly-pads')).toBeNull()
+    expect(play.input).toMatchObject({ left: false, right: false, jump: false, down: false, smash: false })
   })
 
   it('the pads give way to the finish card', async () => {

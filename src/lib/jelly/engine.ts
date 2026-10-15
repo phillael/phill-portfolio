@@ -66,6 +66,8 @@ export interface NavView {
 
 /** PLAYER 1 START's state, as its button knows it (playing and shroom mode the engine knows itself) */
 export type StartArtStatus = 'ready' | 'loading' | 'unavailable'
+/** `play.enter()`: on; not now (the resume isn't open and settled: try again); or Phill or Play's code failed to load */
+export type PlayEnter = 'on' | 'later' | 'failed'
 
 export interface JellyStats {
   words: number
@@ -567,30 +569,32 @@ export function createJellyEngine({ canvas, music, onFind, onOpen, onLanded, onC
    * Play as Phill: loads the cast (if it hasn't yet) and Play's chunk, then he takes the bottom line.
    * Resolves to whether Play started (false: the resume isn't settled, or loading failed).
    */
-  async function enterPlay() {
-    if (playing) return true
-    if (!open || cl) return false
+  /** Enter Play: 'on', 'later' (not now: the resume isn't open and settled; try again) or 'failed' (Phill or Play's code didn't load) */
+  async function enterPlay(): Promise<PlayEnter> {
+    if (playing) return 'on'
+    if (!open || cl) return 'later'
     const [ok, mod] = await Promise.all([
       loadCast(),
       import('./play').catch((err) => { console.warn('Play mode failed to load', err); return null }),
       whenSettled(), // (pressed during the entrance: once it has printed)
     ])
-    if (disposed || !ok || !mod || !cast || !settledNow()) return false
+    if (!ok || !mod || !cast) return disposed ? 'later' : 'failed'
+    if (disposed || !settledNow()) return 'later'
     // a frame each: build Play (the level, his rig), then start it (the Play HUD mounts and lays out after that)
     if (!play) {
       await nextTask()
-      if (disposed || !settledNow()) return false
+      if (disposed || !settledNow()) return 'later'
       play ??= mod.createPlay({ w, cast, params: playParams, input: playInput, viewH: () => cssH, ui, emit: emitPlay })
       await nextTask()
-      if (disposed || !settledNow()) return false
+      if (disposed || !settledNow()) return 'later'
     }
-    if (playing) return true
+    if (playing) return 'on'
     if (w.hole.on) releaseHole(w)
     find('')
     playing = true
     play.enter()
     void cast.loadLasagna(nextTask) // round 2's enemy: only now that Play has started
-    return true
+    return 'on'
   }
 
   /** Leave Play (he hops back to his orbit; instant: no hop, e.g. the resume is closing) */

@@ -326,7 +326,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
     if (!engine || playStatus !== 'ready' || engine.play.isOn()) return
     engine.gesture()
     setPlayStatus('loading')
-    engine.play.enter().then((ok) => setPlayStatus(ok ? 'ready' : 'unavailable'))
+    engine.play.enter().then((r) => setPlayStatus(r === 'failed' ? 'unavailable' : 'ready')) // ('later': not now, e.g. the intro replayed while it loaded)
   }, [engine, playStatus])
   useEffect(() => {
     if (!engine) return
@@ -400,6 +400,7 @@ const JellyResumeCanvas = ({ mode = 'direct', find = null, closing = false, onCl
         if (k === 'escape') { e.stopPropagation(); engine.play.exit() }
         else if (k === 'enter') { if (!onButton(e) && engine.play.state()?.finished) engine.play.again() } // the finish card's Play again
         else if (a) {
+          if (a === 'smash' && onButton(e)) return // (Space on a focused button presses it: ✕ Exit, the finish card's)
           e.preventDefault()
           engine.play.input[a] = true
           if (!e.repeat && a !== 'left' && a !== 'right') engine.play.input.pressed.add(a)

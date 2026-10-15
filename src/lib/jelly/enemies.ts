@@ -312,6 +312,20 @@ export function smashLasagna(e: Lasagna, box: Box, dir: number): 'flung' | 'tink
 }
 
 /**
+ * The run's next lasagna line, given his feet (y): lines he's already more than `passed` below are dropped from the
+ * plan (he dodged past them; they'd stall the queue); it's due once he's above its line by at most `ahead` (−1 till then).
+ */
+export function nextFoeLine(plan: number[], inkTop: (line: number) => number, y: number, ahead: number, passed = 0.5) {
+  while (plan.length && inkTop(plan[0]) > y + passed) plan.shift()
+  if (!plan.length) return -1
+  const top = inkTop(plan[0])
+  return top < y && y - top <= ahead ? plan[0] : -1
+}
+
+/** one he's left behind (patrolling or walking off more than `behind` above him: Play uses half a screen, off the top of the view) retires, so the next can come out */
+export const leftBehind = (e: Lasagna, y: number, behind: number) => !e.huge && (e.state === 'patrol' || e.state === 'leave') && e.y - y > behind
+
+/**
  * A run's lasagnas: `n` lines, one in each of `n` stretches of the lower part of the page (they're met on the way
  * down), long enough to patrol, at least two lines from any of `avoid` (the UFOs' and shrimp's).
  */

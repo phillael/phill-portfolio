@@ -4,7 +4,7 @@
  */
 
 import { bodyBox, feetBox, lasagnaBody, lasagnaKick, overlaps, smashBox, trampleBox } from '@/lib/jelly/hitboxes'
-import { createLasagna, dropGiant, growLasagna, lasagnaLines, shrinkLasagna, smashLasagna, stepLasagna, type EnemyEvent, type EnemyWorld, type Him } from '@/lib/jelly/enemies'
+import { createLasagna, dropGiant, growLasagna, lasagnaLines, leftBehind, nextFoeLine, shrinkLasagna, smashLasagna, stepLasagna, type EnemyEvent, type EnemyWorld, type Him } from '@/lib/jelly/enemies'
 import type { Surface } from '@/lib/jelly/platforms'
 
 /** lines at y = 2, 1.83, 1.66, … (index 0 at the top), all from x −3 to 3 */
@@ -275,5 +275,37 @@ describe('the giant (in the trip)', () => {
     expect(e.line).toBe(5)
     expect(ev.filter((x) => x.kind === 'huge')).toHaveLength(1)
     expect(e.state).toBe('chase')
+  })
+})
+
+describe("the run's queue of lasagnas", () => {
+  const inkTop = (i: number) => 2 - i * 0.17 // (LINES)
+  it('the next one comes out on its line once he is within reach above it, not before', () => {
+    const plan = [10, 30]
+    expect(nextFoeLine(plan, inkTop, inkTop(0), 1)).toBe(-1) // (10 lines = 1.7 below him: too far)
+    expect(nextFoeLine(plan, inkTop, inkTop(5), 1)).toBe(10)
+    expect(plan).toEqual([10, 30]) // (Play takes it off when it puts it out)
+    expect(nextFoeLine(plan, inkTop, inkTop(10), 1)).toBe(-1) // (on its line: wait)
+  })
+
+  it("lines he's already well below are dropped, so a dodged one never stalls the queue", () => {
+    const plan = [10, 30]
+    expect(nextFoeLine(plan, inkTop, inkTop(12), 2)).toBe(-1) // (2 lines past it: within the margin, wait)
+    expect(plan).toEqual([10, 30])
+    expect(nextFoeLine(plan, inkTop, inkTop(25), 2)).toBe(30) // (15 lines past it: dropped; the next is due)
+    expect(plan).toEqual([30])
+    expect(nextFoeLine(plan, inkTop, inkTop(40), 2)).toBe(-1)
+    expect(plan).toEqual([])
+  })
+
+  it('one left behind (patrolling well above him) retires; a giant or one on his heels never does', () => {
+    const e = createLasagna(0, inkTop(5), 5, 1)
+    expect(leftBehind(e, inkTop(6), 1.5)).toBe(false)
+    expect(leftBehind(e, inkTop(20), 1.5)).toBe(true) // (2.55 above him)
+    e.state = 'charge'
+    expect(leftBehind(e, inkTop(20), 1.5)).toBe(false)
+    e.state = 'patrol'
+    e.huge = true
+    expect(leftBehind(e, inkTop(20), 1.5)).toBe(false)
   })
 })

@@ -13,7 +13,7 @@ import { resetView, type UiInsets } from './camera'
 import { FOV, LOOSE, PAD_TOP, PAD_X, PLAY_R2, ZMAX, ZMIN, type AwardKind, type PlayConfig } from './config'
 import { lcg, Q, type Vec3 } from './math'
 import { burst, healAll } from './physics'
-import { createLasagna, dropGiant, growLasagna, lasagnaLines, shrinkLasagna, smashLasagna, squashShape, stepLasagna, type EnemyEvent, type EnemyWorld, type Lasagna } from './enemies'
+import { createLasagna, dropGiant, growLasagna, lasagnaLines, leftBehind, nextFoeLine, shrinkLasagna, smashLasagna, squashShape, stepLasagna, type EnemyEvent, type EnemyWorld, type Lasagna } from './enemies'
 import { smashBox } from './hitboxes'
 import { Boost, placeShrimp, touchesShrimp, type ShrimpSpot } from './pickups'
 import { buildLevel, solid, surfaceAt, type Level, type Surface } from './platforms'
@@ -532,12 +532,13 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     giantView = giantStep = 0
   }
 
-  /** the next one comes out on its line when he's within 1.5 screens above it, as far across the line from him as it goes */
+  /** the next one comes out on its line when he's within 1.5 screens above it, as far across the line from him as it goes (lines he's already past are skipped) */
   function spawnFoe() {
     const a = cast.lasagna()
     if (!a || foes.length || !lasagnaPlan.length) return
-    const line = lasagnaPlan[0], l = level.lines[line]
-    if (l.inkTop >= y || y - l.inkTop > 3 * w.cam.halfH) return
+    const line = nextFoeLine(lasagnaPlan, (i) => level.lines[i].inkTop, y, 3 * w.cam.halfH)
+    if (line < 0) return
+    const l = level.lines[line]
     lasagnaPlan.shift()
     const words = l.bodies.map((bi) => w.bodies[bi]).filter((bd) => solid(bd) && Math.abs((bd.x0 + bd.x1) / 2) < w.pageW / 2 - 0.4)
     if (!words.length) return
@@ -576,7 +577,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     // (one at a time: the one out, far away, goes back to wait on its line if he hasn't met it yet)
     for (let i = foes.length - 1; i >= 0; i--) {
       const e = foes[i].e
-      if (e.state === 'patrol' && e.line > (grounded ? ground.line : -1) && !lasagnaPlan.includes(e.line)) lasagnaPlan.unshift(e.line)
+      if (e.state === 'patrol' && e.y < y - 0.1 && !lasagnaPlan.includes(e.line)) lasagnaPlan.unshift(e.line) // (its line is below him)
       removeFoe(i)
     }
     const lim = w.pageW / 2 - 0.7
@@ -595,6 +596,7 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     let view = 0, stepNear = 0
     giantStep = 0
     for (let i = foes.length - 1; i >= 0; i--) {
+      if (leftBehind(foes[i].e, y, w.cam.halfH)) { removeFoe(i); continue } // (dodged, and off the top of the view: make way for the next)
       const f = foes[i], e = f.e, a = f.prop.model as { extent: number; height: number }
       foeEvents.length = 0
       stepLasagna(e, dt, { x, y, vy, line: grounded ? ground.line : -1, falling: live && !grounded && vy < 0 && flailT < 0, inv: !live || invT > 0 || flailT >= 0 }, enemyWorld, foeEvents)
@@ -796,6 +798,9 @@ export function createPlay({ w, cast, params: P, input, viewH, ui, emit }: PlayC
     anchorY = level.lines[level.start].inkTop
     splat = true
     pose.play('idle', 0.2)
+    // nothing held carries over (a finger left on a pad as the finish card replaced them never got its pointerup)
+    input.left = input.right = input.jump = input.down = input.smash = false
+    input.pressed.clear()
     emit({ type: 'again' })
   }
 

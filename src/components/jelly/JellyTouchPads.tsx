@@ -7,7 +7,7 @@
  * directly and show pressed through a data attribute (no React state while you play).
  */
 
-import { useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import type { JellyEngine } from '@/lib/jelly/engine'
 
 type Action = 'jump' | 'smash' | 'down'
@@ -28,6 +28,8 @@ const block = (e: { preventDefault: () => void }) => e.preventDefault()
 
 const JellyTouchPads = ({ engine, rootRef }: JellyTouchPadsProps) => {
   const input = engine.play.input
+  // going away (the finish card, leaving) with a finger still down: its pointerup never comes, so let go of everything
+  useEffect(() => () => { input.left = input.right = input.jump = input.down = input.smash = false }, [input])
 
   // ---- the move pad: one finger steers; which half it's over picks the direction (so a slide turns him) ----
   const mover = useRef<number | null>(null)

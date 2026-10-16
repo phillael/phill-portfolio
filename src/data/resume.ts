@@ -3,9 +3,12 @@
  * the 3D Jelly Resume (drawn from public/resume/snapshot.json) shows the same words.
  *
  * Mirrors Rezmancer's content/resume.yaml with its AI Engineer variant applied (the
- * variant the snapshot is generated from: 8 TimelyCare bullets in that order). The
- * phone number and email are left out on purpose: the repo and the site are public.
- * `**double asterisks**` mark bold runs, as in Rezmancer.
+ * variant the snapshot is generated from: 8 TimelyCare bullets in that order), including
+ * the TimelyCare title history (Software Engineer → Senior Software Engineer II →
+ * Generative AI Engineer, newest first). The phone number and email are left out on
+ * purpose: the repo and the site are public. `**double asterisks**` mark bold runs, as
+ * in Rezmancer. The home page's Experience section, the Wizard and the JSON-LD read it
+ * through src/data/career.ts.
  */
 
 export interface ResumeContact {
@@ -74,7 +77,8 @@ export const resume: Resume = {
       dates: 'Feb 2023 – Present',
       roles: [
         { title: 'Generative AI Engineer', dates: 'Apr 2026 – Present' },
-        { title: 'Senior Software Engineer II', dates: 'Feb 2023 – Apr 2026' },
+        { title: 'Senior Software Engineer II', dates: 'Apr 2025 – Apr 2026' },
+        { title: 'Software Engineer', dates: 'Feb 2023 – Apr 2025' },
       ],
       bullets: [
         { id: 'nurture-rebuild', text: 'Took a dormant in-house marketing platform that had **never sent a message** to production in **~4 weeks (40 merged PRs)** to replace Customer.io for ~1.4M students, adding SSO, AWS Terraform, SES, segmentation, broadcasts, and automations.' },
@@ -116,6 +120,9 @@ export const resume: Resume = {
   },
   education: [{ degree: 'B.A. Jazz Studies', school: 'University of North Texas' }],
 }
+
+/** The PDF the nav, /resume and the 3D resume's HUD link to (Rezmancer's AI Engineer build). */
+export const RESUME_PDF = '/Phill_Aelony_Resume.pdf'
 
 /** Split `**bold**` markup into runs. */
 export const richText = (s: string) =>

@@ -76,6 +76,17 @@ describe('/resume page', () => {
     expect(within(experience).getByText('never sent a message').tagName).toBe('STRONG')
   })
 
+  it('lists the three TimelyCare titles under TimelyCare, newest first', () => {
+    render(<ResumePage />)
+
+    const roles = screen.getByRole('list', { name: 'Roles at TimelyCare' })
+    expect(within(roles).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Generative AI EngineerApr 2026 – Present',
+      'Senior Software Engineer IIApr 2025 – Apr 2026',
+      'Software EngineerFeb 2023 – Apr 2025',
+    ])
+  })
+
   it('offers the PDF download and a way back home', () => {
     render(<ResumePage />)
 

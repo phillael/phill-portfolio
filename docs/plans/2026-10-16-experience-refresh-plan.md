@@ -154,7 +154,50 @@ The TimelyCare card goes (it's in Experience now). `project-details.json` (Wizar
   - *Done 2026-10-16:* `CLAUDE.md` (career.ts + its grounding test, `components/experience/` + `HudButton`, `SiteMusic.open`, `RESUME_PDF`, Play's 48 lines / seven checkpoints; it never named `experience.json`); `package.json` + lock → 1.6.0. Gates: `npx tsc --noEmit` clean · `npm run lint` clean (0 warnings) · `npx jest --no-watchman` 58 suites / 635 tests passed (6.8 s) · `npm run build` OK (13 routes).
 - [x] **T13: performance + a11y pass** (production build: `npm run build && npm run start`). Chrome trace, emulated phone (390×844, 4× CPU), scrolling the section top to bottom: record DrawFrame fps and the longest task; no task > 50 ms from this section; the tile count-ups and rail never cause layout per frame (no layout reads inside rAF). Keyboard: Tab through the tiles (Enter/Space toggle, Esc closes), Listen, both CTAs, visible focus everywhere; `prefers-reduced-motion` emulated: nothing moves, the rail is full, numbers final. Lighthouse accessibility on `/` ≥ the T0 baseline. Record the numbers here.
   - *Done 2026-10-16, production build (`npm run build && npm run start -- -p 3002`), fresh browser context, 390×844 @3x touch, 4× CPU, the section scrolled top to bottom (8 px per frame, ~9 s):* the first trace found three problems, all fixed in this task: (1) the rail head moved by `top` (a layout every frame; now a rail-tall layer moved by `translateY`); (2) on phones the count-up changed the number's width, so the label beside it re-wrapped and the tile's title/stack and everything below jumped (**CLS 1.79**; now the final value, invisible, sizes the number and the count-up sits on top of it out of flow); (3) `--p` written on the track restyled the whole section every frame (p90 296 elements, ~6 ms; now on the rail: p90 11 elements, 0.6 ms) and the first `toLocaleString` built ICU's formatter in a frame (24 ms; now a regex). **After:** 548 DrawFrames in 9.17 s = **59.8 fps** (headless Chrome is 60 Hz; the headful 120 Hz run before the fixes drew 118 fps); **longest task 7.4 ms** (a GC; none > 50 ms, none from the section); **CLS 0** (no layout shifts during the scroll); **0 layouts inside rAF** (the section never reads layout in a frame); style recalc total 215 ms (was 2,267). Not this section: `react-use-measure` (R3F) reads `getBoundingClientRect` in its scroll handler; it now costs < 1 ms since the section no longer dirties styles. **Keyboard** (1280×800): Tab goes tile 1–4 → Listen → Open the 3D resume → Download the PDF → Skills, each `:focus-visible` with a 2px outline (cyan; magenta on Listen), targets ≥ 54 px tall; Enter/Space toggle a tile, Esc closes it and focus stays. **Reduced motion** (emulated): `document.getAnimations()` running = none on the whole page, the rail fully drawn (`scaleY(1)`, no `data-live`), every node lit, numbers final (~5, ~750, ~68K, 6,700+), nothing armed or hidden. **Lighthouse 12.8 accessibility on `/`: 100** (mobile), same as the baseline (the live site, v1.5.0 = master: 100; T0 recorded none); its one zero-weight item is the hero photo's button on both. No console errors.
-- [ ] **T14: PR text. STOP before pushing and ask Phill.** Write the PR title/body here (summary, the binding decisions, screenshots to take, measurements, test plan, the About ¶4 wording and the three-roles wording (lede, note 16, Wizard summary) to approve, `🤖 Generated with [Claude Code](https://claude.com/claude-code)` at the end). On Phill's go only: `git push -u origin feat/experience-refresh` + `gh pr create --base master`.
+- [ ] **T14: PR text. STOP before pushing and ask Phill.**
+  - *2026-10-16:* PR text written (below, before Per-task verification); Acceptance run on the production build, all ten pass (see T13's note and the PR's test plan). **Waiting on Phill's go** for `git push -u origin feat/experience-refresh` + `gh pr create --base master`. Write the PR title/body here (summary, the binding decisions, screenshots to take, measurements, test plan, the About ¶4 wording and the three-roles wording (lede, note 16, Wizard summary) to approve, `🤖 Generated with [Claude Code](https://claude.com/claude-code)` at the end). On Phill's go only: `git push -u origin feat/experience-refresh` + `gh pr create --base master`.
+
+### T14: PR text (written 2026-10-16; waiting on Phill's go to push and open it)
+
+**Title:** `feat: Experience refresh: the career section, the Wizard and the neighbours (v1.6.0)`
+
+**Body:**
+
+```markdown
+## Summary
+The home page's Experience section is rebuilt as mockup E2 (`docs/design/experience-refresh/round2/e2-hud.html`): Apple-clean with a light HUD. "Senior AI Engineer" headline, a rail that fills with the scroll and lights a node per stop, TimelyCare's three titles as a ladder of promotions, four glass HUD tiles (count-up, spotlight + tilt on fine pointers, tap pulse on touch, one sentence of detail each), one line per earlier job, music in magenta with **Listen** (opens the site's player), and HUD buttons to the 3D resume and the PDF.
+
+One source of truth: `src/data/career.ts` takes titles, companies and dates from `resume.ts` (Rezmancer's AI Engineer variant) and adds the page's tiles and lines plus vetted notes for the Wizard. A grounding test fails if any number in it isn't in `resume.ts` or in its sourced `FACTS` list. The page, the Shroom Wizard's prompt and the JSON-LD all read it; `experience.json` is gone.
+
+Also: Projects gains Quadzilla, Rezmancer and the Jelly Resume (the TimelyCare card goes; Number Slayers links numberslayers.com); the nav/`/resume`/3D-HUD PDF is Rezmancer's latest build behind one `RESUME_PDF`; the 3D resume is regenerated with the three titles (Play gains a checkpoint); hero h1, About ¶4, skills and the Wizard's summary lose the 2025 claims; `SiteMusic.open()`.
+
+## Decisions (Phill's, from the design rounds)
+- Titles: Software Engineer (Feb 2023) → Senior Software Engineer II (Apr 2025) → Generative AI Engineer (Apr 2026); headline "Senior AI Engineer"
+- Care operations replaces the Growth tile; no hologram header, no pixel font, no square corner brackets, no `?play` hook, no stats readout
+- Public repo: no school, customer or people names; no vendor but Customer.io; "replacement for", never "replaced"
+
+## Please approve the wording
+- About ¶4: "… and now I am a Generative AI Engineer at **TimelyCare**, building AI agents and whole platforms, and it is awesome and I do great work."
+- The three-roles line (your mid-build ask): the lede "Today I own platforms end to end, as engineer, designer and product manager, and build AI into them."; the Wizard's summary "… as engineer, designer and product manager in one …"; and a Wizard note listing stakeholders, design + build, legal/compliance and HIPAA, providers' needs, and telling the company what changed
+
+## Measurements (production build, 390×844 @3x, 4× CPU, scrolling the section top to bottom)
+- 59.8 fps drawn (headless, 60 Hz), longest task 7.4 ms (none > 50 ms), CLS 0, no layout reads inside rAF
+- The first trace caught a CLS of 1.79 (the count-up re-wrapped tile labels on phones), a rail head moved by `top`, and `--p` restyling the whole section every frame: all fixed (perf commit)
+- Lighthouse accessibility on `/`: 100 (same as live v1.5.0)
+- Wizard system prompt: 20,943 → 23,610 chars
+
+## Test plan
+- [x] `npx tsc --noEmit`, `npm run lint` (0 warnings), `npx jest --no-watchman` (58 suites, 635 tests), `npm run build`
+- [x] 1280×800 next to the mockup: layout to the pixel, hover (tilt, spotlight, hologram number, notches), open/close, Esc, Listen, Open the 3D resume (opens, closes back to the same spot with focus on the button)
+- [x] 375×812 touch: rows, tap pulse, full-width buttons, no horizontal scroll
+- [x] Keyboard: tiles → Listen → both buttons, visible focus, Enter/Space/Esc
+- [x] Reduced motion: no running animations on the page, rail drawn, numbers final; the 3D button lands on the plain `/resume`
+- [x] The 3D resume shows the three titles; Play's toast "✓ CHECKPOINT 2025 Senior Software Engineer II"; it still dances to the site's player
+- [x] JSON-LD `jobTitle` "Generative AI Engineer"; all PDF links → `/Phill_Aelony_Resume.pdf`; no console errors on `/` and `/resume`
+- [ ] Screenshots for this PR: the section at 1280 (header, tiles, a tile hovered and opened, music + buttons) and at 375
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
 
 ## Per-task verification
 

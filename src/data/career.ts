@@ -42,6 +42,8 @@ export interface CareerJob {
   roles: CareerRole[]
   /** the current job only: what the role is, under the titles (no metric) */
   summary?: string
+  /** the current job only: a quiet line of throughput under the summary */
+  stat?: string
   /** TimelyCare only */
   tiles: CareerTile[]
   /** an earlier job's one-liner; TimelyCare: the "Before that" line under the tiles */
@@ -122,6 +124,8 @@ export const career: Career = {
       // Phill, 2026-10-16: product management is a big part of the job
       summary:
         "I'm the product manager on what I build, not just the engineer: I scope each platform with Finance, Care Operations and Marketing, design it, work it through legal and HIPAA review, learn what our clinicians and therapists need, ship it, and tell the company what changed.",
+      // Phill, 2026-10-16: the strongest number not on a tile (§4 note 14), as a quiet line
+      stat: 'Past year: 251 PRs merged and 392 reviewed, up to 46 a month.',
       tiles: [
         {
           id: 'nurture',

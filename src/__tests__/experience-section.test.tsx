@@ -67,6 +67,13 @@ describe('ExperienceSection', () => {
     expect(line.compareDocumentPosition(firstTile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('adds a quiet line of AI-native throughput after it (Phill, 2026-10-16)', () => {
+    render(<ExperienceSection />)
+    const stat = screen.getByText('Past year: 251 PRs merged and 392 reviewed, up to 46 a month.')
+    const line = screen.getByText(/^I'm the product manager on what I build/)
+    expect(line.nextElementSibling).toBe(stat)
+  })
+
   it('has the four tiles with their numbers', () => {
     render(<ExperienceSection />)
     for (const tile of career.jobs[0].tiles) {

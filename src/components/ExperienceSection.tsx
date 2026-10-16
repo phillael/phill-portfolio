@@ -79,6 +79,7 @@ const ExperienceSection = () => {
               <p className={css.blurb}>{timelycare.blurb}</p>
               <TitleLadder company={timelycare.company} roles={timelycare.roles} />
               {timelycare.summary && <p className={css.roleLine}>{timelycare.summary}</p>}
+              {timelycare.stat && <p className={css.meta}>{timelycare.stat}</p>}
             </div>
             <div className={css.bento}>
               {timelycare.tiles.map((tile, i) => (

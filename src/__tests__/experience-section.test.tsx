@@ -54,6 +54,19 @@ describe('ExperienceSection', () => {
     ])
   })
 
+  it('says under the titles that the job is product management too (Phill, 2026-10-16)', () => {
+    render(<ExperienceSection />)
+    const line = screen.getByText(/^I'm the product manager on what I build, not just the engineer:/)
+    expect(line).toHaveTextContent(
+      "I'm the product manager on what I build, not just the engineer: I scope each platform with Finance, Care Operations and Marketing, design it, work it through legal and HIPAA review, learn what our clinicians and therapists need, ship it, and tell the company what changed.",
+    )
+    const ladder = screen.getByRole('list', { name: 'Titles at TimelyCare, newest first' })
+    const firstTile = screen.getByRole('button', { name: career.jobs[0].tiles[0].title })
+    // after the titles, before the tiles
+    expect(ladder.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(line.compareDocumentPosition(firstTile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('has the four tiles with their numbers', () => {
     render(<ExperienceSection />)
     for (const tile of career.jobs[0].tiles) {

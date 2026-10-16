@@ -40,6 +40,8 @@ export interface CareerJob {
   current: boolean
   /** from resume.ts (TimelyCare: experience[0].roles; earlier jobs: resume.earlier) */
   roles: CareerRole[]
+  /** the current job only: what the role is, under the titles (no metric) */
+  summary?: string
   /** TimelyCare only */
   tiles: CareerTile[]
   /** an earlier job's one-liner; TimelyCare: the "Before that" line under the tiles */
@@ -117,6 +119,9 @@ export const career: Career = {
       dates: timelycare.dates,
       current: true,
       roles: timelycare.roles.map(roleOf),
+      // Phill, 2026-10-16: product management is a big part of the job
+      summary:
+        "I'm the product manager on what I build, not just the engineer: I scope each platform with Finance, Care Operations and Marketing, design it, work it through legal and HIPAA review, learn what our clinicians and therapists need, ship it, and tell the company what changed.",
       tiles: [
         {
           id: 'nurture',

@@ -15,6 +15,7 @@ const experienceForWizard = () => ({
     company: job.company,
     dates: job.dates,
     roles: job.roles.map(({ title, dates }) => ({ title, dates })),
+    ...(job.summary && { summary: job.summary }),
     ...(job.tiles.length && { highlights: job.tiles.map((t) => ({ title: t.title, detail: plain(t.detail) })) }),
     ...(job.line && { line: plain(job.line) }),
   })),

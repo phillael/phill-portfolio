@@ -49,7 +49,7 @@ Effects to keep (all CSS transforms/opacity + small rAF writers; no React state 
 ### 2. Copy (exact)
 Section: eyebrow **Experience** (the `h2`, `id="experience-heading"`, section `id="experience"`), headline **Senior AI Engineer** (from `resume.headline`), lede **"Eight years shipping production software across web, mobile and cloud. Today I own platforms end to end, as engineer, designer and product manager, and build AI into them."** (Phill, 2026-10-16, mid-loop: emphasize that in the current role he's the engineer, designer and product manager in one; the three-roles clause is this loop's wording, flagged in the PR for his OK)
 
-TimelyCare: company **TimelyCare**, blurb **"Virtual health for colleges and universities"**, dates **Feb 2023 – Present**, "Now" marker. Tiles (name · metric · metric label · title · detail · stack):
+TimelyCare: company **TimelyCare**, blurb **"Virtual health for colleges and universities"**, dates **Feb 2023 – Present**, "Now" marker. Under the titles ladder, a role line (Phill, 2026-10-16, after the build: product management is a big part of the job; he picked a line over a tile): **"I'm the product manager on what I build, not just the engineer: I scope each platform with Finance, Care Operations and Marketing, design it, work it through legal and HIPAA review, learn what our clinicians and therapists need, ship it, and tell the company what changed."** Tiles (name · metric · metric label · title · detail · stack):
 
 | # | Name | Metric | Label | Title | Detail (tap/click to open) | Stack |
 |---|---|---|---|---|---|---|
@@ -179,6 +179,7 @@ Also: Projects gains Quadzilla, Rezmancer and the Jelly Resume (the TimelyCare c
 ## Please approve the wording
 - About ¶4: "… and now I am a Generative AI Engineer at **TimelyCare**, building AI agents and whole platforms, and it is awesome and I do great work."
 - The three-roles line (your mid-build ask): the lede "Today I own platforms end to end, as engineer, designer and product manager, and build AI into them."; the Wizard's summary "… as engineer, designer and product manager in one …"; and a Wizard note listing stakeholders, design + build, legal/compliance and HIPAA, providers' needs, and telling the company what changed
+- The product-manager line under your titles (your pick after the build): "I'm the product manager on what I build, not just the engineer: I scope each platform with Finance, Care Operations and Marketing, design it, work it through legal and HIPAA review, learn what our clinicians and therapists need, ship it, and tell the company what changed."
 
 ## Measurements (production build, 390×844 @3x, 4× CPU, scrolling the section top to bottom)
 - 59.8 fps drawn (headless, 60 Hz), longest task 7.4 ms (none > 50 ms), CLS 0, no layout reads inside rAF

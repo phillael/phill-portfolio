@@ -348,6 +348,14 @@
   box-shadow: 0 0 10px var(--cyan);
 }
 
+/* what the current role is, under the titles */
+.roleLine {
+  margin-top: 1.75rem;
+  max-width: 44rem;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+}
+
 /* the tiles: one wide + three (≥ 1000px), two columns (640–999), rows (< 640) */
 .bento {
   margin-top: clamp(2.25rem, 5vw, 3rem);

@@ -1,0 +1,560 @@
+/*
+ * The Experience section's HUD tile (mockup: docs/design/experience-refresh/round2/e2-hud.html
+ * + hud.css). Glass with two soft corner arcs, notched edge accents, a spotlight and tilt for
+ * fine pointers, a scan + flicker reveal, a + ring, and the tech line pinned to the bottom.
+ * Phones (< 640px): plain rows, no glass, hairlines between. States set by the component:
+ * data-armed (hidden until revealed), data-in (revealed), data-tilt (on/off), .open.
+ */
+.tile {
+  --cyan: hsl(var(--primary));
+  --ink: hsl(var(--foreground));
+  --ink-2: hsl(195 18% 72%);
+  --ink-3: hsl(198 14% 56%);
+  --glass: hsl(200 40% 10% / 0.45);
+  --glass-hi: hsl(190 100% 75% / 0.06);
+  --hair: hsl(190 100% 75% / 0.14);
+  --hair-strong: hsl(190 100% 75% / 0.32);
+  --radius: 22px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --pad: clamp(1.4rem, 2.6vw, 2rem);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--glass-hi), transparent 40%), var(--glass);
+  border: 1px solid var(--hair);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow:
+    0 30px 80px -40px hsl(190 100% 50% / 0.25),
+    inset 0 1px 0 hsl(190 100% 90% / 0.08);
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  font-feature-settings: 'tnum' 1;
+  transition:
+    box-shadow 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+/* the two soft corner arcs (top-left, bottom-right), always on */
+.tile::before,
+.tile::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  border-color: var(--cyan);
+  border-style: solid;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 4px hsl(190 100% 70% / 0.8));
+}
+.tile::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1.5px 0 0 1.5px;
+  border-top-left-radius: var(--radius);
+}
+.tile::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 1.5px 1.5px 0;
+  border-bottom-right-radius: var(--radius);
+}
+.tile:hover,
+.tile:focus-within {
+  border-color: hsl(190 100% 75% / 0.35);
+  box-shadow:
+    0 0 34px -8px hsl(190 100% 70% / 0.5),
+    0 30px 80px -40px hsl(190 100% 50% / 0.35);
+}
+.tile.open {
+  border-color: var(--hair-strong);
+}
+
+/* reveal: hidden only once JS has armed it (no-JS shows everything) */
+.tile[data-armed] {
+  transition:
+    opacity 0.8s var(--ease) var(--d, 0ms),
+    transform 0.8s var(--ease) var(--d, 0ms),
+    box-shadow 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+.tile[data-armed]:not([data-in]) {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+/* tilt toward the cursor (fine pointers; the component writes --rx/--ry) */
+.tile[data-in][data-tilt='on'] {
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition:
+    transform 0.12s linear,
+    box-shadow 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+.tile[data-in][data-tilt='off'] {
+  transition:
+    transform 0.6s var(--ease),
+    box-shadow 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+
+/* a light running along the top edge on hover */
+.sweep {
+  position: absolute;
+  top: 0;
+  left: var(--radius);
+  right: var(--radius);
+  height: 1px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, hsl(190 100% 88% / 0.95), transparent) no-repeat;
+  background-size: 35% 100%;
+  background-position: -60% 0;
+}
+.tile:hover .sweep,
+.tile:focus-within .sweep {
+  opacity: 1;
+  animation: sweep 1.8s var(--ease) 1 forwards;
+}
+@keyframes sweep {
+  to {
+    background-position: 160% 0;
+    opacity: 0.25;
+  }
+}
+
+/* effect layers */
+.fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: var(--radius);
+  z-index: 1;
+}
+.fxClip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* notched edge accents + a tick strip, extending on hover */
+.frame {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.frame::before,
+.frame::after {
+  content: '';
+  position: absolute;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  transform-origin: left;
+  transition:
+    transform 0.5s var(--ease),
+    opacity 0.5s var(--ease);
+  opacity: 0.7;
+}
+.frame::before {
+  top: -1px;
+  left: 58%;
+  width: 18%;
+}
+.frame::after {
+  bottom: -1px;
+  left: 14%;
+  width: 12%;
+}
+.frame i {
+  position: absolute;
+  top: 5px;
+  left: calc(76% + 10px);
+  width: 22px;
+  height: 3px;
+  opacity: 0.5;
+  background: repeating-linear-gradient(90deg, var(--cyan) 0 2px, transparent 2px 6px);
+}
+.tile:hover .frame::before,
+.tile:focus-within .frame::before {
+  transform: scaleX(1.6);
+  opacity: 1;
+}
+.tile:hover .frame::after,
+.tile:focus-within .frame::after {
+  transform: scaleX(1.8);
+  opacity: 1;
+}
+
+/* cursor spotlight: a sheen on the glass and a ring along the border */
+.sheen {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease);
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), hsl(190 100% 85% / 0.11), transparent 45%);
+}
+.spot {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease);
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), hsl(190 100% 85%), hsl(190 100% 70% / 0.35) 35%, transparent 65%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.tile[data-tilt='on'] .sheen,
+.tile[data-tilt='on'] .spot {
+  opacity: 1;
+}
+
+/* reveal: one scan sweep + a short power-on flicker */
+.scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 40%;
+  opacity: 0;
+  background: linear-gradient(to bottom, transparent, hsl(190 100% 80% / 0.09) 85%, hsl(190 100% 90% / 0.35) 99%, transparent);
+}
+.tile[data-armed][data-in] .scan {
+  animation: scan 1.3s var(--ease) calc(var(--d, 0ms) + 150ms) 1 both;
+}
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(260%);
+    opacity: 0;
+  }
+}
+.tile[data-armed][data-in] .num {
+  animation: boot 0.7s steps(1) calc(var(--d, 0ms) + 100ms) 1 both;
+}
+@keyframes boot {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  30% {
+    opacity: 0.15;
+  }
+  45% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.5;
+  }
+  70%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* tap pulse (touch; the component animates it from the finger) */
+.tap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  opacity: 0;
+  background: radial-gradient(circle, hsl(190 100% 80% / 0.45), transparent 70%);
+}
+
+/* the button: name, number, title, then the tech line pinned to the bottom */
+.btn {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-areas: 'name' 'metric' 'title' 'stack';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto 1fr;
+  row-gap: 1rem;
+  align-content: start;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--pad);
+  padding-right: calc(var(--pad) + 2.5rem);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: -4px;
+}
+.name {
+  grid-area: name;
+  font: 700 0.74rem/1.3 var(--font-body);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.metric {
+  grid-area: metric;
+}
+.num {
+  display: block;
+  white-space: nowrap;
+  font: 400 clamp(2.2rem, 4.4vw, 3rem) / 1 var(--font-heading);
+  color: #fff;
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 18px hsl(190 100% 70% / 0.35);
+}
+/* a faint hologram split on hover */
+.tile:hover .num,
+.tile:focus-within .num {
+  text-shadow:
+    -1.5px 0 hsl(290 100% 72% / 0.65),
+    1.5px 0 hsl(186 100% 60% / 0.75),
+    0 0 24px hsl(190 100% 70% / 0.7);
+}
+.unit {
+  margin-left: 0.25em;
+  font: 600 0.38em/1 var(--font-body);
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  text-shadow: none;
+}
+.numLabel {
+  display: block;
+  margin-top: 0.55rem;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.title {
+  grid-area: title;
+  max-width: 30rem;
+  font-weight: 600;
+  font-size: 1.08rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.stack {
+  grid-area: stack;
+  align-self: end;
+  padding-top: 0.35rem;
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
+  color: var(--cyan);
+  opacity: 0.85;
+}
+.dot {
+  margin: 0 0.15em;
+  color: var(--ink-3);
+}
+.tech {
+  white-space: nowrap;
+}
+
+/* the + as a dashed HUD ring: the ring turns 90° on hover, the + turns 45° when open */
+.plus {
+  position: absolute;
+  top: calc(var(--pad) - 0.35rem);
+  right: calc(var(--pad) - 0.35rem);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  transition:
+    transform 0.4s var(--ease),
+    background 0.3s var(--ease);
+}
+.plus::before,
+.plus::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 1.5px;
+  background: var(--ink-2);
+  transform: translate(-50%, -50%);
+}
+.plus::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.plus svg {
+  position: absolute;
+  inset: -1px;
+  width: 32px;
+  height: 32px;
+  color: hsl(190 100% 75% / 0.6);
+  transition:
+    transform 0.7s var(--ease),
+    color 0.3s var(--ease);
+}
+.btn:hover .plus svg,
+.open .plus svg {
+  transform: rotate(90deg);
+  color: var(--cyan);
+}
+.open .plus {
+  transform: rotate(45deg);
+  background: hsl(190 100% 75% / 0.08);
+}
+
+/* the detail: a glowing line draws, then the sentence (smooth height + fade) */
+.detail {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.5s var(--ease),
+    opacity 0.25s var(--ease),
+    visibility 0s linear 0.5s;
+}
+.open .detail {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows 0.5s var(--ease),
+    opacity 0.5s var(--ease) 0.12s,
+    visibility 0s;
+}
+.detail > div {
+  overflow: hidden;
+  min-height: 0;
+}
+.detail p {
+  margin: 0;
+  max-width: 44rem;
+  padding: 0 var(--pad) var(--pad);
+  font-size: 1.02rem;
+  color: var(--ink-2);
+}
+.detail p::before {
+  content: '';
+  display: block;
+  height: 1px;
+  margin-bottom: 0.85rem;
+  background: linear-gradient(90deg, var(--cyan), hsl(190 100% 75% / 0.2) 60%, transparent);
+  box-shadow: 0 0 6px hsl(190 100% 70% / 0.6);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s var(--ease) 0.08s;
+}
+.open .detail p::before {
+  transform: scaleX(1);
+}
+.detail strong {
+  font-weight: 800;
+  color: #fff;
+}
+
+/* the wide tile: number on the left, the rest on the right */
+@media (min-width: 1000px) {
+  .wide .btn {
+    grid-template-areas: 'metric name' 'metric title' 'metric stack';
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto 1fr;
+    column-gap: 3rem;
+    align-items: end;
+  }
+  .wide .num {
+    font-size: clamp(3.4rem, 6vw, 4.6rem);
+  }
+  .wide .title {
+    font-size: 1.28rem;
+  }
+}
+
+/* phones: plain rows, no glass, hairlines between */
+@media (max-width: 639px) {
+  .tile {
+    --pad: 0px;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .tile:hover,
+  .tile:focus-within {
+    box-shadow: none;
+  }
+  .tile::before,
+  .tile::after,
+  .sweep,
+  .frame,
+  .scan,
+  .sheen,
+  .spot {
+    display: none;
+  }
+  .tile + .tile {
+    background: linear-gradient(90deg, var(--hair-strong), transparent) top / 100% 1px no-repeat;
+  }
+  .btn {
+    grid-template-rows: none;
+    row-gap: 0.55rem;
+    padding: 1.3rem 2.75rem 1.3rem 0;
+    border-radius: 8px;
+  }
+  .metric {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 0.7rem;
+  }
+  .num {
+    font-size: 1.9rem;
+  }
+  .numLabel {
+    margin-top: 0;
+  }
+  .stack {
+    padding-top: 0;
+  }
+  .plus {
+    top: 1.1rem;
+    right: 0;
+  }
+  .detail p {
+    padding: 0 0 1.3rem;
+  }
+}
+
+/* reduced motion: static; the spotlight may stay, nothing moves */
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .tile *,
+  .tile::before,
+  .tile::after,
+  .tile *::before,
+  .tile *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .tile[data-tilt] {
+    transform: none !important;
+  }
+}

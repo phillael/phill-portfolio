@@ -405,7 +405,7 @@ describe('playing', () => {
     expect(document.querySelector('p[aria-live="polite"]')).toHaveTextContent('The end. Score 6870, a new best. Time 0:42.3, best 0:40.0. Impact 19 of 27. Shrimp 3 of 5.')
     const again = screen.getByRole('button', { name: /Play again/ })
     expect(again).toHaveFocus()
-    expect(screen.getByRole('link', { name: /Resume PDF/ })).toHaveAttribute('href', '/Phillip_Aelony_Resume_2025.pdf')
+    expect(screen.getByRole('link', { name: /Resume PDF/ })).toHaveAttribute('href', '/Phill_Aelony_Resume.pdf')
     fireEvent.keyDown(again, { key: 'Enter' }) // Enter on the button itself: the button's own click (not twice)
     fireEvent.click(again)
     expect(play.again).toHaveBeenCalledTimes(1)

@@ -3,8 +3,9 @@
 import type { RefObject } from 'react'
 import type { JellyEngine } from '@/lib/jelly/engine'
 import { BTN, BTN_MUTED, KEY, ON, PANEL, PLAY_BTN } from '@/components/jelly/hudStyles'
+import { RESUME_PDF } from '@/data/resume'
 
-export const RESUME_PDF = '/Phillip_Aelony_Resume_2025.pdf'
+export { RESUME_PDF }
 
 export interface HudToggles {
   shroom: boolean
@@ -45,7 +46,7 @@ const JellyHudBar = ({ engine, toggles, onToggle, play, onPlay, rootRef }: Jelly
     >
       {play === 'loading' ? 'Loading…' : play === 'unavailable' ? 'Play unavailable' : <><span aria-hidden="true">🎮</span> Play<span className={KEY}> (J)</span></>}
     </button>
-    <a href={RESUME_PDF} download="Phillip_Aelony_Resume.pdf" aria-label="Download the PDF" title="Download the PDF" className={BTN}>
+    <a href={RESUME_PDF} download="Phill_Aelony_Resume.pdf" aria-label="Download the PDF" title="Download the PDF" className={BTN}>
       <span aria-hidden="true">⤓</span> PDF
     </a>
     <button type="button" aria-keyshortcuts="C" onClick={() => engine.chaos()} className={BTN}>

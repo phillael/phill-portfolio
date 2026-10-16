@@ -3,12 +3,12 @@ import Link from 'next/link'
 import SiteFooter from '@/components/SiteFooter'
 import JellyResumeRoute from '@/components/jelly/JellyResumeRoute'
 import ResumeContent from '@/components/ResumeContent'
+import { RESUME_PDF as PDF } from '@/data/resume'
 import { SITE_URL } from '@/lib/site'
 
 const TITLE = 'Phill Aelony | Resume'
 const DESCRIPTION =
   'Resume of Phill Aelony, Senior AI Engineer: full-stack, agentic systems, TypeScript, React, Node and AWS. 8 years shipping production software across web, mobile and cloud.'
-const PDF = '/Phillip_Aelony_Resume_2025.pdf'
 // The site's share card (app/opengraph-image.tsx). Setting openGraph here replaces the
 // layout's, file-based image included, so it's named again.
 const SHARE_IMAGE = {

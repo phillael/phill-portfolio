@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { RESUME_PDF } from '@/data/resume'
 
 interface ResumeDownloadButtonProps {
   variant?: 'desktop' | 'mobile' | 'section'
@@ -70,7 +71,7 @@ const ResumeDownloadButton = ({
         </span>
       )}
       <motion.a
-        href="/Phillip_Aelony_Resume_2025.pdf"
+        href={RESUME_PDF}
         download
         aria-label="Download Phill's resume as PDF"
         className={`${baseClasses} ${variantClasses[variant]}`}

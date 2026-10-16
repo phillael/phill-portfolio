@@ -170,7 +170,7 @@ describe('Phase 3 Integration: Resume Download Flow', () => {
     expect(link).toHaveAttribute('download')
 
     // Verify correct PDF path
-    expect(link).toHaveAttribute('href', '/Phillip_Aelony_Resume_2025.pdf')
+    expect(link).toHaveAttribute('href', '/Phill_Aelony_Resume.pdf')
 
     // Verify accessible label
     expect(link).toHaveAttribute('aria-label')
@@ -200,7 +200,7 @@ describe('Phase 3 Integration: Resume Download Flow', () => {
 
     // Verify link still functions
     const link = screen.getByRole('link')
-    expect(link).toHaveAttribute('href', '/Phillip_Aelony_Resume_2025.pdf')
+    expect(link).toHaveAttribute('href', '/Phill_Aelony_Resume.pdf')
   })
 })
 

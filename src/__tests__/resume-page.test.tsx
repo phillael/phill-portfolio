@@ -91,7 +91,7 @@ describe('/resume page', () => {
     render(<ResumePage />)
 
     const pdf = screen.getByRole('link', { name: /download pdf/i })
-    expect(pdf).toHaveAttribute('href', '/Phillip_Aelony_Resume_2025.pdf')
+    expect(pdf).toHaveAttribute('href', '/Phill_Aelony_Resume.pdf')
     expect(pdf).toHaveAttribute('download')
     expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/')
   })

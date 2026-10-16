@@ -95,20 +95,28 @@ describe('HighlightTile', () => {
     expect(button).toHaveAttribute('type', 'button')
     expect(button).toHaveAttribute('aria-expanded', 'false')
     // the dots between technologies are aria-hidden
-    expect(button).toHaveAccessibleDescription(/^~750 clinicians paid through it Built with: React\s+TypeScript\s+Node\.js\s+MySQL\s+AWS\s+Terraform$/)
+    // the number is described in words a screen reader says cleanly ("about 750", not "tilde 750")
+    expect(button).toHaveAccessibleDescription(/^about 750 clinicians paid through it Built with: React\s+TypeScript\s+Node\.js\s+MySQL\s+AWS\s+Terraform$/)
     expect(screen.getByText(payouts.name)).toBeInTheDocument()
   })
 
-  it('renders the final number for no-JS and screen readers', () => {
+  it('renders the final number for no-JS and screen readers, and waits at zero until it counts', () => {
     const { container } = render(<HighlightTile tile={care} />)
     // the visible number is decoration; its sr-only twin is what's read
     const visible = container.querySelector('[data-count]')!
     expect(visible.closest('[aria-hidden="true"]')).not.toBeNull()
-    expect(visible.textContent).toBe('6,700+')
-    expect(screen.getByText('6,700+', { selector: '.sr-only' })).toBeInTheDocument()
-    // the unit sits next to the number ("~5 wks")
+    expect(screen.getByText('6,700 plus', { selector: '.sr-only' })).toBeInTheDocument()
+    // the sizer keeps the final value (and the width); the armed count shows its zero frame, never final → 0
+    const sizer = visible.parentElement!.querySelector(':scope > :not([data-count])')!
+    expect(sizer.textContent).toBe('6,700+')
+    expect(visible.textContent).toBe('0+')
+    intersect(0.2) // revealed, not yet counting
+    expect(visible.textContent).toBe('0+')
+    // the unit sits next to the number ("~5 wks"), inside the same decorative number
     const { container: c2 } = render(<HighlightTile tile={nurture} />)
-    expect(c2.textContent).toContain('~5wks')
+    const num = c2.querySelector('[data-count]')!.closest('[aria-hidden="true"]')!
+    expect(num.lastElementChild!.textContent).toBe('wks')
+    expect(num.firstElementChild!.firstElementChild!.textContent).toBe('~5') // the sizer: the final value
   })
 
   it('opens and closes its detail', async () => {

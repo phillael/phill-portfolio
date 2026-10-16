@@ -62,6 +62,8 @@ describe('career data', () => {
       ['AI resource platform', '~68K', 'community resources'],
       ['Care operations', '6,700+', 'tickets a year removed'],
     ])
+    // what a screen reader says for each number
+    expect(timelycare.tiles.map((t) => t.srMetric)).toEqual(['about 5 weeks', 'about 750', 'about 68 thousand', '6,700 plus'])
     for (const tile of timelycare.tiles) {
       expect(tile.title).toBeTruthy()
       expect(tile.detail).toBeTruthy()
@@ -92,6 +94,7 @@ describe('career data', () => {
     const all = strings(career)
     expect(all.filter((s) => /dormant/i.test(s))).toEqual([])
     expect(all.filter((s) => /replaced Customer\.io/i.test(s))).toEqual([])
+    expect(all.filter((s) => /\bOkta\b/.test(s))).toEqual([]) // the only vendor named is Customer.io
     const nurture = timelycare.tiles.find((t) => t.name === 'Marketing platform')
     expect(strings(nurture).filter((s) => /from scratch/i.test(s))).toEqual([])
   })

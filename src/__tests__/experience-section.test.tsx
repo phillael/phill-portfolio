@@ -78,7 +78,7 @@ describe('ExperienceSection', () => {
     render(<ExperienceSection />)
     for (const tile of career.jobs[0].tiles) {
       const button = screen.getByRole('button', { name: tile.title })
-      expect(button).toHaveAccessibleDescription(new RegExp(`^${tile.metric.replace(/[.*+?^${}()|[\]\\~]/g, '\\$&')} ${tile.metricLabel}`))
+      expect(button).toHaveAccessibleDescription(new RegExp(`^${(tile.srMetric ?? tile.metric).replace(/[.*+?^${}()|[\]\\~]/g, '\\$&')} ${tile.metricLabel}`))
     }
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(4)
     expect(screen.getByText('cut post-release bugs 50%').tagName).toBe('STRONG')

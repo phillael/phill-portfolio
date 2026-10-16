@@ -19,6 +19,8 @@ export interface CareerTile {
   id: string
   name: string
   metric: string
+  /** the metric as a screen reader should say it ("about 5 weeks", not "tilde 5 w k s") */
+  srMetric?: string
   metricLabel: string
   title: string
   detail: string
@@ -131,6 +133,7 @@ export const career: Career = {
           id: 'nurture',
           name: 'Marketing platform',
           metric: '~5 wks',
+          srMetric: 'about 5 weeks',
           metricLabel: 'prototype to production',
           title: 'Built our in-house replacement for Customer.io and took it to production in about five weeks.',
           detail:
@@ -141,6 +144,7 @@ export const career: Career = {
           id: 'payouts',
           name: 'Provider payments',
           metric: '~750',
+          srMetric: 'about 750',
           metricLabel: 'clinicians paid through it',
           title: 'Built our provider payment platform from scratch and cut payout errors to near zero.',
           detail:
@@ -151,6 +155,7 @@ export const career: Career = {
           id: 'finder',
           name: 'AI resource platform',
           metric: '~68K',
+          srMetric: 'about 68 thousand',
           metricLabel: 'community resources',
           title: 'Built the AI tools care coordinators use to find students the right help.',
           detail:
@@ -161,6 +166,7 @@ export const career: Career = {
           id: 'care',
           name: 'Care operations',
           metric: '6,700+',
+          srMetric: '6,700 plus',
           metricLabel: 'tickets a year removed',
           title: 'Redesigned referral routing and took 6,700+ tickets a year off the care team.',
           detail:
@@ -209,7 +215,7 @@ export const career: Career = {
   notes: [
     'In 2026 Phill moved from the core platform to owning new platforms end to end, working directly with Finance, Care Operations, Marketing and Compliance, and shipping to production himself.',
     'Titles at TimelyCare: Software Engineer (Feb 2023), promoted to Senior Software Engineer II (Apr 2025), then to Generative AI Engineer (Apr 2026).',
-    "Nurture, TimelyCare's in-house lifecycle-marketing platform: he took it from prototype to production in about five weeks (54 merged PRs) as the replacement for Customer.io: Okta SSO, a dedicated AWS account in Terraform, SES delivery tracking, a segment builder, broadcasts, and an event-driven automation engine with a shadow mode for side-by-side comparison. It is live in production.",
+    "Nurture, TimelyCare's in-house lifecycle-marketing platform: he took it from prototype to production in about five weeks (54 merged PRs) as the replacement for Customer.io: SSO, a dedicated AWS account in Terraform, SES delivery tracking, a segment builder, broadcasts, and an event-driven automation engine with a shadow mode for side-by-side comparison. It is live in production.",
     "Ask Nurture and the Nurture MCP server: a Claude-powered assistant on every page and an MCP tool surface, so marketers and AI agents build segments, emails, automations and reports in plain English. Writes never run inside the model's turn: they become action cards a person confirms; API keys are scoped and can't send, approve or delete; tool results carry counts, never recipients.",
     'A natural-language audience builder on Claude (tool use, extended thinking) where prompt caching cut repeated-prefix input cost about 90%.',
     "He turned the care team's ChatGPT custom GPT into an in-product AI Resource Finder (OpenAI Agents SDK, hosted web search, structured output, SSE streaming): school-first results from each school's own resources, one-click add to the directory, attach to a case or share with the student, a no-student-identifiers rule, and cards that render only whitelisted fields so model output never becomes markup.",

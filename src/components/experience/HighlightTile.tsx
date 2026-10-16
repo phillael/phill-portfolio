@@ -72,6 +72,9 @@ export default function HighlightTile({ tile, wide = false, delay = 0, className
     }
     el.dataset.armed = ''
     const text = countRef.current?.firstChild
+    // wait at zero until the count starts (between the reveal at 12% and the count at 40% it
+    // would otherwise show the final value, then drop to 0); numSizer keeps the width
+    if (text instanceof Text) text.nodeValue = countFrame(value, 0) ?? value
     let raf = 0
     let timer = 0
     let counted = false
@@ -233,7 +236,7 @@ export default function HighlightTile({ tile, wide = false, delay = 0, className
             {unit && <span className={css.unit}>{unit}</span>}
           </span>
           <span id={ids.metric} className="sr-only">
-            {tile.metric}
+            {tile.srMetric ?? tile.metric}
           </span>
           <span id={ids.label} className={css.numLabel}>
             {tile.metricLabel}

@@ -6,7 +6,8 @@ import { REDUCED_MOTION, matches } from './motion'
 
 /**
  * ExperienceTrack - the rail down the left of the stops: a hairline whose gradient fill grows
- * with the scroll (`--p` on the track) and lights each stop (`data-lit` on its `[data-stop]`)
+ * with the scroll (`--p` on the rail, never the track: a custom property restyles everything
+ * that inherits it, and the track holds the whole section) and lights each stop (`data-lit` on its `[data-stop]`)
  * as the fill reaches its node. One passive scroll listener, added only while the track is on
  * screen; it reads the scroll position and asks for a frame, and the frame only writes. The
  * geometry is measured outside rAF: on mount, when the track resizes (a tile opening), on a
@@ -15,10 +16,12 @@ import { REDUCED_MOTION, matches } from './motion'
  */
 export default function ExperienceTrack({ children }: { children: ReactNode }) {
   const trackRef = useRef<HTMLDivElement>(null)
+  const railRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const track = trackRef.current
-    if (!track || matches(REDUCED_MOTION) || typeof IntersectionObserver === 'undefined') return
+    const rail = railRef.current
+    if (!track || !rail || matches(REDUCED_MOTION) || typeof IntersectionObserver === 'undefined') return
     let top = 0
     let height = 1
     let vh = window.innerHeight
@@ -38,8 +41,8 @@ export default function ExperienceTrack({ children }: { children: ReactNode }) {
     const draw = () => {
       raf = 0
       const p = Math.max(0, Math.min(1, (vh * 0.6 - (top - scrollY)) / height))
-      track.style.setProperty('--p', p.toFixed(4))
-      track.style.setProperty('--head', p > 0 && p < 1 ? '1' : '0')
+      rail.style.setProperty('--p', p.toFixed(4))
+      rail.style.setProperty('--head', p > 0 && p < 1 ? '1' : '0')
       const reach = p * height
       for (const s of stops) s.el.toggleAttribute('data-lit', s.top + 12 <= reach)
     }
@@ -87,9 +90,11 @@ export default function ExperienceTrack({ children }: { children: ReactNode }) {
 
   return (
     <div ref={trackRef} className={css.track}>
-      <div className={css.rail} aria-hidden="true">
+      <div ref={railRef} className={css.rail} aria-hidden="true">
         <div className={css.railFill} />
-        <div className={css.railHead} />
+        <div className={css.railHeadTrack}>
+          <div className={css.railHead} />
+        </div>
       </div>
       {children}
     </div>

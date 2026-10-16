@@ -86,6 +86,12 @@
   background: linear-gradient(180deg, var(--cyan) 0%, var(--cyan-hot) 55%, var(--magenta) 100%);
   box-shadow: 0 0 10px hsl(190 100% 70% / 0.7);
 }
+/* the head rides a rail-tall layer moved by transform (never `top`: that's a layout per frame) */
+.railHeadTrack {
+  position: absolute;
+  inset: 0;
+  transform: translateY(calc(var(--p, 0) * 100%));
+}
 .railHead {
   position: absolute;
   left: -3px;
@@ -100,7 +106,6 @@
   opacity: 0;
 }
 .track[data-live] .railHead {
-  top: calc(var(--p, 0) * 100% - 3px);
   opacity: var(--head, 1);
 }
 @media (min-width: 900px) {

@@ -334,6 +334,20 @@
     1.5px 0 hsl(186 100% 60% / 0.75),
     0 0 24px hsl(190 100% 70% / 0.7);
 }
+/* the final value (invisible) sizes the number; the count-up is out of flow on top of it, so a
+   mid-count value that's wider (Audiowide's digits aren't all one width) never moves the label */
+.numBox {
+  position: relative;
+  display: inline-block;
+}
+.numSizer {
+  visibility: hidden;
+}
+.numBox > [data-count] {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
 .unit {
   margin-left: 0.25em;
   font: 600 0.38em/1 var(--font-body);

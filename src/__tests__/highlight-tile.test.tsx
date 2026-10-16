@@ -80,6 +80,8 @@ describe('splitMetric / countFrame', () => {
     expect(countFrame('6,700+', 0)).toBe('0+')
     expect(countFrame('6,700+', 0.5)).toBe('5,863+') // 1 - 0.5³ = 0.875
     expect(countFrame('6,700+', 1)).toBe('6,700+')
+    expect(countFrame('11,889', 0.9)).toBe('11,877')
+    expect(countFrame('1,234,567', 0.99)).toBe('1,234,566')
     expect(countFrame('~68K', 0.5)).toBe('~60K')
     expect(countFrame('~750', 1)).toBe('~750')
     expect(countFrame('none', 0.5)).toBeNull()
@@ -159,6 +161,9 @@ describe('HighlightTile', () => {
     runFrame(1000 + 650) // halfway through 1.3 s
     expect(visible.textContent).toBe('5,863+')
     expect(visible.firstChild).toBe(node) // the same text node, not a new one
+    // the final value keeps holding the number's width, so counting never moves the label (no layout shift)
+    const sizer = visible.parentElement!.querySelector(':scope > :not([data-count])')!
+    expect(sizer.textContent).toBe('6,700+')
     runFrame(1000 + 1300)
     expect(visible.textContent).toBe('6,700+')
     expect(frames).toHaveLength(0) // done: no more frames

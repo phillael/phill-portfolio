@@ -27,8 +27,11 @@ export function countFrame(final: string, k: number): string | null {
   const to = parseFloat(num)
   const decimals = (num.split('.')[1] || '').length
   const v = to * (1 - Math.pow(1 - k, 3))
-  return pre + (raw.includes(',') ? Math.round(v).toLocaleString('en-US') : v.toFixed(decimals)) + post
+  return pre + (raw.includes(',') ? withCommas(Math.round(v)) : v.toFixed(decimals)) + post
 }
+
+/** 6700 → "6,700" (not toLocaleString: its first call builds ICU's formatter, ~20 ms on a slow phone, in a frame) */
+const withCommas = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 
 interface HighlightTileProps {
   tile: CareerTile
@@ -220,8 +223,12 @@ export default function HighlightTile({ tile, wide = false, delay = 0, className
         <span className={css.name}>{tile.name}</span>
         <span className={css.metric}>
           <span className={css.num} aria-hidden="true">
-            <span ref={countRef} data-count="">
-              {value}
+            {/* the final value, invisible, holds the width; the count-up sits on top of it, out of flow */}
+            <span className={css.numBox}>
+              <span className={css.numSizer}>{value}</span>
+              <span ref={countRef} data-count="">
+                {value}
+              </span>
             </span>
             {unit && <span className={css.unit}>{unit}</span>}
           </span>

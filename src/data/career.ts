@@ -108,7 +108,7 @@ const earlier = (company: string) => {
 export const career: Career = {
   headline: resume.headline,
   intro:
-    'Eight years shipping production software across web, mobile and cloud. Today I own platforms end to end and build AI into them.',
+    'Eight years shipping production software across web, mobile and cloud. Today I own platforms end to end, as engineer, designer and product manager, and build AI into them.',
   jobs: [
     {
       id: 'timelycare',
@@ -213,5 +213,6 @@ export const career: Career = {
     "He redesigned referral routing so reminder-style referrals go to the student's task list: 6,700+ fewer care tickets a year (40%+ of referral volume, about 1.1 full-time roles).",
     "He works AI-natively: design docs, then Claude Code with custom skills and subagents, isolated worktrees and test-driven loops. In the past year: 251 merged PRs and 392 reviews, up to 46 merged PRs a month. As on-call reviewer for the company's autonomous coding agent he caught two high-severity errors and shipped its push-notification migration (11,889 jobs, 0 failures).",
     'Earlier at TimelyCare: an event-driven reporting dashboard that helped sales close several large clients, and test suites (Vitest, Playwright, Detox) that cut post-release bugs 50%.',
+    'In his current role he is the engineer, designer and product manager in one: he coordinates with stakeholders, designs and builds the products, works with the legal and compliance teams so everything meets legal standards and HIPAA, talks with the medical providers and therapists who use what he builds about their needs, and communicates app changes to the rest of the company.',
   ],
 }

@@ -97,7 +97,10 @@ describe('career data', () => {
   })
 
   it('carries the Wizard notes, never shown on the page', () => {
-    expect(career.notes).toHaveLength(15)
+    expect(career.notes).toHaveLength(16)
     expect(career.notes[1]).toMatch(/Software Engineer \(Feb 2023\), promoted to Senior Software Engineer II \(Apr 2025\), then to Generative AI Engineer \(Apr 2026\)/)
+    // Phill, 2026-10-16: the current role is engineer, designer and product manager in one
+    expect(career.notes[15]).toMatch(/^In his current role he is the engineer, designer and product manager in one/)
+    expect(career.intro).toMatch(/as engineer, designer and product manager/)
   })
 })

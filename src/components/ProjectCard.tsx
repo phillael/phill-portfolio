@@ -21,11 +21,14 @@ interface ProjectCardProps {
  * - Tech stack rendered as badges (same pattern as SkillChip)
  * - Live Demo and View Code action buttons with neon border effects
  * - Gradient card base styling with hover hue-rotate effect
- * - Links open in new tab with proper security attributes
+ * - External links open in a new tab with proper security attributes; this site's own pages in the same tab
+ * - No screenshot yet (no imageUrl): the placeholder
  * - Standardized hover effects: scale 1.05, glow, whileTap 0.95
  */
 const ProjectCard = ({ project, delay = 0 }: ProjectCardProps) => {
   const [imageError, setImageError] = useState(false)
+  // this site's own pages (the 3D resume) open in the same tab
+  const liveIsInternal = project.liveUrl?.startsWith('/') ?? false
 
   return (
     <motion.article
@@ -37,7 +40,7 @@ const ProjectCard = ({ project, delay = 0 }: ProjectCardProps) => {
     >
       {/* Project Image */}
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
-        {!imageError ? (
+        {project.imageUrl && !imageError ? (
           <Image
             src={project.imageUrl}
             alt={`${project.title} screenshot`}
@@ -93,8 +96,8 @@ const ProjectCard = ({ project, delay = 0 }: ProjectCardProps) => {
           {project.liveUrl && (
             <motion.a
               href={project.liveUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              target={liveIsInternal ? undefined : '_blank'}
+              rel={liveIsInternal ? undefined : 'noopener noreferrer'}
               className="
                 inline-flex items-center justify-center
                 px-4 py-2

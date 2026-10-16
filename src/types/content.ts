@@ -33,7 +33,9 @@ export interface Project {
   title: string
   description: string
   techStack: string[]
-  imageUrl: string
+  /** none yet: the card shows a placeholder */
+  imageUrl?: string
+  /** an internal path (e.g. /resume) opens in the same tab */
   liveUrl?: string
   repoUrl?: string
 }

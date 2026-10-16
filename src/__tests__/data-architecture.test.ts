@@ -102,8 +102,14 @@ describe('Data Architecture', () => {
       expect(Array.isArray(projectsData)).toBe(true)
     })
 
-    it('contains three project entries', () => {
-      expect(projectsData.length).toBe(3)
+    it('contains five project entries, in order', () => {
+      expect(projectsData.map((p) => p.id)).toEqual([
+        'quadzilla',
+        'number-slayers',
+        'rezmancer',
+        'jelly-resume',
+        'pong-multiverse-alpaca-squadron',
+      ])
     })
 
     it('each project has required fields', () => {
@@ -113,22 +119,21 @@ describe('Data Architecture', () => {
         expect(proj.title).toBeDefined()
         expect(proj.description).toBeDefined()
         expect(Array.isArray(proj.techStack)).toBe(true)
-        expect(proj.imageUrl).toBeDefined()
+        // a screenshot, or none yet (the card shows a placeholder)
+        expect(proj.imageUrl === undefined || proj.imageUrl.startsWith('/images/projects/')).toBe(true)
       })
     })
 
     it('includes Number Slayers project', () => {
       const numberSlayers = projectsData.find((p) => p.id === 'number-slayers')
       expect(numberSlayers).toBeDefined()
-      expect(numberSlayers?.techStack).toContain('Three.js')
+      expect(numberSlayers?.techStack).toContain('Colyseus')
+      expect(numberSlayers?.liveUrl).toBe('https://numberslayers.com')
+      expect(numberSlayers?.repoUrl).toBe('https://github.com/phillael/number-slayers')
     })
 
-    it('includes TimelyCare project with liveUrl', () => {
-      const timelycare = projectsData.find(
-        (p) => p.id === 'timelycare-platform'
-      )
-      expect(timelycare).toBeDefined()
-      expect(timelycare?.liveUrl).toBe('https://timelycare.com')
+    it('has no TimelyCare card (it lives in Experience now)', () => {
+      expect(projectsData.find((p) => /timelycare/i.test(p.id))).toBeUndefined()
     })
   })
 
@@ -146,6 +151,11 @@ describe('Data Architecture', () => {
         expect(typeof details.keyPatterns).toBe('string')
         expect(typeof details.notableDetails).toBe('string')
       })
+    })
+
+    it('covers Quadzilla, Rezmancer and the Jelly Resume for the Wizard', () => {
+      const ids = projectDetailsData.map((entry) => entry.id)
+      expect(ids).toEqual(expect.arrayContaining(['quadzilla', 'rezmancer', 'jelly-resume']))
     })
 
     it('each id is a unique non-empty string', () => {

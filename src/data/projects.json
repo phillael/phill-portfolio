@@ -1,28 +1,69 @@
 [
   {
+    "id": "quadzilla",
+    "title": "Quadzilla",
+    "description": "AI strength coach for iOS and web. A coach agent holds your whole training history and changes your program through typed tools, with an auditable decision log. Voice logging, Apple Health sync, offline replay. On TestFlight.",
+    "techStack": [
+      "Expo",
+      "Next.js",
+      "tRPC",
+      "Neon Postgres",
+      "Vercel AI SDK",
+      "Claude"
+    ]
+  },
+  {
     "id": "number-slayers",
     "title": "Number Slayers",
-    "description": "An epic multi player online math game built with Three.js featuring immersive 3D graphics and engaging gameplay mechanics designed to make learning math fun and interactive.",
-    "techStack": ["Three.js", "TypeScript", "React", "Next.js", "Node.js", "WebGL", "Vercel"],
+    "description": "Multiplayer 3D math game. Server-authoritative multiplayer with snapshot interpolation at 60fps, AI enemy bots, an adaptive Web Audio mixer, and an FBX→GLB pipeline that cut load size 88%. I wrote the soundtrack too.",
+    "techStack": [
+      "React Three Fiber",
+      "Colyseus",
+      "Next.js",
+      "Convex",
+      "Railway"
+    ],
     "imageUrl": "/images/projects/number-slayers.png",
-    "liveUrl": "https://number-slayers-web.vercel.app/",
+    "liveUrl": "https://numberslayers.com",
     "repoUrl": "https://github.com/phillael/number-slayers"
+  },
+  {
+    "id": "rezmancer",
+    "title": "Rezmancer",
+    "description": "AI resume builder, in development. Resume as code, a pixel-exact PDF and a Claude builder that keeps a career bank of sourced facts: every number it writes must trace back to one. Tailors a resume per posting and flags any line nothing backs.",
+    "techStack": [
+      "Next.js 16",
+      "Neon Postgres",
+      "Better Auth",
+      "Vercel AI SDK",
+      "Claude"
+    ]
+  },
+  {
+    "id": "jelly-resume",
+    "title": "Jelly Resume",
+    "description": "This site's resume as a soft-body toy and a platformer: the hero photo dissolves into a copy of my resume you can knock apart, on one raw WebGL2 canvas, and Play mode turns it into a run from my name to the last line.",
+    "techStack": [
+      "TypeScript",
+      "WebGL2",
+      "Custom physics",
+      "Web Audio"
+    ],
+    "imageUrl": "/images/projects/jelly-resume.webp",
+    "liveUrl": "/resume"
   },
   {
     "id": "pong-multiverse-alpaca-squadron",
     "title": "Pong Multiverse Alpaca Squadron",
     "description": "This is one of the first things I built with JavaScript over 6 years ago. It took me months to get it working but I'm still proud of it!",
-    "techStack": ["JavaScript", "HTML Canvas", "CSS", "Game Development"],
+    "techStack": [
+      "JavaScript",
+      "HTML Canvas",
+      "CSS",
+      "Game Development"
+    ],
     "imageUrl": "/images/projects/pong.jpg",
     "liveUrl": "https://phillael.github.io/Pong-Multiverse-Alpaca-Squadron/",
     "repoUrl": "https://github.com/phillael/Pong-Multiverse-Alpaca-Squadron"
-  },
-  {
-    "id": "timelycare-platform",
-    "title": "TimelyCare",
-    "description": "A comprehensive telehealth platform providing mental health and medical services to university students across the nation, built with accessibility as a core priority.",
-    "techStack": ["React", "React Native", "TypeScript", "Node.js", "AWS"],
-    "imageUrl": "/images/projects/timely-care.png",
-    "liveUrl": "https://timelycare.com"
   }
 ]

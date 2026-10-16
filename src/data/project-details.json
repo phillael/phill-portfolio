@@ -10,5 +10,23 @@
     "architecture": "Next.js 16 (App Router) with React 19, TypeScript, and Tailwind CSS. Section-based single-page layout driven by JSON data files — components map over the data rather than hardcoding content. Deployed on Vercel.",
     "keyPatterns": "Three.js via React Three Fiber powers multiple 3D experiences — the animated Shroom Wizard model (GLTF with 11 animations), a 3D testimonials carousel (Canvas 2D rendered to Three.js sphere geometry), and particle effects. Framer Motion handles DOM animations and scroll-triggered reveals. The AI chat uses Claude Haiku via Anthropic SDK on a Next.js API route with Upstash Redis rate limiting (per-IP daily cap and global token budget).",
     "notableDetails": "Shroom Mode psychedelic effect uses SVG feTurbulence and feDisplacementMap filters with a 30-second intensity ramp, applied to a wrapper div so the music player stays undistorted. Custom Web Audio API music player with real-time frequency visualization (bass, treble, and intensity bands). The wizard has a two-mode persona — Mystic Voice for banter, Clear Speech for career facts — with a tool-use mechanism that triggers an interactive mushroom ceremony UI."
+  },
+  {
+    "id": "quadzilla",
+    "architecture": "An Expo app (iOS) and a Next.js web app sharing a tRPC API on Neon Postgres.",
+    "keyPatterns": "The coach is a Vercel AI SDK agent on Claude. It holds the user's whole training history and changes the program through typed tools, with an auditable decision log.",
+    "notableDetails": "AI strength coach for iOS and web: voice logging, Apple Health sync and offline replay. On TestFlight."
+  },
+  {
+    "id": "rezmancer",
+    "architecture": "A Turborepo monorepo: the resume is YAML, checked by a Zod schema, rendered by React and printed to PDF with Playwright, with 0-pixel parity tests. The editor is Next.js 16 on Neon Postgres with Better Auth.",
+    "keyPatterns": "The AI is routed by task: Opus for writing, Sonnet for chat, Haiku for quick edits. A career bank of sourced facts backs the writing: a deterministic grounding check requires citations, and every number has to trace back to a fact.",
+    "notableDetails": "An AI resume builder, in development and invite-only. It tailors a resume per job posting and flags any line nothing backs."
+  },
+  {
+    "id": "jelly-resume",
+    "architecture": "Plain TypeScript on one raw WebGL2 canvas on this site: spring soft bodies per word, a glyph atlas and skinned GLB characters, with custom physics and Web Audio.",
+    "keyPatterns": "Lazy chunks, paused while hidden, and never mounted for reduced motion.",
+    "notableDetails": "The hero photo dissolves into a copy of Phill's resume you can knock apart. Play mode reads its level off the resume's text lines (one-way platforms, role checkpoints, Impact coins) and turns it into a run from his name to the last line."
   }
 ]

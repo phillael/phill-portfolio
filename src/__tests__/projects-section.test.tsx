@@ -73,13 +73,29 @@ describe('ProjectsSection', () => {
     expect(section).toBeInTheDocument()
   })
 
-  it('renders all 3 project cards from JSON data', () => {
+  it('renders the five project cards, in order, without a TimelyCare card', () => {
     render(<ProjectsSection />)
 
-    // Check each project title is rendered
-    ;(projectsData as Project[]).forEach((project) => {
-      expect(screen.getByText(project.title)).toBeInTheDocument()
-    })
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Quadzilla',
+      'Number Slayers',
+      'Rezmancer',
+      'Jelly Resume',
+      'Pong Multiverse Alpaca Squadron',
+    ])
+    expect((projectsData as Project[]).map((p) => p.title)).not.toContain('TimelyCare')
+  })
+
+  it('links Number Slayers at numberslayers.com and the Jelly Resume in the same tab', () => {
+    render(<ProjectsSection />)
+
+    const live = screen.getAllByRole('link', { name: /live demo/i })
+    const slayers = live.find((a) => a.getAttribute('href') === 'https://numberslayers.com')
+    expect(slayers).toHaveAttribute('target', '_blank')
+    const jelly = live.find((a) => a.getAttribute('href') === '/resume')
+    expect(jelly).toBeDefined()
+    expect(jelly).not.toHaveAttribute('target')
+    expect(jelly).not.toHaveAttribute('rel')
   })
 
   it('has proper accessibility attributes', () => {
@@ -133,6 +149,22 @@ describe('ProjectCard', () => {
     const image = screen.getByAltText('Test Project screenshot')
     expect(image).toBeInTheDocument()
     expect(image).toHaveAttribute('src', '/images/projects/test.png')
+  })
+
+  it('opens an internal link in the same tab', () => {
+    render(<ProjectCard project={{ ...mockProject, liveUrl: '/resume', repoUrl: undefined }} />)
+
+    const liveLink = screen.getByRole('link', { name: /live demo/i })
+    expect(liveLink).toHaveAttribute('href', '/resume')
+    expect(liveLink).not.toHaveAttribute('target')
+    expect(liveLink).not.toHaveAttribute('rel')
+  })
+
+  it('shows the placeholder when there is no screenshot yet', () => {
+    render(<ProjectCard project={{ ...mockProject, imageUrl: undefined }} />)
+
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Test Project')).toHaveLength(2) // the placeholder and the title
   })
 
   it('does not render View Code button when repoUrl is not provided', () => {

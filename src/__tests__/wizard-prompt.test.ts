@@ -38,10 +38,8 @@ describe('buildWizardSystemPrompt', () => {
     expect(experience).toContain('Guitarist & Composer')
     expect(experience).not.toContain('**') // bold markers are page markup
     expect(section(prompt, 'summary')).toMatch(/^\s*Phill Aelony is a Senior AI Engineer \(his title: Generative AI Engineer at TimelyCare\)/)
-    // the 2025 story is gone from the parts built here (skills.json loses Agent OS in T10)
-    for (const part of [section(prompt, 'summary'), experience]) {
-      expect(part).not.toMatch(/Agent OS|5-10x|5–10x|6\+ years/)
-    }
+    // the 2025 story is gone, everywhere
+    expect(prompt).not.toMatch(/Agent OS|5-10x|5–10x|6\+ years/)
   })
 
   it('gives the Wizard the career notes as true details it may share', () => {

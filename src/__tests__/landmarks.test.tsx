@@ -29,7 +29,7 @@ describe('Landmarks and headings', () => {
     renderPage()
     const h1s = screen.getAllByRole('heading', { level: 1 })
     expect(h1s).toHaveLength(1)
-    expect(h1s[0]).toHaveTextContent('Phill Aelony, Software Engineer')
+    expect(h1s[0]).toHaveTextContent('Phill Aelony, Senior AI Engineer')
   })
 
   it('makes the skip link the first tab stop, targeting #main', async () => {

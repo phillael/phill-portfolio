@@ -18,7 +18,7 @@ const HeroSection = () => {
       role="region"
       className="relative min-h-screen flex flex-col items-center justify-center px-4 py-8 overflow-hidden"
     >
-      <h1 className="sr-only">Phill Aelony, Software Engineer</h1>
+      <h1 className="sr-only">Phill Aelony, Senior AI Engineer</h1>
 
       {/* Vortex sparkles effect - desktop only */}
       {isDesktop && (

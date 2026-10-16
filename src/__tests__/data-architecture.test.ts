@@ -50,6 +50,14 @@ describe('Data Architecture', () => {
       )
       expect(professionalSkills).toBeDefined()
       expect(professionalSkills?.skills).toContain('Software Engineering')
+      expect(professionalSkills?.skills).not.toContain('Agent OS')
+    })
+
+    it('lists the 2026 stack among the technical skills', () => {
+      const technical = skillsData.find((c) => c.category === 'Technical Skills')?.skills
+      for (const skill of ['Anthropic SDK', 'OpenAI Agents SDK', 'Terraform', 'Fastify', 'Postgres']) {
+        expect(technical).toContain(skill)
+      }
     })
 
     it('includes Other Skills category', () => {

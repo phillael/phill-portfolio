@@ -140,10 +140,10 @@ const AboutSection = () => {
               I was so good at programming that my first job was at{' '}
               <HighlightedText variant="primary">Microsoft</HighlightedText>. That
               grew tiresome so I moved on to work at some more interesting
-              startups, and now I am doing full stack development for a company
-              called{' '}
-              <HighlightedText variant="secondary">TimelyCare</HighlightedText>{' '}
-              and it is awesome and I do great work.
+              startups, and now I am a Generative AI Engineer at{' '}
+              <HighlightedText variant="secondary">TimelyCare</HighlightedText>,
+              building AI agents and whole platforms, and it is awesome and I do
+              great work.
             </BioParagraph>
 
             {/* The carousel draws quotes onto WebGL textures, so screen readers

@@ -52,7 +52,8 @@ const MusicPlayer = () => {
     getSourceNode
   } = useAudioPlayer(tracks)
 
-  // One player for the whole site: the 3D resume dances to it and P toggles it
+  // One player for the whole site: the 3D resume dances to it, P toggles it and the
+  // Experience section's Listen opens it (the panel then moves focus in, as on a FAB click)
   const playingRef = useRef(isPlaying)
   const toggleRef = useRef(toggle)
   useEffect(() => {
@@ -64,6 +65,7 @@ const MusicPlayer = () => {
       getSource: () => getSourceNode(),
       isPlaying: () => playingRef.current,
       toggle: () => toggleRef.current(),
+      open: () => setIsExpanded(true),
     })
     return () => registerSiteMusic(null)
   }, [getSourceNode])

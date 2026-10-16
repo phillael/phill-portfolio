@@ -4,8 +4,9 @@
  * Tests for the integrated MusicPlayer component.
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import MusicPlayer from '@/components/music/MusicPlayer'
+import { getSiteMusic } from '@/lib/site-music'
 
 // Mock useAudioPlayer hook
 const mockToggle = jest.fn()
@@ -145,6 +146,19 @@ describe('MusicPlayer Integration', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('music-fab')).toHaveFocus()
+      })
+    })
+
+    it("opens from elsewhere on the page through the site's open()", async () => {
+      render(<MusicPlayer />)
+      expect(screen.getByTestId('music-fab')).toHaveAttribute('aria-expanded', 'false')
+
+      act(() => getSiteMusic()!.open())
+
+      expect(screen.getByTestId('music-fab')).toHaveAttribute('aria-expanded', 'true')
+      // focus lands where the FAB's own open puts it
+      await waitFor(() => {
+        expect(screen.getByTestId('panel-close-button')).toHaveFocus()
       })
     })
 

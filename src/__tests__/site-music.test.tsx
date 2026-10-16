@@ -55,7 +55,7 @@ describe('the resume taps the player', () => {
   it('attaches its own 2048-point analyser once the player has an audio graph, and lets go after', () => {
     let current: ReturnType<typeof fakeSource>['node'] | null = null
     let playing = false
-    const tap = createMusicTap(() => ({ getSource: () => current as unknown as MediaElementAudioSourceNode, isPlaying: () => playing, toggle: () => {} }))
+    const tap = createMusicTap(() => ({ getSource: () => current as unknown as MediaElementAudioSourceNode, isPlaying: () => playing, toggle: () => {}, open: () => {} }))
 
     expect(tap.get()).toEqual({ analyser: null, playing: false }) // nothing has played yet
 

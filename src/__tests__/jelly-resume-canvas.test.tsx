@@ -192,7 +192,7 @@ describe('the resume HUD', () => {
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     expect(engine.panKey).toHaveBeenCalledWith('ArrowDown')
     const toggleMusic = jest.fn()
-    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle: toggleMusic })
+    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle: toggleMusic, open: jest.fn() })
     fireEvent.keyDown(window, { key: 'p' }) // P plays/pauses the site's player
     expect(toggleMusic).toHaveBeenCalled()
     registerSiteMusic(null)

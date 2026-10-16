@@ -86,7 +86,7 @@ export const resume: Resume = {
         { id: 'resource-finder', text: 'Shipped an **AI Resource Finder** for care coordinators (OpenAI Agents SDK, web search, structured outputs, SSE streaming), backed by a ~71K-resource directory I built to replace a six-figure vendor contract.' },
         { id: 'payments-platform', text: 'Designed, built, and launched a **provider payment platform** that Finance uses to audit and publish monthly payouts for **~750 clinicians and 50K+ visits/month**. In production since June 2026.' },
         { id: 'payments-audit', text: 'Cut the full-month payout audit from **~44 to ~3 minutes**, and moved payment rules out of SQL stored functions into effective-dated decision tables, resolving six code-vs-policy discrepancies with Finance and Care Ops.' },
-        { id: 'payments-bugs', text: 'Found and fixed payout-correctness bugs, including a no-show overpayment regression (30 items/month → 0), a cron/ETL race that underpaid late-month visits, and a vocabulary mismatch that left **363 coaching sessions unpaid**.' },
+        { id: 'payments-bugs', text: 'Found and fixed payout-correctness bugs, including a no-show overpayment regression (30 items/month to 0), a cron/ETL race that underpaid late-month visits, and a vocabulary mismatch that left **363 coaching sessions unpaid**.' },
         { id: 'growth-pilot', text: 'Ran an abandoned-signup email pilot across a 33-school university system with **7.1% registration vs ~3%** for a comparison group (**~2.7× lift**) and 0 spam complaints, and removed ~919K billable profiles from the vendor workspace.' },
         { id: 'earlier-timely', text: 'Earlier, built an event-driven reporting dashboard (SNS/SQS, SQL, Node, React) that helped sales close several large clients, and **cut post-release bugs 50%** with Vitest, Playwright, and Detox.' },
       ],
@@ -104,7 +104,7 @@ export const resume: Resume = {
       blurb: 'multiplayer 3D math game',
       link: { href: 'https://numberslayers.com', label: 'numberslayers.com' },
       stack: 'React Three Fiber · Colyseus · Next.js · Convex · Railway',
-      text: 'Server-authoritative multiplayer with snapshot interpolation at 60fps, AI enemy bots, an adaptive Web Audio mixer, and an FBX→GLB asset pipeline that cut load size 88%.',
+      text: 'Server-authoritative multiplayer with snapshot interpolation at 60fps, AI enemy bots, an adaptive Web Audio mixer, and an FBX to GLB asset pipeline that cut load size 88%.',
     },
   ],
   earlier: [

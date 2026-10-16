@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Highlights</title>
+<link rel="stylesheet" href="hud.css">
+<style>
+  /* Header */
+  .head { max-width: 46rem; }
+
+  /* TimelyCare hero: plain on the background, no panel */
+  .hero { margin-top: clamp(3.5rem, 8vw, 5.5rem); }
+  .hero-top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: .75rem 2rem; }
+  .hero-co { margin-top: .9rem; font: 400 clamp(2rem, 4.6vw, 3rem)/1.05 var(--font-display); color: #fff; }
+  .hero-blurb { margin-top: .45rem; color: var(--ink-2); font-size: 1.05rem; }
+  .hero-dates { padding-bottom: .3rem; }
+
+  /* Title ladder: thin line, three dots, oldest → newest */
+  .ladder { list-style: none; margin: 2.5rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+  .step { position: relative; padding-top: 1.9rem; }
+  .step-dot {
+    position: absolute; top: 0; left: 0; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--ink-3); border: 1.5px solid var(--ink-3);
+  }
+  .step:not(:last-child)::after { /* segment to the next dot */
+    content: ''; position: absolute; top: 6px; left: 19px; right: calc(-1.5rem + 6px); height: 1px;
+    background: linear-gradient(90deg, var(--ink-3), var(--cyan));
+    transform-origin: left center; transition: transform 1.1s var(--ease);
+  }
+  .step:nth-child(2)::after { transition-delay: .7s; }
+  .js .ladder:not(.in) .step::after { transform: scaleX(0); }
+  .step-kicker { display: block; font: 700 .72rem/1.3 var(--font-text); letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); }
+  .step-title { display: block; margin-top: .5rem; font-weight: 600; font-size: 1.05rem; line-height: 1.35; color: var(--ink-2); }
+  .step.current .step-dot { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 0 5px hsl(190 100% 75% / .12), 0 0 14px var(--cyan); }
+  .step.current .step-kicker { color: var(--cyan); }
+  .step.current .step-title { color: #fff; font-weight: 700; font-size: 1.15rem; }
+
+  @media (max-width: 639px) {
+    .ladder { grid-template-columns: 1fr; gap: 1.6rem; }
+    .step { padding: 0 0 0 2.1rem; }
+    .step-dot { top: .2rem; }
+    .step:not(:last-child)::after {
+      top: calc(.2rem + 19px); left: 6px; right: auto; bottom: calc(-1.6rem - .2rem + 6px); width: 1px; height: auto;
+      background: linear-gradient(180deg, var(--ink-3), var(--cyan)); transform-origin: center top;
+    }
+    .js .ladder:not(.in) .step::after { transform: scaleY(0); }
+  }
+
+  /* Bento of glass tiles */
+  .bento { margin-top: clamp(2.5rem, 5vw, 3.5rem); display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 640px) {
+    .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tile.wide, .tile:nth-child(4) { grid-column: span 2; }
+  }
+  @media (min-width: 960px) {
+    .bento { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tile.wide { grid-column: span 3; }
+    .tile:nth-child(4) { grid-column: auto; }
+  }
+  .tile { --pad: clamp(1.5rem, 3vw, 2.25rem); display: flex; flex-direction: column; }
+  .js .tile.reveal { transition: opacity .8s var(--ease) var(--d, 0ms), transform .8s var(--ease) var(--d, 0ms), border-color .3s var(--ease); }
+  .tile.open { border-color: var(--hair-strong); }
+  .tile-btn {
+    position: relative; flex: 1; display: grid; grid-template-areas: 'name' 'metric' 'title'; row-gap: 1.1rem; align-content: start;
+    width: 100%; min-height: 44px; padding: var(--pad); padding-right: calc(var(--pad) + 2.5rem);
+    text-align: left; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
+  }
+  .tile-btn:focus-visible { outline-offset: -4px; }
+  .tile-name { grid-area: name; font: 700 .74rem/1.3 var(--font-text); letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); }
+  .tile-metric { grid-area: metric; }
+  .tile-metric .num, .tile-metric .num-label { display: block; }
+  .tile-title { grid-area: title; font-weight: 600; font-size: 1.1rem; line-height: 1.4; color: var(--ink); max-width: 30rem; }
+  @media (min-width: 960px) {
+    .tile.wide .tile-btn { grid-template-areas: 'metric name' 'metric title'; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); column-gap: 3rem; align-items: end; }
+    .tile.wide .num { font-size: clamp(3.4rem, 6.5vw, 5rem); }
+    .tile.wide .tile-title { font-size: 1.3rem; }
+    .tile.wide .tile-detail p { margin-left: calc((100% - 2 * var(--pad) - 2.5rem - 3rem) / 2.2 + 3rem); }
+  }
+
+  /* + that turns into × */
+  .plus {
+    position: absolute; top: calc(var(--pad) - .35rem); right: calc(var(--pad) - .35rem);
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--hair-strong);
+    transition: transform .4s var(--ease), border-color .3s var(--ease), background .3s var(--ease);
+  }
+  .plus::before, .plus::after { content: ''; position: absolute; left: 50%; top: 50%; width: 12px; height: 1.5px; background: var(--ink-2); transform: translate(-50%, -50%); }
+  .plus::after { transform: translate(-50%, -50%) rotate(90deg); }
+  .tile-btn:hover .plus { border-color: var(--cyan); }
+  .tile.open .plus { transform: rotate(45deg); border-color: var(--cyan); background: hsl(190 100% 75% / .08); }
+
+  /* The one animated touch: a light sweep along the tile's top edge on hover/focus */
+  .sweep {
+    position: absolute; top: 0; left: var(--radius); right: var(--radius); height: 1px; pointer-events: none; opacity: 0;
+    background: linear-gradient(90deg, transparent, hsl(190 100% 88% / .95), transparent) no-repeat;
+    background-size: 35% 100%; background-position: -60% 0;
+  }
+  .tile:hover .sweep, .tile:focus-within .sweep { opacity: 1; animation: sweep 1.8s var(--ease) 1 forwards; }
+  @keyframes sweep { to { background-position: 160% 0; opacity: .25; } }
+
+  /* Expandable detail: smooth height + fade, removed from the a11y tree when closed */
+  .tile-detail {
+    display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden;
+    transition: grid-template-rows .5s var(--ease), opacity .25s var(--ease), visibility 0s linear .5s;
+  }
+  .tile.open .tile-detail {
+    grid-template-rows: 1fr; opacity: 1; visibility: visible;
+    transition: grid-template-rows .5s var(--ease), opacity .5s var(--ease) .12s, visibility 0s;
+  }
+  .tile-detail > div { overflow: hidden; min-height: 0; }
+  .tile-detail p { padding: 0 var(--pad) var(--pad); max-width: 44rem; color: var(--ink-2); font-size: 1.02rem; }
+
+  .after-grid { margin-top: 1.6rem; display: grid; gap: .5rem; grid-template-columns: minmax(0, 1fr); }
+  .earlier-line { color: var(--ink-2); font-size: .98rem; max-width: 48rem; }
+
+  /* Earlier jobs: a spec-sheet list with hairlines */
+  .before { margin-top: clamp(5rem, 10vw, 7rem); }
+  .before-h { margin-bottom: 1.25rem; }
+  .jobs { list-style: none; margin: 0; padding: 0; }
+  .job {
+    display: grid; grid-template-columns: 1fr; gap: .6rem; padding: 1.75rem 0;
+    background: linear-gradient(90deg, transparent, var(--hair-strong), transparent) top / 100% 1px no-repeat;
+  }
+  .job:last-child { background-image: linear-gradient(90deg, transparent, var(--hair-strong), transparent), linear-gradient(90deg, transparent, var(--hair-strong), transparent); background-position: top, bottom; background-size: 100% 1px; }
+  @media (min-width: 760px) { .job { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 2.5rem; } }
+  .job-co { font: 400 1.3rem/1.2 var(--font-display); color: #fff; }
+  .job-dates { margin-top: .35rem; }
+  .job-title { font-weight: 700; color: var(--ink); }
+  .job-hl { margin-top: .3rem; color: var(--ink-2); }
+  .job .meta { margin-top: .55rem; }
+
+  /* Music: the one magenta moment */
+  .music {
+    margin-top: clamp(4rem, 8vw, 5.5rem); padding-top: 2.25rem; display: grid; gap: 1rem 2.5rem; grid-template-columns: 1fr;
+    background: linear-gradient(90deg, transparent, hsl(290 100% 80% / .5), transparent) top / 100% 1px no-repeat;
+  }
+  @media (min-width: 760px) { .music { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); } }
+  .music .eyebrow { color: var(--magenta); }
+  .music-title { margin-top: .7rem; font: 400 1.3rem/1.2 var(--font-display); color: #fff; }
+  .music-line { color: var(--ink-2); font-size: 1.05rem; max-width: 40rem; }
+  .music-actions { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+  .music-pill { border-color: hsl(290 100% 80% / .45); }
+  .music-pill:hover { border-color: var(--magenta); box-shadow: 0 0 18px hsl(290 100% 70% / .3); }
+  .music-pill[aria-pressed='true'] { border-color: var(--magenta); background: hsl(290 100% 80% / .1); }
+  .music-pill .ico { width: 14px; display: inline-flex; justify-content: center; color: var(--magenta); }
+  .eq { display: inline-flex; gap: 2px; align-items: end; height: 12px; }
+  .eq i { width: 2px; height: 100%; background: var(--magenta); transform-origin: bottom; animation: eq .9s ease-in-out infinite alternate; }
+  .eq i:nth-child(2) { animation-delay: -.35s; } .eq i:nth-child(3) { animation-delay: -.65s; }
+  @keyframes eq { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
+  .music .edu { margin-top: .9rem; }
+
+  /* End */
+  .cta { margin-top: clamp(4.5rem, 9vw, 6.5rem); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem 1.75rem; text-align: center; }
+  .cta .pill.primary svg { width: 12px; height: 12px; }
+  .resume-link { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; text-decoration: none; }
+  .resume-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .cta-status { flex-basis: 100%; min-height: 1.4em; }
+  .tile-metric .num { white-space: nowrap; }
+  .tile-metric .unit { margin-left: .25em; font: 600 .38em/1 var(--font-text); letter-spacing: .02em; color: var(--ink-2); text-shadow: none; }
+</style>
+</head>
+<body>
+<p class="mock-note">Round 2 · B · Highlights: the Case Files idea as an Apple product-page bento. Select a tile to open its one-sentence detail; Esc closes it.</p>
+
+<section class="section" id="experience" aria-labelledby="exp-h">
+  <header class="head reveal">
+    <h2 class="eyebrow" id="exp-h">Experience</h2>
+    <p class="title" id="headline"></p>
+    <p class="lede" id="intro"></p>
+  </header>
+
+  <article class="hero reveal" aria-labelledby="tc-h" id="hero"></article>
+  <div class="bento" id="bento"></div>
+  <div class="after-grid reveal" id="after"></div>
+
+  <section class="before" aria-labelledby="before-h">
+    <h3 class="eyebrow before-h" id="before-h">Before TimelyCare</h3>
+    <ul class="jobs" id="jobs"></ul>
+  </section>
+
+  <section class="music reveal" aria-labelledby="music-h" id="music"></section>
+
+  <div class="cta reveal">
+    <button class="pill primary" type="button" id="play">
+      <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>
+      Play through my career
+    </button>
+    <a class="resume-link" href="#">Read the full resume →</a>
+    <p class="cta-status meta" id="cta-status" aria-live="polite"></p>
+  </div>
+</section>
+
+<script src="highlights.js"></script>
+<script src="../shared.js"></script>
+<script>
+document.documentElement.classList.add('js')
+const { rich, src, esc, reducedMotion, mockBar } = MOCK
+mockBar('Round 2 · B · Highlights')
+const H = window.HIGHLIGHTS
+const tc = H.jobs[0]
+
+document.getElementById('headline').textContent = H.headline
+document.getElementById('intro').innerHTML = rich(H.intro) + src(H.introSrc)
+
+/* TimelyCare hero + the title ladder, oldest first */
+const steps = [...tc.ladder].reverse()
+document.getElementById('hero').innerHTML = `
+  <div class="hero-top">
+    <div>
+      <span class="live">Now</span>
+      <h3 class="hero-co" id="tc-h">${esc(tc.company)}</h3>
+      <p class="hero-blurb">${esc(tc.blurb)}</p>
+    </div>
+    <p class="meta hero-dates">${esc(tc.dates)}${src('R · Phill 2026-10-16')}</p>
+  </div>
+  <ol class="ladder" aria-label="Titles at ${esc(tc.company)}, oldest first">
+    ${steps.map((s, i) => {
+      const current = i === steps.length - 1
+      return `<li class="step${current ? ' current' : ''}">
+        <span class="step-dot" aria-hidden="true"></span>
+        <span class="step-kicker">${i === 0 ? 'Joined' : 'Promoted'} · ${esc(s.start)}</span>
+        <span class="step-title">${esc(s.title)}${current ? '<span class="sr-only"> (current title)</span>' : ''}</span>
+      </li>`
+    }).join('')}
+  </ol>`
+
+/* The four highlights */
+document.getElementById('bento').innerHTML = tc.highlights.map((h, i) => `
+  <div class="tile hud reveal${i === 0 ? ' wide' : ''}" style="--d:${i * 90}ms">
+    <span class="sweep" aria-hidden="true"></span>
+    <button type="button" class="tile-btn" id="b-${h.id}" aria-expanded="false" aria-controls="d-${h.id}">
+      <span class="plus" aria-hidden="true"></span>
+      <span class="tile-name">${esc(h.name)}</span>
+      <span class="tile-metric"><span class="num">${(() => { const m = /^(.*?)(?:\s+([a-z]+))?$/.exec(h.metric); return esc(m[1]) + (m[2] ? `<span class="unit">${esc(m[2])}</span>` : '') })()}</span><span class="num-label">${esc(h.metricLabel)}${src(h.src)}</span></span>
+      <span class="tile-title">${esc(h.title)}</span>
+    </button>
+    <div class="tile-detail" id="d-${h.id}">
+      <div><p>${rich(h.detail)}</p></div>
+    </div>
+  </div>`).join('')
+
+document.getElementById('after').innerHTML = `
+  <p class="earlier-line">${rich(tc.earlier.text)}${src(tc.earlier.src)}</p>
+  <p class="meta">${tc.stack.map(esc).join('<span class="dot" aria-hidden="true">·</span>')}</p>`
+
+/* Earlier jobs */
+document.getElementById('jobs').innerHTML = H.jobs.slice(1).map((j) => `
+  <li class="job reveal">
+    <div>
+      <h4 class="job-co">${esc(j.company)}</h4>
+      <p class="meta job-dates">${esc(j.dates)}</p>
+    </div>
+    <div>
+      <p class="job-title">${esc(j.ladder[0].title)}</p>
+      ${j.highlights.map((h) => `<p class="job-hl">${rich(h.title)}${src(h.src)}</p>`).join('')}
+      <p class="meta">${j.stack.map(esc).join('<span class="dot" aria-hidden="true">·</span>')}</p>
+    </div>
+  </li>`).join('')
+
+/* Music */
+const m = H.music
+document.getElementById('music').innerHTML = `
+  <div>
+    <p class="eyebrow">Also</p>
+    <h3 class="music-title" id="music-h">${esc(m.title)}</h3>
+    <p class="meta" style="margin-top:.35rem">${esc(m.company)} · ${esc(m.dates)}</p>
+  </div>
+  <div>
+    <p class="music-line">${rich(m.line)}${src(m.src)}</p>
+    <div class="music-actions">
+      <button class="pill music-pill" type="button" id="track" aria-pressed="false">
+        <span class="ico" aria-hidden="true">▶</span>
+        <span><span class="sr-only">Play </span>${esc(m.track.title)}</span>
+      </button>
+      <span class="meta">${esc(m.track.by)}</span>
+    </div>
+    <p class="meta edu">${esc(m.education)}</p>
+    <p class="sr-only" id="track-status" aria-live="polite"></p>
+  </div>`
+
+/* Interactions */
+function setTile(btn, open) {
+  btn.setAttribute('aria-expanded', String(open))
+  btn.closest('.tile').classList.toggle('open', open)
+}
+document.querySelectorAll('.tile-btn').forEach((btn) =>
+  btn.addEventListener('click', () => setTile(btn, btn.getAttribute('aria-expanded') !== 'true')))
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return
+  const tile = document.activeElement && document.activeElement.closest('.tile.open')
+  if (!tile) return
+  const btn = tile.querySelector('.tile-btn')
+  setTile(btn, false)
+  btn.focus()
+})
+
+const track = document.getElementById('track')
+const ico = track.querySelector('.ico')
+track.addEventListener('click', () => {
+  const on = track.getAttribute('aria-pressed') !== 'true'
+  track.setAttribute('aria-pressed', String(on))
+  ico.innerHTML = on ? '<span class="eq"><i></i><i></i><i></i></span>' : '▶'
+  document.getElementById('track-status').textContent = on ? `Playing ${m.track.title} (mockup).` : 'Paused.'
+})
+
+document.getElementById('play').addEventListener('click', () => {
+  document.getElementById('cta-status').textContent = 'Mockup: this opens the Jelly Resume and starts Play mode.'
+})
+
+/* Reveal once on enter; everything shows at once with reduced motion */
+const revealables = [...document.querySelectorAll('.reveal, .ladder')]
+const show = (el) => el.classList.add('in')
+if (reducedMotion()) revealables.forEach(show)
+else {
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (!e.isIntersecting) return
+    show(e.target)
+    io.unobserve(e.target)
+  }), { threshold: 0.15, rootMargin: '0px 0px -6% 0px' })
+  revealables.forEach((el) => io.observe(el))
+}
+addEventListener('mock:rm', (e) => { if (e.detail) revealables.forEach(show) })
+</script>
+</body>
+</html>

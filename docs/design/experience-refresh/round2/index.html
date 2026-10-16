@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experience Round 2</title>
+<link rel="stylesheet" href="hud.css">
+<style>
+  .dirs { margin-top: clamp(3rem, 7vw, 4.5rem); list-style: none; padding: 0; }
+  .dirs li + li { border-top: 1px solid transparent; border-image: linear-gradient(90deg, var(--hair-strong), transparent) 1; }
+  .dirs a { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; gap: 1.25rem; align-items: baseline; padding: 1.6rem 0; text-decoration: none; color: var(--ink); }
+  .dirs .k { font: 400 1.4rem/1 var(--font-display); color: var(--cyan); text-shadow: 0 0 14px hsl(190 100% 70% / .4); }
+  .dirs h2 { font: 400 1.45rem/1.2 var(--font-display); color: #fff; }
+  .dirs p { margin-top: .4rem; color: var(--ink-2); }
+  .dirs .go { color: var(--cyan); font-weight: 700; white-space: nowrap; }
+  .dirs a:hover h2, .dirs a:focus-visible h2 { text-shadow: 0 0 16px hsl(190 100% 70% / .5); }
+  .cols { margin-top: clamp(3.5rem, 8vw, 5rem); display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+  .cols .hud { padding: 1.75rem; }
+  .cols h3 { font: 700 .78rem/1 var(--font-text); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-3); }
+  .cols ul { margin: 1rem 0 0; padding-left: 1.1rem; display: grid; gap: .6rem; color: var(--ink-2); }
+  .cols li strong { color: var(--ink); }
+  .back { display: inline-flex; align-items: center; min-height: 44px; margin-top: 2.5rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<section class="section" aria-labelledby="t">
+  <p class="eyebrow">Experience refresh · Round 2</p>
+  <h1 class="title" id="t">Cleaner. Calmer. Just the highlights.</h1>
+  <p class="lede">Your four round-1 ideas, rebuilt on one design language: Audiowide and Nunito only, glass panels with HUD corner brackets, hairlines instead of boxes, and the strongest points from each job. All four read the same copy (<code>highlights.js</code>).</p>
+
+  <ul class="dirs">
+    <li><a href="e2-hud.html"><span class="k">E2</span><span><h2>HUD cards &amp; buttons</h2><p>E plus juiced cards (cursor spotlight on the glass and its border, target-lock corners, notches, reveal scan, count-up, tilt; a tap pulse on phones) and HUD buttons for Play, Open the 3D resume and Download the PDF.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="e-holo.html"><span class="k">E+</span><span><h2>Hologram pass (dropped)</h2><p>E with more HUD: a 3D hologram projector in the header, notched glowing tile frames, a reveal scan and count-up, a reticle riding the line, and a hologram tilt on hover. CSS/SVG only, paused offscreen.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="e-combined.html"><span class="k">E</span><span><h2>Trajectory + Highlights</h2><p>The combination: A’s scroll-lit line with the promotions on it, B’s “Senior AI Engineer” headline and glass tiles (A’s rows on phones), and neon headers like the rest of the site.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="a-trajectory.html"><span class="k">A</span><span><h2>Trajectory</h2><p>One hairline that fills as you scroll and lights each job. The promotions are ticks on the line, and each metric sits beside its one-line story.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="b-highlights.html"><span class="k">B</span><span><h2>Highlights</h2><p>An Apple product-page bento: a promotion stepper, then four glass tiles with big numbers. Tap one for its sentence.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="c-hud.html"><span class="k">C</span><span><h2>Heads-up display</h2><p>One instrument: four live readouts and a segmented control that switches jobs inside a single glass panel. The most compact of the four.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="d-release-notes.html"><span class="k">D</span><span><h2>Release notes</h2><p>Apple’s “What’s New”, applied to a career: versions down a glowing line, the current role’s highlights, and one before→after panel.</p></span><span class="go">Open →</span></a></li>
+  </ul>
+
+  <div class="cols">
+    <div class="hud">
+      <h3>Decided</h3>
+      <ul>
+        <li><strong>Facts come from</strong> your resume and the 2026 fact sheet. The site’s data, the Shroom Wizard and the SEO data all read from one place.</li>
+        <li><strong>Titles:</strong> Software Engineer (Feb 2023) → Senior Software Engineer II (Apr 2025) → Generative AI Engineer (Apr 2026). Already on your resume in Rezmancer PR #18.</li>
+        <li><strong>Look:</strong> no pixel font, Apple-clean, a light HUD touch, highlights only.</li>
+      </ul>
+    </div>
+    <div class="hud">
+      <h3>Still open</h3>
+      <ul>
+        <li>Which direction, or which mix?</li>
+        <li>Show Rezmancer in Projects before it launches?</li>
+        <li>Drop the $60B / $7.1M / 10x / 5–10x claims?</li>
+        <li>Swap the nav’s 2025 PDF for the new one?</li>
+        <li>Add a <code>/resume?play</code> hook so the Play button lands in Play mode?</li>
+      </ul>
+    </div>
+  </div>
+  <a class="back" href="../index.html">← Round 1</a>
+</section>
+<script src="highlights.js"></script>
+<script src="../shared.js"></script>
+<script>MOCK.mockBar('Round 2 · index')</script>
+</body>
+</html>

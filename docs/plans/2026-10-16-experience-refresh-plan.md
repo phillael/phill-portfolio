@@ -62,8 +62,8 @@ Under the tiles: "Before that: an event-driven reporting dashboard that helped s
 
 Earlier stops (company · title · dates · line · stack):
 - **Sessions** · Software Engineer · Jul 2022 – Dec 2022 · "Built features and a React / React Native component library for a platform connecting 130K musicians with 1.7M fans." · React · React Native · TypeScript
-- **Designit for Microsoft** · Front End Developer · Mar 2021 – Jul 2022 · "Built accessible Azure product pages through 50% year-over-year growth, and raised team velocity 25%." · C# · ASP.NET MVC · Accessibility
-- **phillcodes.com** · Freelance Developer · Dec 2018 – Dec 2020 · "Built client web apps end to end in React, TypeScript and Next.js." · React · Next.js · AWS
+- **Designit for Microsoft** · Front End Developer · Mar 2021 – Jul 2022 · "Built accessible Azure product pages through 50% year-over-year growth, and raised team velocity 25%." · C# · ASP.NET MVC · JavaScript · HTML · CSS · Accessibility (JavaScript, HTML, CSS: Phill, 2026-10-16, after the build)
+- **phillcodes.com** · Freelance Developer · Dec 2018 – Dec 2020 · "Built client web apps end to end in React, TypeScript and Next.js." · React · Next.js · JavaScript · HTML · CSS · AWS (JavaScript, HTML, CSS: Phill, 2026-10-16, after the build)
 - **Guitarist & Composer** (magenta) · The Funky Knuckles · Strange Loop Games · 1998 – Present · "Adaptive score for the award-winning game **ECO** (314K units sold), a **#1 iTunes jazz album** with The Funky Knuckles, and 15+ years teaching." · B.A. Jazz Studies, University of North Texas · **Listen** button (visible text "Listen", accessible name "Listen: open the music player").
 
 CTA: **Open the 3D resume** (primary; `href="/resume"`, click → `openResume({ origin: click point, tint: 0, opener: the link }, null)` from `resumeTrigger.ts`, hover/focus → `prefetchResume()`; with reduced motion `openResume` already hard-navigates to the plain page) and **Download the PDF** (secondary; the PDF constant, `download`).

@@ -71,6 +71,11 @@ describe('ExperienceSection', () => {
       expect(within(stop).getByText(job.roles[0].title)).toBeInTheDocument()
       expect(within(stop).getByText(job.dates)).toBeInTheDocument()
       expect(within(stop).getByText(job.line!)).toBeInTheDocument()
+      expect(stop).toHaveTextContent(job.stack.join('·'))
+    }
+    // the web basics on the two front-end jobs (Phill, 2026-10-16)
+    for (const company of ['Designit for Microsoft', 'phillcodes.com']) {
+      expect(career.jobs.find((j) => j.company === company)!.stack).toEqual(expect.arrayContaining(['JavaScript', 'HTML', 'CSS']))
     }
     const music = screen.getByRole('heading', { level: 3, name: 'Guitarist & Composer' }).closest('li')!
     expect(within(music).getByText(career.music.dates)).toBeInTheDocument()

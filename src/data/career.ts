@@ -178,7 +178,7 @@ export const career: Career = {
       current: false,
       tiles: [],
       line: 'Built accessible Azure product pages through 50% year-over-year growth, and raised team velocity 25%.',
-      stack: ['C#', 'ASP.NET MVC', 'Accessibility'],
+      stack: ['C#', 'ASP.NET MVC', 'JavaScript', 'HTML', 'CSS', 'Accessibility'],
     },
     {
       id: 'freelance',
@@ -187,7 +187,7 @@ export const career: Career = {
       current: false,
       tiles: [],
       line: 'Built client web apps end to end in React, TypeScript and Next.js.',
-      stack: ['React', 'Next.js', 'AWS'],
+      stack: ['React', 'Next.js', 'JavaScript', 'HTML', 'CSS', 'AWS'],
     },
   ],
   music: {

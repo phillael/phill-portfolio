@@ -55,12 +55,16 @@ describe('SEO metadata files', () => {
     ])
   })
 
-  it('layout sets canonical and theme-color without touching title/description', () => {
+  it('layout sets canonical and theme-color, keeps the joke title, and says the current job title', () => {
     expect(metadata.alternates?.canonical).toBe('/')
     expect(viewport.themeColor).toBe(BACKGROUND_COLOR)
     expect(metadata.title).toBe('Phill Aelony | Legendary Code Sorcerer')
     expect(metadata.description).toBe(
-      'Phill Aelony - Full Stack Developer, Musician, and Builder of Dreams. A cyberpunk developer portfolio showcasing skills, projects, and experience.',
+      'Phill Aelony - Senior AI Engineer, Musician, and Builder of Dreams. A cyberpunk developer portfolio showcasing skills, projects, and experience.',
     )
+    // the share cards say it too, and nothing still says the 2025 title
+    expect(metadata.openGraph?.description).toBe('Senior AI Engineer, Musician, and Builder of Dreams. Vanquisher of Bugs.')
+    expect(metadata.twitter?.description).toBe('Senior AI Engineer, Musician, and Builder of Dreams. Vanquisher of Bugs.')
+    expect(JSON.stringify(metadata)).not.toMatch(/Full Stack Developer/)
   })
 })

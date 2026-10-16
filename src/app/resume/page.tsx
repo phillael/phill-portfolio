@@ -15,7 +15,7 @@ const SHARE_IMAGE = {
   url: '/opengraph-image',
   width: 1200,
   height: 630,
-  alt: 'Phill Aelony - Software Engineer in cyberpunk Tokyo with llamas',
+  alt: 'Phill Aelony - Senior AI Engineer in cyberpunk Tokyo with llamas',
 }
 
 export const metadata: Metadata = {

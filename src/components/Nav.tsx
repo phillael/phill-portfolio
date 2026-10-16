@@ -97,7 +97,7 @@ const Nav = () => {
                 Phill Aelony
               </span>
               <span className="font-body text-xs md:text-sm text-foreground/80 neon-text-green -mt-1">
-                Software Engineer
+                Senior AI Engineer
               </span>
             </a>
           </div>

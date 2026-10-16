@@ -1,194 +1,127 @@
 /**
- * Experience Section Tests
- *
- * Tests for the ExperienceSection and TimelineCard components:
- * - ExperienceSection renders with correct ID (#experience)
- * - Timeline renders all experience entries from data
- * - TimelineCard expands/collapses on click
- * - Expanded card shows description and tech stack
- * - aria-expanded attribute updates correctly
- * - Keyboard accessibility (Enter/Space to toggle)
+ * The Experience section (mockup E2, docs/design/experience-refresh/round2/e2-hud.html),
+ * rendered from src/data/career.ts: the headline, the titles ladder, TimelyCare's four
+ * tiles, the earlier stops, music with Listen, and the two HUD buttons.
  */
 
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { axe } from 'jest-axe'
 import ExperienceSection from '@/components/ExperienceSection'
-import TimelineCard from '@/components/TimelineCard'
-import experienceData from '@/data/experience.json'
-import { Experience } from '@/types/content'
+import { career } from '@/data/career'
+import { RESUME_PDF } from '@/data/resume'
+import { registerSiteMusic } from '@/lib/site-music'
 
-// Helper to filter out framer-motion props
-const filterMotionProps = (props: Record<string, unknown>) => {
-  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
-  const filtered: Record<string, unknown> = {}
-  Object.keys(props).forEach(key => {
-    if (!motionProps.includes(key)) {
-      filtered[key] = props[key]
-    }
-  })
-  return filtered
-}
-
-// Mock framer-motion to avoid animation issues in tests
-jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, className, role, tabIndex, onClick, onKeyDown, ...props }: React.PropsWithChildren<{ className?: string; role?: string; tabIndex?: number; onClick?: () => void; onKeyDown?: (e: React.KeyboardEvent) => void }>) => (
-      <div className={className} role={role} tabIndex={tabIndex} onClick={onClick} onKeyDown={onKeyDown} {...filterMotionProps(props)}>{children}</div>
-    ),
-    h2: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <h2 className={className} {...filterMotionProps(props)}>{children}</h2>
-    ),
-    section: ({ children, className, id, ...props }: React.PropsWithChildren<{ className?: string; id?: string }>) => (
-      <section className={className} id={id} {...filterMotionProps(props)}>{children}</section>
-    ),
-    ul: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <ul className={className} {...filterMotionProps(props)}>{children}</ul>
-    ),
-    a: ({ children, className, href, target, rel, download, ...props }: React.PropsWithChildren<{ className?: string; href?: string; target?: string; rel?: string; download?: string }>) => (
-      <a className={className} href={href} target={target} rel={rel} download={download} {...filterMotionProps(props)}>{children}</a>
-    ),
-    span: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <span className={className} {...filterMotionProps(props)}>{children}</span>
-    ),
-  },
-  AnimatePresence: ({ children }: React.PropsWithChildren<object>) => <>{children}</>,
-  useReducedMotion: () => false,
+const openResume = jest.fn()
+const prefetchResume = jest.fn()
+jest.mock('@/components/jelly/resumeTrigger', () => ({
+  openResume: (...a: unknown[]) => openResume(...a),
+  prefetchResume: () => prefetchResume(),
 }))
 
-describe('ExperienceSection', () => {
-  it('renders with correct ID (#experience)', () => {
-    render(<ExperienceSection />)
-
-    const section = document.getElementById('experience')
-    expect(section).toBeInTheDocument()
-  })
-
-  it('renders all experience entries from data', () => {
-    render(<ExperienceSection />)
-
-    // Each experience should have its title displayed
-    const experiences = experienceData as Experience[]
-    experiences.forEach((exp) => {
-      expect(screen.getByText(exp.title)).toBeInTheDocument()
-    })
-
-    // Verify there are experience entries (dynamic count from data)
-    expect(experienceData.length).toBeGreaterThan(0)
-  })
-
-  it('has proper accessibility attributes', () => {
-    render(<ExperienceSection />)
-
-    const section = screen.getByRole('region', { name: /^experience$/i })
-    expect(section).toBeInTheDocument()
-  })
+beforeEach(() => {
+  openResume.mockClear()
+  prefetchResume.mockClear()
 })
 
-describe('TimelineCard', () => {
-  const mockExperience: Experience = {
-    id: 'test-exp',
-    title: 'Test Engineer',
-    company: 'Test Company',
-    dateRange: 'Jan 2023 - Present',
-    description: 'This is a test description for the experience.',
-    bulletPoints: ['First bullet point', 'Second bullet point'],
-    techStack: ['React', 'TypeScript', 'Node.js'],
-    type: 'tech',
-  }
-
-  it('expands and collapses on click', () => {
-    render(<TimelineCard experience={mockExperience} />)
-
-    const card = screen.getByRole('button')
-
-    // Initially collapsed - description should not be visible
-    expect(screen.queryByText(mockExperience.description)).not.toBeInTheDocument()
-
-    // Click to expand
-    fireEvent.click(card)
-
-    // Now description should be visible
-    expect(screen.getByText(mockExperience.description)).toBeInTheDocument()
-
-    // Click again to collapse
-    fireEvent.click(card)
-
-    // Description should be hidden again
-    expect(screen.queryByText(mockExperience.description)).not.toBeInTheDocument()
+describe('ExperienceSection', () => {
+  it('is the #experience region, headed "Experience", with the headline and lede', () => {
+    render(<ExperienceSection />)
+    const section = screen.getByRole('region', { name: 'Experience' })
+    expect(section).toHaveAttribute('id', 'experience')
+    expect(screen.getByRole('heading', { level: 2, name: 'Experience' })).toHaveAttribute('id', 'experience-heading')
+    expect(within(section).getByText('Senior AI Engineer')).toHaveClass('neon-text-purple')
+    expect(within(section).getByText(career.intro)).toBeInTheDocument()
   })
 
-  it('expanded card shows description and tech stack', () => {
-    render(<TimelineCard experience={mockExperience} />)
+  it('shows TimelyCare first, now, with its three titles newest first', () => {
+    render(<ExperienceSection />)
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'TimelyCare',
+      'Sessions',
+      'Designit for Microsoft',
+      'phillcodes.com',
+      'Guitarist & Composer',
+    ])
+    expect(screen.getByText('Now')).toBeInTheDocument()
+    expect(screen.getByText('Virtual health for colleges and universities')).toBeInTheDocument()
 
-    const card = screen.getByRole('button')
-    fireEvent.click(card)
-
-    // Check description is visible
-    expect(screen.getByText(mockExperience.description)).toBeInTheDocument()
-
-    // Check tech stack badges are visible
-    mockExperience.techStack.forEach((tech) => {
-      expect(screen.getByText(tech)).toBeInTheDocument()
-    })
-
-    // Check bullet points are visible
-    mockExperience.bulletPoints.forEach((bullet) => {
-      expect(screen.getByText(bullet)).toBeInTheDocument()
-    })
+    const ladder = screen.getByRole('list', { name: 'Titles at TimelyCare, newest first' })
+    expect(within(ladder).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Promoted · Apr 2026Generative AI Engineer (current title)',
+      'Promoted · Apr 2025Senior Software Engineer II',
+      'Joined · Feb 2023Software Engineer',
+    ])
   })
 
-  it('aria-expanded attribute updates correctly', () => {
-    render(<TimelineCard experience={mockExperience} />)
-
-    const card = screen.getByRole('button')
-
-    // Initially collapsed
-    expect(card).toHaveAttribute('aria-expanded', 'false')
-
-    // Click to expand
-    fireEvent.click(card)
-    expect(card).toHaveAttribute('aria-expanded', 'true')
-
-    // Click to collapse
-    fireEvent.click(card)
-    expect(card).toHaveAttribute('aria-expanded', 'false')
+  it('has the four tiles with their numbers', () => {
+    render(<ExperienceSection />)
+    for (const tile of career.jobs[0].tiles) {
+      const button = screen.getByRole('button', { name: tile.title })
+      expect(button).toHaveAccessibleDescription(new RegExp(`^${tile.metric.replace(/[.*+?^${}()|[\]\\~]/g, '\\$&')} ${tile.metricLabel}`))
+    }
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(4)
+    expect(screen.getByText('cut post-release bugs 50%').tagName).toBe('STRONG')
   })
 
-  it('supports keyboard interaction (Enter to toggle)', async () => {
+  it('shows each earlier job with its title, dates and one line', () => {
+    render(<ExperienceSection />)
+    for (const job of career.jobs.slice(1)) {
+      const stop = screen.getByRole('heading', { level: 3, name: job.company }).closest('li')!
+      expect(within(stop).getByText(job.roles[0].title)).toBeInTheDocument()
+      expect(within(stop).getByText(job.dates)).toBeInTheDocument()
+      expect(within(stop).getByText(job.line!)).toBeInTheDocument()
+    }
+    const music = screen.getByRole('heading', { level: 3, name: 'Guitarist & Composer' }).closest('li')!
+    expect(within(music).getByText(career.music.dates)).toBeInTheDocument()
+    expect(within(music).getByText(career.music.education)).toBeInTheDocument()
+    expect(within(music).getByText('#1 iTunes jazz album').tagName).toBe('STRONG')
+  })
+
+  it("Listen opens the site's music player", async () => {
+    const open = jest.fn()
+    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle: () => {}, open })
+    render(<ExperienceSection />)
+    const listen = screen.getByRole('button', { name: 'Listen: open the music player' })
+    expect(listen).toHaveTextContent('Listen')
+    await userEvent.click(listen)
+    expect(open).toHaveBeenCalledTimes(1)
+    registerSiteMusic(null)
+  })
+
+  it('links the 3D resume (opened in place) and the PDF', async () => {
     const user = userEvent.setup()
-    render(<TimelineCard experience={mockExperience} />)
+    render(<ExperienceSection />)
+    const open3d = screen.getByRole('link', { name: 'Open the 3D resume' })
+    expect(open3d).toHaveAttribute('href', '/resume')
+    const pdf = screen.getByRole('link', { name: 'Download the PDF' })
+    expect(pdf).toHaveAttribute('href', RESUME_PDF)
+    expect(pdf).toHaveAttribute('download')
 
-    const card = screen.getByRole('button')
+    await user.hover(open3d)
+    expect(prefetchResume).toHaveBeenCalled()
+    await user.click(open3d)
+    expect(openResume).toHaveBeenCalledWith({ origin: expect.objectContaining({ x: expect.any(Number) }), tint: 0, opener: open3d }, null)
 
-    // Focus the card
-    card.focus()
-    expect(card).toHaveFocus()
-
-    // Press Enter to expand
+    // from the keyboard: the dissolve starts from the photo's center
+    open3d.focus()
     await user.keyboard('{Enter}')
-    expect(card).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText(mockExperience.description)).toBeInTheDocument()
-
-    // Press Enter again to collapse
-    await user.keyboard('{Enter}')
-    expect(card).toHaveAttribute('aria-expanded', 'false')
+    expect(openResume).toHaveBeenLastCalledWith({ origin: null, tint: 0, opener: open3d }, null)
   })
 
-  it('supports keyboard interaction (Space to toggle)', async () => {
+  it('leaves modified clicks to the browser (new tab, new window)', async () => {
     const user = userEvent.setup()
-    render(<TimelineCard experience={mockExperience} />)
+    render(<ExperienceSection />)
+    const open3d = screen.getByRole('link', { name: 'Open the 3D resume' })
+    open3d.addEventListener('click', (e) => e.preventDefault()) // jsdom can't navigate
+    await user.keyboard('{Meta>}')
+    await user.click(open3d)
+    await user.keyboard('{/Meta}')
+    expect(openResume).not.toHaveBeenCalled()
+  })
 
-    const card = screen.getByRole('button')
-
-    // Focus the card
-    card.focus()
-
-    // Press Space to expand
-    await user.keyboard(' ')
-    expect(card).toHaveAttribute('aria-expanded', 'true')
-
-    // Press Space again to collapse
-    await user.keyboard(' ')
-    expect(card).toHaveAttribute('aria-expanded', 'false')
+  it('has no axe violations', async () => {
+    const { container } = render(<ExperienceSection />)
+    expect(await axe(container, { rules: { 'color-contrast': { enabled: false } } })).toHaveNoViolations()
   })
 })

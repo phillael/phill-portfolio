@@ -4,15 +4,12 @@ import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type 
 import type { CareerTile } from '@/data/career'
 import { richText } from '@/data/resume'
 import css from './HighlightTile.module.css'
+import { FINE_POINTER, REDUCED_MOTION, matches } from './motion'
 
-const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
-const FINE_POINTER = '(hover: hover) and (pointer: fine)'
 const COUNT_MS = 1300
 /** the reveal (fade, scan, flicker) starts at 12% in view, the count-up at 40% (as in the mockup) */
 const REVEAL_AT = 0.12
 const COUNT_AT = 0.4
-
-const matches = (query: string) => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches
 
 /** "~5 wks" → { value: "~5", unit: "wks" }: the unit is set small next to the number */
 export function splitMetric(metric: string) {

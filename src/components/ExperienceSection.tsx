@@ -1,99 +1,153 @@
 'use client'
 
-import AnimatedSection from '@/components/AnimatedSection'
-import TimelineCard from '@/components/TimelineCard'
-import GlitchText from '@/components/GlitchText'
-import experienceData from '@/data/experience.json'
-import { Experience } from '@/types/content'
+import { Fragment, useRef, type MouseEvent } from 'react'
+import { career } from '@/data/career'
+import { RESUME_PDF, richText } from '@/data/resume'
+import { getSiteMusic } from '@/lib/site-music'
+import { openResume, prefetchResume } from '@/components/jelly/resumeTrigger'
+import ExperienceTrack from '@/components/experience/ExperienceTrack'
+import HighlightTile from '@/components/experience/HighlightTile'
+import HudButton from '@/components/experience/HudButton'
+import TitleLadder from '@/components/experience/TitleLadder'
+import { useReveal } from '@/components/experience/useReveal'
+import css from '@/components/experience/Experience.module.css'
 
-/**
- * TimelineDot - Individual timeline dot with neon glow effect
- */
-const TimelineDot = () => (
-  <div className="timeline-dot w-4 h-4 rounded-full flex-shrink-0" />
+/** `**bold**` runs as <strong> */
+const Rich = ({ text }: { text: string }) => (
+  <>
+    {richText(text).map((run, i) => (run.bold ? <strong key={i}>{run.text}</strong> : <Fragment key={i}>{run.text}</Fragment>))}
+  </>
 )
 
-/**
- * TimelineEntry - Single timeline entry with connector dot and card
- */
-const TimelineEntry = ({
-  experience,
-  index,
-}: {
-  experience: Experience
-  index: number
-}) => {
-  return (
-    <AnimatedSection delay={0.1 * index}>
-      <div className="relative flex items-start gap-4 md:gap-6">
-        {/* Timeline Dot - Visible on all screen sizes */}
-        <div className="flex-shrink-0 relative z-10 mt-6">
-          <TimelineDot />
-        </div>
+/** "React · React Native · TypeScript", the dots decoration */
+const Stack = ({ items }: { items: string[] }) => (
+  <>
+    {items.map((item, i) => (
+      <Fragment key={item}>
+        {i > 0 && (
+          <span className={css.dot} aria-hidden="true">
+            ·
+          </span>
+        )}
+        {item}
+      </Fragment>
+    ))}
+  </>
+)
 
-        {/* Card - Takes remaining space */}
-        <div className="flex-1 pb-8 md:pb-12">
-          <TimelineCard experience={experience} />
-        </div>
-      </div>
-    </AnimatedSection>
-  )
+/** Open the 3D resume in place, from the click (keyboard: from the photo's center); modified clicks are the browser's */
+const open3d = (e: MouseEvent<HTMLElement>) => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+  e.preventDefault()
+  openResume({ origin: e.detail === 0 ? null : { x: e.clientX, y: e.clientY }, tint: 0, opener: e.currentTarget }, null)
 }
 
 /**
- * ExperienceSection - Work experience timeline section
- *
- * Features:
- * - Section ID for navigation anchor
- * - Vertical timeline with glowing cyan line
- * - Timeline dots at each entry point with neon glow
- * - Expandable HUD-style cards for each experience
- * - Responsive layout: dots on left with cards on right
- * - Entries ordered reverse-chronologically
- * - AnimatedSection wrapper with slide-from-right variant for heading
- * - GlitchText effect on heading for hover interaction
+ * ExperienceSection - the career as mockup E2 tells it (docs/design/experience-refresh/round2/e2-hud.html),
+ * from src/data/career.ts: the "Senior AI Engineer" headline, then a rail down the left that
+ * fills with the scroll and lights a node per stop. TimelyCare first (now): its titles as a
+ * ladder of promotions and four HUD tiles; then one line per earlier job; music last, in
+ * magenta, with Listen (opens the site's one music player); then the HUD buttons to the 3D
+ * resume and the PDF.
  */
 const ExperienceSection = () => {
-  // Data is already ordered reverse-chronologically in the JSON
-  const experiences = experienceData as Experience[]
+  const sectionRef = useRef<HTMLElement>(null)
+  useReveal(sectionRef)
+  const [timelycare, ...earlier] = career.jobs
+  const { music } = career
 
   return (
-    <section
-      id="experience"
-      aria-labelledby="experience-heading"
-      role="region"
-      className="min-h-screen py-20 md:py-32 px-4 md:px-6"
-    >
-      <div className="max-w-4xl mx-auto">
-        {/* Section Heading - slide-from-right animation variant with glitch effect */}
-        <AnimatedSection variant="slide-from-right">
-          <h2 id="experience-heading" className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-8 md:mb-10">
-            <GlitchText as="span" className="neon-text-purple">
-              Experience
-            </GlitchText>
-          </h2>
-        </AnimatedSection>
+    <section ref={sectionRef} id="experience" aria-labelledby="experience-heading" className={css.section}>
+      <header className={css.reveal} data-reveal="">
+        <h2 id="experience-heading" className={css.eyebrow}>
+          Experience
+        </h2>
+        <p className={`${css.headline} neon-text-purple`}>{career.headline}</p>
+        <p className={css.lede}>{career.intro}</p>
+      </header>
 
-        {/* Timeline Container */}
-        <div className="relative">
-          {/* Vertical Timeline Line */}
-          <div
-            className="timeline-line absolute left-[7px] md:left-[7px] top-0 bottom-0 w-0.5"
-            aria-hidden="true"
-          />
+      <ExperienceTrack>
+        <ol className={css.stops}>
+          <li className={`${css.stop} ${css.now}`} data-stop="">
+            <span className={css.node} aria-hidden="true" />
+            <div className={css.reveal} data-reveal="">
+              <span className={css.live}>Now</span>
+              <div className={css.stopHead}>
+                <h3 className={`${css.company} neon-text-blue`}>{timelycare.company}</h3>
+                <span className={css.dates}>{timelycare.dates}</span>
+              </div>
+              <p className={css.blurb}>{timelycare.blurb}</p>
+              <TitleLadder company={timelycare.company} roles={timelycare.roles} />
+            </div>
+            <div className={css.bento}>
+              {timelycare.tiles.map((tile, i) => (
+                <HighlightTile key={tile.id} tile={tile} wide={i === 0} delay={i * 90} />
+              ))}
+            </div>
+            {timelycare.line && (
+              <div className={`${css.after} ${css.reveal}`} data-reveal="">
+                <p className={css.earlierLine}>
+                  <Rich text={timelycare.line} />
+                </p>
+              </div>
+            )}
+          </li>
 
-          {/* Timeline Entries */}
-          <div className="relative">
-            {experiences.map((experience, index) => (
-              <TimelineEntry
-                key={experience.id}
-                experience={experience}
-                index={index}
-              />
-            ))}
-          </div>
+          {earlier.map((job) => (
+            <li key={job.id} className={css.stop} data-stop="">
+              <span className={css.node} aria-hidden="true" />
+              <div className={css.reveal} data-reveal="">
+                <div className={css.stopHead}>
+                  <h3 className={`${css.company} neon-text-blue`}>{job.company}</h3>
+                  <span className={css.dates}>{job.dates}</span>
+                </div>
+                <p className={css.role}>{job.roles[0].title}</p>
+                {job.line && (
+                  <p className={css.one}>
+                    <Rich text={job.line} />
+                  </p>
+                )}
+                <p className={css.meta}>
+                  <Stack items={job.stack} />
+                </p>
+              </div>
+            </li>
+          ))}
+
+          <li className={`${css.stop} ${css.music}`} data-stop="">
+            <span className={css.node} aria-hidden="true" />
+            <div className={css.reveal} data-reveal="">
+              <div className={css.stopHead}>
+                <h3 className={`${css.company} ${css.neonMagenta}`}>{music.title}</h3>
+                <span className={css.dates}>{music.dates}</span>
+              </div>
+              <p className={css.role}>{music.company}</p>
+              <p className={css.one}>
+                <Rich text={music.line} />
+              </p>
+              <p className={css.meta}>{music.education}</p>
+              <HudButton
+                variant="music"
+                icon="headphones"
+                ariaLabel="Listen: open the music player"
+                className={css.listen}
+                onClick={() => getSiteMusic()?.open()}
+              >
+                Listen
+              </HudButton>
+            </div>
+          </li>
+        </ol>
+
+        <div className={`${css.cta} ${css.reveal}`} data-reveal="">
+          <HudButton variant="primary" icon="cube" href="/resume" onClick={open3d} onPointerEnter={prefetchResume} onFocus={prefetchResume}>
+            Open the 3D resume
+          </HudButton>
+          <HudButton variant="secondary" icon="download" href={RESUME_PDF} download>
+            Download the PDF
+          </HudButton>
         </div>
-      </div>
+      </ExperienceTrack>
     </section>
   )
 }

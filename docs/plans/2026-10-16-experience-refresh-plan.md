@@ -169,6 +169,8 @@ The home page's Experience section is rebuilt as mockup E2 (`docs/design/experie
 
 One source of truth: `src/data/career.ts` takes titles, companies and dates from `resume.ts` (Rezmancer's AI Engineer variant) and adds the page's tiles and lines plus vetted notes for the Wizard. A grounding test fails if any number in it isn't in `resume.ts` or in its sourced `FACTS` list. The page, the Shroom Wizard's prompt and the JSON-LD all read it; `experience.json` is gone.
 
+After seeing the build, Phill added: a product-manager line under the TimelyCare titles, a quiet "Past year: 251 PRs merged and 392 reviewed, up to 46 a month." under it, and JavaScript · HTML · CSS on the Designit and phillcodes.com stacks.
+
 Also: Projects gains Quadzilla, Rezmancer and the Jelly Resume (the TimelyCare card goes; Number Slayers links numberslayers.com); the nav/`/resume`/3D-HUD PDF is Rezmancer's latest build behind one `RESUME_PDF`; the 3D resume is regenerated with the three titles (Play gains a checkpoint); hero h1, About ¶4, skills and the Wizard's summary lose the 2025 claims; `SiteMusic.open()`.
 
 ## Decisions (Phill's, from the design rounds)
@@ -188,7 +190,7 @@ Also: Projects gains Quadzilla, Rezmancer and the Jelly Resume (the TimelyCare c
 - Wizard system prompt: 20,943 → 23,610 chars
 
 ## Test plan
-- [x] `npx tsc --noEmit`, `npm run lint` (0 warnings), `npx jest --no-watchman` (58 suites, 635 tests), `npm run build`
+- [x] `npx tsc --noEmit`, `npm run lint` (0 warnings), `npx jest --no-watchman` (58 suites, 637 tests), `npm run build`
 - [x] 1280×800 next to the mockup: layout to the pixel, hover (tilt, spotlight, hologram number, notches), open/close, Esc, Listen, Open the 3D resume (opens, closes back to the same spot with focus on the button)
 - [x] 375×812 touch: rows, tap pulse, full-width buttons, no horizontal scroll
 - [x] Keyboard: tiles → Listen → both buttons, visible focus, Enter/Space/Esc

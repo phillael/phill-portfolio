@@ -1,0 +1,124 @@
+/*
+ * Round 2 design language: Apple-clean, with a light futuristic HUD.
+ * Two fonts only (the site's): Audiowide for display, Nunito for everything else.
+ * Rules: lots of air, one accent per view, hairlines instead of boxes, corner brackets
+ * instead of clipped cards, glass panels, glow only on the few things that matter.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Nunito:wght@300;400;600;700;800&display=swap');
+
+:root {
+  --bg: hsl(220 20% 3%);
+  --bg-end: hsl(180 45% 10%);
+  --ink: hsl(180 100% 97%);          /* primary text */
+  --ink-2: hsl(195 18% 72%);         /* secondary text */
+  --ink-3: hsl(198 14% 56%);         /* labels, meta (AA on --bg at ≥ 14px bold / 18px) */
+  --cyan: hsl(190 100% 75%);
+  --cyan-hot: hsl(186 100% 60%);
+  --magenta: hsl(290 100% 80%);
+  --green: hsl(130 90% 55%);
+  --glass: hsl(200 40% 10% / 0.45);
+  --glass-hi: hsl(190 100% 75% / 0.06);
+  --hair: hsl(190 100% 75% / 0.14);
+  --hair-strong: hsl(190 100% 75% / 0.32);
+  --radius: 22px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --font-display: 'Audiowide', sans-serif;
+  --font-text: 'Nunito', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; overflow-x: clip; }
+body {
+  background: linear-gradient(160deg, var(--bg) 0%, hsl(205 40% 5%) 55%, var(--bg-end) 100%) fixed;
+  background-color: var(--bg);
+  color: var(--ink);
+  font: 400 1.0625rem/1.55 var(--font-text);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'tnum' 1;
+}
+h1, h2, h3, h4, p { margin: 0; }
+h2, h3 { font-weight: 400; }
+a { color: var(--cyan); }
+strong { font-weight: 800; color: #fff; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 8px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Section shell */
+.section { max-width: 68rem; margin: 0 auto; padding: clamp(4.5rem, 10vw, 8rem) 16px; }
+.eyebrow { font: 700 .78rem/1 var(--font-text); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-3); }
+.title {
+  margin-top: .9rem; font: 400 clamp(2.4rem, 6.5vw, 4.25rem)/1.05 var(--font-display); letter-spacing: -.01em; color: #fff;
+  text-shadow: 0 0 28px hsl(190 100% 70% / .25);
+}
+.lede { margin-top: 1.1rem; max-width: 40rem; font-size: clamp(1.1rem, 2.2vw, 1.3rem); line-height: 1.5; color: var(--ink-2); font-weight: 300; }
+
+/* Display numbers */
+.num { font: 400 clamp(2.2rem, 5vw, 3.4rem)/1 var(--font-display); color: #fff; letter-spacing: -.01em; text-shadow: 0 0 18px hsl(190 100% 70% / .35); }
+.num-label { margin-top: .55rem; font-size: .92rem; color: var(--ink-2); line-height: 1.4; }
+
+/* Glass HUD panel with corner brackets (no clipped corners, no box walls) */
+.hud {
+  position: relative; border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--glass-hi), transparent 40%), var(--glass);
+  border: 1px solid var(--hair);
+  backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 30px 80px -40px hsl(190 100% 50% / .25), inset 0 1px 0 hsl(190 100% 90% / .08);
+}
+.hud::before, .hud::after { /* top-left and bottom-right brackets */
+  content: ''; position: absolute; width: 18px; height: 18px; pointer-events: none;
+  border-color: var(--cyan); border-style: solid; opacity: .8;
+  filter: drop-shadow(0 0 4px hsl(190 100% 70% / .8));
+}
+.hud::before { top: -1px; left: -1px; border-width: 1.5px 0 0 1.5px; border-top-left-radius: var(--radius); }
+.hud::after { bottom: -1px; right: -1px; border-width: 0 1.5px 1.5px 0; border-bottom-right-radius: var(--radius); }
+
+/* Hairline divider that fades at both ends */
+.hairline { height: 1px; border: 0; margin: 0; background: linear-gradient(90deg, transparent, var(--hair-strong), transparent); }
+
+/* Status dot */
+.live { display: inline-flex; align-items: center; gap: .5rem; font: 700 .78rem/1 var(--font-text); letter-spacing: .16em; text-transform: uppercase; color: var(--green); }
+.live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: breathe 2.4s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .45; } }
+
+/* Quiet meta line (stack etc.): text, not chips */
+.meta { font-size: .9rem; color: var(--ink-3); letter-spacing: .01em; }
+.meta .dot { margin: 0 .5em; opacity: .6; }
+
+/* Buttons: pills */
+.pill {
+  display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+  min-height: 48px; padding: .75rem 1.4rem; border-radius: 999px; cursor: pointer; text-decoration: none;
+  font: 700 1rem/1 var(--font-text); color: var(--ink);
+  background: transparent; border: 1px solid var(--hair-strong);
+  transition: border-color .25s var(--ease), box-shadow .25s var(--ease), background .25s var(--ease);
+}
+.pill:hover { border-color: var(--cyan); box-shadow: 0 0 18px hsl(190 100% 70% / .3); }
+.pill.primary { background: #f2ffff; color: hsl(220 30% 8%); border-color: transparent; box-shadow: 0 0 30px hsl(190 100% 75% / .35); }
+.pill.primary:hover { background: #fff; box-shadow: 0 0 40px hsl(190 100% 75% / .55); }
+
+/* Reveal on enter (JS adds .in); nothing is hidden without JS */
+.js .reveal { opacity: 0; transform: translateY(14px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
+.js .reveal.in { opacity: 1; transform: none; }
+
+/* Mockup chrome (not part of the design): shared.js's bar */
+.mock-bar {
+  position: sticky; top: 0; z-index: 100; display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem;
+  padding: .4rem 16px; font: 600 .85rem/1.3 var(--font-text); color: hsl(42 100% 70%);
+  background: hsl(220 30% 4% / .85); backdrop-filter: blur(8px); border-bottom: 1px dashed hsl(42 100% 62% / .35);
+}
+.mock-bar a { color: hsl(42 100% 70%); }
+.mock-bar .spacer { flex: 1; }
+.mock-bar label { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; cursor: pointer; }
+.mock-bar input { width: 18px; height: 18px; accent-color: hsl(42 100% 62%); }
+.mock-note { max-width: 68rem; margin: 1rem auto 0; padding: 0 16px; font-size: .9rem; color: hsl(42 90% 75%); }
+.src { display: none; margin-left: .4em; padding: 0 .35em; border-radius: 4px; font: 600 .68rem/1.6 var(--font-text); vertical-align: middle; color: hsl(42 100% 70%); background: hsl(42 100% 62% / .1); border: 1px solid hsl(42 100% 62% / .3); white-space: nowrap; }
+.show-src .src { display: inline-block; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
+  .js .reveal { opacity: 1; transform: none; }
+}
+.rm *, .rm *::before, .rm *::after { animation: none !important; transition-duration: .01ms !important; }
+.rm .js .reveal, .rm.js .reveal { opacity: 1; transform: none; }

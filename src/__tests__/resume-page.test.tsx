@@ -76,11 +76,22 @@ describe('/resume page', () => {
     expect(within(experience).getByText('never sent a message').tagName).toBe('STRONG')
   })
 
+  it('lists the three TimelyCare titles under TimelyCare, newest first', () => {
+    render(<ResumePage />)
+
+    const roles = screen.getByRole('list', { name: 'Roles at TimelyCare' })
+    expect(within(roles).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Generative AI EngineerApr 2026 – Present',
+      'Senior Software Engineer IIApr 2025 – Apr 2026',
+      'Software EngineerFeb 2023 – Apr 2025',
+    ])
+  })
+
   it('offers the PDF download and a way back home', () => {
     render(<ResumePage />)
 
     const pdf = screen.getByRole('link', { name: /download pdf/i })
-    expect(pdf).toHaveAttribute('href', '/Phillip_Aelony_Resume_2025.pdf')
+    expect(pdf).toHaveAttribute('href', '/Phill_Aelony_Resume.pdf')
     expect(pdf).toHaveAttribute('download')
     expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/')
   })

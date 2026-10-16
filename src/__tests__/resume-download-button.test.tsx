@@ -49,7 +49,7 @@ describe('ResumeDownloadButton', () => {
     render(<ResumeDownloadButton />)
 
     const link = screen.getByRole('link')
-    expect(link).toHaveAttribute('href', '/Phillip_Aelony_Resume_2025.pdf')
+    expect(link).toHaveAttribute('href', '/Phill_Aelony_Resume.pdf')
   })
 
   it('download attribute is present for proper download behavior', () => {
@@ -123,6 +123,6 @@ describe('ResumeDownloadButton', () => {
     expect(link).toHaveFocus()
 
     // Verify the link is interactive via keyboard (href is set properly)
-    expect(link).toHaveAttribute('href', '/Phillip_Aelony_Resume_2025.pdf')
+    expect(link).toHaveAttribute('href', '/Phill_Aelony_Resume.pdf')
   })
 })

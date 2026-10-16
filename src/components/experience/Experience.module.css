@@ -1,0 +1,427 @@
+/*
+ * The Experience section (mockup: docs/design/experience-refresh/round2/e2-hud.html + hud.css):
+ * Apple-clean with a light HUD. The header, a scroll-lit rail down the left with a node per
+ * stop, the titles ladder, the tiles' grid, the earlier stops, music, the HUD buttons.
+ * States set by JS: data-live on the track (the rail follows the scroll; without it, e.g. no
+ * JS or reduced motion, the rail is fully drawn and every node lit), data-lit on a stop,
+ * data-armed/data-in on revealed blocks.
+ */
+.section {
+  --cyan: hsl(var(--primary));
+  --cyan-hot: hsl(186 100% 60%);
+  --magenta: hsl(var(--secondary));
+  --green: hsl(var(--accent));
+  --ink: hsl(var(--foreground));
+  --ink-2: hsl(195 18% 72%);
+  --ink-3: hsl(198 14% 56%);
+  --hair: hsl(190 100% 75% / 0.14);
+  --hair-strong: hsl(190 100% 75% / 0.32);
+  --bg: hsl(var(--background));
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: clamp(4.5rem, 10vw, 8rem) 16px;
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  font-feature-settings: 'tnum' 1;
+}
+.section strong {
+  font-weight: 800;
+  color: #fff;
+}
+
+/* header */
+.eyebrow {
+  font: 700 0.78rem/1 var(--font-body);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+.headline {
+  margin-top: 0.9rem;
+  font: 400 clamp(2.4rem, 6.5vw, 4.25rem) / 1.05 var(--font-heading);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.lede {
+  margin-top: 1.1rem;
+  max-width: 40rem;
+  font-size: clamp(1.1rem, 2.2vw, 1.3rem);
+  line-height: 1.5;
+  font-weight: 300;
+  color: var(--ink-2);
+}
+
+/* reveal on enter: hidden only once JS has armed it */
+.reveal[data-armed] {
+  transition:
+    opacity 0.8s var(--ease),
+    transform 0.8s var(--ease);
+}
+.reveal[data-armed]:not([data-in]) {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+/* the rail */
+.track {
+  position: relative;
+  margin-top: clamp(3.5rem, 8vw, 5.5rem);
+  padding-left: 52px;
+}
+.rail {
+  position: absolute;
+  left: 11px;
+  top: 12px;
+  bottom: 0;
+  width: 1px;
+  background: var(--hair);
+}
+.railFill {
+  position: absolute;
+  inset: 0;
+  transform-origin: top;
+  transform: scaleY(var(--p, 1));
+  background: linear-gradient(180deg, var(--cyan) 0%, var(--cyan-hot) 55%, var(--magenta) 100%);
+  box-shadow: 0 0 10px hsl(190 100% 70% / 0.7);
+}
+/* the head rides a rail-tall layer moved by transform (never `top`: that's a layout per frame) */
+.railHeadTrack {
+  position: absolute;
+  inset: 0;
+  transform: translateY(calc(var(--p, 0) * 100%));
+}
+.railHead {
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 8px #fff,
+    0 0 18px var(--cyan);
+  opacity: 0;
+}
+.track[data-live] .railHead {
+  opacity: var(--head, 1);
+}
+@media (min-width: 900px) {
+  .track {
+    padding-left: 88px;
+  }
+  .rail {
+    left: 27px;
+  }
+}
+
+/* stops */
+.stops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.stop {
+  position: relative;
+  padding-bottom: clamp(3.5rem, 8vw, 5.5rem);
+}
+.node {
+  position: absolute;
+  top: 0.45rem;
+  left: -52px;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  border: 1px solid var(--hair-strong);
+  transition:
+    border-color 0.5s var(--ease),
+    box-shadow 0.5s var(--ease);
+}
+@media (min-width: 900px) {
+  .node {
+    left: -72px;
+  }
+}
+.node::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  transition:
+    background 0.5s var(--ease),
+    box-shadow 0.5s var(--ease);
+}
+.track:not([data-live]) .node,
+.stop[data-lit] .node {
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px hsl(190 100% 70% / 0.45);
+}
+.track:not([data-live]) .node::after,
+.stop[data-lit] .node::after {
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+.music .node {
+  border-color: hsl(var(--secondary) / 0.5);
+}
+.track:not([data-live]) .music .node,
+.music[data-lit] .node {
+  border-color: var(--magenta);
+  box-shadow: 0 0 14px hsl(var(--secondary) / 0.5);
+}
+.track:not([data-live]) .music .node::after,
+.music[data-lit] .node::after {
+  background: var(--magenta);
+  box-shadow: 0 0 8px var(--magenta);
+}
+
+/* the "Now" marker: its dot breathes with opacity only */
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font: 700 0.78rem/1 var(--font-body);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.live::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.stopHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 1rem;
+}
+.now .stopHead {
+  margin-top: 0.7rem;
+}
+.company {
+  font: 400 clamp(1.3rem, 2.8vw, 1.6rem) / 1.15 var(--font-heading);
+  color: var(--ink);
+}
+.now .company {
+  font-size: clamp(2rem, 4.6vw, 3rem);
+}
+.neonMagenta {
+  color: hsl(300 100% 92%);
+  text-shadow:
+    0 0 4px var(--magenta),
+    0 0 12px hsl(290 100% 70%),
+    0 0 22px hsl(290 100% 60% / 0.6);
+}
+/* dates: neon, easy to read */
+.dates {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: hsl(188 70% 86%);
+  text-shadow:
+    0 0 6px hsl(190 100% 70% / 0.55),
+    0 0 16px hsl(190 100% 60% / 0.3);
+}
+.music .dates {
+  color: hsl(295 80% 90%);
+  text-shadow:
+    0 0 6px hsl(290 100% 72% / 0.6),
+    0 0 16px hsl(290 100% 62% / 0.3);
+}
+.blurb {
+  margin-top: 0.4rem;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+}
+.role {
+  margin-top: 0.35rem;
+  font-weight: 700;
+  color: var(--cyan);
+}
+.music .role {
+  color: var(--ink-2);
+}
+.one {
+  margin-top: 0.6rem;
+  max-width: 44rem;
+  color: var(--ink-2);
+}
+.meta {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+  color: var(--ink-3);
+}
+.meta .dot {
+  margin: 0 0.5em;
+  opacity: 0.6;
+}
+
+/* the titles ladder: ticks off the rail, newest first */
+.ladder {
+  margin: 2rem 0 0;
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 1.1rem;
+}
+.ladder li {
+  position: relative;
+}
+.ladder li::before {
+  content: '';
+  position: absolute;
+  top: 0.35rem;
+  left: -41px;
+  width: 30px;
+  height: 1px;
+  background: var(--hair-strong);
+}
+.ladder li::after {
+  content: '';
+  position: absolute;
+  top: calc(0.35rem - 3px);
+  left: -44px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--ink-3);
+}
+@media (min-width: 900px) {
+  .ladder li::before {
+    left: -61px;
+    width: 48px;
+  }
+  .ladder li::after {
+    left: -64px;
+  }
+}
+.kicker {
+  display: block;
+  font: 700 0.72rem/1.3 var(--font-body);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.rung {
+  display: block;
+  margin-top: 0.3rem;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+}
+.ladder .current .kicker {
+  color: var(--cyan);
+}
+.ladder .current .rung {
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+.ladder .current::before {
+  background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan);
+}
+.ladder .current::after {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+}
+
+/* what the current role is, under the titles */
+.roleLine {
+  margin-top: 1.75rem;
+  max-width: 44rem;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+}
+
+/* the tiles: one wide + three (≥ 1000px), two columns (640–999), rows (< 640) */
+.bento {
+  margin-top: clamp(2.25rem, 5vw, 3rem);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 640px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bento > :first-child,
+  .bento > :nth-child(4) {
+    grid-column: span 2;
+  }
+}
+@media (min-width: 1000px) {
+  .bento {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .bento > :first-child {
+    grid-column: span 3;
+  }
+  .bento > :nth-child(4) {
+    grid-column: auto;
+  }
+}
+@media (max-width: 639px) {
+  .bento {
+    gap: 0;
+  }
+}
+.after {
+  margin-top: 1.5rem;
+}
+.earlierLine {
+  max-width: 48rem;
+  font-size: 0.98rem;
+  color: var(--ink-2);
+}
+
+/* music's Listen */
+.listen {
+  margin-top: 1.2rem;
+}
+
+/* the HUD buttons */
+.cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem 1.5rem;
+  margin-top: 0.5rem;
+}
+@media (max-width: 420px) {
+  .cta > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section *,
+  .section *::before,
+  .section *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

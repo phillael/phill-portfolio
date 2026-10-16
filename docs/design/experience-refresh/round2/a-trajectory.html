@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trajectory</title>
+<link rel="stylesheet" href="hud.css">
+<style>
+  /* Stats readout */
+  .readout { margin-top: clamp(3rem, 7vw, 4.5rem); display: grid; grid-template-columns: repeat(4, 1fr); }
+  .readout > div { padding: .25rem 1.5rem; border-left: 1px solid var(--hair); min-width: 0; }
+  .readout .num { white-space: nowrap; }
+  .readout .unit { margin-left: .3em; font: 600 1rem/1 var(--font-text); letter-spacing: .02em; color: var(--ink-2); text-shadow: none; }
+  .readout > div:first-child { border-left: 0; padding-left: 0; }
+  @media (max-width: 760px) {
+    .readout { grid-template-columns: 1fr 1fr; row-gap: 2rem; }
+    .readout > div:nth-child(3) { border-left: 0; padding-left: 0; }
+  }
+
+  /* The trajectory: one hairline that fills as you scroll */
+  .track { position: relative; margin-top: clamp(4rem, 9vw, 6.5rem); padding-left: 56px; }
+  @media (min-width: 900px) { .track { padding-left: 88px; } }
+  .rail { position: absolute; left: 11px; top: 10px; bottom: 0; width: 1px; background: var(--hair); }
+  @media (min-width: 900px) { .rail { left: 27px; } }
+  .rail-fill {
+    position: absolute; inset: 0; transform-origin: top; transform: scaleY(var(--p, 0));
+    background: linear-gradient(180deg, var(--cyan) 0%, var(--cyan-hot) 60%, var(--magenta) 100%);
+    box-shadow: 0 0 10px hsl(190 100% 70% / .7);
+  }
+  .rail-head { /* the bright point riding the fill */
+    position: absolute; left: -3px; width: 7px; height: 7px; border-radius: 50%; top: calc(var(--p, 0) * 100% - 3px);
+    background: #fff; box-shadow: 0 0 8px #fff, 0 0 18px var(--cyan); opacity: var(--head, 1);
+  }
+
+  .stop { position: relative; padding-bottom: clamp(3.5rem, 8vw, 5.5rem); }
+  .node {
+    position: absolute; top: .55rem; left: -56px; width: 23px; height: 23px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--bg); border: 1px solid var(--hair-strong);
+    transition: border-color .5s var(--ease), box-shadow .5s var(--ease);
+  }
+  @media (min-width: 900px) { .node { left: -72px; } }
+  .node::after { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); transition: background .5s var(--ease), box-shadow .5s var(--ease); }
+  .stop.lit .node { border-color: var(--cyan); box-shadow: 0 0 14px hsl(190 100% 70% / .45); }
+  .stop.lit .node::after { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .stop.now .node { width: 23px; height: 23px; }
+  .stop.music .node { border-color: hsl(290 100% 80% / .5); }
+  .stop.music.lit .node { border-color: var(--magenta); box-shadow: 0 0 14px hsl(290 100% 70% / .5); }
+  .stop.music.lit .node::after { background: var(--magenta); box-shadow: 0 0 8px var(--magenta); }
+
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; }
+  .company { font: 400 clamp(1.7rem, 4vw, 2.4rem)/1.1 var(--font-display); color: #fff; }
+  .stop:not(.now) .company { font-size: clamp(1.25rem, 2.6vw, 1.5rem); color: var(--ink); }
+  .dates { margin-left: auto; font-size: .95rem; color: var(--ink-3); white-space: nowrap; }
+  .blurb { margin-top: .35rem; color: var(--ink-2); }
+  .role { margin-top: .35rem; font-weight: 700; color: var(--cyan); }
+
+  /* Title ladder: ticks on the rail */
+  .ladder { margin-top: 1.6rem; list-style: none; padding: 0; display: grid; gap: .9rem; }
+  .ladder li { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .9rem; }
+  .ladder li::before { /* tick reaching back to the rail */
+    content: ''; position: absolute; top: .75em; left: -44px; width: 30px; height: 1px; background: var(--hair-strong);
+  }
+  @media (min-width: 900px) { .ladder li::before { left: -60px; width: 44px; } }
+  .ladder .t { font-weight: 700; color: var(--ink); }
+  .ladder li:first-child .t { color: #fff; }
+  .ladder .d { font-size: .92rem; color: var(--ink-3); }
+  .ladder .promo { font: 700 .72rem/1 var(--font-text); letter-spacing: .16em; text-transform: uppercase; color: var(--cyan); }
+
+  /* Highlights */
+  .hl { margin-top: 2.25rem; list-style: none; padding: 0; }
+  .hl li { display: grid; grid-template-columns: minmax(9rem, 12rem) 1fr; gap: 1.75rem; padding: 1.4rem 0; }
+  .hl li + li { border-top: 1px solid transparent; border-image: linear-gradient(90deg, var(--hair-strong), transparent) 1; }
+  .hl .m { font: 400 clamp(1.5rem, 3.2vw, 2rem)/1 var(--font-display); color: #fff; text-shadow: 0 0 16px hsl(190 100% 70% / .35); white-space: nowrap; }
+  .hl .ml { margin-top: .4rem; font-size: .82rem; color: var(--ink-3); }
+  .hl .ti { font-weight: 700; font-size: 1.12rem; color: #fff; }
+  .hl .de { margin-top: .3rem; color: var(--ink-2); }
+  @media (max-width: 560px) { .hl li { grid-template-columns: 1fr; gap: .6rem; } }
+  .before { margin-top: .75rem; color: var(--ink-3); font-size: .98rem; }
+  .before strong { color: var(--ink); }
+
+  .one { margin-top: .6rem; color: var(--ink-2); max-width: 44rem; }
+  .stop .meta { margin-top: .6rem; }
+
+  .music .company { color: var(--magenta) !important; }
+  .music .play { margin-top: 1.1rem; }
+  .play[aria-pressed='true'] { border-color: var(--magenta); box-shadow: 0 0 18px hsl(290 100% 70% / .35); }
+  .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .eq i { width: 2px; height: 40%; background: var(--magenta); border-radius: 1px; }
+  .play[aria-pressed='true'] .eq i { animation: eq .9s var(--ease) infinite alternate; }
+  .play[aria-pressed='true'] .eq i:nth-child(2) { animation-delay: -.3s; }
+  .play[aria-pressed='true'] .eq i:nth-child(3) { animation-delay: -.6s; }
+  @keyframes eq { to { height: 100%; } }
+
+  .cta { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.75rem; }
+  .cta a.plain { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; text-decoration: none; }
+  .cta a.plain:hover { text-decoration: underline; }
+  .cta-note { margin-top: .8rem; font-size: .9rem; color: var(--ink-3); min-height: 1.4em; }
+</style>
+</head>
+<body>
+<p class="mock-note">Round 2 · A · Trajectory: the level map, distilled. One hairline fills as you scroll and lights each stop; the promotions are ticks on the line. Toggle Show sources in the bar.</p>
+
+<section class="section" id="experience" aria-labelledby="exp-title">
+  <p class="eyebrow reveal">Experience</p>
+  <h2 class="title reveal" id="exp-title">The highlights.</h2>
+  <p class="lede reveal" id="lede"></p>
+
+  <div class="readout reveal" id="readout"></div>
+
+  <div class="track" id="track">
+    <div class="rail" aria-hidden="true"><div class="rail-fill"></div><div class="rail-head"></div></div>
+    <ol id="stops" style="list-style:none;margin:0;padding:0"></ol>
+    <div class="cta reveal">
+      <button class="pill primary" type="button" id="play">Play through my career <span aria-hidden="true">→</span></button>
+      <a class="plain" href="#">Read the full resume →</a>
+    </div>
+    <p class="cta-note" id="cta-note" aria-live="polite"></p>
+  </div>
+</section>
+
+<script src="highlights.js"></script>
+<script src="../shared.js"></script>
+<script>
+document.documentElement.classList.add('js')
+const { rich, src, esc, reducedMotion, mockBar } = MOCK
+const H = window.HIGHLIGHTS
+mockBar('Round 2 · A · Trajectory')
+
+document.getElementById('lede').innerHTML = rich(H.intro) + src(H.introSrc)
+
+/* Readout: count once on enter */
+const readout = document.getElementById('readout')
+const split = (v) => { const m = /^(.*?)(?:\s+([a-z]+))?$/.exec(v); return [m[1], m[2] || ''] }
+const tail = (s) => (s.suffix && !/^\s/.test(s.suffix) ? s.suffix : '')
+readout.innerHTML = H.stats.map((s, i) => `
+  <div><p class="num" aria-hidden="true"><span data-i="${i}">${esc(split(s.value)[0])}</span>${split(s.value)[1] ? `<span class="unit">${esc(split(s.value)[1])}</span>` : ''}</p>
+  <p class="sr-only">${esc(s.value)}</p>
+  <p class="num-label">${esc(s.label)}${src(s.src)}</p></div>`).join('')
+
+function fmt(s, v) {
+  const n = s.decimals ? v.toFixed(s.decimals) : Math.round(v)
+  return `${s.prefix || ''}${n}${tail(s)}`
+}
+function countUp() {
+  const els = [...readout.querySelectorAll('.num [data-i]')]
+  if (reducedMotion()) return
+  const t0 = performance.now(), dur = 1400
+  els.forEach((el) => { const s = H.stats[+el.dataset.i]; el.textContent = fmt(s, s.countFrom ?? 0) })
+  function tick(t) {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3)
+    els.forEach((el) => {
+      const s = H.stats[+el.dataset.i]
+      const fin = split(s.value)[0]
+      if (s.countFrom != null) el.textContent = k < 1 ? `${Math.round(s.countFrom + (s.countTo - s.countFrom) * e)}` : fin
+      else el.textContent = k < 1 ? fmt(s, s.countTo * e) : fin
+    })
+    if (k < 1) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
+/* Stops */
+const stops = []
+for (const j of H.jobs) {
+  if (j.current) {
+    stops.push(`
+    <li class="stop now" data-stop>
+      <span class="node" aria-hidden="true"></span>
+      <div class="reveal">
+        <div class="head"><h3 class="company">${esc(j.company)}</h3><span class="live">Now</span><span class="dates">${esc(j.dates)}</span></div>
+        <p class="blurb">${esc(j.blurb)}</p>
+        <ol class="ladder" aria-label="Titles at ${esc(j.company)}, newest first">
+          ${j.ladder.map((r, i) => `<li><span class="t">${esc(r.title)}</span><span class="d">${esc(r.dates)}</span>${i < j.ladder.length - 1 ? '<span class="promo">Promoted</span>' : ''}</li>`).join('')}
+        </ol>
+        <ul class="hl">
+          ${j.highlights.map((h) => `
+            <li class="reveal">
+              <div><p class="m">${esc(h.metric)}</p><p class="ml">${esc(h.metricLabel)}</p></div>
+              <div><p class="ti">${esc(h.title)}</p><p class="de">${rich(h.detail)}${src(h.src)}</p></div>
+            </li>`).join('')}
+        </ul>
+        <p class="before">${rich(j.earlier.text)}${src(j.earlier.src)}</p>
+        <p class="meta">${j.stack.map(esc).join('<span class="dot">·</span>')}</p>
+      </div>
+    </li>`)
+  } else {
+    const r = j.ladder[0]
+    stops.push(`
+    <li class="stop" data-stop>
+      <span class="node" aria-hidden="true"></span>
+      <div class="reveal">
+        <div class="head"><h3 class="company">${esc(j.company)}</h3><span class="dates">${esc(j.dates)}</span></div>
+        <p class="role">${esc(r.title)}</p>
+        ${j.highlights.map((h) => `<p class="one">${rich(h.title)}${src(h.src)}</p>`).join('')}
+        <p class="meta">${j.stack.map(esc).join('<span class="dot">·</span>')}</p>
+      </div>
+    </li>`)
+  }
+}
+const m = H.music
+stops.push(`
+  <li class="stop music" data-stop>
+    <span class="node" aria-hidden="true"></span>
+    <div class="reveal">
+      <div class="head"><h3 class="company">${esc(m.title)}</h3><span class="dates">${esc(m.dates)}</span></div>
+      <p class="role" style="color:var(--ink-2)">${esc(m.company)}</p>
+      <p class="one">${rich(m.line)}${src(m.src)}</p>
+      <p class="meta">${esc(m.education)}</p>
+      <button class="pill play" type="button" aria-pressed="false" id="track-btn">
+        <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Play “${esc(m.track.title)}”</span>
+      </button>
+      <p class="meta" style="margin-top:.5rem">${esc(m.track.by)}</p>
+    </div>
+  </li>`)
+document.getElementById('stops').innerHTML = stops.join('')
+
+document.getElementById('track-btn').addEventListener('click', (e) => {
+  const b = e.currentTarget; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'))
+})
+document.getElementById('play').addEventListener('click', () => {
+  document.getElementById('cta-note').textContent = 'Mockup: opens the Jelly Resume in Play mode.'
+})
+
+/* Reveal on enter */
+const reveals = [...document.querySelectorAll('.reveal')]
+let counted = false
+const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+  if (!e.isIntersecting) return
+  e.target.classList.add('in'); io.unobserve(e.target)
+  if (e.target === readout && !counted) { counted = true; countUp() }
+}), { threshold: 0.15, rootMargin: '0px 0px -8% 0px' })
+reveals.forEach((el) => io.observe(el))
+
+/* The rail fills with scroll and lights the stops it reaches */
+const track = document.getElementById('track')
+const stopEls = [...document.querySelectorAll('[data-stop]')]
+let ticking = false, visible = false
+function update() {
+  ticking = false
+  const r = track.getBoundingClientRect()
+  const focus = innerHeight * 0.6
+  const p = reducedMotion() ? 1 : Math.max(0, Math.min(1, (focus - r.top) / r.height))
+  track.style.setProperty('--p', p.toFixed(4))
+  track.style.setProperty('--head', p > 0 && p < 1 ? 1 : 0)
+  const reach = r.top + p * r.height
+  stopEls.forEach((s) => s.classList.toggle('lit', s.getBoundingClientRect().top + 12 <= reach))
+}
+const onScroll = () => { if (visible && !ticking) { ticking = true; requestAnimationFrame(update) } }
+new IntersectionObserver(([e]) => { visible = e.isIntersecting; onScroll() }).observe(track)
+addEventListener('scroll', onScroll, { passive: true })
+addEventListener('resize', onScroll)
+addEventListener('mock:rm', (e) => { if (e.detail) reveals.forEach((el) => el.classList.add('in')); update() })
+update()
+</script>
+</body>
+</html>

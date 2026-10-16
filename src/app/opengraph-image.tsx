@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 // Rendered once at build time from existing brand assets (hero art, Audiowide,
 // the neon tokens in globals.css), so the card can't drift from the site.
-export const alt = 'Phill Aelony - Software Engineer in cyberpunk Tokyo with llamas'
+export const alt = 'Phill Aelony - Senior AI Engineer in cyberpunk Tokyo with llamas'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 

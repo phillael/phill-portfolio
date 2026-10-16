@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release Notes</title>
+<link rel="stylesheet" href="hud.css">
+<style>
+  .rn-head { max-width: 46rem; }
+
+  /* One grid row: a narrow version column + content */
+  .row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; padding-left: 2rem; }
+  @media (min-width: 860px) {
+    .row { grid-template-columns: 10rem minmax(0, 1fr); gap: 3rem; padding-left: 2.4rem; }
+  }
+
+  /* The timeline: one thin glowing line, small nodes */
+  .releases { list-style: none; margin: clamp(3.5rem, 8vw, 5.5rem) 0 0; padding: 0; position: relative; }
+  .releases::before {
+    content: ''; position: absolute; left: 5px; top: .7rem; bottom: 1.5rem; width: 1px;
+    background: linear-gradient(to bottom, var(--cyan), var(--hair-strong) 22%, var(--hair) 80%, transparent);
+  }
+  .release { padding-bottom: clamp(3.25rem, 7vw, 4.75rem); }
+  .side { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .9rem; }
+  .node {
+    position: absolute; left: -2rem; top: .45rem; width: 11px; height: 11px; border-radius: 50%;
+    background: var(--bg); border: 1px solid var(--hair-strong);
+  }
+  .current .node { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 0 5px hsl(190 100% 75% / .1), 0 0 14px var(--cyan); }
+  .ver { font: 400 1.5rem/1 var(--font-display); color: var(--ink-3); letter-spacing: .02em; }
+  .current .ver { color: #fff; text-shadow: 0 0 20px hsl(190 100% 70% / .55); }
+  .when { font-size: .9rem; color: var(--ink-3); }
+  @media (min-width: 860px) {
+    .side { display: block; position: sticky; top: 5.5rem; align-self: start; }
+    .node { left: -2.4rem; top: .75rem; }
+    .ver { font-size: 2.5rem; }
+    .when { margin-top: .6rem; }
+  }
+
+  /* Release content */
+  .rel-title { font: 400 clamp(1.55rem, 3.6vw, 2.25rem)/1.15 var(--font-display); color: #fff; }
+  .co { margin-top: .5rem; color: var(--ink-2); }
+  .status { margin-top: 1rem; }
+  .label { margin-top: 2.4rem; }
+  .notes { list-style: none; margin: 1.1rem 0 0; padding: 0; display: grid; gap: 1.3rem; max-width: 40rem; }
+  .notes li { position: relative; padding-left: 1.4rem; color: var(--ink-2); }
+  .notes li::before {
+    content: ''; position: absolute; left: 0; top: .62em; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+  }
+  .notes strong { color: #fff; font-weight: 700; }
+  .one { max-width: 40rem; color: var(--ink); font-size: 1.08rem; }
+  .earlier { margin-top: 1.6rem; max-width: 40rem; color: var(--ink-2); }
+  .stack { margin-top: 1.4rem; }
+
+  /* The one before → after */
+  .perf { margin-top: 2.4rem; max-width: 40rem; padding: 1.6rem 1.8rem 1.5rem; }
+  .perf-nums { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1.4rem; }
+  .perf .from { font: 400 clamp(1.5rem, 3.6vw, 2.1rem)/1 var(--font-display); color: var(--ink-3); }
+  .perf .arrow { flex: 0 0 auto; width: 72px; height: 12px; overflow: visible; }
+  .perf .arrow path { fill: none; stroke: var(--cyan); stroke-width: 1.25; stroke-linecap: round; filter: drop-shadow(0 0 3px hsl(190 100% 70% / .9)); }
+  .perf .unit { font: 400 .5em/1 var(--font-display); color: var(--ink-2); margin-left: .25em; text-shadow: none; }
+  .perf .num-label { margin-top: .9rem; }
+
+  /* Version history: a quiet spec list */
+  .ladder { list-style: none; margin: 1rem 0 0; padding: 0; max-width: 40rem; }
+  .ladder li {
+    display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto; gap: .2rem 1rem; align-items: baseline;
+    padding: .75rem 0; border-top: 1px solid var(--hair);
+  }
+  .ladder li:last-child { border-bottom: 1px solid var(--hair); }
+  .ladder .lv { font: 400 .9rem/1 var(--font-display); color: var(--ink-3); }
+  .ladder .lt { color: var(--ink-2); }
+  .ladder .ld { font-size: .9rem; color: var(--ink-3); text-align: right; }
+  .ladder li.now .lv { color: var(--cyan); text-shadow: 0 0 10px hsl(190 100% 70% / .6); }
+  .ladder li.now .lt { color: #fff; font-weight: 700; }
+  @media (max-width: 560px) {
+    .ladder li { grid-template-columns: 2.6rem minmax(0, 1fr); }
+    .ladder .ld { grid-column: 2; text-align: left; }
+  }
+
+  /* Also: music */
+  .also { margin-top: .5rem; }
+  .also .node { border-color: var(--magenta); box-shadow: 0 0 10px hsl(290 100% 75% / .5); }
+  .also .ver { color: var(--magenta); text-shadow: 0 0 16px hsl(290 100% 75% / .45); }
+  .also .rel-title { font-size: clamp(1.35rem, 3vw, 1.75rem); color: var(--magenta); text-shadow: 0 0 22px hsl(290 100% 70% / .3); }
+  .also .one { margin-top: 1rem; color: var(--ink-2); }
+  .track { margin-top: 1.4rem; display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+  .pill.music { border-color: hsl(290 100% 80% / .45); }
+  .pill.music:hover { border-color: var(--magenta); box-shadow: 0 0 18px hsl(290 100% 75% / .35); }
+  .pill.music[aria-pressed='true'] { background: hsl(290 100% 80% / .12); border-color: var(--magenta); }
+  .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .eq i { width: 2px; height: 40%; background: var(--magenta); border-radius: 1px; }
+  .pill.music[aria-pressed='true'] .eq i { animation: eq .9s ease-in-out infinite alternate; }
+  .pill.music[aria-pressed='true'] .eq i:nth-child(2) { animation-delay: -.35s; }
+  .pill.music[aria-pressed='true'] .eq i:nth-child(3) { animation-delay: -.7s; }
+  @keyframes eq { from { height: 25%; } to { height: 100%; } }
+  .track-by { font-size: .9rem; color: var(--ink-3); }
+  .edu { margin-top: 1.1rem; }
+
+  /* End */
+  .cta-row { margin-top: clamp(3.5rem, 8vw, 5.5rem); }
+  .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.75rem; }
+  .plain { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; text-decoration: none; color: var(--cyan); }
+  .plain:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .cta-note { margin-top: 1rem; font-size: .9rem; color: var(--ink-3); min-height: 1.4em; }
+</style>
+</head>
+<body>
+<p class="mock-note">Release notes: each role is a release, newest first. Calm type, one timeline line, one before → after.</p>
+
+<section class="section" aria-labelledby="rn-eyebrow rn-title">
+  <header class="rn-head reveal">
+    <p class="eyebrow" id="rn-eyebrow">Experience</p>
+    <h2 class="title" id="rn-title">Release notes</h2>
+    <p class="lede" id="lede"></p>
+  </header>
+
+  <ol class="releases" id="releases" aria-label="Releases, newest first"></ol>
+
+  <div id="also"></div>
+
+  <div class="row cta-row reveal">
+    <div aria-hidden="true"></div>
+    <div>
+      <div class="cta">
+        <button class="pill primary" type="button" id="play">Play through my career</button>
+        <a class="plain" href="#">Read the full resume →</a>
+      </div>
+      <p class="cta-note" id="cta-note" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+</section>
+
+<script src="highlights.js"></script>
+<script src="../shared.js"></script>
+<script>
+document.documentElement.classList.add('js')
+const { rich, src, esc, reducedMotion, mockBar } = MOCK
+const H = window.HIGHLIGHTS
+mockBar('Round 2 · D · Release notes')
+
+document.getElementById('lede').innerHTML = rich(H.intro) + src(H.introSrc)
+
+const tc = H.jobs[0]
+const versions = { timelycare: '5.0', sessions: '3.0', designit: '2.0', freelance: '1.0' }
+/* TimelyCare's own versions, oldest first: 4.0 → 4.5 → 5.0 */
+const ladderVersions = ['4.0', '4.5', '5.0']
+const stackLine = (list) =>
+  `<p class="meta stack">${list.map(esc).join('<span class="dot" aria-hidden="true">·</span>')}</p>`
+
+const audit = H.stats.find((s) => s.countFrom != null)
+const unit = (audit.suffix || '').trim()
+
+function currentRelease() {
+  const now = tc.ladder[0]
+  const ladder = tc.ladder.slice().reverse()
+  return `
+  <li class="row release current reveal">
+    <div class="side">
+      <span class="node" aria-hidden="true"></span>
+      <p class="ver"><span class="sr-only">Version </span>${versions.timelycare}</p>
+      <p class="when">${esc(now.dates)}</p>
+    </div>
+    <div>
+      <h3 class="rel-title">${esc(now.title)}</h3>
+      <p class="co">${esc(tc.company)} · ${esc(tc.blurb)}</p>
+      <p class="status"><span class="live">Current</span></p>
+
+      <p class="eyebrow label">What’s new</p>
+      <ul class="notes">
+        ${tc.highlights.map((h) => `<li><strong>${esc(h.title)}</strong> ${rich(h.detail)}${src(h.src)}</li>`).join('')}
+      </ul>
+
+      <div class="hud perf" id="perf">
+        <p class="sr-only">${esc(audit.label)}: from about ${audit.countFrom} ${esc(unit)} to about ${audit.countTo} ${esc(unit)}.</p>
+        <div class="perf-nums" aria-hidden="true">
+          <span class="from">~${audit.countFrom}<span class="unit">${esc(unit)}</span></span>
+          <svg class="arrow" viewBox="0 0 72 12"><path d="M1 6 H69 M63 1.5 L69 6 L63 10.5"/></svg>
+          <span class="num"><span id="perf-n">~${audit.countTo}</span><span class="unit">${esc(unit)}</span></span>
+        </div>
+        <p class="num-label" aria-hidden="true">${esc(audit.label.charAt(0).toUpperCase() + audit.label.slice(1))}${src(audit.src)}</p>
+      </div>
+
+      <p class="earlier">${rich(tc.earlier.text)}${src(tc.earlier.src)}</p>
+
+      <p class="eyebrow label">Version history</p>
+      <ol class="ladder">
+        ${ladder.map((r, i) => `
+          <li class="${i === ladder.length - 1 ? 'now' : ''}">
+            <span class="lv">${ladderVersions[i]}</span>
+            <span class="lt">${esc(r.title)}</span>
+            <span class="ld">${i === 0 ? esc(r.start) : 'Promoted ' + esc(r.start)}</span>
+          </li>`).join('')}
+      </ol>
+
+      ${stackLine(tc.stack)}
+    </div>
+  </li>`
+}
+
+function olderRelease(job) {
+  const role = job.ladder[0]
+  return `
+  <li class="row release reveal">
+    <div class="side">
+      <span class="node" aria-hidden="true"></span>
+      <p class="ver"><span class="sr-only">Version </span>${versions[job.id]}</p>
+      <p class="when">${esc(job.dates)}</p>
+    </div>
+    <div>
+      <h3 class="rel-title">${esc(role.title)}</h3>
+      <p class="co">${esc(job.company)} · ${esc(job.blurb)}</p>
+      ${job.highlights.map((h) => `<p class="one" style="margin-top:1.1rem">${rich(h.title)}${src(h.src)}</p>`).join('')}
+      ${stackLine(job.stack)}
+    </div>
+  </li>`
+}
+
+document.getElementById('releases').innerHTML = currentRelease() + H.jobs.slice(1).map(olderRelease).join('')
+
+const m = H.music
+document.getElementById('also').innerHTML = `
+  <aside class="row also reveal" aria-labelledby="also-title">
+    <div class="side">
+      <span class="node" aria-hidden="true"></span>
+      <p class="ver">Also</p>
+      <p class="when">${esc(m.dates)}</p>
+    </div>
+    <div>
+      <h3 class="rel-title" id="also-title">${esc(m.title)}</h3>
+      <p class="co">${esc(m.company)}</p>
+      <p class="one">${rich(m.line)}${src(m.src)}</p>
+      <div class="track">
+        <button class="pill music" type="button" id="track" aria-pressed="false">
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span aria-hidden="true" id="track-icon">▶</span>
+          <span><span class="sr-only">Play </span>${esc(m.track.title)}</span>
+        </button>
+        <span class="track-by">${esc(m.track.by)}</span>
+      </div>
+      <p class="meta edu">${esc(m.education)}</p>
+    </div>
+  </aside>`
+
+/* Interactions */
+const trackBtn = document.getElementById('track')
+trackBtn.addEventListener('click', () => {
+  const on = trackBtn.getAttribute('aria-pressed') !== 'true'
+  trackBtn.setAttribute('aria-pressed', String(on))
+  document.getElementById('track-icon').textContent = on ? '❚❚' : '▶'
+})
+document.getElementById('play').addEventListener('click', () => {
+  document.getElementById('cta-note').textContent = 'Mockup: this would open the resume in Play mode.'
+})
+
+/* Reveal once as each row enters; the audit counts down once */
+const perfN = document.getElementById('perf-n')
+let perfDone = false
+function runPerf() {
+  if (perfDone) return
+  perfDone = true
+  if (reducedMotion()) { perfN.textContent = `~${audit.countTo}`; return }
+  const from = audit.countFrom, to = audit.countTo, dur = 1400, t0 = performance.now()
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3)
+    perfN.textContent = `~${Math.round(from + (to - from) * e)}`
+    if (k < 1 && !reducedMotion()) requestAnimationFrame(step)
+    else perfN.textContent = `~${to}`
+  }
+  requestAnimationFrame(step)
+}
+
+const reveals = [...document.querySelectorAll('.reveal')]
+function showAll() { reveals.forEach((el) => el.classList.add('in')); perfDone = false; runPerf() }
+if (reducedMotion() || !('IntersectionObserver' in window)) showAll()
+else {
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (!e.isIntersecting) return
+    e.target.classList.add('in')
+    io.unobserve(e.target)
+  }), { threshold: 0.08, rootMargin: '0px 0px -6% 0px' })
+  reveals.forEach((el) => io.observe(el))
+  const pio = new IntersectionObserver(([e]) => {
+    if (!e.isIntersecting) return
+    perfN.textContent = `~${audit.countFrom}`
+    setTimeout(runPerf, 250)
+    pio.disconnect()
+  }, { threshold: 0.6 })
+  pio.observe(document.getElementById('perf'))
+}
+addEventListener('mock:rm', (e) => { if (e.detail) { reveals.forEach((el) => el.classList.add('in')); perfN.textContent = `~${audit.countTo}` } })
+</script>
+</body>
+</html>

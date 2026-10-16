@@ -63,7 +63,7 @@ describe('createRun', () => {
     expect(run.reach(5).map((c) => c.year)).toEqual([]) // above them all
     expect(run.reach(cps[0].line).map((c) => c.year)).toEqual([2026])
     expect(run.reach(cps[0].line).map((c) => c.year)).toEqual([]) // once
-    expect(run.reach(cps[3].line + 1).map((c) => c.year)).toEqual([2023, 2022, 2021]) // dropped past three
+    expect(run.reach(cps[3].line + 1).map((c) => c.year)).toEqual([2025, 2023, 2022]) // dropped past three
     expect(run.checkpoint).toBe(3)
     expect(run.reach(cps[0].line).map((c) => c.year)).toEqual([]) // never backwards
     expect(run.checkpoint).toBe(3)

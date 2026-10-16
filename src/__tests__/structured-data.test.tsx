@@ -2,7 +2,7 @@ import { render } from '@testing-library/react'
 import HomePage from '@/app/page'
 import { buildStructuredData, serializeJsonLd } from '@/lib/structured-data'
 import { socials } from '@/data/socials'
-import experience from '@/data/experience.json'
+import { career } from '@/data/career'
 import skills from '@/data/skills.json'
 import { SITE_URL } from '@/lib/site'
 
@@ -28,8 +28,8 @@ describe('structured data', () => {
     expect(person()).toMatchObject({
       name: 'Phill Aelony',
       url: SITE_URL,
-      jobTitle: experience[0].title,
-      worksFor: { '@type': 'Organization', name: experience[0].company },
+      jobTitle: 'Generative AI Engineer', // the real title (career.ts, from resume.ts)
+      worksFor: { '@type': 'Organization', name: career.jobs[0].company },
       sameAs: [socials.github, socials.linkedin],
     })
     const technical = skills.find((c) => c.category === 'Technical Skills')!.skills

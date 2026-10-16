@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heads-up Display</title>
+<link rel="stylesheet" href="hud.css">
+<style>
+  .section { position: relative; isolation: isolate; }
+  .section::before { /* a soft glow behind the instrument */
+    content: ''; position: absolute; left: -10%; right: -10%; top: 22%; height: 55%; z-index: -1; pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 50%, hsl(190 100% 60% / .09), transparent 70%);
+  }
+  .head { display: grid; justify-items: center; text-align: center; }
+  .head .lede { margin-inline: auto; }
+
+  /* The instrument */
+  .panel { margin-top: clamp(2.5rem, 6vw, 4rem); padding: clamp(1.25rem, 4vw, 2.75rem); }
+  .scan { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+  .scan::after {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 100%; opacity: 0;
+    background: linear-gradient(to bottom, transparent calc(100% - 90px), hsl(190 100% 75% / .07) calc(100% - 3px), hsl(190 100% 80% / .9) calc(100% - 1px), transparent 100%);
+    transform: translateY(-100%);
+  }
+  .panel.scanning .scan::after { animation: sweep 1.7s var(--ease) 1 forwards; }
+  @keyframes sweep { 0% { transform: translateY(-100%); opacity: 1; } 85% { opacity: 1; } 100% { transform: translateY(0); opacity: 0; } }
+
+  .panel-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem 1rem; margin-bottom: clamp(1.25rem, 3vw, 2rem); }
+
+  /* Readouts */
+  .stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); }
+  .stat { padding: .35rem clamp(.6rem, 2vw, 1.5rem); text-align: center; }
+  .stat + .stat { border-left: 1px solid var(--hair); }
+  .stat .num { font-size: clamp(1.7rem, 4.2vw, 2.9rem); white-space: nowrap; }
+  .stat .unit { font-size: .42em; margin-left: .2em; letter-spacing: .02em; color: var(--ink-2); text-shadow: none; }
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: 1fr 1fr; }
+    .stat { padding: 1.1rem .5rem; }
+    .stat + .stat { border-left: 0; }
+    .stat:nth-child(2n) { border-left: 1px solid var(--hair); }
+    .stat:nth-child(n + 3) { border-top: 1px solid var(--hair); }
+    .stat .num { font-size: clamp(1.45rem, 7vw, 1.9rem); }
+  }
+
+  /* Segmented control */
+  .seg-wrap { margin: clamp(1.5rem, 3vw, 2.25rem) -4px 0; padding: 4px; overflow-x: auto; scrollbar-width: none; }
+  .seg-wrap::-webkit-scrollbar { display: none; }
+  .seg { position: relative; display: inline-flex; min-width: 100%; gap: 2px; padding: 4px; border-radius: 999px; background: hsl(200 40% 5% / .7); border: 1px solid var(--hair); }
+  .seg [role='tab'] {
+    position: relative; z-index: 1; flex: 1 0 auto; min-height: 44px; padding: 0 1.15rem; border: 0; border-radius: 999px;
+    background: none; cursor: pointer; font-weight: 700; font-size: .98rem; color: var(--ink-2); white-space: nowrap;
+    transition: color .3s var(--ease);
+  }
+  .seg [role='tab']:hover { color: var(--ink); }
+  .seg [role='tab'][aria-selected='true'] { color: #fff; }
+  .seg [role='tab']:focus-visible { outline-offset: 1px; }
+  .thumb {
+    position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 0; width: 0; border-radius: 999px;
+    background: linear-gradient(180deg, hsl(190 100% 80% / .16), hsl(190 100% 70% / .05));
+    border: 1px solid var(--hair-strong);
+    box-shadow: 0 0 18px hsl(190 100% 70% / .22), inset 0 1px 0 hsl(190 100% 95% / .15);
+    transition: transform .5s var(--ease), width .5s var(--ease), border-color .4s, box-shadow .4s;
+  }
+  .thumb.still { transition: none; }
+  .panel[data-accent='music'] .thumb { border-color: hsl(290 100% 80% / .5); box-shadow: 0 0 18px hsl(290 100% 70% / .3), inset 0 1px 0 hsl(290 100% 95% / .15); }
+
+  /* Tab panels */
+  .tabpanel { margin-top: clamp(1.75rem, 3.5vw, 2.5rem); border-radius: 12px; }
+  .tabpanel.enter { animation: fade-up .5s var(--ease) both; }
+  @keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .job-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem 1.5rem; }
+  .job-head h3 { font: 400 clamp(1.5rem, 3.4vw, 2.1rem)/1.1 var(--font-display); color: #fff; }
+  .job-head .sub { margin-top: .4rem; color: var(--ink-2); }
+  .job-head .dates { color: var(--ink-3); font-weight: 700; font-size: .95rem; }
+
+  .tc-grid { margin-top: clamp(1.5rem, 3vw, 2.25rem); display: grid; grid-template-columns: 14.5rem minmax(0, 1fr); gap: clamp(1.5rem, 4vw, 3rem); }
+  @media (max-width: 860px) { .tc-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .ladder { list-style: none; margin: 1rem 0 0; padding: 0; position: relative; }
+  .ladder::before { content: ''; position: absolute; left: 5px; top: .6rem; bottom: 1.6rem; width: 1px; background: linear-gradient(var(--cyan), var(--hair)); }
+  .ladder li { position: relative; padding: 0 0 1.15rem 1.65rem; }
+  .ladder li::before { content: ''; position: absolute; left: 0; top: .42rem; width: 11px; height: 11px; border-radius: 50%; background: var(--bg); border: 1px solid var(--hair-strong); }
+  .ladder li:first-child::before { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+  .ladder .t { font-weight: 700; line-height: 1.3; color: var(--ink-2); }
+  .ladder li:first-child .t { color: #fff; }
+  .ladder .d { margin-top: .15rem; font-size: .88rem; color: var(--ink-3); }
+
+  .hl { list-style: none; margin: 0; padding: 0; }
+  .hl li { display: grid; grid-template-columns: 8.75rem 1fr; gap: 1.25rem; padding: 1.15rem 0; border-top: 1px solid var(--hair); }
+  .hl li:first-child { border-top: 0; padding-top: .25rem; }
+  .hl .m { font: 400 1.6rem/1.05 var(--font-display); color: var(--cyan); text-shadow: 0 0 14px hsl(190 100% 70% / .4); white-space: nowrap; }
+  .hl .ml { margin-top: .4rem; font-size: .84rem; font-weight: 700; color: var(--ink-3); }
+  .hl .ht { font-weight: 700; color: #fff; font-size: 1.08rem; line-height: 1.35; }
+  .hl .hd { margin-top: .3rem; color: var(--ink-2); }
+  @media (max-width: 560px) {
+    .hl li { grid-template-columns: 1fr; gap: .45rem; }
+    .hl .metric { display: flex; align-items: baseline; gap: .7rem; }
+    .hl .m { font-size: 1.4rem; }
+    .hl .ml { margin-top: 0; }
+  }
+  .after { margin-top: .5rem; padding-top: 1.1rem; border-top: 1px solid var(--hair); color: var(--ink-2); }
+  .stackline { margin-top: 1rem; }
+
+  .role { margin-top: 1.6rem; font: 700 .8rem/1.2 var(--font-text); letter-spacing: .18em; text-transform: uppercase; color: var(--cyan); }
+  .panel[data-accent='music'] .role { color: var(--magenta); }
+  .one { margin-top: .8rem; max-width: 46rem; font-size: clamp(1.15rem, 2.4vw, 1.45rem); line-height: 1.45; font-weight: 300; color: var(--ink); }
+  .music-row { margin-top: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
+  .play-track[aria-pressed='true'] { border-color: var(--magenta); box-shadow: 0 0 18px hsl(290 100% 70% / .35); }
+  .play-track svg { width: 12px; height: 12px; }
+  .eq { display: none; gap: 2px; height: 14px; align-items: end; }
+  .eq i { width: 3px; height: 40%; background: var(--magenta); border-radius: 1px; }
+  .play-track[aria-pressed='true'] svg { display: none; }
+  .play-track[aria-pressed='true'] .eq { display: inline-flex; }
+  .play-track[aria-pressed='true'] .eq i { animation: eq .9s ease-in-out infinite alternate; }
+  .play-track[aria-pressed='true'] .eq i:nth-child(2) { animation-delay: -.3s; }
+  .play-track[aria-pressed='true'] .eq i:nth-child(3) { animation-delay: -.6s; }
+  @keyframes eq { from { height: 25%; } to { height: 100%; } }
+
+  /* Close */
+  .cta { margin-top: clamp(2.5rem, 6vw, 3.75rem); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem 1.75rem; }
+  .cta .pill.primary svg { width: 12px; height: 12px; }
+  .read { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; text-decoration: none; }
+  .read:hover { text-decoration: underline; }
+  .cta-note { flex-basis: 100%; min-height: 1.4em; text-align: center; font-size: .9rem; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<p class="mock-note">Round 2 · C: the section is one glass instrument. Four readouts count in once, a segmented control switches jobs, and each job shows only its strongest points.</p>
+
+<section class="section" id="experience" aria-labelledby="exp-title">
+  <header class="head reveal">
+    <p class="eyebrow">Experience</p>
+    <h2 class="title" id="exp-title"></h2>
+    <p class="lede" id="lede"></p>
+  </header>
+
+  <div class="hud panel reveal" id="panel">
+    <div class="scan" aria-hidden="true"></div>
+    <div class="panel-top">
+      <span class="live">Now</span>
+      <span class="meta">Selected numbers · Feb–Oct 2026</span>
+    </div>
+    <ul class="stats" id="stats"></ul>
+
+    <div class="seg-wrap" id="segWrap">
+      <div class="seg" role="tablist" aria-label="Career" id="seg">
+        <span class="thumb still" id="thumb" aria-hidden="true"></span>
+      </div>
+    </div>
+    <hr class="hairline" style="margin-top: clamp(1.25rem, 3vw, 1.75rem)">
+    <div id="panels"></div>
+  </div>
+
+  <div class="cta reveal">
+    <button class="pill primary" type="button" id="playCareer">
+      <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>
+      Play through my career
+    </button>
+    <a class="read" href="#">Read the full resume →</a>
+    <p class="cta-note" id="ctaNote" aria-live="polite"></p>
+  </div>
+</section>
+
+<script src="highlights.js"></script>
+<script src="../shared.js"></script>
+<script>
+document.documentElement.classList.add('js')
+MOCK.mockBar('Round 2 · C · Heads-up display')
+const H = window.HIGHLIGHTS
+const { rich, src, esc, reducedMotion } = MOCK
+
+/* Header */
+document.getElementById('exp-title').textContent = H.headline
+document.getElementById('lede').innerHTML = esc(H.intro) + src(H.introSrc)
+
+/* Readouts */
+const fmt = (n, s) => (s.decimals ? n.toFixed(s.decimals) : String(Math.round(n)))
+function parts(s, n) {
+  const spaced = s.suffix && s.suffix.startsWith(' ')
+  const unit = spaced ? s.suffix.trim() : ''
+  const tail = spaced ? '' : s.suffix || ''
+  const cur = n === undefined ? s.countTo : n
+  const v = s.countFrom != null ? `${s.countFrom}→${fmt(cur, s)}` : `${s.prefix || ''}${fmt(cur, s)}${tail}`
+  return { v, unit }
+}
+const statsEl = document.getElementById('stats')
+statsEl.innerHTML = H.stats.map((s) => {
+  const { v, unit } = parts(s)
+  return `<li class="stat">
+    <p class="num" aria-hidden="true"><span class="v">${esc(v)}</span>${unit ? `<span class="unit">${esc(unit)}</span>` : ''}</p>
+    <p class="num-label"><span class="sr-only">${esc(s.value)}: </span>${esc(s.label)}${src(s.src)}</p>
+  </li>`
+}).join('')
+const vEls = [...statsEl.querySelectorAll('.v')]
+const setNum = (i, n) => { vEls[i].textContent = parts(H.stats[i], n).v }
+const startOf = (s) => (s.countFrom != null ? s.countFrom : 0)
+let counted = false
+if (!reducedMotion()) H.stats.forEach((s, i) => setNum(i, startOf(s)))
+
+function countIn() {
+  if (counted) return
+  counted = true
+  if (reducedMotion()) { H.stats.forEach((_, i) => setNum(i)); return }
+  const t0 = performance.now(), dur = 1300
+  const tick = (t) => {
+    const k = reducedMotion() ? 1 : Math.min(1, (t - t0) / dur)
+    const e = 1 - Math.pow(1 - k, 3)
+    H.stats.forEach((s, i) => setNum(i, k >= 1 ? undefined : startOf(s) + (s.countTo - startOf(s)) * e))
+    if (k < 1) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
+/* Tabs + panels */
+const tabs = [
+  ...H.jobs.map((j) => ({ id: j.id, label: j.id === 'designit' ? 'Microsoft' : j.id === 'freelance' ? 'Freelance' : j.company, job: j })),
+  { id: 'music', label: 'Music', music: H.music },
+]
+const stackLine = (list) => `<p class="meta stackline">${list.map(esc).join('<span class="dot" aria-hidden="true">·</span>')}</p>`
+const head = (title, sub, dates) => `
+  <div class="job-head">
+    <div><h3>${esc(title)}</h3><p class="sub">${esc(sub)}</p></div>
+    <p class="dates">${esc(dates)}</p>
+  </div>`
+
+function timelyPanel(j) {
+  const n = j.ladder.length
+  const ladder = j.ladder.map((r, i) => `
+    <li><p class="t">${esc(r.title)}</p><p class="d">${i === n - 1 ? 'Joined' : 'Promoted'} · ${esc(r.start)}</p></li>`).join('')
+  const hl = j.highlights.map((h) => `
+    <li>
+      <div class="metric"><p class="m">${esc(h.metric)}</p><p class="ml">${esc(h.metricLabel)}</p></div>
+      <div><p class="ht">${esc(h.title)}</p><p class="hd">${rich(h.detail)}${src(h.src)}</p></div>
+    </li>`).join('')
+  return `${head(j.company, j.blurb, j.dates)}
+    <div class="tc-grid">
+      <div><p class="eyebrow">Titles</p><ol class="ladder">${ladder}</ol></div>
+      <div>
+        <ul class="hl">${hl}</ul>
+        <p class="after">${rich(j.earlier.text)}${src(j.earlier.src)}</p>
+        ${stackLine(j.stack)}
+      </div>
+    </div>`
+}
+const jobPanel = (j) => `${head(j.company, j.blurb, j.dates)}
+  <p class="role">${esc(j.ladder[0].title)}</p>
+  ${j.highlights.map((h) => `<p class="one">${rich(h.title)}${src(h.src)}</p>`).join('')}
+  ${stackLine(j.stack)}`
+const musicPanel = (m) => `${head(m.title, m.company, m.dates)}
+  <p class="one">${rich(m.line)}${src(m.src)}</p>
+  <div class="music-row">
+    <button class="pill play-track" type="button" aria-pressed="false" id="trackBtn">
+      <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span><span class="sr-only">Play </span>${esc(m.track.title)}</span>
+    </button>
+    <span class="meta">${esc(m.track.by)}</span>
+  </div>
+  <p class="meta" style="margin-top:1.1rem">${esc(m.education)}</p>`
+
+const seg = document.getElementById('seg'), segWrap = document.getElementById('segWrap'), thumb = document.getElementById('thumb')
+const panelsEl = document.getElementById('panels'), panel = document.getElementById('panel')
+seg.insertAdjacentHTML('beforeend', tabs.map((t, i) => `
+  <button type="button" role="tab" id="tab-${t.id}" aria-controls="tp-${t.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}">${esc(t.label)}</button>`).join(''))
+panelsEl.innerHTML = tabs.map((t, i) => `
+  <div class="tabpanel" role="tabpanel" id="tp-${t.id}" aria-labelledby="tab-${t.id}" tabindex="0" ${i ? 'hidden' : ''}>
+    ${t.music ? musicPanel(t.music) : t.id === 'timelycare' ? timelyPanel(t.job) : jobPanel(t.job)}
+  </div>`).join('')
+const tabBtns = [...seg.querySelectorAll('[role="tab"]')]
+const tabPanels = [...panelsEl.querySelectorAll('[role="tabpanel"]')]
+let cur = 0
+
+function moveThumb() {
+  const b = tabBtns[cur]
+  thumb.style.width = `${b.offsetWidth}px`
+  thumb.style.transform = `translateX(${b.offsetLeft}px)`
+}
+function keepVisible(b) {
+  const l = b.offsetLeft, r = l + b.offsetWidth, w = segWrap
+  let to = null
+  if (l < w.scrollLeft + 8) to = l - 16
+  else if (r > w.scrollLeft + w.clientWidth - 8) to = r - w.clientWidth + 16
+  if (to !== null) w.scrollTo({ left: Math.max(0, to), behavior: reducedMotion() ? 'auto' : 'smooth' })
+}
+function select(i, focus) {
+  if (i === cur && !focus) return
+  cur = i
+  tabBtns.forEach((b, j) => {
+    const on = j === i
+    b.setAttribute('aria-selected', String(on))
+    b.tabIndex = on ? 0 : -1
+    tabPanels[j].hidden = !on
+  })
+  const p = tabPanels[i]
+  p.classList.remove('enter'); void p.offsetWidth; p.classList.add('enter')
+  panel.dataset.accent = tabs[i].id === 'music' ? 'music' : ''
+  moveThumb()
+  keepVisible(tabBtns[i])
+  if (focus) tabBtns[i].focus()
+}
+tabBtns.forEach((b, i) => b.addEventListener('click', () => select(i, false)))
+seg.addEventListener('keydown', (e) => {
+  const last = tabBtns.length - 1
+  const next = { ArrowRight: cur === last ? 0 : cur + 1, ArrowLeft: cur === 0 ? last : cur - 1, Home: 0, End: last }[e.key]
+  if (next === undefined) return
+  e.preventDefault()
+  select(next, true)
+})
+
+/* Thumb: place without animating, then let it slide */
+const placeThumb = () => { thumb.classList.add('still'); moveThumb(); requestAnimationFrame(() => requestAnimationFrame(() => thumb.classList.remove('still'))) }
+placeThumb()
+document.fonts.ready.then(placeThumb)
+new ResizeObserver(placeThumb).observe(seg)
+
+/* Music toggle (mockup) */
+document.getElementById('trackBtn').addEventListener('click', (e) => {
+  const b = e.currentTarget
+  b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'))
+})
+
+/* CTA (mockup) */
+document.getElementById('playCareer').addEventListener('click', () => {
+  document.getElementById('ctaNote').textContent = 'Mockup: this opens the Jelly Resume in Play mode.'
+})
+
+/* Reveal + the panel's one-time scan and count */
+const reveals = new IntersectionObserver((entries) => entries.forEach((en) => {
+  if (!en.isIntersecting) return
+  en.target.classList.add('in')
+  reveals.unobserve(en.target)
+}), { threshold: 0.12 })
+document.querySelectorAll('.reveal').forEach((el) => reveals.observe(el))
+
+const panelIO = new IntersectionObserver(([en]) => {
+  if (!en.isIntersecting) return
+  if (!reducedMotion()) panel.classList.add('scanning')
+  countIn()
+  panelIO.disconnect()
+}, { threshold: 0.35 })
+panelIO.observe(panel)
+
+addEventListener('mock:rm', (e) => {
+  if (!e.detail) return
+  panel.classList.remove('scanning')
+  H.stats.forEach((_, i) => setNum(i))
+  counted = true
+})
+</script>
+</body>
+</html>

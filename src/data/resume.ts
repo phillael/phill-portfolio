@@ -3,9 +3,12 @@
  * the 3D Jelly Resume (drawn from public/resume/snapshot.json) shows the same words.
  *
  * Mirrors Rezmancer's content/resume.yaml with its AI Engineer variant applied (the
- * variant the snapshot is generated from: 8 TimelyCare bullets in that order). The
- * phone number and email are left out on purpose: the repo and the site are public.
- * `**double asterisks**` mark bold runs, as in Rezmancer.
+ * variant the snapshot is generated from: 8 TimelyCare bullets in that order), including
+ * the TimelyCare title history (Software Engineer → Senior Software Engineer II →
+ * Generative AI Engineer, newest first). The phone number and email are left out on
+ * purpose: the repo and the site are public. `**double asterisks**` mark bold runs, as
+ * in Rezmancer. The home page's Experience section, the Wizard and the JSON-LD read it
+ * through src/data/career.ts.
  */
 
 export interface ResumeContact {
@@ -74,7 +77,8 @@ export const resume: Resume = {
       dates: 'Feb 2023 – Present',
       roles: [
         { title: 'Generative AI Engineer', dates: 'Apr 2026 – Present' },
-        { title: 'Senior Software Engineer II', dates: 'Feb 2023 – Apr 2026' },
+        { title: 'Senior Software Engineer II', dates: 'Apr 2025 – Apr 2026' },
+        { title: 'Software Engineer', dates: 'Feb 2023 – Apr 2025' },
       ],
       bullets: [
         { id: 'nurture-rebuild', text: 'Took a dormant in-house marketing platform that had **never sent a message** to production in **~4 weeks (40 merged PRs)** to replace Customer.io for ~1.4M students, adding SSO, AWS Terraform, SES, segmentation, broadcasts, and automations.' },
@@ -82,7 +86,7 @@ export const resume: Resume = {
         { id: 'resource-finder', text: 'Shipped an **AI Resource Finder** for care coordinators (OpenAI Agents SDK, web search, structured outputs, SSE streaming), backed by a ~71K-resource directory I built to replace a six-figure vendor contract.' },
         { id: 'payments-platform', text: 'Designed, built, and launched a **provider payment platform** that Finance uses to audit and publish monthly payouts for **~750 clinicians and 50K+ visits/month**. In production since June 2026.' },
         { id: 'payments-audit', text: 'Cut the full-month payout audit from **~44 to ~3 minutes**, and moved payment rules out of SQL stored functions into effective-dated decision tables, resolving six code-vs-policy discrepancies with Finance and Care Ops.' },
-        { id: 'payments-bugs', text: 'Found and fixed payout-correctness bugs, including a no-show overpayment regression (30 items/month → 0), a cron/ETL race that underpaid late-month visits, and a vocabulary mismatch that left **363 coaching sessions unpaid**.' },
+        { id: 'payments-bugs', text: 'Found and fixed payout-correctness bugs, including a no-show overpayment regression (30 items/month to 0), a cron/ETL race that underpaid late-month visits, and a vocabulary mismatch that left **363 coaching sessions unpaid**.' },
         { id: 'growth-pilot', text: 'Ran an abandoned-signup email pilot across a 33-school university system with **7.1% registration vs ~3%** for a comparison group (**~2.7× lift**) and 0 spam complaints, and removed ~919K billable profiles from the vendor workspace.' },
         { id: 'earlier-timely', text: 'Earlier, built an event-driven reporting dashboard (SNS/SQS, SQL, Node, React) that helped sales close several large clients, and **cut post-release bugs 50%** with Vitest, Playwright, and Detox.' },
       ],
@@ -100,7 +104,7 @@ export const resume: Resume = {
       blurb: 'multiplayer 3D math game',
       link: { href: 'https://numberslayers.com', label: 'numberslayers.com' },
       stack: 'React Three Fiber · Colyseus · Next.js · Convex · Railway',
-      text: 'Server-authoritative multiplayer with snapshot interpolation at 60fps, AI enemy bots, an adaptive Web Audio mixer, and an FBX→GLB asset pipeline that cut load size 88%.',
+      text: 'Server-authoritative multiplayer with snapshot interpolation at 60fps, AI enemy bots, an adaptive Web Audio mixer, and an FBX to GLB asset pipeline that cut load size 88%.',
     },
   ],
   earlier: [
@@ -116,6 +120,9 @@ export const resume: Resume = {
   },
   education: [{ degree: 'B.A. Jazz Studies', school: 'University of North Texas' }],
 }
+
+/** The PDF the nav, /resume and the 3D resume's HUD link to (Rezmancer's AI Engineer build). */
+export const RESUME_PDF = '/Phill_Aelony_Resume.pdf'
 
 /** Split `**bold**` markup into runs. */
 export const richText = (s: string) =>

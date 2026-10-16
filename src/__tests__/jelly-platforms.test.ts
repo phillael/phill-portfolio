@@ -41,8 +41,8 @@ describe('buildLevel', () => {
     lv = buildLevel(w, inkFixture(w))
   })
 
-  it('clusters the words into the 47 visual lines, top to bottom, each left to right', () => {
-    expect(lv.lines).toHaveLength(47)
+  it('clusters the words into the 48 visual lines, top to bottom, each left to right', () => {
+    expect(lv.lines).toHaveLength(48)
     for (let i = 1; i < lv.lines.length; i++) expect(lv.lines[i].inkTop).toBeLessThan(lv.lines[i - 1].inkTop - 0.15)
     for (const line of lv.lines) {
       const xs = line.bodies.map((bi) => w.bodies[bi].x0)
@@ -57,14 +57,15 @@ describe('buildLevel', () => {
   it('starts at the name and finishes on the bottom line (you read the resume walking down it)', () => {
     expect(lv.start).toBe(0)
     expect(words(w, lv, lv.start)).toBe('Phill Aelony')
-    expect(lv.finish).toBe(46)
+    expect(lv.finish).toBe(47)
     expect(words(w, lv, lv.finish)).toBe('EDUCATION B.A. Jazz Studies · University of North Texas')
   })
 
   it('makes a checkpoint of each role, newest first, in reading order', () => {
     expect(lv.checkpoints.map((c) => [c.year, c.title])).toEqual([
       [2026, 'Generative AI Engineer'],
-      [2023, 'Senior Software Engineer II'],
+      [2025, 'Senior Software Engineer II'],
+      [2023, 'Software Engineer'],
       [2022, 'Software Engineer · Sessions'],
       [2021, 'Front End Developer · Designit for Microsoft'],
       [2018, 'Freelance Developer · phillcodes.com'],

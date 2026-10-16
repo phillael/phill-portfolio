@@ -382,7 +382,7 @@ const FinishCard = ({ result, onAgain, onLeave }: { result: RunResult; onAgain: 
         <button ref={again} type="button" onClick={onAgain} aria-keyshortcuts="Enter" className={`${PLAY_BTN} flex-auto`}>
           <span aria-hidden="true">↻</span> Play again<span className={KEY}> (Enter)</span>
         </button>
-        <a href={RESUME_PDF} download="Phillip_Aelony_Resume.pdf" className={`${BTN} flex-auto`}>
+        <a href={RESUME_PDF} download="Phill_Aelony_Resume.pdf" className={`${BTN} flex-auto`}>
           <span aria-hidden="true">⤓</span> Resume PDF
         </a>
         <button type="button" onClick={onLeave} aria-keyshortcuts="Escape" className={`${BTN} flex-auto`}>

@@ -7,7 +7,7 @@
  * - Bio paragraphs are present
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import AboutSection from '@/components/AboutSection'
 import { testimonials } from '@/data/testimonials'
 
@@ -81,6 +81,17 @@ describe('About Section', () => {
 
     const paragraphs = screen.getAllByRole('paragraph')
     expect(paragraphs.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('says what Phill does now, keeping the joke', () => {
+    render(<AboutSection />)
+
+    const p4 = screen.getByText(/and now I am a Generative AI Engineer at/)
+    expect(p4).toHaveTextContent(
+      'and now I am a Generative AI Engineer at TimelyCare, building AI agents and whole platforms, and it is awesome and I do great work.',
+    )
+    expect(p4).not.toHaveTextContent(/full stack development/)
+    expect(within(p4).getByText('TimelyCare')).toBeInTheDocument() // still highlighted
   })
 
   it('renders space llama image with alt text', () => {

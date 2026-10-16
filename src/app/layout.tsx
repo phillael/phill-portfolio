@@ -18,7 +18,7 @@ const audiowide = Audiowide({
 })
 
 const nunito = Nunito({
-  weight: ['400', '500', '600', '700'],
+  weight: ['300', '400', '500', '600', '700', '800'], // one variable file: extra weights cost no bytes
   subsets: ['latin'],
   variable: '--font-nunito',
 })
@@ -43,15 +43,16 @@ export const metadata: Metadata = {
   },
   title: 'Phill Aelony | Legendary Code Sorcerer',
   description:
-    'Phill Aelony - Full Stack Developer, Musician, and Builder of Dreams. A cyberpunk developer portfolio showcasing skills, projects, and experience.',
+    'Phill Aelony - Senior AI Engineer, Musician, and Builder of Dreams. A cyberpunk developer portfolio showcasing skills, projects, and experience.',
   keywords: [
     'Phill Aelony',
-    'Full Stack Developer',
+    'Senior AI Engineer',
+    'Generative AI Engineer',
+    'Full-stack',
     'React',
     'Next.js',
     'TypeScript',
     'Portfolio',
-    'Software Engineer',
   ],
   icons: {
     icon: [
@@ -62,7 +63,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'Phill Aelony | Legendary Code Sorcerer',
-    description: 'Full Stack Developer, Musician, and Builder of Dreams. Vanquisher of Bugs.',
+    description: 'Senior AI Engineer, Musician, and Builder of Dreams. Vanquisher of Bugs.',
     url: SITE_URL,
     siteName: 'Phill Aelony Portfolio',
     locale: 'en_US',
@@ -71,7 +72,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Phill Aelony | Legendary Code Sorcerer',
-    description: 'Full Stack Developer, Musician, and Builder of Dreams. Vanquisher of Bugs.',
+    description: 'Senior AI Engineer, Musician, and Builder of Dreams. Vanquisher of Bugs.',
   },
 }
 

@@ -46,7 +46,6 @@ describe('globals.css reduced-motion block', () => {
 
   it.each([
     '.screen-shake',
-    '.timeline-dot',
     '.glow-layer',
     '.animate-ripple',
     '.marquee-text',

@@ -5,51 +5,14 @@
  * conform to their TypeScript interfaces.
  */
 
-import experienceData from '@/data/experience.json'
 import skillsData from '@/data/skills.json'
 import projectsData from '@/data/projects.json'
 import projectDetailsData from '@/data/project-details.json'
 import educationData from '@/data/education.json'
-import type { Experience, SkillCategory, Project, ProjectDetails, Education } from '@/types/content'
+import type { SkillCategory, Project, ProjectDetails, Education } from '@/types/content'
 
 describe('Data Architecture', () => {
-  describe('Experience Data', () => {
-    it('imports experience.json without errors', () => {
-      expect(experienceData).toBeDefined()
-      expect(Array.isArray(experienceData)).toBe(true)
-    })
-
-    it('contains the expected number of experience entries', () => {
-      expect(experienceData.length).toBe(6)
-    })
-
-    it('each experience entry has required fields', () => {
-      experienceData.forEach((entry) => {
-        const experience = entry as Experience
-        expect(experience.id).toBeDefined()
-        expect(experience.title).toBeDefined()
-        expect(experience.company).toBeDefined()
-        expect(experience.dateRange).toBeDefined()
-        expect(experience.description).toBeDefined()
-        expect(Array.isArray(experience.bulletPoints)).toBe(true)
-        expect(Array.isArray(experience.techStack)).toBe(true)
-        expect(['tech', 'music', 'education']).toContain(experience.type)
-      })
-    })
-
-    it('includes TimelyCare as the most recent entry', () => {
-      const timelycare = experienceData.find((e) => e.id === 'timelycare')
-      expect(timelycare).toBeDefined()
-      expect(timelycare?.company).toBe('TimelyCare')
-      expect(timelycare?.title).toBe('Senior Software Engineer II')
-    })
-
-    it('includes music career entry', () => {
-      const musicCareer = experienceData.find((e) => e.type === 'music')
-      expect(musicCareer).toBeDefined()
-      expect(musicCareer?.company).toContain('Funky Knuckles')
-    })
-  })
+  // The career (the Experience section, the Wizard, the JSON-LD): src/__tests__/career-data.test.ts
 
   describe('Skills Data', () => {
     it('imports skills.json without errors', () => {
@@ -87,6 +50,14 @@ describe('Data Architecture', () => {
       )
       expect(professionalSkills).toBeDefined()
       expect(professionalSkills?.skills).toContain('Software Engineering')
+      expect(professionalSkills?.skills).not.toContain('Agent OS')
+    })
+
+    it('lists the 2026 stack among the technical skills', () => {
+      const technical = skillsData.find((c) => c.category === 'Technical Skills')?.skills
+      for (const skill of ['Anthropic SDK', 'OpenAI Agents SDK', 'Terraform', 'Fastify', 'Postgres']) {
+        expect(technical).toContain(skill)
+      }
     })
 
     it('includes Other Skills category', () => {
@@ -102,8 +73,14 @@ describe('Data Architecture', () => {
       expect(Array.isArray(projectsData)).toBe(true)
     })
 
-    it('contains three project entries', () => {
-      expect(projectsData.length).toBe(3)
+    it('contains five project entries, in order', () => {
+      expect(projectsData.map((p) => p.id)).toEqual([
+        'quadzilla',
+        'number-slayers',
+        'rezmancer',
+        'jelly-resume',
+        'pong-multiverse-alpaca-squadron',
+      ])
     })
 
     it('each project has required fields', () => {
@@ -113,22 +90,21 @@ describe('Data Architecture', () => {
         expect(proj.title).toBeDefined()
         expect(proj.description).toBeDefined()
         expect(Array.isArray(proj.techStack)).toBe(true)
-        expect(proj.imageUrl).toBeDefined()
+        // a screenshot, or none yet (the card shows a placeholder)
+        expect(proj.imageUrl === undefined || proj.imageUrl.startsWith('/images/projects/')).toBe(true)
       })
     })
 
     it('includes Number Slayers project', () => {
       const numberSlayers = projectsData.find((p) => p.id === 'number-slayers')
       expect(numberSlayers).toBeDefined()
-      expect(numberSlayers?.techStack).toContain('Three.js')
+      expect(numberSlayers?.techStack).toContain('Colyseus')
+      expect(numberSlayers?.liveUrl).toBe('https://numberslayers.com')
+      expect(numberSlayers?.repoUrl).toBe('https://github.com/phillael/number-slayers')
     })
 
-    it('includes TimelyCare project with liveUrl', () => {
-      const timelycare = projectsData.find(
-        (p) => p.id === 'timelycare-platform'
-      )
-      expect(timelycare).toBeDefined()
-      expect(timelycare?.liveUrl).toBe('https://timelycare.com')
+    it('has no TimelyCare card (it lives in Experience now)', () => {
+      expect(projectsData.find((p) => /timelycare/i.test(p.id))).toBeUndefined()
     })
   })
 
@@ -146,6 +122,11 @@ describe('Data Architecture', () => {
         expect(typeof details.keyPatterns).toBe('string')
         expect(typeof details.notableDetails).toBe('string')
       })
+    })
+
+    it('covers Quadzilla, Rezmancer and the Jelly Resume for the Wizard', () => {
+      const ids = projectDetailsData.map((entry) => entry.id)
+      expect(ids).toEqual(expect.arrayContaining(['quadzilla', 'rezmancer', 'jelly-resume']))
     })
 
     it('each id is a unique non-empty string', () => {

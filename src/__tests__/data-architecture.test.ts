@@ -5,51 +5,14 @@
  * conform to their TypeScript interfaces.
  */
 
-import experienceData from '@/data/experience.json'
 import skillsData from '@/data/skills.json'
 import projectsData from '@/data/projects.json'
 import projectDetailsData from '@/data/project-details.json'
 import educationData from '@/data/education.json'
-import type { Experience, SkillCategory, Project, ProjectDetails, Education } from '@/types/content'
+import type { SkillCategory, Project, ProjectDetails, Education } from '@/types/content'
 
 describe('Data Architecture', () => {
-  describe('Experience Data', () => {
-    it('imports experience.json without errors', () => {
-      expect(experienceData).toBeDefined()
-      expect(Array.isArray(experienceData)).toBe(true)
-    })
-
-    it('contains the expected number of experience entries', () => {
-      expect(experienceData.length).toBe(6)
-    })
-
-    it('each experience entry has required fields', () => {
-      experienceData.forEach((entry) => {
-        const experience = entry as Experience
-        expect(experience.id).toBeDefined()
-        expect(experience.title).toBeDefined()
-        expect(experience.company).toBeDefined()
-        expect(experience.dateRange).toBeDefined()
-        expect(experience.description).toBeDefined()
-        expect(Array.isArray(experience.bulletPoints)).toBe(true)
-        expect(Array.isArray(experience.techStack)).toBe(true)
-        expect(['tech', 'music', 'education']).toContain(experience.type)
-      })
-    })
-
-    it('includes TimelyCare as the most recent entry', () => {
-      const timelycare = experienceData.find((e) => e.id === 'timelycare')
-      expect(timelycare).toBeDefined()
-      expect(timelycare?.company).toBe('TimelyCare')
-      expect(timelycare?.title).toBe('Senior Software Engineer II')
-    })
-
-    it('includes music career entry', () => {
-      const musicCareer = experienceData.find((e) => e.type === 'music')
-      expect(musicCareer).toBeDefined()
-      expect(musicCareer?.company).toContain('Funky Knuckles')
-    })
-  })
+  // The career (the Experience section, the Wizard, the JSON-LD): src/__tests__/career-data.test.ts
 
   describe('Skills Data', () => {
     it('imports skills.json without errors', () => {

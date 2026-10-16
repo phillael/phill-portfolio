@@ -1,11 +1,25 @@
 import projects from '@/data/projects.json'
 import projectDetails from '@/data/project-details.json'
 import skills from '@/data/skills.json'
-import experience from '@/data/experience.json'
+import { career } from '@/data/career'
 import education from '@/data/education.json'
 import wizardData from '@/data/wizard.json'
 
 let cached: string | null = null
+
+const plain = (s: string) => s.replace(/\*\*/g, '')
+
+/** The career as the home page tells it (career.ts): titles and dates from the resume, the highlights' sentences */
+const experienceForWizard = () => ({
+  jobs: career.jobs.map((job) => ({
+    company: job.company,
+    dates: job.dates,
+    roles: job.roles.map(({ title, dates }) => ({ title, dates })),
+    ...(job.tiles.length && { highlights: job.tiles.map((t) => ({ title: t.title, detail: plain(t.detail) })) }),
+    ...(job.line && { line: plain(job.line) }),
+  })),
+  music: { ...career.music, line: plain(career.music.line) },
+})
 
 const PERSONA_TEMPLATE = `You are the Shroom Wizard, an ancient, whimsical, slightly unhinged fungal sage who lives in the grove of phillcodes.com. You are a walrus-faced wizard with ivory tusks and a great magenta mushroom cap. You never break character.
 
@@ -32,6 +46,10 @@ You are here to talk about Phill Aelony, a software developer whose portfolio yo
 <experience>
 {{EXPERIENCE_JSON}}
 </experience>
+
+<career-notes>
+{{CAREER_NOTES}}
+</career-notes>
 
 <education>
 {{EDUCATION_JSON}}
@@ -60,6 +78,7 @@ For direct factual questions about Phill's career, skills, experience, projects,
 - If the traveler wants more detail, they will ask a follow-up. Let them drive deeper rather than dumping everything at once.
 - When asked about skills or tech stack, name the actual technologies in a natural sentence, not a long list.
 - When asked about a specific company or role, give the real title, date range, and 2-3 standout achievements.
+- The <career-notes> are true, vetted details about Phill's work that go deeper than his site shows. Share them freely when the traveler wants more, a fact or two at a time, in your own words.
 
 **How to choose:** If the traveler seems to want real information about Phill (career questions, recruiter-style questions, "tell me about his experience"), use Clear Speech. If they're just chatting, joking, or exploring, use Mystic Voice. When in doubt, lean toward being informative — this is a portfolio site and visitors often want to learn about Phill.
 
@@ -102,7 +121,8 @@ export function buildWizardSystemPrompt(): string {
     .replace('{{PROJECTS_JSON}}', JSON.stringify(projects, null, 2))
     .replace('{{PROJECT_DETAILS_JSON}}', JSON.stringify(projectDetails, null, 2))
     .replace('{{SKILLS_JSON}}', JSON.stringify(skills, null, 2))
-    .replace('{{EXPERIENCE_JSON}}', JSON.stringify(experience, null, 2))
+    .replace('{{EXPERIENCE_JSON}}', JSON.stringify(experienceForWizard(), null, 2))
+    .replace('{{CAREER_NOTES}}', career.notes.map((note) => `- ${note}`).join('\n'))
     .replace('{{EDUCATION_JSON}}', JSON.stringify(education, null, 2))
 
   return cached

@@ -2,6 +2,9 @@ import {
   buildWizardSystemPrompt,
   __resetWizardPromptCache,
 } from '../lib/wizard-prompt'
+import { career } from '@/data/career'
+
+const section = (prompt: string, tag: string) => prompt.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))?.[1] ?? ''
 
 describe('buildWizardSystemPrompt', () => {
   beforeEach(() => {
@@ -21,7 +24,31 @@ describe('buildWizardSystemPrompt', () => {
     expect(prompt).toMatch(/<project-details>[\s\S]+<\/project-details>/)
     expect(prompt).toMatch(/<skills>[\s\S]+<\/skills>/)
     expect(prompt).toMatch(/<experience>[\s\S]+<\/experience>/)
+    expect(prompt).toMatch(/<career-notes>[\s\S]+<\/career-notes>/)
     expect(prompt).toMatch(/<education>[\s\S]+<\/education>/)
+  })
+
+  it('tells the new career story from career.ts', () => {
+    const prompt = buildWizardSystemPrompt()
+    const experience = section(prompt, 'experience')
+    expect(experience).toContain('Generative AI Engineer')
+    expect(experience).toContain('Senior Software Engineer II')
+    expect(experience).toContain('Customer.io')
+    expect(experience).toContain('MCP')
+    expect(experience).toContain('Guitarist & Composer')
+    expect(experience).not.toContain('**') // bold markers are page markup
+    expect(section(prompt, 'summary')).toMatch(/^\s*Phill Aelony is a Senior AI Engineer \(his title: Generative AI Engineer at TimelyCare\)/)
+    // the 2025 story is gone from the parts built here (skills.json loses Agent OS in T10)
+    for (const part of [section(prompt, 'summary'), experience]) {
+      expect(part).not.toMatch(/Agent OS|5-10x|5–10x|6\+ years/)
+    }
+  })
+
+  it('gives the Wizard the career notes as true details it may share', () => {
+    const prompt = buildWizardSystemPrompt()
+    const notes = section(prompt, 'career-notes')
+    for (const note of career.notes) expect(notes).toContain(`- ${note}`)
+    expect(prompt).toMatch(/career-notes.*true/i)
   })
 
   it('includes project architecture details in the prompt', () => {

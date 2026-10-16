@@ -1,21 +1,8 @@
 /**
  * TypeScript interfaces for portfolio content data structures.
  * These interfaces define the shape of data in /src/data/*.json files.
+ * (The career, for the Experience section, is typed in src/data/career.ts.)
  */
-
-/**
- * Experience - Work history entry for the timeline section
- */
-export interface Experience {
-  id: string
-  title: string
-  company: string
-  dateRange: string
-  description: string
-  bulletPoints: string[]
-  techStack: string[]
-  type: 'tech' | 'music' | 'education'
-}
 
 /**
  * SkillCategory - Grouped skills for the skills showcase section

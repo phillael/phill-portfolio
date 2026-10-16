@@ -1,4 +1,4 @@
-import experience from '@/data/experience.json'
+import { career } from '@/data/career'
 import skills from '@/data/skills.json'
 import { socials } from '@/data/socials'
 import { SITE_URL } from '@/lib/site'
@@ -10,7 +10,7 @@ const PERSON_ID = `${SITE_URL}/#person`
  * update (new job title, skills, socials) updates SEO with it.
  */
 export function buildStructuredData() {
-  const current = experience[0]
+  const [current] = career.jobs
   const technicalSkills =
     skills.find((category) => category.category === 'Technical Skills')?.skills ?? []
 
@@ -30,7 +30,7 @@ export function buildStructuredData() {
         name: 'Phill Aelony',
         url: SITE_URL,
         image: `${SITE_URL}/images/hero-image-phill-llamas.png`,
-        jobTitle: current.title,
+        jobTitle: current.roles[0].title, // the real title (the headline is resume.headline)
         worksFor: { '@type': 'Organization', name: current.company },
         sameAs: [socials.github, socials.linkedin],
         knowsAbout: technicalSkills,

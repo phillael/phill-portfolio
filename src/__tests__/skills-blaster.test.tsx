@@ -245,3 +245,29 @@ describe('the music', () => {
     expect(document.querySelector('[data-sk-group="cloud"] h3')).toHaveClass('bl-live')
   })
 })
+
+describe('one screen', () => {
+  beforeAll(() => { window.scrollBy = jest.fn() as unknown as typeof window.scrollBy })
+
+  it('the first shot forms the arena (each heading knows its count) and stopping puts the list back', () => {
+    const section = document.getElementById('skills')!
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    expect(section).toHaveClass('bl-arena')
+    expect(section.style.getPropertyValue('--fit')).toBe('1')
+    expect(document.querySelector('[data-sk-group="frontend"] h3')).toHaveAttribute('data-n', '15')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(section).not.toHaveClass('bl-arena')
+    expect(section.style.getPropertyValue('--fit')).toBe('')
+  })
+
+  it('a pause lets the arena go after 6 s', () => {
+    const section = document.getElementById('skills')!
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    pass(BAR * 1000 + 5600) // idle: paused
+    expect(dev().G.state).toBe('paused')
+    expect(section).toHaveClass('bl-arena')
+    pass(6100)
+    expect(section).not.toHaveClass('bl-arena')
+    expect(hud()).not.toHaveClass('on')
+  })
+})

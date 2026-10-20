@@ -10,7 +10,8 @@ import css from '@/components/skills/Skills.module.css'
  * groups as quiet lines of words. Every skill is a button that looks like text, so the list stays the
  * content (readable, focusable, searchable); a click is what reveals the game (SkillsPlay: the magnet lean,
  * and the Skill blaster, imported on the first click). JS hooks: data-skill and
- * data-group on each skill, data-sk-group on each group's box, data-name on an AI skill's name.
+ * data-group on each skill, data-sk-group on each group's box (data-sk-groups around the non-AI ones), data-name on
+ * an AI skill's name.
  */
 const SkillsSection = () => {
   const [ai, ...rest] = SKILLS.groups
@@ -47,7 +48,7 @@ const SkillsSection = () => {
           </ul>
         </div>
 
-        <div className={css.groups}>
+        <div className={css.groups} data-sk-groups="">
           {rest.map((g) => (
             <div key={g.id} className={g.id === 'music' ? `${css.group} ${css.music}` : css.group} data-sk-group={g.id}>
               <h3 id={`skg-${g.id}`} className={css.h}>

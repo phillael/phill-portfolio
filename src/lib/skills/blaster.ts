@@ -14,7 +14,7 @@ import './blaster.css'
 import type { SkillGroupId } from '@/data/skills'
 import { BAR, BEAT, BEATS, ON_8TH, PARTS, SIX, createSynth, hz, inChord, type SkillSynth } from './synth'
 import {
-  FIRST_FOE_WAVE, HEARD_BARS, KIND, MAX_HP, ORDER, SHIELD_PTS, bandSize as bandOf, clearBonus, inBand, isFoe, levelFor, lifeFor, need, pickWeighted, planFor, readoutClears, waveCfg,
+  FIRST_FOE_WAVE, HEARD_BARS, KIND, MAX_HP, ORDER, SHIELD_PTS, bandSize as bandOf, clearBonus, inBand, isFoe, levelFor, lifeFor, need, pickWeighted, planFor, readoutClears, stageOrder, waveCfg,
   type Kind, type MusicState, type WaveCfg,
 } from './rules'
 import { labelOf, type Lean } from './lean'
@@ -326,10 +326,92 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   function handBack() { if (pausedSite) { pausedSite = false; site?.play() } }
   const offSite = site?.onChange((on) => { if (on && playing()) { pausedSite = false; pause('Paused · the music player is on') } })
 
-  /* ---------- one screen: the arena (T9) ---------- */
-  const armArena = (k: Key): Moved | undefined => { void k; return undefined }
-  const arenaOff = () => {}
-  const restage = (wave: number) => { void wave }
+  /* ---------- one screen: the arena ---------- */
+  // When the game starts, the section tightens to fit the screen: the header and the AI notes hide and the words
+  // slide into place (FLIP). If it still doesn't fit (phones, short windows), groups fold to their heading for a
+  // wave and take turns. Everything goes back when the game ends.
+  const groupEl: Partial<Record<SkillGroupId, HTMLElement>> = {}
+  root.querySelectorAll<HTMLElement>('[data-sk-group]').forEach((el) => { groupEl[el.dataset.skGroup as SkillGroupId] = el })
+  ORDER.forEach((g) => headings[g]?.setAttribute('data-n', String(groupSize[g] ?? 0)))
+  const list = root.querySelector<HTMLElement>('[data-sk-list]')
+  const arenaOnNow = () => root.classList.contains('bl-arena')
+  const flipEls = () => [...keys.map((k) => k.label), ...ORDER.map((g) => headings[g]).filter((h): h is HTMLElement => !!h)]
+  const snapshot = () => new Map(flipEls().map((el) => [el, el.getBoundingClientRect()]))
+  function flipFrom(before: Map<HTMLElement, DOMRect>, skip?: HTMLElement) {
+    if (rm) return // reduced motion: the arena just appears
+    for (const [el, r0] of before) {
+      if (el === skip) continue
+      const r1 = el.getBoundingClientRect()
+      if (!r1.width) continue
+      if (!r0.width) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: 'ease-out' }); continue }
+      const dx = r0.left - r1.left, dy = r0.top - r1.top
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue
+      el.animate([{ transform: `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)` }, { transform: 'translate(0, 0)' }], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)', composite: 'add' })
+    }
+  }
+  function setStage(open: SkillGroupId[] | null) {
+    for (const g of ORDER) groupEl[g]?.classList.toggle('bl-folded', !!open && !open.includes(g))
+  }
+  function fitArena(wave = 0) {
+    const avail = innerHeight - barH - 6
+    root.classList.remove('bl-staged')
+    setStage(null)
+    root.style.setProperty('--fit', '1')
+    if (innerWidth >= 700) { // desktop: tighten the type a little if needed
+      for (const f of [1, 0.94, 0.88, 0.82, 0.76]) { root.style.setProperty('--fit', String(f)); if (root.offsetHeight <= avail) return }
+    }
+    // still too tall: some groups fold to their heading for this wave, taking turns. Every wave opens
+    // one of chords, bass or lead first, then as many of the others as fit
+    root.classList.add('bl-staged')
+    const open: SkillGroupId[] = []
+    for (const g of stageOrder(wave)) {
+      setStage([...open, g])
+      if (!open.length || root.offsetHeight <= avail) open.push(g)
+    }
+    setStage(open)
+  }
+  const toTop = () => scrollTo({ top: root.getBoundingClientRect().top + scrollY - barH, behavior: 'instant' })
+  function arenaOn() {
+    if (arenaOnNow()) return
+    const before = snapshot()
+    root.classList.add('bl-arena')
+    fitArena(Math.max(0, G.wave))
+    toTop()
+    measure()
+    flipFrom(before)
+  }
+  /* the arena forms around the word you just hit: returns where that word was, so its letters fly from there */
+  function armArena(k: Key): Moved | undefined {
+    if (arenaOnNow()) return undefined
+    const r0 = k.label.getBoundingClientRect(), before = snapshot()
+    root.classList.add('bl-arena')
+    fitArena(Math.max(0, G.wave))
+    toTop()
+    measure()
+    flipFrom(before, k.label)
+    const r1 = k.label.getBoundingClientRect()
+    return { dx: r0.left - r1.left, dy: r0.top - r1.top }
+  }
+  function restage(wave: number) { // a new wave on a phone: a quick fade to the next groups (behind the wave's banner)
+    if (rm || !list) { fitArena(wave); measure(); return }
+    const out = list.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' })
+    out.onfinish = () => {
+      fitArena(wave)
+      measure()
+      out.cancel()
+      list.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' })
+    }
+  }
+  function arenaOff() {
+    if (!arenaOnNow()) return
+    const before = snapshot(), r0 = root.getBoundingClientRect()
+    root.classList.remove('bl-arena', 'bl-staged')
+    setStage(null)
+    root.style.removeProperty('--fit')
+    if (r0.bottom > 0 && r0.top < innerHeight) scrollBy(0, root.getBoundingClientRect().top - r0.top) // on screen: its top stays put (off screen, scroll anchoring keeps the page still)
+    measure()
+    flipFrom(before)
+  }
   /** the sticky nav's height: lit skills stay clear of it */
   let barH = 0
   function measureBar() {
@@ -992,6 +1074,9 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     rw = w
     clearTimeout(rT)
     rT = window.setTimeout(() => {
+      // the sections above reflow too: a playing arena goes back under the nav (a height-only resize, such as a
+      // phone's URL bar, only refits: it never fights a scroll)
+      if (arenaOnNow()) { fitArena(Math.max(0, G.wave)); if (playing()) toTop() }
       measure()
       if (G.state === 'wave' && G.active.size) {
         const n = G.active.size
@@ -1002,7 +1087,12 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     }, 150)
   })
   ro?.observe(root)
-  const onResize = () => placeHud()
+  let hT = 0
+  const onResize = () => {
+    placeHud()
+    clearTimeout(hT)
+    hT = window.setTimeout(() => { if (arenaOnNow()) { fitArena(Math.max(0, G.wave)); measure() } }, 200)
+  }
   window.addEventListener('resize', onResize)
   const onMotion = () => {
     rm = rmQuery.matches
@@ -1019,7 +1109,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
       active: () => (E ? E.active : 0), made: () => (E ? E.made : 0),
       /** checks only: solo the synths */
       drums: (on: boolean) => { if (E) E.dbus.gain.value = on ? E.P.drums.bus : 0 },
-      startWave, stop,
+      startWave, stop, arenaOn, arenaOff, fitArena,
       /** the riser into the drop, as the mockup's "Jump to wave 3" */
       jumpToDrop() {
         if (playing() || G.state === 'paused') stop()
@@ -1032,6 +1122,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
         hudOn()
         init()
         status('Skipping ahead · the riser into the drop')
+        arenaOn()
         musicStart(1)
         toWave(FIRST_FOE_WAVE)
         G.lastShot = now() + 3000
@@ -1053,7 +1144,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     shoot,
     dispose() {
       stop()
-      clearTimeout(sayT); clearTimeout(rT)
+      clearTimeout(sayT); clearTimeout(rT); clearTimeout(hT)
       document.removeEventListener('keydown', onKey)
       window.removeEventListener('resize', onResize)
       offSite?.()

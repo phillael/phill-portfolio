@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Breaker</title>
+<link rel="stylesheet" href="../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="skills.css">
+<style>
+  /* ===== A · Skill Breaker: the skills are the bricks ===== */
+  .sk-arena { --bh: 40px; height: clamp(480px, 60vw, 620px); background: radial-gradient(120% 80% at 50% 110%, hsl(190 100% 50% / .10), transparent 60%), linear-gradient(180deg, hsl(205 40% 6% / .55), hsl(205 40% 4% / .35)); cursor: none; }
+  @media (max-width: 639px) { .sk-arena { --bh: 30px; height: min(560px, 72vh); } }
+  .sk-arena:focus-visible { outline: 1px solid hsl(190 100% 75% / .55); outline-offset: 3px; }
+  .layer { position: absolute; inset: 0; }
+  .fx { pointer-events: none; z-index: 3; }
+  .brick, .ball, .paddle, .cap, .pop { position: absolute; left: 0; top: 0; will-change: transform; }
+  .brick {
+    height: var(--bh); padding: 0 14px; display: flex; align-items: center; justify-content: center; border-radius: 9px;
+    font: 700 17px/1 var(--font-text); color: hsl(185 100% 94%); white-space: nowrap;
+    background: linear-gradient(180deg, hsl(190 100% 75% / .17), hsl(190 100% 75% / .05));
+    border: 1px solid hsl(190 100% 75% / .42);
+    box-shadow: inset 0 1px 0 hsl(190 100% 90% / .16), 0 0 16px -6px hsl(190 100% 70% / .65);
+  }
+  @media (max-width: 639px) { .brick { font-size: 13px; padding: 0 10px; } }
+  .brick.ai { color: hsl(300 100% 95%); background: linear-gradient(180deg, hsl(290 100% 75% / .22), hsl(290 100% 70% / .07)); border-color: hsl(290 100% 80% / .65); box-shadow: inset 0 1px 0 hsl(300 100% 92% / .2), 0 0 20px -5px hsl(290 100% 70% / .8); }
+  .brick.ai.cracked { border-style: dashed; background: linear-gradient(180deg, hsl(290 100% 75% / .32), hsl(290 100% 70% / .12)); }
+  .brick.music { color: hsl(300 100% 95%); border-color: hsl(290 100% 80% / .45); }
+  .brick .pw { width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 8px var(--pc); flex: none; }
+  .ball { width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px #fff, 0 0 22px var(--cyan); }
+  .paddle { height: 12px; margin-top: -6px; border-radius: 6px; background: linear-gradient(90deg, hsl(190 100% 70%), #fff 50%, hsl(190 100% 70%)); box-shadow: 0 0 14px hsl(190 100% 70% / .9), 0 0 32px hsl(190 100% 60% / .45); transition: width .25s var(--ease), margin-left .25s var(--ease); }
+  .net { position: absolute; left: 12px; right: 12px; bottom: 10px; height: 2px; border-radius: 2px; background: var(--magenta); box-shadow: 0 0 10px var(--magenta), 0 0 22px hsl(290 100% 70% / .6); opacity: 0; transition: opacity .3s var(--ease); }
+  .net.on { opacity: 1; }
+  .cap { height: 26px; margin: -13px 0 0 0; padding: 0 10px; display: flex; align-items: center; gap: 6px; border-radius: 999px; font: 800 12px/1 var(--font-text); letter-spacing: .04em; color: hsl(222 45% 7%); background: var(--pc); box-shadow: 0 0 16px var(--pc); white-space: nowrap; }
+  .pop { font: 400 18px/1 var(--font-display); color: var(--green); text-shadow: 0 0 10px var(--green); pointer-events: none; white-space: nowrap; }
+  .powers { display: inline-flex; gap: .4rem; }
+  .powers span { padding: .2rem .5rem; border-radius: 999px; font-size: .68rem; letter-spacing: .06em; color: hsl(222 45% 7%); background: var(--pc); }
+  .lives i { display: inline-block; width: 8px; height: 8px; margin-left: 3px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+  .lives i.off { background: transparent; box-shadow: none; border: 1px solid var(--ink-3); }
+  .launch { position: absolute; z-index: 2; left: 50%; bottom: 64px; transform: translateX(-50%); font-size: .9rem; color: var(--ink-2); pointer-events: none; transition: opacity .3s var(--ease); white-space: nowrap; }
+  .sk-card .collected { margin-top: 1rem; max-height: 9.5rem; overflow: auto; font-size: .9rem; color: var(--cyan); line-height: 1.7; }
+  .sk-card .collected .dot { margin: 0 .35em; color: var(--ink-3); }
+  .legend { margin-top: 1rem; display: grid; gap: .35rem; text-align: left; font-size: .9rem; color: var(--ink-2); }
+  .legend b { display: inline-block; min-width: 9.5rem; padding: .1rem .5rem; margin-right: .5rem; border-radius: 999px; font-size: .74rem; color: hsl(222 45% 7%); background: var(--pc); text-align: center; }
+  .rm .ball, .rm .paddle { box-shadow: none; }
+  .sk-arena .sk-toast { top: auto; bottom: 62px; } /* above the paddle, clear of the HUD bar */
+</style>
+</head>
+<body>
+<p class="mock-note">Round 1 · A · Skill Breaker. The skills are the bricks: press Play and the AI words fly out of the list into level 1. Levels are the skill groups, AI first. AI bricks take two hits and drop their own power-ups. Mouse, touch drag or ← →; click, tap or Space launches; Esc exits.</p>
+
+<section class="section" id="skills" aria-labelledby="skills-h"></section>
+
+<script src="skills.js"></script>
+<script src="section.js"></script>
+<script>
+(() => {
+  const { mount, showArena, showList, reducedMotion, say, esc } = SECTION
+  const els = mount({ title: 'Round 1 · A · Skill Breaker', playLabel: 'Play Skill Breaker', hint: 'Break the bricks to collect the skills. AI bricks drop power-ups.', onPlay: start })
+  const GROUPS = SKILL_GROUPS
+  const TOTAL = SKILL_COUNT
+  const coarse = matchMedia('(pointer: coarse)').matches
+
+  let G = null // the running game
+
+  /* ---------- start / exit ---------- */
+  function start() {
+    // where the first level's words are in the list, to fly them into the wall
+    const from = new Map()
+    for (const el of els.list.querySelectorAll('[data-skill]')) from.set(el.dataset.skill, el.getBoundingClientRect())
+    showArena()
+    build()
+    G.from = from
+    measure()
+    startLevel(0, true)
+    els.arena.focus({ preventScroll: true })
+    // fit the whole arena on screen (the words keep flying: they're inside it)
+    els.arena.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' })
+  }
+  function exit() {
+    if (!G) return
+    cancelAnimationFrame(G.raf)
+    G.io.disconnect(); G.ro.disconnect()
+    removeEventListener('keydown', onKey); removeEventListener('keyup', onKeyUp)
+    document.removeEventListener('visibilitychange', onVis)
+    G = null
+    showList()
+  }
+
+  /* ---------- the arena ---------- */
+  function build() {
+    const a = els.arena
+    a.tabIndex = 0
+    a.setAttribute('role', 'application')
+    a.setAttribute('aria-label', 'Skill Breaker. Move the paddle with the mouse, touch or the arrow keys; Space launches; Escape exits.')
+    a.innerHTML = `
+      <div class="sk-hudbar" id="hud"><span>Level <b id="h-lv">1</b>/${GROUPS.length} · <b id="h-name"></b></span><span>Score <b id="h-score">0</b></span><span>Collected <b id="h-got">0</b>/${TOTAL}</span><span class="lives" id="h-lives" aria-label="lives"></span><span class="powers" id="h-pw"></span><span class="spacer"></span><button type="button" class="hbtn small exit" id="h-exit">✕ Exit</button></div>
+      <div class="layer" id="bricks"></div>
+      <div class="net" id="net"></div>
+      <div class="paddle" id="paddle"></div>
+      <div class="layer" id="balls"></div>
+      <div class="layer" id="caps"></div>
+      <canvas class="layer fx" id="fx"></canvas>
+      <div class="launch" id="launch">${coarse ? 'Tap to launch' : 'Click or press Space to launch'}<span id="launch-pw"> · AI bricks take two hits and drop power-ups</span></div>
+      <div class="sk-toast" id="toast"></div>`
+    const $ = (id) => a.querySelector('#' + id)
+    G = {
+      a, $, bricksEl: $('bricks'), ballsEl: $('balls'), capsEl: $('caps'), paddleEl: $('paddle'), netEl: $('net'), fx: $('fx'), ctx: $('fx').getContext('2d'),
+      W: 0, H: 0, lv: 0, score: 0, got: 0, lives: 3, collected: [],
+      bricks: [], balls: [], caps: [], sparks: [], powers: {}, net: false,
+      px: 0, pw: 120, keys: { l: false, r: false }, paused: false, visible: true, over: false, last: 0, raf: 0, scale: 1,
+    }
+    $('h-exit').addEventListener('click', exit)
+    a.addEventListener('pointermove', onPointer)
+    a.addEventListener('pointerdown', (e) => { onPointer(e); if (!e.target.closest('button')) launch() })
+    addEventListener('keydown', onKey); addEventListener('keyup', onKeyUp)
+    document.addEventListener('visibilitychange', onVis)
+    G.ro = new ResizeObserver(() => { measure(); layoutBricks(false) })
+    G.ro.observe(a)
+    G.io = new IntersectionObserver(([e]) => { G && (G.visible = e.isIntersecting) })
+    G.io.observe(a)
+    renderLives()
+  }
+  function measure() {
+    const r = G.a.getBoundingClientRect()
+    G.W = r.width; G.H = r.height
+    G.scale = Math.min(1.15, Math.max(0.7, G.W / 900))
+    const dpr = Math.min(2, devicePixelRatio || 1)
+    G.fx.width = G.W * dpr; G.fx.height = G.H * dpr
+    G.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    G.paddleY = G.H - 34
+    G.top = G.$('hud').offsetHeight + 6 // the wall starts under the HUD bar (it wraps on phones)
+    if (!G.px) G.px = G.W / 2
+    G.basePw = G.W < 640 ? 96 : 128
+    setPaddleWidth()
+  }
+
+  /* ---------- levels ---------- */
+  const font = () => `700 ${G.W < 640 ? 13 : 17}px Nunito, sans-serif`
+  function startLevel(i, fly) {
+    G.lv = i
+    const g = GROUPS[i]
+    G.$('h-lv').textContent = i + 1
+    G.$('h-name').textContent = g.name
+    G.bricksEl.innerHTML = ''
+    G.bricks = g.skills.map((s) => {
+      const el = document.createElement('div')
+      el.className = 'brick' + (g.id === 'ai' ? ' ai' : '') + (g.id === 'music' ? ' music' : '')
+      el.innerHTML = esc(s.name) + (s.power ? `<span class="pw" style="--pc:${POWERS[s.power].color}"></span>` : '')
+      G.bricksEl.appendChild(el)
+      return { el, name: s.name, power: s.power, hits: g.id === 'ai' ? 2 : 1, ai: g.id === 'ai', x: 0, y: 0, w: 0, h: 0, alive: true }
+    })
+    layoutBricks(true)
+    // the words fly in from the list (level 1) or drop in from above
+    const rm = reducedMotion()
+    const arenaR = G.a.getBoundingClientRect()
+    G.bricks.forEach((b, k) => {
+      b.el.style.transform = `translate3d(${b.x}px, ${b.y}px, 0)`
+      if (rm) return
+      const src = fly && G.from.get(b.name)
+      const fromT = src ? `translate3d(${src.left - arenaR.left}px, ${src.top - arenaR.top}px, 0)` : `translate3d(${b.x}px, ${b.y - 60}px, 0)`
+      b.el.animate([{ transform: fromT, opacity: src ? 1 : 0 }, { transform: `translate3d(${b.x}px, ${b.y}px, 0)`, opacity: 1 }], { duration: src ? 900 : 600, delay: k * (src ? 35 : 25), easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' })
+    })
+    resetBall()
+    G.$('launch-pw').hidden = g.id !== 'ai'
+    say(`Level ${i + 1}: ${g.name}, ${g.skills.length} skills.`)
+    if (!G.raf) { G.last = performance.now(); G.raf = requestAnimationFrame(loop) }
+  }
+  function layoutBricks(fresh) {
+    if (!G || !G.bricks.length) return
+    const ctx = G.ctx
+    ctx.font = font()
+    const pad = G.W < 640 ? 10 : 18, gap = G.W < 640 ? 6 : 10, bh = G.W < 640 ? 30 : 40, side = G.W < 640 ? 12 : 32
+    const maxW = G.W - side * 2
+    const rows = [[]]
+    let rowW = 0
+    for (const b of G.bricks) {
+      b.w = Math.ceil(ctx.measureText(b.name).width + pad * 2 + 2 + (b.power ? 15 : 0))
+      b.h = bh
+      if (rowW && rowW + gap + b.w > maxW) { rows.push([]); rowW = 0 }
+      rows[rows.length - 1].push(b)
+      rowW += (rowW ? gap : 0) + b.w
+    }
+    let y = G.top + 10
+    for (const row of rows) {
+      const w = row.reduce((n, b) => n + b.w, 0) + gap * (row.length - 1)
+      let x = (G.W - w) / 2
+      for (const b of row) { b.x = x; b.y = y; b.el.style.width = b.w + 'px'; if (!fresh) b.el.style.transform = `translate3d(${b.x}px, ${b.y}px, 0)`; x += b.w + gap }
+      y += bh + gap
+    }
+  }
+
+  /* ---------- balls, paddle, power-ups ---------- */
+  function newBall(x, y, vx, vy, stuck) {
+    const el = document.createElement('div')
+    el.className = 'ball'
+    G.ballsEl.appendChild(el)
+    const b = { el, x, y, vx, vy, r: 7, stuck }
+    G.balls.push(b)
+    return b
+  }
+  function resetBall() {
+    G.balls.forEach((b) => b.el.remove())
+    G.balls = []
+    newBall(G.px, G.paddleY - 14, 0, 0, true)
+    G.$('launch').style.opacity = 1
+  }
+  const speed = () => (reducedMotion() ? 330 : 420) * G.scale * (1 + Math.min(0.35, G.hitsThisLevel * 0.012 || 0))
+  function launch() {
+    if (!G || G.paused) return
+    const b = G.balls.find((b) => b.stuck)
+    if (!b) return
+    b.stuck = false
+    const ang = (Math.random() * 0.5 - 0.25)
+    b.vx = speed() * Math.sin(ang); b.vy = -speed() * Math.cos(ang)
+    G.$('launch').style.opacity = 0
+  }
+  function setPaddleWidth() {
+    G.pw = G.basePw * (G.powers.wide ? 1.6 : 1)
+    G.paddleEl.style.width = G.pw + 'px'
+    G.paddleEl.style.marginLeft = -G.pw / 2 + 'px'
+  }
+  function activate(kind) {
+    const P = POWERS[kind]
+    toast(`${P.label}: ${P.hint}`, P.color)
+    say(`${P.label}: ${P.hint}.`)
+    if (kind === 'multi') {
+      const src = G.balls.find((b) => !b.stuck) || G.balls[0]
+      const s = speed()
+      for (const d of [-0.45, 0.45]) {
+        const a = Math.atan2(src.vx || 0.01, -(src.vy || -1)) + d
+        newBall(src.x, src.y, s * Math.sin(a), -s * Math.cos(a), false)
+      }
+    } else if (kind === 'net') {
+      G.net = true; G.netEl.classList.add('on')
+    } else {
+      G.powers[kind] = kind === 'slow' ? 8 : 12
+      if (kind === 'wide') setPaddleWidth()
+    }
+    renderPowers()
+  }
+  function renderPowers() {
+    G.$('h-pw').innerHTML = Object.keys(G.powers).map((k) => `<span style="--pc:${POWERS[k].color}">${esc(POWERS[k].label)} ${Math.ceil(G.powers[k])}</span>`).join('') + (G.net ? `<span style="--pc:${POWERS.net.color}">Net</span>` : '')
+  }
+  function renderLives() {
+    G.$('h-lives').innerHTML = [0, 1, 2].map((i) => `<i class="${i < G.lives ? '' : 'off'}"></i>`).join('')
+    G.$('h-lives').setAttribute('aria-label', `${G.lives} lives`)
+  }
+
+  /* ---------- input ---------- */
+  function onPointer(e) {
+    if (!G) return
+    const r = G.a.getBoundingClientRect() // in the event, never in the frame
+    G.px = Math.max(G.pw / 2, Math.min(G.W - G.pw / 2, e.clientX - r.left))
+  }
+  function onKey(e) {
+    if (!G || e.metaKey || e.ctrlKey || e.altKey) return
+    if (e.key === 'Escape') { e.preventDefault(); exit(); return }
+    if (G.over || G.card) return
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { G.keys.l = true; e.preventDefault() }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { G.keys.r = true; e.preventDefault() }
+    if (e.key === ' ') { e.preventDefault(); launch() }
+  }
+  function onKeyUp(e) {
+    if (!G) return
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') G.keys.l = false
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') G.keys.r = false
+  }
+  const onVis = () => { if (G) G.visible = !document.hidden }
+
+  /* ---------- the frame ---------- */
+  function loop(t) {
+    if (!G) return
+    G.raf = requestAnimationFrame(loop)
+    let dt = Math.min(0.033, (t - G.last) / 1000)
+    G.last = t
+    if (!G.visible || G.paused || G.card) { drawSparks(G.visible ? dt : 0); return } // sparks keep fading under a card
+    if (G.powers.slow) dt *= 0.55
+    // powers tick down (on real time)
+    let changed = false
+    for (const k of Object.keys(G.powers)) { G.powers[k] -= Math.min(0.033, dt / (G.powers.slow ? 0.55 : 1)); if (G.powers[k] <= 0) { delete G.powers[k]; changed = true; if (k === 'wide') setPaddleWidth() } }
+    if (changed || Math.floor(t / 1000) !== G.lastSec) { G.lastSec = Math.floor(t / 1000); renderPowers() }
+    // paddle
+    const kv = (G.keys.r ? 1 : 0) - (G.keys.l ? 1 : 0)
+    if (kv) G.px = Math.max(G.pw / 2, Math.min(G.W - G.pw / 2, G.px + kv * 760 * G.scale * dt))
+    G.paddleEl.style.transform = `translate3d(${G.px}px, ${G.paddleY}px, 0)`
+    // balls (substeps keep fast balls from tunnelling through a brick)
+    const steps = 3
+    for (let s = 0; s < steps; s++) for (const b of G.balls) step(b, dt / steps)
+    G.balls = G.balls.filter((b) => !b.dead)
+    for (const b of G.balls) b.el.style.transform = `translate3d(${b.x}px, ${b.y}px, 0)`
+    if (!G.balls.length) loseLife()
+    // power-up capsules
+    for (const c of G.caps) {
+      c.y += 170 * G.scale * dt
+      c.el.style.transform = `translate3d(${c.x - c.w / 2}px, ${c.y}px, 0)`
+      if (c.y > G.paddleY - 14 && c.y < G.paddleY + 10 && Math.abs(c.x - G.px) < G.pw / 2 + c.w / 2) { c.dead = true; activate(c.kind) }
+      else if (c.y > G.H + 20) c.dead = true
+      if (c.dead) c.el.remove()
+    }
+    G.caps = G.caps.filter((c) => !c.dead)
+    drawSparks(dt)
+  }
+  function step(b, dt) {
+    if (b.stuck) { b.x = G.px; b.y = G.paddleY - 14; return }
+    b.x += b.vx * dt; b.y += b.vy * dt
+    if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) }
+    if (b.x > G.W - b.r) { b.x = G.W - b.r; b.vx = -Math.abs(b.vx) }
+    if (b.y < G.top + b.r) { b.y = G.top + b.r; b.vy = Math.abs(b.vy) }
+    // the paddle: the angle follows where it hits
+    if (b.vy > 0 && b.y + b.r >= G.paddleY - 6 && b.y < G.paddleY + 8 && Math.abs(b.x - G.px) <= G.pw / 2 + b.r) {
+      const off = Math.max(-1, Math.min(1, (b.x - G.px) / (G.pw / 2)))
+      const a = off * 1.05, s = speed()
+      b.vx = s * Math.sin(a); b.vy = -s * Math.cos(a); b.y = G.paddleY - 6 - b.r
+    }
+    // the bottom: the net saves one ball
+    if (b.y > G.H - 12) {
+      if (G.net) { G.net = false; G.netEl.classList.remove('on'); b.vy = -Math.abs(b.vy); b.y = G.H - 13; renderPowers() }
+      else if (b.y > G.H + 20) b.dead = true
+    }
+    // bricks
+    for (const k of G.bricks) {
+      if (!k.alive) continue
+      const cx = Math.max(k.x, Math.min(b.x, k.x + k.w)), cy = Math.max(k.y, Math.min(b.y, k.y + k.h))
+      const dx = b.x - cx, dy = b.y - cy
+      if (dx * dx + dy * dy > b.r * b.r) continue
+      // reflect on the shallower axis
+      const ox = Math.min(Math.abs(b.x - k.x), Math.abs(k.x + k.w - b.x)), oy = Math.min(Math.abs(b.y - k.y), Math.abs(k.y + k.h - b.y))
+      if (ox < oy) b.vx = b.x < k.x + k.w / 2 ? -Math.abs(b.vx) : Math.abs(b.vx)
+      else b.vy = b.y < k.y + k.h / 2 ? -Math.abs(b.vy) : Math.abs(b.vy)
+      hit(k)
+      break
+    }
+  }
+  function hit(k) {
+    G.hitsThisLevel = (G.hitsThisLevel || 0) + 1
+    k.hits--
+    if (!reducedMotion()) k.el.animate([{ filter: 'brightness(2.2)' }, { filter: 'brightness(1)' }], { duration: 220 })
+    if (k.hits > 0) { k.el.classList.add('cracked'); return }
+    k.alive = false
+    const pts = (k.ai ? 250 : 100) * (G.powers.double ? 2 : 1)
+    G.score += pts
+    G.got++
+    G.collected.push(k.name)
+    G.$('h-score').textContent = G.score.toLocaleString('en-US')
+    G.$('h-got').textContent = G.got
+    burst(k.x + k.w / 2, k.y + k.h / 2, k.ai ? 'hsl(290 100% 78%)' : 'hsl(190 100% 75%)')
+    pop(k.x + k.w / 2, k.y, `+${pts}`)
+    toast(`+ ${k.name}`)
+    k.el.remove()
+    if (k.power) dropCap(k)
+    if (G.bricks.every((b) => !b.alive)) levelClear()
+  }
+  function dropCap(k) {
+    const P = POWERS[k.power]
+    const el = document.createElement('div')
+    el.className = 'cap'
+    el.style.setProperty('--pc', P.color)
+    el.textContent = P.label
+    G.capsEl.appendChild(el)
+    const w = Math.ceil(G.ctx.measureText(P.label).width + 24)
+    G.caps.push({ el, kind: k.power, x: k.x + k.w / 2, y: k.y + k.h, w })
+  }
+  function loseLife() {
+    G.lives--
+    renderLives()
+    G.powers = {}; setPaddleWidth(); renderPowers()
+    G.caps.forEach((c) => c.el.remove()); G.caps = []
+    if (G.lives <= 0) return gameOver()
+    say(`Missed. ${G.lives} ${G.lives === 1 ? 'life' : 'lives'} left.`)
+    resetBall()
+  }
+
+  /* ---------- cards ---------- */
+  function card(html, onGo) {
+    const c = document.createElement('div')
+    c.className = 'sk-card'
+    c.innerHTML = `<div class="panel">${html}</div>`
+    G.a.appendChild(c)
+    G.card = c
+    const btns = c.querySelectorAll('button')
+    btns[0] && btns[0].focus({ preventScroll: true })
+    c.addEventListener('click', (e) => {
+      const b = e.target.closest('button')
+      if (!b) return
+      if (b.dataset.act === 'list') return exit()
+      c.remove(); G.card = null; onGo(b.dataset.act)
+    })
+  }
+  const collectedList = (names) => `<p class="collected">${names.map(esc).join('<span class="dot" aria-hidden="true">·</span> ')}</p>`
+  function levelClear() {
+    const g = GROUPS[G.lv]
+    G.balls.forEach((b) => b.el.remove()); G.balls = []
+    G.caps.forEach((c) => c.el.remove()); G.caps = []
+    G.hitsThisLevel = 0
+    const next = GROUPS[G.lv + 1]
+    if (!next) return victory()
+    say(`Level ${G.lv + 1} cleared: ${g.name}.`)
+    card(`<p class="k">Level ${G.lv + 1} cleared</p><h3>${esc(g.name)}</h3>${collectedList(g.skills.map((s) => s.name))}<p>Next: <b>${esc(next.name)}</b></p><div class="row"><button type="button" class="hbtn primary" data-act="go">Level ${G.lv + 2} →</button><button type="button" class="hbtn" data-act="list">Back to the list</button></div>`, () => startLevel(G.lv + 1, false))
+  }
+  function victory() {
+    G.over = true
+    say(`Full stack collected. Score ${G.score}.`)
+    card(`<p class="k">All ${TOTAL} skills collected</p><h3>Full stack, collected</h3><p>Score <b>${G.score.toLocaleString('en-US')}</b></p><div class="row"><button type="button" class="hbtn primary" data-act="again">Play again</button><button type="button" class="hbtn" data-act="list">Back to the list</button></div>`, () => restart())
+  }
+  function gameOver() {
+    G.over = true
+    say(`Game over. ${G.got} of ${TOTAL} skills collected.`)
+    card(`<p class="k">Game over</p><h3>${G.got}/${TOTAL} skills collected</h3><p>Score <b>${G.score.toLocaleString('en-US')}</b> · reached level ${G.lv + 1}, ${esc(GROUPS[G.lv].name)}</p>${G.collected.length ? collectedList(G.collected) : ''}<div class="row"><button type="button" class="hbtn primary" data-act="again">Play again</button><button type="button" class="hbtn" data-act="list">Back to the list</button></div>`, () => restart())
+  }
+  function restart() {
+    Object.assign(G, { score: 0, got: 0, lives: 3, collected: [], powers: {}, net: false, over: false, hitsThisLevel: 0 })
+    G.netEl.classList.remove('on')
+    G.$('h-score').textContent = '0'; G.$('h-got').textContent = '0'
+    renderLives(); renderPowers(); setPaddleWidth()
+    startLevel(0, false)
+  }
+
+  /* ---------- juice ---------- */
+  function burst(x, y, color) {
+    if (reducedMotion()) return
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * Math.PI * 2, s = 80 + Math.random() * 220
+      G.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60, life: 0.5 + Math.random() * 0.35, t: 0, color })
+    }
+  }
+  function drawSparks(dt) {
+    const c = G.ctx
+    c.clearRect(0, 0, G.W, G.H)
+    if (!G.sparks.length) return
+    c.globalCompositeOperation = 'lighter'
+    for (const p of G.sparks) {
+      p.t += dt; p.vy += 420 * dt; p.x += p.vx * dt; p.y += p.vy * dt
+      const k = 1 - p.t / p.life
+      if (k <= 0) continue
+      c.globalAlpha = k
+      c.fillStyle = p.color
+      c.fillRect(p.x - 1.5, p.y - 1.5, 3, 3)
+    }
+    c.globalAlpha = 1
+    c.globalCompositeOperation = 'source-over'
+    G.sparks = G.sparks.filter((p) => p.t < p.life)
+  }
+  function pop(x, y, text) {
+    if (reducedMotion()) return
+    const el = document.createElement('div')
+    el.className = 'pop'
+    el.textContent = text
+    G.a.appendChild(el)
+    el.animate([{ transform: `translate3d(${x - 20}px, ${y}px, 0)`, opacity: 1 }, { transform: `translate3d(${x - 20}px, ${y - 46}px, 0)`, opacity: 0 }], { duration: 800, easing: 'cubic-bezier(.2,.7,.2,1)' }).onfinish = () => el.remove()
+  }
+  let toastT = 0
+  function toast(text, color) {
+    const t = G.$('toast')
+    t.textContent = text
+    t.style.borderColor = color || ''
+    t.classList.add('on')
+    clearTimeout(toastT)
+    toastT = setTimeout(() => t.classList.remove('on'), 1100)
+  }
+
+  // mockup-only handle for scripted checks: break every brick, or lose every life
+  window.__breaker = { clear: () => G && G.bricks.filter((b) => b.alive).forEach((b) => { b.hits = 1; hit(b) }), lose: () => { if (!G) return; G.lives = 1; G.balls.forEach((b) => b.el.remove()); G.balls = []; loseLife() } }
+})()
+</script>
+</body>
+</html>

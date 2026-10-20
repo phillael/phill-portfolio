@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Sound Lab</title>
+<link rel="stylesheet" href="../experience-refresh/round2/hud.css">
+<style>
+  /* ===== The Sound lab: every sound in the Skill blaster, with every setting on a slider ===== */
+  body { min-height: 100vh; }
+  .mock-bar { position: static; } /* the transport is the sticky bar on this page */
+  .mock-bar a.mb { display: inline-flex; align-items: center; min-height: 32px; padding: 0 .7rem; border-radius: 6px; text-decoration: none; border: 1px dashed hsl(42 100% 62% / .5); }
+  .lab { --c: 190 100% 75%; max-width: 78rem; margin: 0 auto; padding: 1.6rem 16px 5rem; }
+  .lab-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1rem 2rem; }
+  .lab-head > div { flex: 1 1 28rem; }
+  .lab-title { margin-top: .55rem; font: 400 clamp(2rem, 5vw, 3rem)/1.05 var(--font-display); color: #fff; text-shadow: 0 0 8px hsl(190 100% 70% / .55), 0 0 28px hsl(190 100% 60% / .35); }
+  .lab-lede { margin-top: .6rem; max-width: 46rem; color: var(--ink-2); font-size: 1rem; }
+  .tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .tstatus { flex-basis: 100%; text-align: right; font-size: .82rem; color: var(--ink-3); min-height: 1.2em; }
+  .tstatus.flash { color: var(--green); }
+  .tstatus.err { color: hsl(355 100% 74%); }
+
+  /* buttons: glass pills, a toggle lights in its colour */
+  .tbtn {
+    display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; padding: 0 1rem; border-radius: 999px; cursor: pointer;
+    font: 700 .88rem/1 var(--font-text); color: var(--ink); background: transparent; border: 1px solid var(--hair-strong); white-space: nowrap;
+    transition: border-color .2s var(--ease), background .2s var(--ease), box-shadow .2s var(--ease); -webkit-tap-highlight-color: transparent;
+  }
+  .tbtn:hover { border-color: hsl(var(--tc, 190 100% 75%)); }
+  .tbtn[aria-pressed="true"] { color: #fff; border-color: hsl(var(--tc, 190 100% 75%)); background: hsl(var(--tc, 190 100% 75%) / .15); box-shadow: 0 0 14px -2px hsl(var(--tc, 190 100% 75%) / .6); }
+  .tbtn svg { width: 15px; height: 15px; flex: none; }
+  .tbtn.sure { color: hsl(355 100% 80%); border-color: hsl(355 100% 66% / .7); background: hsl(355 100% 60% / .12); }
+  .tbtn .k { font-weight: 600; font-size: .72rem; color: var(--ink-3); letter-spacing: .06em; }
+  #beat .on, #beat[aria-pressed="true"] .off { display: none; }
+  #beat[aria-pressed="true"] .on { display: block; }
+
+  /* the transport: the beat, autoplay, the chord, a scope of the output, the original for comparison */
+  .transport {
+    position: sticky; top: 8px; z-index: 30; margin-top: 1.4rem; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem;
+    padding: 7px 10px; border-radius: 26px; background: hsl(220 30% 5% / .9); border: 1px solid var(--hair-strong);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 12px 32px -16px hsl(190 100% 50% / .45);
+  }
+  .transport select { min-height: 44px; max-width: 15rem; padding: 0 .6rem; border-radius: 12px; font: 600 .88rem/1 var(--font-text); color: var(--ink); background: hsl(220 30% 8%); border: 1px solid var(--hair-strong); }
+  .beats4 { display: inline-flex; gap: 5px; }
+  .beats4 i { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1px hsl(190 100% 75% / .45); }
+  .beats4 i.on { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .busy { display: inline-flex; align-items: center; gap: .5rem; font: 700 .74rem/1 var(--font-text); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+  .busy input { width: 92px; --c: 190 100% 75%; }
+  .chord { display: inline-flex; align-items: baseline; gap: .55rem; font: 700 .74rem/1 var(--font-text); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+  .chord b { display: inline-block; min-width: 5.6ch; font: 400 1.05rem/1 var(--font-display); letter-spacing: 0; text-transform: none; color: hsl(260 100% 88%); text-shadow: 0 0 12px hsl(260 100% 70% / .6); }
+  .tsp { flex: 1; }
+  .scope { position: relative; width: 150px; height: 40px; }
+  .scope canvas { display: block; width: 100%; height: 100%; }
+  .scope .clip { position: absolute; right: 2px; top: 0; font: 800 .62rem/1 var(--font-text); letter-spacing: .14em; color: hsl(355 100% 70%); opacity: 0; }
+  .scope.clipping .clip { opacity: 1; }
+  #compare { --tc: 45 100% 65%; }
+
+  /* the paste box */
+  .paste { margin-top: .9rem; padding: 14px 16px; border-radius: 18px; background: hsl(200 40% 10% / .45); border: 1px solid var(--hair); }
+  .paste label { font-weight: 700; font-size: .9rem; color: var(--ink-2); }
+  .paste textarea { display: block; width: 100%; margin-top: .5rem; min-height: 8rem; padding: 10px 12px; border-radius: 12px; resize: vertical; font: 500 .85rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); background: hsl(220 30% 4% / .8); border: 1px solid var(--hair-strong); }
+  .paste .row { display: flex; gap: .5rem; margin-top: .6rem; }
+
+  /* the parts: a rail on wide screens, a strip on phones */
+  .lab-body { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); gap: 2.25rem; margin-top: 1.8rem; align-items: start; }
+  .parts { position: sticky; top: 92px; display: grid; gap: 3px; }
+  .prow { --c: 190 100% 75%; display: flex; align-items: center; gap: 4px; }
+  .ptab {
+    flex: 1; min-width: 0; display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; column-gap: .7rem; align-items: center; min-height: 54px; padding: 6px 12px;
+    border-radius: 16px; text-align: left; cursor: pointer; color: var(--ink-2); background: transparent; border: 1px solid transparent;
+    transition: background .2s var(--ease), border-color .2s var(--ease);
+  }
+  .ptab:hover { background: hsl(var(--c) / .05); }
+  .ptab .dot { grid-row: 1 / 3; width: 9px; height: 9px; border-radius: 50%; background: hsl(var(--c)); box-shadow: 0 0 8px hsl(var(--c) / .8); }
+  .ptab .pn { font: 700 1rem/1.2 var(--font-text); color: var(--ink); }
+  .ptab .pg { grid-column: 2; font-size: .78rem; line-height: 1.25; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ptab .pc { grid-row: 1 / 3; grid-column: 3; padding: 3px 7px; border-radius: 999px; font: 800 .7rem/1 var(--font-text); color: hsl(var(--c)); background: hsl(var(--c) / .13); }
+  .ptab .pc:empty { display: none; }
+  .ptab[aria-current="true"] { background: hsl(var(--c) / .09); border-color: hsl(var(--c) / .38); }
+  .ptab[aria-current="true"] .pn { color: #fff; text-shadow: 0 0 10px hsl(var(--c) / .65); }
+  .ptab.hot .dot { background: #fff; box-shadow: 0 0 6px #fff, 0 0 14px hsl(var(--c)); }
+  .prow.off .ptab .pn, .prow.off .ptab .dot { opacity: .45; }
+  .ms {
+    display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; cursor: pointer; padding: 0;
+    font: 800 .76rem/1 var(--font-text); color: var(--ink-3); background: transparent; border: 1px solid var(--hair); -webkit-tap-highlight-color: transparent;
+  }
+  .ms:hover { color: var(--ink); border-color: var(--hair-strong); }
+  .ms.m[aria-pressed="true"] { color: hsl(355 100% 80%); border-color: hsl(355 100% 66% / .65); background: hsl(355 100% 60% / .13); }
+  .ms.s[aria-pressed="true"] { color: hsl(45 100% 76%); border-color: hsl(45 100% 60% / .65); background: hsl(45 100% 60% / .13); }
+  .ms.gap { visibility: hidden; }
+
+  /* the panel: the part's name, what it is, its skills to play, then every setting */
+  .panel { --c: 190 100% 75%; min-width: 0; }
+  .ph { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+  .pt { font: 400 clamp(1.7rem, 3.6vw, 2.3rem)/1.1 var(--font-display); color: #fff; text-shadow: 0 0 8px hsl(var(--c)), 0 0 24px hsl(var(--c) / .7); }
+  .ph .pg { font: 700 .76rem/1 var(--font-text); letter-spacing: .2em; text-transform: uppercase; color: var(--ink-3); }
+  .ph .pact { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .ph .pact .ms { display: none; }
+  .ph .nchg { font-size: .82rem; color: hsl(var(--c)); }
+  .about { margin-top: .55rem; max-width: 46rem; color: var(--ink-2); }
+  .pads-box { margin-top: 1.2rem; padding: 12px 16px 10px; border-radius: 20px; background: linear-gradient(180deg, hsl(var(--c) / .05), transparent 60%), hsl(200 40% 10% / .4); border: 1px solid hsl(var(--c) / .2); }
+  .pads-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem 1rem; font: 700 .72rem/1 var(--font-text); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
+  .pads-bar .opts { margin: 0; }
+  .pads-bar label.chk { display: inline-flex; align-items: center; gap: .45rem; min-height: 40px; cursor: pointer; letter-spacing: .06em; text-transform: none; font-size: .82rem; font-weight: 600; }
+  .pads-bar input[type="checkbox"] { width: 17px; height: 17px; accent-color: hsl(var(--c)); }
+  .pads { display: flex; flex-wrap: wrap; align-items: center; gap: 0; margin: .25rem 0 0; padding: 0; list-style: none; }
+  .pads li { display: inline-flex; align-items: center; }
+  .pads li:not(:last-child):not(.eol)::after { content: '·'; color: var(--ink-3); opacity: .5; } /* no dot at the end of a line */
+  .pad {
+    min-height: 44px; padding: 0 .55rem; border: 0; border-radius: 10px; cursor: pointer; background: none;
+    font: 600 1.02rem/1 var(--font-text); color: var(--ink-2); transition: color .15s, text-shadow .15s; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  .pad:hover { color: #fff; text-shadow: 0 0 10px hsl(var(--c) / .8); }
+  .pad small { margin-left: .4rem; font-size: .74rem; font-weight: 700; color: hsl(var(--c)); }
+  .pad.hot { color: #fff; text-shadow: 0 0 8px hsl(var(--c)), 0 0 20px hsl(var(--c)); transition: none; }
+  .hint { margin-top: .35rem; font-size: .8rem; color: var(--ink-3); }
+
+  .secs { margin-top: 1.9rem; display: grid; gap: 2rem 2.4rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); align-items: start; }
+  .sec h3 { padding-bottom: .55rem; font: 700 .74rem/1 var(--font-text); letter-spacing: .22em; text-transform: uppercase; color: hsl(var(--c)); border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, hsl(var(--c) / .45), transparent) 1; }
+
+  /* one setting: its name, its value (in the part's colour once changed, with ↺ to go back), a slider
+     whose small tick marks where it started */
+  .ctl { position: relative; margin-top: .6rem; }
+  .cl { display: flex; align-items: center; gap: .5rem; min-height: 24px; font-size: .9rem; }
+  .cl label, .seg legend > span { color: var(--ink-2); font-weight: 600; }
+  .cl output { margin-left: auto; font-weight: 700; color: var(--ink); font-feature-settings: 'tnum' 1; white-space: nowrap; }
+  .ctl.changed .cl output { color: hsl(var(--c)); }
+  .rst {
+    display: grid; place-items: center; width: 44px; height: 44px; margin: -10px -12px -10px -10px; flex: none; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+    background: none; color: hsl(var(--c)); font: 700 1rem/1 var(--font-text);
+  }
+  .rst svg { width: 15px; height: 15px; }
+  .ctl:not(.changed) .rst, .seg:not(.changed) .rst { visibility: hidden; }
+  .trk { position: relative; }
+  .trk::after { /* where the setting started */
+    content: ''; position: absolute; top: 50%; left: calc(9px + (100% - 18px) * var(--dn)); width: 2px; height: 11px; margin: -5.5px 0 0 -1px; border-radius: 1px;
+    background: hsl(0 0% 100% / .4); pointer-events: none;
+  }
+  .ctl:not(.changed) .trk::after { opacity: 0; }
+  input[type="range"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 30px; margin: 0; background: transparent; cursor: pointer; touch-action: pan-y; }
+  input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, hsl(var(--c) / .9) 0 calc(9px + (100% - 18px) * var(--pn, 0)), hsl(190 100% 75% / .16) 0); }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; border: 0; background: #f2ffff; box-shadow: 0 0 0 4px hsl(var(--c) / .16), 0 0 12px hsl(var(--c) / .65); }
+  input[type="range"]::-moz-range-track { height: 4px; border-radius: 4px; background: hsl(190 100% 75% / .16); }
+  input[type="range"]::-moz-range-progress { height: 4px; border-radius: 4px; background: hsl(var(--c) / .9); }
+  input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; border: 0; background: #f2ffff; box-shadow: 0 0 0 4px hsl(var(--c) / .16), 0 0 12px hsl(var(--c) / .65); }
+  input[type="range"]:focus-visible { outline: none; }
+  input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--cyan); }
+  input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--cyan); }
+
+  /* a choice: a row of pills */
+  .seg { margin: .75rem 0 0; padding: 0; border: 0; min-width: 0; }
+  .seg legend { display: flex; align-items: center; gap: .5rem; width: 100%; padding: 0; min-height: 24px; font-size: .9rem; }
+  .seg legend .rst { margin-left: auto; }
+  .seg.changed legend > span::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: .45rem; border-radius: 50%; background: hsl(var(--c)); box-shadow: 0 0 6px hsl(var(--c)); vertical-align: .12em; }
+  .opts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: .35rem; }
+  .opts label { position: relative; display: inline-flex; }
+  .opts input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .opts span { display: inline-flex; align-items: center; min-height: 36px; padding: 0 .8rem; border-radius: 999px; border: 1px solid var(--hair); font: 700 .82rem/1 var(--font-text); color: var(--ink-2); transition: background .15s, border-color .15s; }
+  .opts label:hover span { border-color: var(--hair-strong); color: var(--ink); }
+  .opts input:checked + span { color: #fff; border-color: hsl(var(--c) / .75); background: hsl(var(--c) / .16); box-shadow: 0 0 12px -3px hsl(var(--c) / .85); }
+  .opts input:focus-visible + span { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  @media (pointer: coarse) { /* touch: every target at least 44px */
+    input[type="range"] { height: 44px; }
+    .opts span, .ms { min-height: 44px; }
+    .ms { width: 44px; height: 44px; }
+  }
+  @media (max-width: 900px) {
+    .lab-body { grid-template-columns: minmax(0, 1fr); gap: 1.2rem; }
+    .parts { position: static; display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+    .parts::-webkit-scrollbar { display: none; }
+    .prow { flex: none; }
+    .prow .ms { display: none; }
+    .ptab { min-height: 44px; grid-template-columns: 10px auto auto; padding: 0 12px; border-color: var(--hair); white-space: nowrap; }
+    .ptab .pg { display: none; }
+    .ptab .dot { grid-row: auto; }
+    .ptab .pc { grid-row: auto; }
+    .ph .pact .ms { display: grid; }
+  }
+  @media (max-width: 640px) {
+    .transport { top: 6px; padding: 6px 8px; gap: .4rem .5rem; border-radius: 22px; }
+    .transport select { max-width: 9.5rem; }
+    .scope, .tsp, .beats4, .busy, .chord { display: none; } /* two rows at most: the beat, its pattern, autoplay, the original */
+    .transport select { max-width: 8.8rem; }
+    .tbtn { padding: 0 .85rem; }
+    .tbtn .k { display: none; }
+    .tstatus { text-align: left; }
+  }
+  html.rm .pad, html.rm .ptab { transition: none; }
+  .lab[data-bank="jelly"] .sk-only { display: none; }
+  .bank { margin-top: 1rem; }
+  .bank span { min-height: 44px; padding: 0 1.15rem; font-size: .92rem; }
+  .bank input:checked + span { --c: 190 100% 75%; }
+  .lab.comparing .secs { opacity: .55; }
+  .lab.comparing .secs:hover { opacity: .8; }
+</style>
+</head>
+<body>
+<div class="mock-bar">
+  <a href="../skills-game/round6/blaster-synth.html">← Round 6 game</a>
+  <span class="mock-title">Sound lab</span>
+  <span class="spacer"></span>
+  <a class="mb" href="../skills-game/round6/blaster-synth.html" target="_blank" rel="noopener">Open the game in a new tab ↗</a>
+  <label><input type="checkbox" data-t="rm"> Reduced motion</label>
+</div>
+
+<main class="lab" id="lab">
+  <div class="lab-head">
+    <div>
+      <p class="eyebrow">phillcodes.com</p>
+      <h1 class="lab-title">Sound lab</h1>
+      <div class="opts bank" role="radiogroup" aria-label="Which sounds">
+        <label><input type="radio" name="bank" value="skills"><span>Skill blaster</span></label>
+        <label><input type="radio" name="bank" value="jelly"><span>Jelly resume</span></label>
+      </div>
+      <p class="lab-lede">Every sound is synthesized live: oscillators, filters, envelopes and noise, no samples. Change anything and it’s saved in this browser (the Skill blaster mockup picks it up, live if it’s open in another tab). When it sounds right, <b>Copy patch</b> and send it over.</p>
+    </div>
+    <div class="tools">
+      <button type="button" class="tbtn" id="copy">Copy patch</button>
+      <button type="button" class="tbtn" id="paste-open" aria-expanded="false" aria-controls="paste">Paste</button>
+      <button type="button" class="tbtn" id="reset-all">Reset all</button>
+      <p class="tstatus" id="tstatus" role="status"></p>
+    </div>
+  </div>
+
+  <div class="paste" id="paste" hidden>
+    <label for="paste-t">Paste a patch (the JSON that Copy patch gives you)</label>
+    <textarea id="paste-t" spellcheck="false" autocomplete="off"></textarea>
+    <div class="row"><button type="button" class="tbtn" id="paste-apply">Apply</button><button type="button" class="tbtn" id="paste-cancel">Cancel</button></div>
+  </div>
+
+  <div class="transport" role="group" aria-label="Transport">
+    <button type="button" class="tbtn sk-only" id="beat" aria-pressed="false">
+      <svg class="off" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
+      <svg class="on" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5" fill="currentColor"/></svg>
+      Beat <span class="k" aria-hidden="true">B</span>
+    </button>
+    <select id="level" class="sk-only" aria-label="Beat pattern"></select>
+    <span class="beats4 sk-only" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    <button type="button" class="tbtn sk-only" id="auto" aria-pressed="false" title="Plays skills for you, like a player would">Autoplay <span class="k" aria-hidden="true">A</span></button>
+    <label class="busy sk-only"><span>Busy</span><input type="range" id="busy" min="0" max="1" step="0.05" value="0.5" aria-label="How busy autoplay is"></label>
+    <span class="chord sk-only">Chord <b id="chord">Dm9</b></span>
+    <span class="tsp"></span>
+    <span class="scope" aria-hidden="true"><canvas id="scope"></canvas><span class="clip">CLIP</span></span>
+    <button type="button" class="tbtn" id="compare" aria-pressed="false" title="Hear the sound as it shipped, without your changes">Original <span class="k" aria-hidden="true">O</span></button>
+  </div>
+
+  <div class="lab-body">
+    <nav class="parts" id="parts" aria-label="Sounds"></nav>
+    <section class="panel" id="panel" aria-labelledby="panel-h"></section>
+  </div>
+</main>
+<p class="sr-only" aria-live="polite" id="live"></p>
+
+<script src="../skills-game/skills.js"></script>
+<script src="../skills-game/round6/synth.js"></script>
+<script src="jelly-sfx.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skills Round 2</title>
+<link rel="stylesheet" href="../../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="../skills.css">
+<style>
+  .dirs { margin-top: clamp(3rem, 7vw, 4.5rem); list-style: none; padding: 0; }
+  .dirs li + li { border-top: 1px solid transparent; border-image: linear-gradient(90deg, var(--hair-strong), transparent) 1; }
+  .dirs a { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; gap: 1.25rem; align-items: baseline; padding: 1.6rem 0; text-decoration: none; color: var(--ink); }
+  .dirs .k { font: 400 1.4rem/1 var(--font-display); color: var(--cyan); text-shadow: 0 0 14px hsl(190 100% 70% / .4); }
+  .dirs h2 { font: 400 1.45rem/1.2 var(--font-display); color: #fff; }
+  .dirs p { margin-top: .4rem; color: var(--ink-2); }
+  .dirs .try { margin-top: .5rem; font-size: .92rem; color: var(--ink-3); }
+  .dirs .try b { color: var(--ink-2); font-weight: 700; }
+  .dirs .go { color: var(--cyan); font-weight: 700; white-space: nowrap; }
+  .dirs a:hover h2, .dirs a:focus-visible h2 { text-shadow: 0 0 16px hsl(190 100% 70% / .5); }
+  .cols { margin-top: clamp(3.5rem, 8vw, 5rem); display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+  .cols .hud { padding: 1.75rem; }
+  .cols h3 { font: 700 .78rem/1 var(--font-text); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-3); }
+  .cols ul { margin: 1rem 0 0; padding-left: 1.1rem; display: grid; gap: .6rem; color: var(--ink-2); }
+  .cols li strong { color: var(--ink); }
+  @media (max-width: 520px) { .dirs a { grid-template-columns: 2.2rem minmax(0, 1fr); } .dirs .go { display: none; } }
+</style>
+</head>
+<body>
+<section class="section" aria-labelledby="t">
+  <p class="eyebrow cyan">Skills rethink · Round 2</p>
+  <h1 class="title neon-purple" id="t">Stumble on it</h1>
+  <p class="lede">Each one starts as the section you loved: the AI glass panel and the quiet group lines. No Play button, no game window. It reads like a list until you click something. Open each one and scroll in the way a visitor would.</p>
+
+  <ul class="dirs">
+    <li><a href="a-live.html"><span class="k">A</span><span><h2>Live skills</h2><p>Every skill does what it says, right where it sits. Human-in-the-loop asks you to approve an action, and approving it really sorts the panel. Structured outputs prints itself as JSON, SSE streaming re-streams the panel, PHI guardrails redacts a student’s name, and Prompt caching is slow once and instant the second time. Below the panel: Three.js spins in 3D, Docker gets boxed, Colyseus lets Player 2 in, Guitar plays a lick. 58 of the 81 have a trick; the rest answer with a small ping.</p><p class="try">Try: <b>Human-in-the-loop</b>, <b>Prompt caching</b> twice, <b>Colyseus</b>, <b>CSS</b>, <b>Spanish</b>, <b>Audit logging</b> last.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="b-alchemy.html"><span class="k">B</span><span><h2>Skill alchemy</h2><p>Click a skill and threads light up toward the skills it pairs with. Click a partner and the two fuse into a win from your career, with its real number: Anthropic SDK + MCP servers → the marketing platform in ~5 wks; Composition + Game audio → ECO’s 314K. 14 combos, each sourced from career.ts or resume.ts. The ones you find stay in a quiet Combos strip.</p><p class="try">Try: <b>Prompt caching</b>, then follow its thread.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="c-magnetic.html"><span class="k">C</span><span><h2>Magnetic words</h2><p>The old exploding chips, grown up. Words lean toward your cursor like iron filings. A click pops one loose with sparks, points and a combo; it tumbles and piles up at the bottom, then drifts home. Grab one and throw it. A faint ghost holds each word’s place, so the list always reads.</p><p class="try">Try: move slowly over a line, then pop five fast.</p></span><span class="go">Open →</span></a></li>
+    <li><a href="d-synth.html"><span class="k">D</span><span><h2>Skill synth</h2><p>Every skill is a key and every group an instrument on one scale: the AI panel rings like bells, Backend is the bass, Music & more is a plucked guitar. Silent until your first click. There’s a hidden phrase that starts one of your tracks in the site’s player.</p><p class="try">Try: sound on, play around for a bit, and watch for the hint.</p></span><span class="go">Open →</span></a></li>
+  </ul>
+
+  <div class="cols">
+    <div class="hud">
+      <h3>Same in all four</h3>
+      <ul>
+        <li>The list is the content: every skill is a real button with its text, so recruiters, search and screen readers get the same list.</li>
+        <li>Keyboard works throughout, touch targets are 44px, and reduced motion means nothing moves on its own (the Reduced motion box in the bar fakes the setting).</li>
+        <li>No loop runs while nothing is happening.</li>
+        <li><a href="base.html">The plain section</a> with no behavior, for comparison.</li>
+      </ul>
+    </div>
+    <div class="hud">
+      <h3>Mixes that work</h3>
+      <ul>
+        <li><strong>A + B:</strong> the AI panel does live demos, and the groups combine into wins.</li>
+        <li><strong>A + D:</strong> the music line plays (Guitar already does in A).</li>
+        <li><strong>C under anything:</strong> the lean-toward-the-cursor alone, as the hint that the words are alive.</li>
+      </ul>
+    </div>
+    <div class="hud">
+      <h3>For you</h3>
+      <ul>
+        <li>Which one, or which mix?</li>
+        <li>Anything that felt off, too much, or not fun enough?</li>
+        <li>Then I write the plan and the loop prompt, and the build goes to a fresh session.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</body>
+</html>

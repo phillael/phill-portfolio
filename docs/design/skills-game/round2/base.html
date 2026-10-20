@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skills Base</title>
+<link rel="stylesheet" href="../../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="../skills.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<section class="section" id="skills" aria-labelledby="skills-h"></section>
+<script src="../skills.js"></script>
+<script src="base.js"></script>
+<script>
+  const s = SECTION2.mount({ title: 'Round 2 · the shared section (no behavior)' })
+  const f = SECTION2.found({ total: 81, label: 'found' })
+  s.words.forEach((w) => w.el.addEventListener('click', () => { f.add(w.name); SECTION2.say(w.name) }))
+</script>
+</body>
+</html>

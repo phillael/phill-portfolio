@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Type Invaders</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="skills.css">
+<style>
+  /* the arena: ~16:10 on desktop, a tall card on phones */
+  #sk-arena { aspect-ratio: 16 / 10; min-height: 520px; max-height: calc(100vh - 140px);
+    background: radial-gradient(120% 80% at 50% 115%, hsl(190 100% 50% / .12), transparent 60%), linear-gradient(180deg, hsl(220 30% 5% / .75), hsl(205 40% 6% / .6)); }
+  @media (max-width: 639px) { #sk-arena { aspect-ratio: auto; height: 560px; min-height: 0; max-height: none; } }
+  #sk-arena:focus { outline: none; }
+  #sk-arena:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+
+  /* the words march inside the field (clipped under the HUD bar, so new rows slide in from the top) */
+  .ti-field { position: absolute; left: 0; right: 0; top: 48px; bottom: 0; overflow: hidden; }
+  .ti-w { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; height: 34px; padding: 0 .8rem; border-radius: 999px;
+    white-space: nowrap; font: 700 .92rem/1 var(--font-text); letter-spacing: .01em; color: var(--ink); cursor: crosshair;
+    background: linear-gradient(180deg, hsl(190 100% 75% / .10), hsl(190 100% 75% / .02)), hsl(205 40% 9% / .78);
+    border: 1px solid hsl(190 100% 75% / .32); box-shadow: inset 0 1px 0 hsl(190 100% 90% / .08);
+    transition: transform 110ms linear, opacity .25s var(--ease), box-shadow .2s var(--ease), border-color .2s var(--ease); will-change: transform; }
+  .ti-w.ai { color: #fff; border-color: hsl(290 100% 80% / .6);
+    background: linear-gradient(180deg, hsl(290 100% 80% / .17), hsl(290 100% 80% / .03)), hsl(262 40% 10% / .8);
+    box-shadow: 0 0 16px -3px hsl(290 100% 70% / .7), inset 0 1px 0 hsl(290 100% 92% / .14); }
+  .ti-w .t { color: var(--cyan); text-shadow: 0 0 10px hsl(190 100% 70% / .85); }
+  .ti-w.ai .t { color: hsl(300 100% 88%); text-shadow: 0 0 10px hsl(290 100% 70% / .9); }
+  .ti-w.lock { z-index: 2; border-color: var(--cyan); box-shadow: 0 0 0 2px hsl(190 100% 75% / .9), 0 0 22px hsl(190 100% 70% / .55); }
+  .ti-w.lock::before { content: ''; position: absolute; left: 50%; bottom: -11px; margin-left: -5px; border: 5px solid transparent; border-bottom-color: var(--cyan); filter: drop-shadow(0 0 4px var(--cyan)); }
+  .ti-w.bad { border-color: hsl(0 100% 66%); box-shadow: 0 0 0 2px hsl(0 100% 66% / .9), 0 0 22px hsl(0 100% 60% / .5); }
+  .ti-w.bad::before { border-bottom-color: hsl(0 100% 66%); }
+  .ti-w.dead { opacity: 0; pointer-events: none; }
+  @media (max-width: 639px) { .ti-w { height: 30px; padding: 0 .6rem; font-size: .8rem; } }
+
+  /* the line they must not reach, the ship, the fx canvas */
+  .ti-floor { position: absolute; left: 5%; right: 5%; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, hsl(290 100% 75% / .75), transparent); box-shadow: 0 0 10px hsl(290 100% 70% / .5); }
+  .ti-floor.hit { animation: floorhit .55s var(--ease) 1; }
+  @keyframes floorhit { 0% { background: hsl(0 100% 65%); box-shadow: 0 0 24px hsl(0 100% 60%); } 100% { } }
+  .ti-ship { position: absolute; left: 50%; bottom: 18px; width: 44px; height: 40px; margin-left: -22px; pointer-events: none;
+    color: var(--cyan); filter: drop-shadow(0 0 8px hsl(190 100% 70% / .8)); transform-origin: 50% 72%; transition: transform .12s var(--ease); }
+  .ti-ship svg { width: 100%; height: 100%; overflow: visible; }
+  .ti-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+  .ti-typed { position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%); pointer-events: none; min-height: 1.2em;
+    font: 700 .82rem/1.2 var(--font-text); letter-spacing: .16em; color: var(--cyan); text-shadow: 0 0 8px hsl(190 100% 70% / .7); }
+  .ti-help { position: absolute; right: 1rem; bottom: .9rem; font-size: .78rem; color: var(--ink-3); pointer-events: none; }
+  @media (max-width: 639px) { .ti-help { display: none; } }
+
+  /* the wave banner and the +points pops */
+  .ti-banner { position: absolute; left: 0; right: 0; top: 38%; z-index: 4; text-align: center; pointer-events: none; opacity: 0; transition: opacity .35s var(--ease); }
+  .ti-banner.on { opacity: 1; }
+  .ti-banner .k { font: 700 .78rem/1 var(--font-text); letter-spacing: .22em; text-transform: uppercase; color: var(--cyan); }
+  .ti-banner .t { margin-top: .6rem; font: 400 clamp(1.6rem, 4.5vw, 2.4rem)/1.1 var(--font-display); color: #fff; text-shadow: 0 0 22px hsl(190 100% 70% / .5); }
+  .ti-banner .s { margin-top: .5rem; color: var(--ink-2); font-size: .95rem; }
+  .ti-banner.ai .t { color: hsl(300 100% 92%); text-shadow: 0 0 4px var(--magenta), 0 0 14px hsl(290 100% 70%), 0 0 26px hsl(290 100% 60% / .6); }
+  .ti-pop { position: absolute; z-index: 3; pointer-events: none; font: 400 1rem/1 var(--font-display); color: hsl(130 100% 60%);
+    text-shadow: 0 0 10px hsl(130 100% 50% / .9); transform: translate(-50%, 0); animation: tipop .8s var(--ease) 1 forwards; }
+  .ti-pop.ai { color: hsl(300 100% 88%); text-shadow: 0 0 10px hsl(290 100% 70% / .9); }
+  @keyframes tipop { to { opacity: 0; transform: translate(-50%, -36px); } }
+
+  /* HUD bar items */
+  .sk-hudbar .sh { letter-spacing: .2em; color: hsl(290 100% 82%); }
+  .sk-hudbar .exit { color: var(--ink); }
+  .sk-hudbar .exit svg { width: 14px; height: 14px; }
+  @media (max-width: 639px) {
+    .sk-hudbar { gap: .35rem .8rem; padding: .5rem .6rem; letter-spacing: .06em; font-size: .74rem; }
+    .sk-hudbar .opt { display: none; }
+    .sk-hudbar .exit { min-height: 44px; padding: 0 .75rem; }
+  }
+
+  /* end card stats */
+  .ti-stats { margin: 1.3rem auto 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 2rem; max-width: 22rem; text-align: left; }
+  .ti-stats div { border-left: 1px solid var(--hair-strong); padding-left: .8rem; }
+  .ti-stats dt { font: 700 .7rem/1.2 var(--font-text); letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); }
+  .ti-stats dd { margin: .3rem 0 0; font: 400 1.5rem/1 var(--font-display); color: #fff; font-feature-settings: 'tnum' 1; }
+  .ti-keys { margin-top: 1rem; display: grid; gap: .35rem; color: var(--ink-2); font-size: .95rem; }
+  .ti-keys kbd { display: inline-block; min-width: 1.8em; padding: .1rem .45rem; border-radius: 6px; border: 1px solid var(--hair-strong); font: 700 .8rem/1.4 var(--font-text); color: var(--ink); background: hsl(205 40% 9% / .8); }
+
+  @media (prefers-reduced-motion: reduce) { .ti-w, .ti-ship, .ti-banner { transition: none; } .ti-floor.hit { animation: none; } }
+  .rm .ti-w, .rm .ti-ship, .rm .ti-banner { transition: none; }
+  .rm .ti-floor.hit { animation: none; }
+</style>
+</head>
+<body>
+<p class="mock-note">Round 1 · B · Type Invaders: the skills march down like Space Invaders and you blast each one by typing its name (letters and digits only, so “Next.js” is <code>nextjs</code>). Waves follow the groups, AI first; AI words glow magenta and score double. On a phone, tap a word. The list above stays the accessible content.</p>
+
+<section class="section" id="skills" aria-labelledby="skills-h"></section>
+
+<script src="skills.js"></script>
+<script src="section.js"></script>
+<script>
+(function () {
+  const S = window.SECTION
+  const GROUPS = window.SKILL_GROUPS
+  const TOTAL = window.SKILL_COUNT
+  const esc = S.esc
+  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const coarse = matchMedia('(pointer: coarse)').matches
+  const rm = () => S.reducedMotion()
+
+  const els = S.mount({
+    title: 'Round 1 · B · Type Invaders',
+    playLabel: 'Play Type Invaders',
+    hint: 'Type a skill to blast it. On a phone, tap it.',
+    onPlay: start,
+  })
+  if (coarse) els.cta.querySelector('.hint').textContent = 'Tap the skills to blast them.'
+  const arena = els.arena
+  arena.setAttribute('role', 'application')
+  arena.setAttribute('aria-label', coarse
+    ? 'Type Invaders. Tap a skill to blast it before it reaches the line. The Exit button is at the top.'
+    : 'Type Invaders. Type a skill’s name to blast it, letters and digits only. Backspace drops your lock. Escape exits.')
+  arena.tabIndex = -1
+
+  const SHIP = '<svg viewBox="0 0 44 40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M22 3 37 33 22 26 7 33Z" fill="hsl(205 50% 8% / .9)"/><path d="M22 10v12M15 27l-4 8M29 27l4 8" opacity=".7"/><circle cx="22" cy="31" r="2.2" fill="currentColor" stroke="none"/></svg>'
+  const X_ICON = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"/></svg>'
+
+  let G = null // the running game
+
+  async function start() {
+    S.showArena()
+    if (document.fonts && document.fonts.ready) await document.fonts.ready
+    build()
+    arena.scrollIntoView({ block: 'center', behavior: rm() ? 'auto' : 'smooth' })
+    startCard()
+  }
+
+  /* ---------- arena setup ---------- */
+  function build() {
+    arena.innerHTML = `
+      <div class="sk-hudbar">
+        <span>Wave <b data-h="wave">1/${GROUPS.length}</b></span>
+        <span>Score <b data-h="score">0</b></span>
+        <span><span class="opt">Combo </span><b data-h="combo">×1</b></span>
+        <span><span class="opt">Shields </span><b class="sh" data-h="shields">●●●</b></span>
+        <span class="spacer"></span>
+        <button type="button" class="hbtn small exit" aria-label="Exit the game">${X_ICON}<span>Exit</span></button>
+      </div>
+      <div class="ti-field"></div>
+      <div class="ti-floor" aria-hidden="true"></div>
+      <div class="ti-ship" aria-hidden="true">${SHIP}</div>
+      <div class="ti-typed" aria-hidden="true"></div>
+      <p class="ti-help" aria-hidden="true">${coarse ? 'Tap a skill' : 'Type to lock · Backspace drops it · Esc exits'}</p>
+      <canvas class="ti-fx" aria-hidden="true"></canvas>
+      <div class="ti-banner" aria-hidden="true"><p class="k"></p><p class="t"></p><p class="s"></p></div>`
+    const q = (s) => arena.querySelector(s)
+    G = {
+      bar: q('.sk-hudbar'), field: q('.ti-field'), floor: q('.ti-floor'), ship: q('.ti-ship'), typedEl: q('.ti-typed'), canvas: q('.ti-fx'), banner: q('.ti-banner'),
+      hud: { wave: q('[data-h="wave"]'), score: q('[data-h="score"]'), combo: q('[data-h="combo"]'), shields: q('[data-h="shields"]') },
+      ctx: null, W: 0, H: 0, fieldTop: 48, floorY: 400, narrow: false,
+      words: [], pillH: 34, fx: 0, fy: 0, dir: 1, acc: 0, formRight: 0,
+      wave: 0, playing: false, marching: false, paused: false, inView: true, docVisible: !document.hidden,
+      score: 0, combo: 0, shields: 3, lock: null, right: 0, wrong: 0, read: 0, typingStart: 0, typingEnd: 0,
+      particles: [], bolts: [], fxDirty: false, raf: 0, last: 0, timers: [], sayQueue: [], sayT: 0, card: null,
+    }
+    G.ctx = G.canvas.getContext('2d')
+    q('.exit').addEventListener('click', exit)
+    G.field.addEventListener('pointerdown', onTap)
+    window.addEventListener('keydown', onKey)
+    document.addEventListener('visibilitychange', onVisibility)
+    // the arena's size: from the ResizeObserver's entry, never read inside a frame
+    G.ro = new ResizeObserver(([e]) => resize(e.contentRect.width, e.contentRect.height))
+    G.ro.observe(arena)
+    G.io = new IntersectionObserver(([e]) => { G.inView = e.isIntersecting; syncPause() }, { threshold: 0.3 })
+    G.io.observe(arena)
+    const r = arena.getBoundingClientRect() // once, at setup
+    resize(r.width, r.height)
+  }
+
+  function resize(w, h) {
+    if (!G || !w) return
+    G.W = w; G.H = h; G.narrow = w < 640
+    G.fieldTop = G.bar.offsetHeight + 4
+    G.field.style.top = `${G.fieldTop}px`
+    G.floorY = h - G.fieldTop - (G.narrow ? 84 : 92) // field coordinates
+    G.floor.style.top = `${G.fieldTop + G.floorY}px`
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    G.canvas.width = Math.round(w * dpr); G.canvas.height = Math.round(h * dpr)
+    G.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    G.fxDirty = true
+    // keep a marching formation inside the arena
+    if (G.words.some((x) => x.alive)) {
+      const b = bounds()
+      if (b.max > w - 10) G.fx -= b.max - (w - 10)
+      if (b.min < 10) G.fx += 10 - b.min
+      place()
+    }
+  }
+
+  function teardown() {
+    if (!G) return
+    cancelAnimationFrame(G.raf)
+    G.timers.forEach(clearTimeout)
+    clearTimeout(G.sayT)
+    G.ro.disconnect(); G.io.disconnect()
+    window.removeEventListener('keydown', onKey)
+    document.removeEventListener('visibilitychange', onVisibility)
+    G = null
+  }
+  function exit() { teardown(); S.showList() }
+  const later = (ms, f) => { const t = setTimeout(f, ms); G.timers.push(t); return t }
+
+  /* ---------- cards ---------- */
+  function card(html, buttons) {
+    closeCard()
+    const c = document.createElement('div')
+    c.className = 'sk-card'
+    c.innerHTML = `<div class="panel">${html}<div class="row">${buttons.map((b, i) => `<button type="button" class="hbtn ${i === 0 ? 'primary' : ''}" data-i="${i}">${esc(b.label)}</button>`).join('')}</div></div>`
+    c.addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (b) buttons[+b.dataset.i].on() })
+    arena.appendChild(c)
+    G.card = c
+    c.querySelector('button').focus({ preventScroll: true })
+  }
+  function closeCard() { if (G && G.card) { G.card.remove(); G.card = null } }
+
+  function startCard() {
+    const keys = coarse
+      ? '<p>Tap each skill before it reaches the glowing line. Three shields; each skill that gets through costs one.</p>'
+      : `<div class="ti-keys"><span>Type a skill’s name to blast it.</span><span>Letters and digits only: <b>Next.js</b> is <kbd>nextjs</kbd></span><span><kbd>Backspace</kbd> drops your lock · <kbd>Esc</kbd> exits</span><span>Three shields. AI skills glow magenta and score double.</span></div>`
+    card(`<p class="k">Skills · arcade</p><h3>Type the skills</h3>${keys}`, [
+      { label: 'Start', on: begin },
+      { label: 'Back to the list', on: exit },
+    ])
+  }
+
+  function endCard(won) {
+    G.playing = false; G.marching = false
+    release()
+    G.typingEnd = performance.now()
+    const mins = G.typingStart ? (G.typingEnd - G.typingStart) / 60000 : 0
+    const wpm = G.right && mins > 0 ? Math.round(G.right / 5 / mins) : '—'
+    const acc = G.right + G.wrong ? `${Math.round((G.right / (G.right + G.wrong)) * 100)}%` : '—'
+    S.say(`${won ? 'All clear.' : 'Game over.'} Score ${G.score}. Skills read ${G.read} of ${TOTAL}.`)
+    card(`<p class="k">${won ? 'All clear' : 'Game over'}</p><h3>${won ? 'Full stack, cleared' : 'Shields down'}</h3>
+      <dl class="ti-stats">
+        <div><dt>Score</dt><dd>${G.score.toLocaleString('en-US')}</dd></div>
+        <div><dt>Words / min</dt><dd>${wpm}</dd></div>
+        <div><dt>Accuracy</dt><dd>${acc}</dd></div>
+        <div><dt>Skills read</dt><dd>${G.read}/${TOTAL}</dd></div>
+      </dl>`, [
+      { label: 'Play again', on: () => { closeCard(); begin() } },
+      { label: 'Back to the list', on: exit },
+    ])
+  }
+
+  /* ---------- the run ---------- */
+  function begin() {
+    closeCard()
+    Object.assign(G, { score: 0, combo: 0, shields: 3, right: 0, wrong: 0, read: 0, typingStart: 0, lock: null, particles: [], bolts: [] })
+    G.playing = true
+    hud()
+    arena.focus({ preventScroll: true })
+    wave(0)
+    loop()
+  }
+
+  function wave(i) {
+    if (!G) return
+    if (i >= GROUPS.length) return endCard(true)
+    const g = GROUPS[i]
+    G.wave = i
+    hud()
+    spawn(g)
+    const b = G.banner
+    b.classList.toggle('ai', g.id === 'ai')
+    b.querySelector('.k').textContent = `Wave ${i + 1} of ${GROUPS.length}`
+    b.querySelector('.t').textContent = g.name
+    b.querySelector('.s').textContent = `${g.skills.length} skills${g.id === 'ai' ? ' · double points' : ''}`
+    b.classList.add('on')
+    G.marching = false
+    S.say(`Wave ${i + 1}: ${g.name}, ${g.skills.length} skills.`)
+    later(1500, () => { if (!G) return; b.classList.remove('on'); G.marching = true; G.acc = 0 })
+  }
+
+  function spawn(g) {
+    G.field.textContent = ''
+    G.words = g.skills.map((s) => {
+      const el = document.createElement('span')
+      el.className = `ti-w${g.id === 'ai' ? ' ai' : ''}`
+      el.textContent = s.name
+      el.style.transition = 'none'
+      G.field.appendChild(el)
+      return { el, name: s.name, norm: norm(s.name), ai: g.id === 'ai', typed: 0, alive: true, w: 0, ox: 0, oy: 0, x: 0, y: 0 }
+    })
+    // one measure per wave (outside any frame)
+    G.pillH = G.words[0].el.offsetHeight
+    G.words.forEach((w) => (w.w = w.el.offsetWidth))
+    // pack into centered rows, like an invader formation
+    const maxW = G.W * (G.narrow ? 0.8 : 0.66)
+    const gx = G.narrow ? 6 : 10, gy = G.narrow ? 8 : 12
+    const rows = [[]]
+    let rw = 0
+    for (const w of G.words) {
+      if (rows[rows.length - 1].length && rw + gx + w.w > maxW) { rows.push([]); rw = 0 }
+      rw += (rows[rows.length - 1].length ? gx : 0) + w.w
+      rows[rows.length - 1].push(w)
+    }
+    const widths = rows.map((r) => r.reduce((n, w, i) => n + w.w + (i ? gx : 0), 0))
+    const formW = Math.max(...widths)
+    rows.forEach((r, ri) => {
+      let x = (formW - widths[ri]) / 2
+      r.forEach((w) => { w.ox = x; w.oy = ri * (G.pillH + gy); x += w.w + gx })
+    })
+    const formH = rows.length * (G.pillH + gy) - gy
+    G.fx = (G.W - formW) / 2
+    // a tall formation starts partly above the field and marches in
+    G.fy = 8 - Math.max(0, formH - 0.45 * G.floorY)
+    G.dir = 1
+    place()
+    requestAnimationFrame(() => G && G.words.forEach((w) => (w.el.style.transition = '')))
+  }
+
+  const alive = () => G.words.filter((w) => w.alive)
+  function bounds() {
+    let min = Infinity, max = -Infinity
+    for (const w of G.words) if (w.alive) { min = Math.min(min, G.fx + w.ox); max = Math.max(max, G.fx + w.ox + w.w) }
+    return { min, max }
+  }
+  function place() {
+    for (const w of G.words) {
+      if (!w.alive) continue
+      w.x = G.fx + w.ox; w.y = G.fy + w.oy
+      w.el.style.transform = `translate3d(${w.x}px, ${w.y}px, 0)`
+    }
+  }
+
+  /* one step of the march: sideways, or down a row and back at an edge; faster as it thins */
+  function interval() {
+    if (rm()) return G.narrow ? 480 : 400
+    const live = alive().length, total = G.words.length || 1
+    return (G.narrow ? 360 : 260) * Math.pow(0.9, G.wave) * (0.32 + 0.68 * (live / total))
+  }
+  function step() {
+    const sx = G.narrow ? 8 : 14, dy = G.narrow ? 16 : 22, m = 10
+    const b = bounds()
+    if (G.dir > 0 ? b.max + sx > G.W - m : b.min - sx < m) { G.fy += dy; G.dir = -G.dir } else G.fx += G.dir * sx
+    place()
+    for (const w of G.words) if (w.alive && w.y + G.pillH >= G.floorY) hitFloor(w)
+  }
+
+  function hitFloor(w) {
+    if (!G.playing || !w.alive) return
+    kill(w)
+    G.shields--
+    G.combo = 0
+    if (!rm()) { G.floor.classList.remove('hit'); void G.floor.offsetWidth; G.floor.classList.add('hit') }
+    burst(w, 'hsl(0 100% 65%)')
+    G.fy -= (G.narrow ? 16 : 22) * 2 // the shield knocks them back
+    place()
+    hud()
+    S.say(G.shields > 0 ? `${w.name} got through. ${G.shields} ${G.shields === 1 ? 'shield' : 'shields'} left.` : `${w.name} got through. Shields down.`)
+    if (G.shields <= 0) return endCard(false)
+    if (!alive().length) clearWave()
+  }
+
+  function kill(w) {
+    w.alive = false
+    if (G.lock === w) release()
+    w.el.classList.remove('lock', 'bad')
+    if (rm()) w.el.remove()
+    else {
+      w.el.style.transform = `translate3d(${w.x}px, ${w.y}px, 0) scale(1.25)`
+      w.el.classList.add('dead')
+      later(280, () => w.el.remove())
+    }
+  }
+
+  function destroy(w) {
+    const mult = Math.min(4, 1 + Math.floor(G.combo / 3))
+    const pts = 10 * w.norm.length * (w.ai ? 2 : 1) * mult
+    G.score += pts
+    G.combo++
+    G.read++
+    pop(w, pts)
+    burst(w, w.ai ? 'hsl(295 100% 75%)' : 'hsl(190 100% 72%)')
+    kill(w)
+    hud()
+    announce(w.name)
+    if (!alive().length) clearWave()
+  }
+
+  function clearWave() {
+    G.marching = false
+    later(650, () => G && G.playing && wave(G.wave + 1))
+  }
+
+  /* ---------- input ---------- */
+  function onKey(e) {
+    if (!G) return
+    const tgt = e.target instanceof Element ? e.target : null
+    if (tgt && tgt.closest('input, textarea, select, [contenteditable="true"]')) return
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      if (G.playing && G.lock) release()
+      else exit()
+      return
+    }
+    if (!G.playing || e.key === 'Tab') return
+    if (e.key === 'Backspace') { e.preventDefault(); release(); return }
+    if (e.key.length !== 1) return
+    const ch = e.key.toLowerCase()
+    if (!/[a-z0-9]/.test(ch)) {
+      // spaces and punctuation are free (people type "next.js"); keep Space from scrolling the page
+      if (e.key === ' ' && !(tgt && tgt.closest('button'))) e.preventDefault()
+      return
+    }
+    e.preventDefault()
+    if (!G.typingStart) G.typingStart = performance.now()
+    if (G.lock) {
+      const w = G.lock
+      if (w.norm[w.typed] === ch) correct(w)
+      else miss(w)
+      return
+    }
+    // lock the lowest live word on screen that starts with this letter (nearest the ship on a tie)
+    const cands = G.words.filter((w) => w.alive && w.y >= -2 && w.norm[0] === ch)
+    if (!cands.length) { miss(null); return }
+    cands.sort((a, b) => b.y - a.y || Math.abs(a.x + a.w / 2 - G.W / 2) - Math.abs(b.x + b.w / 2 - G.W / 2))
+    lock(cands[0])
+    correct(cands[0])
+  }
+
+  function lock(w) {
+    if (G.lock && G.lock !== w) G.lock.el.classList.remove('lock', 'bad')
+    G.lock = w
+    w.el.classList.add('lock')
+  }
+  function release() {
+    if (!G || !G.lock) return
+    const w = G.lock
+    w.typed = 0
+    render(w)
+    w.el.classList.remove('lock', 'bad')
+    G.lock = null
+    G.typedEl.textContent = ''
+  }
+  function correct(w) {
+    G.right++
+    w.typed++
+    w.el.classList.remove('bad')
+    render(w)
+    fire(w)
+    G.typedEl.textContent = w.norm.slice(0, w.typed)
+    if (w.typed >= w.norm.length) { G.typedEl.textContent = ''; destroy(w) }
+  }
+  function miss(w) {
+    G.wrong++
+    G.combo = 0
+    hud()
+    if (!w) return
+    w.el.classList.add('bad')
+    if (!rm()) { clearTimeout(w.badT); w.badT = setTimeout(() => w.el.classList.remove('bad'), 260) }
+  }
+  /* the typed part glows; letters and digits map back onto the name as it's shown */
+  function render(w) {
+    let n = 0, i = 0
+    for (; i < w.name.length && n < w.typed; i++) if (/[a-z0-9]/i.test(w.name[i])) n++
+    w.el.innerHTML = w.typed ? `<span class="t">${esc(w.name.slice(0, i))}</span>${esc(w.name.slice(i))}` : esc(w.name)
+  }
+
+  function onTap(e) {
+    if (!G || !G.playing) return
+    const el = e.target.closest('.ti-w')
+    if (!el) return
+    const w = G.words.find((x) => x.el === el)
+    if (!w || !w.alive || w.y < -2) return
+    e.preventDefault()
+    fire(w)
+    destroy(w)
+  }
+
+  function onVisibility() { if (!G) return; G.docVisible = !document.hidden; syncPause() }
+  function syncPause() {
+    if (!G) return
+    const run = G.inView && G.docVisible
+    if (run && G.paused) { G.paused = false; loop() }
+    else if (!run && !G.paused) { G.paused = true; cancelAnimationFrame(G.raf); G.raf = 0 }
+  }
+
+  /* ---------- feedback ---------- */
+  function hud() {
+    G.hud.wave.textContent = `${G.wave + 1}/${GROUPS.length}`
+    G.hud.score.textContent = G.score.toLocaleString('en-US')
+    G.hud.combo.textContent = `×${Math.min(4, 1 + Math.floor(G.combo / 3))}`
+    G.hud.shields.textContent = '●'.repeat(Math.max(0, G.shields)) + '○'.repeat(3 - Math.max(0, G.shields))
+  }
+  function fire(w) {
+    const cx = w.x + w.w / 2, cy = G.fieldTop + w.y + G.pillH / 2
+    const sx = G.W / 2, sy = G.H - 44
+    const ang = Math.max(-55, Math.min(55, (Math.atan2(cx - sx, sy - cy) * 180) / Math.PI))
+    G.ship.style.transform = `rotate(${ang.toFixed(1)}deg)`
+    if (rm()) return
+    G.bolts.push({ x1: sx, y1: sy, x2: cx, y2: cy, life: 0.2, max: 0.2, ai: w.ai })
+  }
+  function burst(w, color) {
+    if (rm()) return
+    const cx = w.x + w.w / 2, cy = G.fieldTop + w.y + G.pillH / 2
+    const n = G.narrow ? 12 : 20
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 220
+      G.particles.push({ x: cx + (Math.random() - 0.5) * w.w * 0.6, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, life: 0.5 + Math.random() * 0.4, max: 0.9, color, r: 1 + Math.random() * 1.8 })
+    }
+  }
+  function pop(w, pts) {
+    if (rm()) return
+    const p = document.createElement('span')
+    p.className = `ti-pop${w.ai ? ' ai' : ''}`
+    p.textContent = `+${pts}`
+    p.style.left = `${w.x + w.w / 2}px`
+    p.style.top = `${w.y - 6}px`
+    p.addEventListener('animationend', () => p.remove())
+    G.field.appendChild(p)
+  }
+  // the live region: a short line now and then, never every letter
+  function announce(name) {
+    G.sayQueue.push(name)
+    if (G.sayT) return
+    G.sayT = setTimeout(() => {
+      if (!G) return
+      const names = G.sayQueue.splice(0)
+      S.say(`Blasted ${names.join(', ')}.`)
+      G.sayT = 0
+    }, 1400)
+  }
+
+  /* ---------- the one loop: the march's steps + the fx canvas ---------- */
+  function loop() {
+    if (!G || G.paused) return
+    cancelAnimationFrame(G.raf)
+    G.last = performance.now()
+    G.raf = requestAnimationFrame(frame)
+  }
+  function frame(t) {
+    if (!G || G.paused) return
+    const dt = Math.min(0.05, (t - G.last) / 1000)
+    G.last = t
+    if (G.playing && G.marching) {
+      G.acc += dt * 1000
+      let iv = interval()
+      while (G.acc >= iv && G.playing && G.marching) { G.acc -= iv; step(); iv = interval() }
+    }
+    drawFx(dt)
+    G.raf = requestAnimationFrame(frame)
+  }
+  function drawFx(dt) {
+    const c = G.ctx
+    if (!G.particles.length && !G.bolts.length) {
+      if (G.fxDirty) { c.clearRect(0, 0, G.W, G.H); G.fxDirty = false }
+      return
+    }
+    c.clearRect(0, 0, G.W, G.H)
+    G.fxDirty = true
+    c.globalCompositeOperation = 'lighter'
+    for (let i = G.bolts.length - 1; i >= 0; i--) {
+      const b = G.bolts[i]
+      b.life -= dt
+      if (b.life <= 0) { G.bolts.splice(i, 1); continue }
+      const k = b.life / b.max
+      c.strokeStyle = b.ai ? `hsla(295, 100%, 78%, ${k})` : `hsla(188, 100%, 75%, ${k})`
+      c.lineWidth = 2.2
+      c.shadowColor = b.ai ? 'hsl(290 100% 70%)' : 'hsl(190 100% 70%)'
+      c.shadowBlur = 12
+      c.beginPath(); c.moveTo(b.x1, b.y1); c.lineTo(b.x2, b.y2); c.stroke()
+    }
+    c.shadowBlur = 0
+    for (let i = G.particles.length - 1; i >= 0; i--) {
+      const p = G.particles[i]
+      p.life -= dt
+      if (p.life <= 0) { G.particles.splice(i, 1); continue }
+      p.vy += 260 * dt; p.vx *= 0.985
+      p.x += p.vx * dt; p.y += p.vy * dt
+      c.globalAlpha = Math.min(1, p.life / p.max * 1.4)
+      c.fillStyle = p.color
+      c.beginPath(); c.arc(p.x, p.y, p.r, 0, Math.PI * 2); c.fill()
+    }
+    c.globalAlpha = 1
+    c.globalCompositeOperation = 'source-over'
+  }
+})()
+</script>
+</body>
+</html>

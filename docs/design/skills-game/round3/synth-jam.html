@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Synth Jam</title>
+<link rel="stylesheet" href="../../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="../skills.css">
+<link rel="stylesheet" href="../round2/base.css">
+<style>
+  /* ===== Round 3 · Skill synth: loop it, trade fours, jam with Number Slayers ===== */
+
+  /* the string under a struck word (from round 2's D) */
+  .syn-str { position: absolute; left: 0; right: 0; top: calc(50% + .5em); height: 10px; pointer-events: none; opacity: 0; color: hsl(var(--g, 190 100% 72%)); }
+  .syn-str svg { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 1px currentColor); }
+  .sk-ai-item .syn-str { left: -7.5px; right: auto; top: 4px; bottom: 4px; width: 14px; height: auto; }
+  .sk-ai-item .sk-name { display: block; width: max-content; max-width: 100%; }
+
+  /* trading fours: the word to play next, once you've missed twice */
+  .sk-ai-item.tf-next .sk-name { text-decoration: underline dotted hsl(290 100% 80% / .9); text-decoration-thickness: 2px; text-underline-offset: 6px; }
+
+  /* the readout: instrument and scale, the loop pedal, and a status line */
+  .syn-hud {
+    position: sticky; z-index: 20; bottom: 16px; width: max-content; max-width: calc(100% - 76px); margin: 2.5rem auto 0 0;
+    display: grid; gap: .3rem; padding: 5px 14px 7px 5px; border-radius: 26px;
+    font: 700 .8rem/1.2 var(--font-text); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2);
+    background: hsl(220 30% 5% / .92); border: 1px solid var(--hair-strong);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 10px 30px -12px hsl(190 100% 50% / .35);
+    opacity: 0; transform: translateY(8px); transition: opacity .4s var(--ease), transform .4s var(--ease); visibility: hidden;
+  }
+  .syn-hud.on { opacity: 1; transform: none; visibility: visible; }
+  .syn-hud .r1 { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+  .syn-hud .r2 { display: flex; align-items: center; gap: .4rem .9rem; flex-wrap: wrap; padding-left: 9px; min-height: 1.2rem; font-size: .74rem; letter-spacing: .08em; }
+  .syn-hud .r2:empty { display: none; }
+  .syn-hud b { color: #fff; letter-spacing: .06em; }
+  .syn-hud .now { display: inline-flex; gap: .45rem; align-items: baseline; }
+  .syn-hud .now i { font-style: normal; color: hsl(var(--g, 190 100% 72%)); letter-spacing: .04em; font-feature-settings: 'tnum' 1; min-width: 2.6rem; }
+  .syn-hud .now em { font-style: normal; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: none; font-size: .82rem; }
+  .syn-hud .sep { width: 1px; height: 1.1rem; background: var(--hair-strong); }
+  .syn-hud .status { color: var(--ink); }
+  .syn-hud .status .tf { color: var(--magenta); }
+  .syn-hud .lock { color: var(--green); }
+  .syn-hud .lock::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: .45rem; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); vertical-align: .05em; }
+  .hbtn-ico {
+    display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; cursor: pointer; color: var(--cyan); padding: 0;
+    background: hsl(190 100% 75% / .08); border: 1px solid hsl(190 100% 75% / .35); transition: border-color .25s var(--ease), box-shadow .25s var(--ease), background .25s var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hbtn-ico:hover { border-color: var(--cyan); box-shadow: 0 0 16px -2px hsl(190 100% 70% / .6); }
+  .hbtn-ico:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 50%; }
+  .hbtn-ico svg { width: 20px; height: 20px; }
+  .syn-mute .off, .syn-mute[aria-pressed="true"] .on { display: none; }
+  .syn-mute[aria-pressed="true"] .off { display: block; }
+  .syn-mute[aria-pressed="true"] { color: var(--ink-3); }
+
+  /* the loop pedal: a footswitch, 8 beat lights (2 bars), undo, clear */
+  .loop { display: inline-flex; align-items: center; gap: .55rem; }
+  .loop[hidden] { display: none; }
+  .ped { --c: 355 100% 66%; color: hsl(var(--c)); border-color: hsl(var(--c) / .5); background: hsl(var(--c) / .1); }
+  .ped .dot { width: 14px; height: 14px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; transition: border-radius .2s var(--ease), transform .2s var(--ease); }
+  .ped[data-s="count"] .dot, .ped[data-s="rec"] .dot { animation: ped-blink .46s steps(2, jump-none) infinite; }
+  .ped[data-s="play"] { --c: 130 90% 58%; }
+  .ped[data-s="play"] .dot { border-radius: 3px; transform: scale(.85); } /* a stop square while it plays */
+  .ped[data-s="stopped"] { --c: 130 90% 58%; }
+  .ped[data-s="stopped"] .dot { width: 0; height: 0; border-radius: 0; background: none; box-shadow: none; border-style: solid; border-width: 8px 0 8px 13px; border-color: transparent transparent transparent currentColor; margin-left: 4px; } /* a play triangle */
+  @keyframes ped-blink { 50% { opacity: .35; } }
+  .beats { display: inline-flex; gap: 5px; }
+  .beats i { width: 8px; height: 8px; border-radius: 50%; border: 1px solid hsl(190 100% 75% / .4); transition: background .08s linear, box-shadow .08s linear; }
+  .beats i:nth-child(4n + 1) { border-color: hsl(190 100% 85% / .7); }
+  .beats i.on { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .beats[data-s="rec"] i.on { background: hsl(355 100% 66%); box-shadow: 0 0 8px hsl(355 100% 66%); border-color: hsl(355 100% 66%); }
+  .beats[data-s="play"] i.on { background: var(--green); box-shadow: 0 0 8px var(--green); border-color: var(--green); }
+  .loop .small { width: 44px; height: 44px; color: var(--ink-2); }
+  .loop .small[hidden] { display: none; }
+
+  @media (max-width: 560px) {
+    .syn-hud { max-width: calc(100% - 60px); padding-right: 10px; font-size: .72rem; letter-spacing: .05em; }
+    .syn-hud .now em, .syn-hud .r1 > .sep { display: none; }
+    .syn-hud.has-loop .now { display: none; } /* the pedal needs the room */
+    .syn-hud .r1 { gap: .45rem; }
+    .loop { gap: .35rem; }
+    .beats { gap: 3px; }
+    .beats i { width: 7px; height: 7px; }
+    .syn-hud .r2 { font-size: .68rem; }
+  }
+
+  /* ===== mockup only: a stand-in for the site's one music player (MusicFAB, bottom right) ===== */
+  .sp { position: fixed; z-index: 50; right: 16px; bottom: 16px; display: flex; align-items: center; gap: .6rem; }
+  @media (min-width: 768px) { .sp { right: 24px; bottom: 24px; } }
+  .sp-fab {
+    display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; color: var(--cyan);
+    background: hsl(220 30% 6%); border: 2px solid hsl(190 100% 75% / .5); box-shadow: 0 0 8px hsl(190 100% 70% / .4), 0 0 16px hsl(190 100% 70% / .2);
+  }
+  @media (min-width: 768px) { .sp-fab { width: 56px; height: 56px; } }
+  .sp-fab svg { width: 22px; height: 22px; }
+  .sp-fab:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 50%; }
+  .sp.playing .sp-fab { box-shadow: 0 0 15px hsl(190 100% 60%), 0 0 30px hsl(190 100% 60% / .5); }
+  .sp-title {
+    padding: .45rem .8rem; border-radius: 999px; font: 700 .82rem/1.2 var(--font-text); color: var(--ink); white-space: nowrap;
+    background: hsl(220 30% 5% / .85); border: 1px solid hsl(190 100% 75% / .35); opacity: 0; transform: translateX(8px);
+    transition: opacity .35s var(--ease), transform .35s var(--ease); pointer-events: none;
+  }
+  .sp.playing .sp-title { opacity: 1; transform: none; }
+  @media (max-width: 1100px) { .sp-title { display: none; } }
+  .mock-bar .metro { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; cursor: pointer; }
+</style>
+</head>
+<body>
+<p class="mock-note">Round 3 · Skill synth: loop it, trade fours, jam. Everything is in D minor at 130 BPM, the key and tempo of Number Slayers. Play a few skills, then try the red ● in the readout. Stop for a moment and the bells answer you. The ♫ bottom right stands in for the site's player: play Number Slayers there and the synth locks to it.</p>
+
+<section class="section" id="skills" aria-labelledby="skills-h"></section>
+
+<!-- mockup only: the stand-in for the site's one player (its single <audio>) -->
+<div class="sp" id="sp">
+  <span class="sp-title" id="sp-title" aria-hidden="true"></span>
+  <button type="button" class="sp-fab" id="sp-fab" aria-label="Play Number Slayers">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  </button>
+  <audio id="sp-audio" preload="none"></audio>
+</div>
+
+<script src="../skills.js"></script>
+<script src="../round2/base.js"></script>
+<script src="synth-jam.js"></script>
+</body>
+</html>

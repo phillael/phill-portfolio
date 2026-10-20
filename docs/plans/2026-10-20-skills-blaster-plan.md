@@ -460,7 +460,7 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
       Every case is ≤ −80 dB.
     - **Gates:** `npx tsc --noEmit` exit 0; `npm run lint` exit 0; `npx jest --no-watchman`: 62 suites, 700 passed; `npm run build` exit 0.
 - [x] **T12: PR text. STOP before pushing:** Phill tries it locally on desktop and his phone first. Write the PR description under this task: summary, decisions, the measurements, the test plan, screenshots to take.
-  - **Written 2026-10-20. NOT pushed:** the branch waits for Phill's go after he tries it on desktop and his phone. Title: `feat(skills): the Skill blaster: the Skills section, AI first, with a game you stumble on (v1.8.0)`
+  - **Written 2026-10-20.** Phill tried it locally (desktop and phone): "amazzzing!! its so cool! open a pr!" The text below includes his two follow-ups (the addendum). Title: `feat(skills): the Skill blaster: the Skills section, AI first, with a game you stumble on (v1.8.0)`
 
 ````markdown
 ## Summary
@@ -475,7 +475,8 @@ The home page's Skills section, rebuilt from the six mockup rounds (docs/design/
 - **Wave 3:** the drop (a riser, a breath, a crash and a boom), then red skills shoot back (5 health). Elites take 3 hits; gold is worth 500.
 - **The music is yours:** the drums are the only part that plays by itself. Each group is a band part (Cloud = a new chord, Backend = bass, AI = lead, Frontend = arp, Quality = bleeps, Product = bells, Music & more = vox). Hits are quantized into the chord, and the parts heard in the last two bars are the multiplier.
 - **One screen:** the section tightens to fit the screen while you play. On phones, groups fold and take turns each wave.
-- **Game over:** the score, your best, and a link to numberslayers.com.
+- **The shot:** a laser Phill tuned in the Sound lab, a little different every time (its dive time, pitch and filter vary), so a run of shots never grates.
+- **Game over:** the music fades, the section goes back to the list, and the readout keeps the score, your best and a link to numberslayers.com for a few seconds.
 
 It's all synthesized in Web Audio except four CC0 drum recordings (the ride, crash, riser and boom you picked in the Sound lab), on the site player's AudioContext: one track at a time.
 
@@ -516,6 +517,9 @@ It's all synthesized in Web Audio except four CC0 drum recordings (the ride, cra
 **Phill's**
 - Everything in the design rounds.
 - On a phone, the summoned Shroom Wizard steps aside while you play, because the readout sits where he stands. He walks off and back, and his canvas stops drawing while he's parked. On desktop the readout centres beside him instead.
+- **After his first local try:**
+  - Game over fades the music and returns the section to the list; shots still flying at game over don't start a new game.
+  - The shot is a new Laser part in the Sound lab: his patch, plus per-shot variety (the dive 140–500 ms, pitch ±2 st, filter ±0.4 oct).
 
 **Where the site had a system the mockup didn't**
 - **Esc:** while the game runs, Esc stops only the game. The wizard and shroom mode don't also go; an open wizard chat still catches Esc first.
@@ -544,7 +548,7 @@ It's all synthesized in Web Audio except four CC0 drum recordings (the ride, cra
   - 1440×900 at 1;
   - phones are staged, with no horizontal scroll and no touch target under 44 px.
 - **The end of a game:** 0 voices left and no leftover effect elements; the site's song is handed back.
-- **Tests:** 62 suites / 700 tests (from 58 / 644).
+- **Tests:** 62 suites / 705 tests (from 58 / 644).
 - **Gates:** `npx tsc --noEmit`, `npm run lint` (zero warnings) and `npm run build` all green.
 
 ## Test plan (Phill, locally, desktop and phone)
@@ -556,7 +560,8 @@ It's all synthesized in Web Audio except four CC0 drum recordings (the ride, cra
 - [ ] With the site's music playing, click any skill: the song pauses, the beat starts, the word bursts, and the section fits the screen.
 - [ ] Waves 1–2: hit the lit skills. Cloud skills change the chord; the band lights and the multiplier follow what you play.
 - [ ] The drop into wave 3: the riser, the breath, the crash + boom. Red skills shoot back (the crack, the red flash, health).
-- [ ] Wave 4: the ride comes in. Lose (or press Esc): the tape stop, then the song comes back.
+- [ ] Fire fast: every laser shot sounds a little different.
+- [ ] Wave 4: the ride comes in. Lose: the music fades and the section goes back to the list (shots still flying don't restart it); the song comes back. Esc stops too.
 - [ ] Stop shooting for 5 s: it pauses. Shoot: it picks up. Press play on the site's player mid-game: the game pauses.
 - [ ] Keyboard only: Tab to a skill, Enter shoots, L jumps to a lit skill, Esc stops.
 - [ ] Summon the wizard, then play: the readout centres.

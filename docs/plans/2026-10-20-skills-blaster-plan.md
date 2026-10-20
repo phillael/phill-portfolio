@@ -217,7 +217,7 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
       - `curl -sI localhost:3002/skills/sfx/ride-k.mp3`: `200 OK`, `Content-Type: audio/mpeg`, 75821 bytes.
       - `public/skills/sfx/`: 380 KB.
       - `npx tsc --noEmit` exit 0; eslint exit 0.
-- [ ] **T4: the rules as pure modules.** `src/lib/skills/rules.ts`, ported from `blaster-synth.js`:
+- [x] **T4: the rules as pure modules.** `src/lib/skills/rules.ts`, ported from `blaster-synth.js`:
   - `WAVES`/`waveCfg`/`planFor` (inject the RNG);
   - `KIND` points;
   - `need(group, state)` (the conductor's weights);
@@ -225,6 +225,11 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
   - the band size;
   - the phone staging order (`core` per wave + the rotation in `fitArena`, as a pure function of `wave`).
   - **Tests** (`skills-rules.test.ts`): the wave table and the extrapolation past wave 5; the first enemy third in wave 3; the conductor's weights in each case; the staging order for waves 0–6 (cloud first on wave 3).
+  - **Done 2026-10-20:** `rules.ts` also holds:
+    - **constants:** `MAX_HP`, `FIRST_FOE_WAVE`, `HEARD_BARS`, `ORDER`, `SHIELD_PTS`;
+    - **helpers:** `clearBonus`, `isFoe`, `lifeFor` (the 1.6× keyboard time) and `pickWeighted` (`pickTarget`'s weighted pick, same RNG order).
+    - **The best-score key:** the mockup stores it as `skill-blaster-band-best`, Binding §1 says `skill-blaster-best`, and the plan's key wins (T7).
+    - **Verification:** `npx jest --no-watchman skills-rules` 16 passed (it failed first with `Cannot find module`); `npx tsc --noEmit` exit 0; eslint exit 0.
 - [ ] **T5: the section at rest.**
   - **Rewrite `SkillsSection.tsx`** from `skills.ts` to the mockup's rest markup: header, AI glass panel (each skill a button with name + note), the groups (h3 + a list of buttons with dots), every button `type="button" data-skill data-group`.
   - **Styles:** `src/components/skills/Skills.module.css`, ported from `skills.css` + `round2/base.css` + the round 6 static rules (tokens mapped to the site's, as the Experience section did).

@@ -42,6 +42,15 @@
     opacity: 0.55;
   }
 }
+/* a group's heading lights in its part's colour while that part plays (blaster.ts sets --pc) */
+#skills [data-sk-group] h3.bl-live {
+  color: hsl(var(--pc));
+  text-shadow: 0 0 10px hsl(var(--pc) / 0.65);
+}
+#skills [data-sk-group='ai'] h3.bl-live {
+  color: hsl(300 100% 92%);
+  text-shadow: 0 0 6px var(--magenta), 0 0 16px hsl(290 100% 70%), 0 0 34px hsl(290 100% 60% / 0.85);
+}
 /* a blown-up word: its text goes clear (the button keeps its place, name and focus) while its letters fly */
 .bl-gone,
 .bl-gone:hover {

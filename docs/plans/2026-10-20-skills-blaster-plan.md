@@ -302,7 +302,7 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
       - no effect elements left (the layer holds 0 elements, the screen only `bl-vig`); the live region says "Stopped. 200 points.";
       - the readout is clear of the music and summon buttons;
       - with the wizard summoned: centred at 1280; at 375 the wizard parks at left −300 and walks back to −41 after Esc.
-- [ ] **T8: the game's music.**
+- [x] **T8: the game's music.**
   - Wire the engine (T3) to the game:
     - the clock and drums per wave;
     - hits → `engine.hit` quantized;
@@ -314,6 +314,33 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
     - "Paused · the music player is on".
   - The recordings load after the first shot.
   - **Tests:** with fakes, the first shot creates the engine on the site player's context; the site's music is paused then resumed on stop; mute silences the master.
+  - **Done 2026-10-20:**
+    - **What's ported:** the round 6 music, into `blaster.ts`:
+      - the engine on the given context, made with the first shot (`init`);
+      - the 25 ms look-ahead scheduler (`tick`/`step`, only while `M.on`), the breath before the drop, fills, `M.muteUntil`;
+      - `partHit` (8ths for chords, bass and vox, 16ths for the rest), `hear`/`bandSize` (2 bars), `glow`;
+      - the conductor (`musicState().on`);
+      - `SFX` (Arcade levels) and `MUS` (kill, clear, hurt, tape stop, the riser);
+      - `drawBand` (pips, `bl-live` headings with `--pc`).
+    - **Mute:** `E.setMuted`.
+    - **The site's music:** `handOff`/`handBack` through `getSiteMusic()`. `onChange(true)` mid-game → "Paused · the music player is on".
+    - **Dev handle:** gained `part`, `E`, `chordAt`, `active()`, `made()`, `drums(on)`, `meter()`.
+    - **Tests:** `skills-blaster` music block (6):
+      - the engine is made on the given context with the first shot;
+      - the site's music pauses at start and comes back on Esc;
+      - play mid-game pauses the game (nothing handed back);
+      - mute → the master's gain targets 0;
+      - a kick on the first 16th;
+      - a lit hit joins the band (the Cloud heading `bl-live`).
+    - **Results:** `npx jest --no-watchman skills site-music` (see the commit); `npx tsc --noEmit` exit 0; `npm run lint` exit 0.
+    - **Browser** (dev, 1280×800 mouse and 375×812 touch, the site's song playing first):
+      - the song pauses at the first shot (the context `running`);
+      - the band's pips and a `bl-live` heading follow the parts;
+      - the riser is placed (`dropBar` 15/16), the recorded sets are loaded before the drop (`samplesReady` true), and the drop is level 2 (meter RMS 0.035 desk, 0.025 phone);
+      - a hit taken skips the drums (`muteUntil` +0.5 s); wave 4 is level 3 with the recorded ride ready;
+      - game over: the tape stop, voices back to 0, the song handed back (playing again);
+      - pressing play on the player mid-game → paused with "Paused · the music player is on";
+      - at the end: 0 voices, no effect elements (layer 0, screen `bl-vig` only), no console errors.
 - [ ] **T9: one screen.** The arena per Binding §1:
   - fit levels and staging;
   - FLIP from the clicked word (its letters fly from where it was);

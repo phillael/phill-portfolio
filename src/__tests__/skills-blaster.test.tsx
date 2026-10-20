@@ -11,12 +11,15 @@ import SkillsSection from '@/components/SkillsSection'
 import { createBlaster, type Blaster, type Shot } from '@/lib/skills/blaster'
 import { BAR } from '@/lib/skills/synth'
 import { isWizardAside, setWizardAside, subscribeWizardAside } from '@/lib/wizard-aside'
+import { registerSiteMusic, type SiteMusic } from '@/lib/site-music'
 import { FakeAudioContext } from './helpers/fakeAudio'
 
 jest.mock('@/components/skills/SkillsPlay', () => ({ __esModule: true, default: () => null }))
 
 interface Dev {
   G: { state: string; score: number; wave: number; active: Set<{ k: { el: HTMLElement; label: HTMLElement } }> }
+  E: { ac: unknown; master: { gain: { calls: unknown[][] } } } | null
+  bandSize(): number
 }
 const dev = () => (window as unknown as { __skills: Dev }).__skills
 
@@ -89,10 +92,12 @@ describe('the Skill blaster', () => {
     expect(document.querySelector('.bl-layer .bl-ring')).not.toBeNull()
 
     act(() => game.shoot(shotAt(lit.k.el)))
-    expect(dev().G.score).toBe(200)
+    const band = dev().bandSize() // the parts heard in the last two bars multiply the points
+    expect(band).toBeGreaterThanOrEqual(1)
+    expect(dev().G.score).toBe(100 + 100 * band)
     expect(lit.k.label).not.toHaveClass('bl-lit')
     pass(1400)
-    expect(live()).toMatch(/\. 200 points\.$/)
+    expect(live()).toMatch(new RegExp(`\\. ${(100 + 100 * band).toLocaleString('en-US')} points\\.$`))
   })
 
   it('Escape stops it: back to the list, and the live region says the score', () => {
@@ -165,5 +170,78 @@ describe('the summoned Shroom Wizard', () => {
   it('stays put when it isn’t out', () => {
     act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
     expect(isWizardAside()).toBe(false)
+  })
+})
+
+describe('the music', () => {
+  /** the site's one player, playing a song when the game starts */
+  const player = () => {
+    let playing = true
+    const listeners = new Set<(on: boolean) => void>()
+    const music: SiteMusic & { set(on: boolean): void } = {
+      getSource: () => null,
+      isPlaying: () => playing,
+      toggle: () => {},
+      open: () => {},
+      context: () => ac as unknown as AudioContext,
+      pause: jest.fn(() => { playing = false; listeners.forEach((cb) => cb(false)) }),
+      play: jest.fn(() => { playing = true; listeners.forEach((cb) => cb(true)) }),
+      onChange: (cb) => { listeners.add(cb); return () => listeners.delete(cb) },
+      set(on) { playing = on; listeners.forEach((cb) => cb(on)) },
+    }
+    return music
+  }
+  let music: ReturnType<typeof player>
+  beforeEach(() => {
+    game.dispose() // a game made with the site's player registered
+    music = player()
+    registerSiteMusic(music)
+    game = createBlaster({ section: document.getElementById('skills')!, ac: ac as unknown as AudioContext, lean: null })
+  })
+  afterEach(() => registerSiteMusic(null))
+
+  it('the first shot makes the engine on the AudioContext it was given (the site player’s)', () => {
+    expect(dev().E).toBeNull()
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    expect(dev().E?.ac).toBe(ac)
+  })
+
+  it('the site’s music pauses when the game starts and comes back when it stops', () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    expect(music.pause).toHaveBeenCalledTimes(1)
+    expect(music.play).not.toHaveBeenCalled()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(music.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('pressing play on the site’s player mid-game pauses the game: one track at a time', () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    pass(300)
+    act(() => music.set(true))
+    expect(dev().G.state).toBe('paused')
+    expect(document.querySelector('.bl-hud .r2')!.textContent).toContain('Paused · the music player is on')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(music.play).not.toHaveBeenCalled() // it's already playing: nothing to hand back
+  })
+
+  it('mute silences the master', () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    fireEvent.click(screen.getByRole('button', { name: 'Mute the game and its beat' }))
+    expect(screen.getByRole('button', { name: 'Mute the game and its beat' })).toHaveAttribute('aria-pressed', 'true')
+    expect(dev().E!.master.gain.calls.at(-1)?.slice(0, 2)).toEqual(['target', 0])
+  })
+
+  it('the drums play by themselves on the beat: a kick on the first 16th', () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    const from = ac.nodes.length
+    pass(200)
+    const kicks = ac.since(from, 'osc').filter((o) => o.frequency.value === 150) // the kick's start pitch
+    expect(kicks.length).toBeGreaterThan(0)
+  })
+
+  it('a lit hit brings its part into the band (the multiplier)', () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    expect(dev().bandSize()).toBe(1) // Docker's part, Cloud & DevOps (the chords)
+    expect(document.querySelector('[data-sk-group="cloud"] h3')).toHaveClass('bl-live')
   })
 })

@@ -12,13 +12,14 @@
 
 import './blaster.css'
 import type { SkillGroupId } from '@/data/skills'
-import { BAR, BEAT, BEATS, PARTS } from './synth'
+import { BAR, BEAT, BEATS, ON_8TH, PARTS, SIX, createSynth, hz, inChord, type SkillSynth } from './synth'
 import {
-  FIRST_FOE_WAVE, KIND, MAX_HP, SHIELD_PTS, clearBonus, isFoe, levelFor, lifeFor, need, pickWeighted, planFor, readoutClears, waveCfg,
+  FIRST_FOE_WAVE, HEARD_BARS, KIND, MAX_HP, ORDER, SHIELD_PTS, bandSize as bandOf, clearBonus, inBand, isFoe, levelFor, lifeFor, need, pickWeighted, planFor, readoutClears, waveCfg,
   type Kind, type MusicState, type WaveCfg,
 } from './rules'
 import { labelOf, type Lean } from './lean'
 import { setWizardAside } from '@/lib/wizard-aside'
+import { getSiteMusic } from '@/lib/site-music'
 
 /** a click in the section: on a skill (or on nothing), where, and whether it came from Enter or Space */
 export interface Shot {
@@ -99,35 +100,231 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     return { el, name: el.dataset.skill ?? '', group, ai: group === 'ai', idx, gi, frac: gi / Math.max(1, groupSize[group]! - 1), label: labelOf(el), t: null, fly: null, cool: 0 }
   })
   const keyByEl = new Map(keys.map((k) => [k.el, k]))
+  const headings: Partial<Record<SkillGroupId, HTMLElement>> = {}
+  ORDER.forEach((g) => {
+    const h = root.querySelector<HTMLElement>(`[data-sk-group="${g}"] h3`)
+    if (h) { headings[g] = h; h.style.setProperty('--pc', PARTS[g].c) }
+  })
 
-  /* ---------- the clock: the game's time is the audio clock, so waves start on a bar and enemies fire on a beat ---------- */
-  // (the drums and every note on it: the music, T8)
-  const M = { on: false, zero: 0, level: 0, next: null as { t: number; level: number } | null, muteUntil: 0, fills: new Set<number>(), dropBar: -1, last: {} as MusicState['last'] }
+  /* ---------- the audio: one engine (synth.ts) on the site player's AudioContext, made with the first shot ---------- */
+  let E: SkillSynth | null = null
+  let muted = false
+  const site = getSiteMusic()
+  function init() {
+    if (E) { if (ac.state === 'suspended') (ac as AudioContext).resume?.().catch(() => {}); return }
+    E = createSynth(ac)
+    if (muted) E.setMuted(true)
+  }
+  const eng = () => E!
+
+  /* ---------- the clock: a look-ahead scheduler, only while the game plays; the drums are the only part that plays
+     by itself (waves start on a bar, enemies fire on a beat) ---------- */
+  const M = { on: false, zero: 0, cursor: 0, timer: 0, level: 0, next: null as { t: number; level: number } | null, muteUntil: 0, fills: new Set<number>(), dropBar: -1, last: {} as MusicState['last'] }
+  const part: Partial<Record<SkillGroupId, number>> = {} // group → until when it counts in the band
   const barTime = (bar: number) => M.zero + bar * BAR
   const nextBar = (t: number) => Math.ceil((t - M.zero) / BAR - 1e-6)
+  const q16 = (t: number) => M.zero + Math.ceil((t - M.zero) / SIX - 1e-6) * SIX
+  const q8 = (t: number) => M.zero + Math.ceil((t - M.zero) / (2 * SIX) - 1e-6) * 2 * SIX
   function onGrid(sec: number, div = 2) { // seconds until the first 8th (div 2) or beat (div 1) at least `sec` away
     if (!M.on) return sec
     const t0 = ac.currentTime, unit = BEAT / div
     return M.zero + Math.ceil((t0 + sec - M.zero) / unit) * unit - t0
   }
+  const pending = new Set<number>()
+  function at(t: number, fn: () => void) { const id = window.setTimeout(() => { pending.delete(id); fn() }, Math.max(0, (t - ac.currentTime) * 1000)); pending.add(id) }
+
   function musicStart(level: number) {
+    init()
+    const { mbus, glitch } = eng()
     const t = ac.currentTime
     M.on = true; M.level = level; M.next = null; M.muteUntil = 0; M.fills.clear(); M.dropBar = -1; M.last = {}
     M.zero = t + 0.06
+    M.cursor = t
+    eng().resetHarmony()
+    ORDER.forEach((g) => { part[g] = 0 })
+    for (const p of [mbus.gain, glitch.frequency]) p.cancelScheduledValues(t)
+    glitch.frequency.setValueAtTime(18000, t)
+    mbus.gain.setValueAtTime(0.3, t)
+    mbus.gain.linearRampToValueAtTime(1, M.zero + BAR) // the first bar fades in
+    clearInterval(M.timer)
+    M.timer = window.setInterval(tick, 25)
+    drawBand()
   }
-  function musicStop() {
+  function musicStop(fade = 0.35) {
     if (!M.on) return
     M.on = false
+    clearInterval(M.timer); M.timer = 0
+    pending.forEach(clearTimeout); pending.clear()
+    const { mbus } = eng()
+    const t = ac.currentTime
+    mbus.gain.cancelScheduledValues(t)
+    mbus.gain.setValueAtTime(mbus.gain.value, t)
+    mbus.gain.linearRampToValueAtTime(0, t + fade)
+    eng().releaseAll(t + fade)
+    ORDER.forEach((g) => { part[g] = 0 })
+    drawBand()
   }
-  /* a shot at a skill plays its part (the music, T8) */
-  function partHit(k: Key, v = 1, heard = true) { void k; void v; void heard }
-  const bandSize = () => 0
-  const musicState = (): MusicState => ({ on: false, now: ac.currentTime, last: M.last, active: [...G.active].map((a) => a.k.group) })
-  /* the game's own sounds and its musical moments (the music, T8) */
-  const SFX = { zap() {}, boom(size: number) { void size }, lockOn() {}, fire() {}, scratch() {}, clank() {} }
-  const MUS = { kill(elite: boolean) { void elite }, clear() {}, hurt() {}, tapeStop() {}, riser(t0: number, t1: number) { void t0; void t1 } }
-  function handOff() {} // the site's music (T8)
-  function handBack() {}
+  function tick() {
+    const t0 = ac.currentTime, until = t0 + 0.12
+    if (M.cursor < t0) M.cursor = t0 // after a stall, skip the backlog rather than play it late
+    for (let s = Math.ceil((M.cursor - M.zero) / SIX - 1e-6); ; s++) {
+      const t = M.zero + s * SIX
+      if (t >= until) break
+      if (t >= M.cursor - 1e-6) step(s, t)
+    }
+    M.cursor = until
+  }
+  function step(s: number, t: number) {
+    const bar = Math.floor(s / 16), pos = s % 16
+    if (M.next && t >= M.next.t - 1e-4) { M.level = M.next.level; M.next = null }
+    if (bar === M.dropBar - 1 && pos >= 12) { if (pos === 12) eng().releaseAll(t); return } // the breath before the drop: everything stops for a beat
+    if (t >= M.muteUntil - 1e-4) eng().beat(M.level, bar, pos, t, { drop: bar === M.dropBar, fill: M.fills.has(bar) })
+    if (pos % 4 === 0) at(t, drawBand) // parts leave the band on the beat
+  }
+
+  /* a shot at a skill plays its part (chords, bass and vox on the next 8th, the rest on the next 16th, every
+     note moved into the chord you hit last); a lit one (`heard`) also counts in the band */
+  function partHit(k: Key, v = 1, heard = true) {
+    if (!M.on || muted) { if (heard) hear(k.group); return }
+    const t0 = ac.currentTime + 0.012, t = ON_8TH[k.group] ? q8(t0) : q16(t0)
+    const ch = eng().hit(k.group, k, t, v)
+    if (ch) status(`<span style="color:hsl(${PARTS.cloud.c})">${ch.name}</span>`, false)
+    glow(k.group, t)
+    if (heard) hear(k.group, t)
+  }
+  let joinedOnce = false
+  function hear(g: SkillGroupId, t = ac.currentTime) {
+    if (!M.on) return
+    const was = (part[g] ?? 0) > ac.currentTime
+    part[g] = Math.max(part[g] ?? 0, t + HEARD_BARS * BAR)
+    M.last[g] = t
+    if (!was) {
+      drawBand()
+      if (bandSize() === 2 && !joinedOnce) { joinedOnce = true; status('Every group is its own sound · mix them for a bigger multiplier'); tell('Every group is its own sound. Mix them for a bigger multiplier.') }
+    }
+  }
+  const bandSize = () => (M.on ? bandOf(part, ac.currentTime) : 0)
+  const musicState = (): MusicState => ({ on: M.on, now: ac.currentTime, last: M.last, active: [...G.active].map((a) => a.k.group) })
+  /* a group's heading pulses when it plays */
+  function glow(g: SkillGroupId, t: number) {
+    if (rm) return
+    at(t, () => headings[g]?.animate([{ textShadow: `0 0 10px hsl(${PARTS[g].c}), 0 0 26px hsl(${PARTS[g].c})`, color: '#fff' }, {}], { duration: 360, easing: 'ease-out' }))
+  }
+
+  /* the game's own sounds (not in the track): the laser, booms, the enemy's lock-on and shot, a clank */
+  const T = () => ac.currentTime + 0.005
+  const SFX = {
+    zap() {
+      if (muted || !E) return
+      const { voice, osc, gain, env, play, sfx } = E, t = T(), v = voice(sfx)
+      const o = osc(v, 'triangle', 2600); o.frequency.exponentialRampToValueAtTime(320, t + 0.08)
+      const g = gain(v); env(g.gain, t, 0.002, 0.03, 0.09)
+      o.connect(g).connect(v.out)
+      play([o], t, t + 0.1)
+    },
+    boom(size = 1) {
+      if (muted || !E) return
+      const { voice, osc, gain, filter, env, play, noiseSrc, sfx } = E, t = T(), v = voice(sfx)
+      const n = noiseSrc(v, t, 0.4 * size)
+      const lp = filter(v, 'lowpass', 2200 + 1600 * size, 0.7)
+      lp.frequency.setValueAtTime(2200 + 1600 * size, t); lp.frequency.exponentialRampToValueAtTime(90, t + 0.28 * size)
+      const g = gain(v); env(g.gain, t, 0.002, 0.13 * size, 0.32 * size)
+      n.connect(lp).connect(g).connect(v.out)
+      const th = osc(v, 'sine', 120); th.frequency.exponentialRampToValueAtTime(36, t + 0.22 * size)
+      const tg = gain(v); env(tg.gain, t, 0.002, 0.24 * Math.min(size, 2), 0.26 * size)
+      th.connect(tg).connect(v.out)
+      play([th], t, t + 0.3 * size)
+    },
+    lockOn() {
+      if (muted || !E) return
+      const { voice, osc, gain, env, play, sfx } = E, t = T()
+      ;([[880, 0], [1174.7, 0.07]] as const).forEach(([f, d]) => {
+        const v = voice(sfx), o = osc(v, 'sine', f), g = gain(v)
+        env(g.gain, t + d, 0.002, 0.045, 0.06)
+        o.connect(g).connect(v.out)
+        play([o], t + d, t + d + 0.08)
+      })
+    },
+    fire() {
+      if (muted || !E) return
+      const { voice, osc, gain, filter, env, play, sfx } = E, t = T(), v = voice(sfx)
+      const o = osc(v, 'sawtooth', 760); o.frequency.exponentialRampToValueAtTime(90, t + 0.28)
+      const lp = filter(v, 'lowpass', 1800)
+      const g = gain(v); env(g.gain, t, 0.004, 0.06, 0.3)
+      o.connect(lp).connect(g).connect(v.out)
+      play([o], t, t + 0.32)
+    },
+    scratch() { // getting hit: a scratch and a thud
+      if (muted || !E) return
+      const { voice, osc, gain, filter, env, play, noiseSrc, sfx } = E, t = T(), v = voice(sfx)
+      const n = noiseSrc(v, t, 0.3)
+      const bp = filter(v, 'bandpass', 3200, 2.5)
+      bp.frequency.setValueAtTime(3200, t); bp.frequency.exponentialRampToValueAtTime(260, t + 0.25)
+      const g = gain(v); env(g.gain, t, 0.002, 0.2, 0.27)
+      n.connect(bp).connect(g).connect(v.out)
+      const th = osc(v, 'sine', 90); th.frequency.exponentialRampToValueAtTime(30, t + 0.3)
+      const tg = gain(v); env(tg.gain, t, 0.002, 0.36, 0.34)
+      th.connect(tg).connect(v.out)
+      play([th], t, t + 0.36)
+    },
+    clank() {
+      if (muted || !E) return
+      const { voice, osc, gain, env, play, sfx } = E, t = T(), v = voice(sfx)
+      const a = osc(v, 'sine', 1420), b = osc(v, 'sine', 2093)
+      const g = gain(v); env(g.gain, t, 0.001, 0.06, 0.18)
+      a.connect(g); b.connect(g); g.connect(v.out)
+      play([a, b], t, t + 0.2)
+    },
+  }
+  /* musical moments, on the grid */
+  const MUS = {
+    kill(elite: boolean) { // a crash (the skill plays its own sound too); an elite gets a fill first
+      if (!M.on || muted) return
+      const { D } = eng(), t = q16(ac.currentTime + 0.012)
+      if (elite) { for (let i = 0; i < 4; i++) D.snare(t + i * SIX, 0.45 + i * 0.15); D.crash(t + BEAT, 1); D.kick(t + BEAT) } else D.crash(t, 0.7)
+    },
+    clear() { // wave clear: the chord you're on, as a bell run
+      if (!M.on || muted) return
+      const t = q16(ac.currentTime + 0.012), list = inChord(eng().chordAt(t), 74, 90)
+      list.slice(0, 5).forEach((m, i) => eng().I.bell(hz(m), t + i * SIX, 0.6))
+    },
+    hurt() { // the track dips and the drums skip two beats
+      if (!M.on) return
+      const { glitch } = eng(), t = ac.currentTime
+      glitch.frequency.cancelScheduledValues(t)
+      glitch.frequency.setValueAtTime(18000, t)
+      glitch.frequency.exponentialRampToValueAtTime(320, t + 0.08)
+      glitch.frequency.setValueAtTime(320, t + BEAT)
+      glitch.frequency.exponentialRampToValueAtTime(18000, t + BEAT + 0.45)
+      M.muteUntil = q16(t) + 2 * BEAT
+    },
+    tapeStop() { // game over: the track winds down
+      if (!M.on) return
+      const { glitch, mbus, voice, osc, filter, gain, env, play, sfx } = eng(), t = ac.currentTime
+      glitch.frequency.cancelScheduledValues(t)
+      glitch.frequency.setValueAtTime(18000, t)
+      glitch.frequency.exponentialRampToValueAtTime(140, t + 1.2)
+      mbus.gain.cancelScheduledValues(t)
+      mbus.gain.setValueAtTime(mbus.gain.value, t)
+      mbus.gain.linearRampToValueAtTime(0, t + 1.4)
+      M.muteUntil = t + 10
+      if (!muted) {
+        const v = voice(sfx), o = osc(v, 'sawtooth', 220), lp = filter(v, 'lowpass', 900), g = gain(v)
+        o.frequency.exponentialRampToValueAtTime(30, t + 1.2)
+        env(g.gain, t, 0.01, 0.07, 1.25)
+        o.connect(lp).connect(g).connect(v.out)
+        play([o], t, t + 1.3)
+      }
+    },
+    riser(t0: number, t1: number) { eng().D.riser(t0, t1) },
+  }
+
+  /* one track at a time: the site's music pauses while the game plays and comes back after; pressing play on the
+     site's player mid-game pauses the game */
+  let pausedSite = false
+  function handOff() { if (site?.isPlaying()) { site.pause(); pausedSite = true } }
+  function handBack() { if (pausedSite) { pausedSite = false; site?.play() } }
+  const offSite = site?.onChange((on) => { if (on && playing()) { pausedSite = false; pause('Paused · the music player is on') } })
 
   /* ---------- one screen: the arena (T9) ---------- */
   const armArena = (k: Key): Moved | undefined => { void k; return undefined }
@@ -378,6 +575,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   const untilBar = (bar: number) => (barTime(bar) - ac.currentTime) * 1000
 
   function shootSkill(k: Key, shot: Shot) {
+    init()
     const kb = shot.keyboard
     const p = kb ? centerOf(k.label) : { x: shot.x, y: shot.y }
     shotFx(p)
@@ -389,6 +587,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     graze(k)
   }
   function shootAir(shot: Shot) {
+    init()
     shotFx({ x: shot.x, y: shot.y })
     G.lastShot = now()
   }
@@ -611,7 +810,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     if (best) { G.best = G.score; saveBest() }
     root.classList.remove('bl-on')
     MUS.tapeStop()
-    later(1500, () => { musicStop(); handBack() })
+    later(1500, () => { musicStop(0.05); handBack() })
     later(12000, () => { if (G.state === 'over') { G.state = 'rest'; hudOff(); arenaOff() } }) // no second go: back to the list
     banner('Game over', best ? 'New best' : `Best ${fmt(G.best)}`, RED)
     status(`<span class="foe">Game over</span> · <b>${fmt(G.score)}</b> · ${best ? '<span class="good">new best</span>' : `best ${fmt(G.best)}`} · shoot any skill to play again <a href="https://numberslayers.com" target="_blank" rel="noopener">Want more? Number Slayers ↗</a>`)
@@ -625,7 +824,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     if (G.state === 'wave') G.spawned = Math.max(0, G.spawned - n) // they come back on resume
     G.state = 'paused'
     watchOff()
-    musicStop()
+    musicStop(0.6)
     root.classList.remove('bl-on')
     status(msg)
     tell(msg.replace(' ·', '.'))
@@ -652,7 +851,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     if (G.score > G.best) { G.best = G.score; saveBest() }
     G.state = 'rest'
     root.classList.remove('bl-on')
-    musicStop()
+    musicStop(0.3)
     hudOff()
     arenaOff()
     handBack()
@@ -661,6 +860,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   function resetRun() {
     clearLater()
     G.score = 0; G.wave = -1; G.hp = MAX_HP; G.hpOn = false; G.spawned = 0; G.blind = 0; G.eliteSeen = false
+    joinedOnce = false
     hpEl.hidden = true
     scoreB.textContent = '0'
     waveB.textContent = '1'
@@ -698,11 +898,11 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   const $ = <T extends HTMLElement>(s: string) => hud.querySelector<T>(s)!
   const muteBtn = $<HTMLButtonElement>('.bl-mute'), stopBtn = $<HTMLButtonElement>('.bl-stop'), scoreB = $('.bl-score b'), multEl = $('.bl-mult'), waveB = $('.bl-wave b'), hpEl = $('.bl-hp'), r2 = $('.r2')
   const hpBars = [...hpEl.querySelectorAll('i')]
-  const ORDER = Object.keys(PARTS) as SkillGroupId[]
   const bandEl = document.createElement('span')
   bandEl.className = 'bl-band'
   bandEl.setAttribute('aria-hidden', 'true')
   bandEl.innerHTML = `Band <span class="pips">${ORDER.map((g) => `<i style="--c:${PARTS[g].c}" title="${PARTS[g].label}"></i>`).join('')}</span>`
+  const pips = Object.fromEntries(ORDER.map((g, i) => [g, bandEl.querySelectorAll('i')[i]])) as Record<SkillGroupId, HTMLElement>
   const statusEl = document.createElement('span')
   let statusText = '', holdUntil = 0
   function status(html: string, important = true) { // the band's joins and drops never cover a hit, a wave or a pause
@@ -728,6 +928,15 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     if (at) floatPoints(at.x, at.y, `+${fmt(pts)}`, mult, c, big)
   }
   function setMult(m: number) { multEl.textContent = m > 1 ? `×${m}` : '' }
+  /* the band (the parts heard in the last two bars), as lights in the readout and lit headings */
+  function drawBand() {
+    const on = new Set(M.on ? inBand(part, ac.currentTime + 0.01) : [])
+    for (const g of ORDER) {
+      pips[g].classList.toggle('on', on.has(g))
+      headings[g]?.classList.toggle('bl-live', on.has(g))
+    }
+    setMult(on.size)
+  }
   function drawHp() {
     hpBars.forEach((b, i) => b.classList.toggle('out', i >= G.hp))
     hpEl.classList.toggle('low', G.hp <= 2)
@@ -744,10 +953,10 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     const wait = urgent ? 0 : Math.max(0, 1300 - (now() - sayLast))
     sayT = window.setTimeout(() => { sayLast = now(); say(text) }, wait)
   }
-  let muted = false
   muteBtn.addEventListener('click', () => {
     muted = !muted
     muteBtn.setAttribute('aria-pressed', String(muted))
+    E?.setMuted(muted)
   })
   stopBtn.addEventListener('click', stop)
 
@@ -805,7 +1014,11 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   /* dev handle for checks (stripped from production builds) */
   if (process.env.NODE_ENV !== 'production') {
     ;(window as unknown as { __skills: unknown }).__skills = {
-      G, M, keys, get ac() { return ac }, bandSize,
+      G, M, keys, part, get ac() { return ac }, get E() { return E }, bandSize,
+      chordAt: (t?: number) => E?.chordAt(t ?? ac.currentTime),
+      active: () => (E ? E.active : 0), made: () => (E ? E.made : 0),
+      /** checks only: solo the synths */
+      drums: (on: boolean) => { if (E) E.dbus.gain.value = on ? E.P.drums.bus : 0 },
       startWave, stop,
       /** the riser into the drop, as the mockup's "Jump to wave 3" */
       jumpToDrop() {
@@ -817,13 +1030,22 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
         G.wave = FIRST_FOE_WAVE - 1
         root.classList.add('bl-on')
         hudOn()
+        init()
         status('Skipping ahead · the riser into the drop')
         musicStart(1)
         toWave(FIRST_FOE_WAVE)
         G.lastShot = now() + 3000
         watchOn()
       },
-      meter: () => null,
+      /** RMS and peak of the last 2048 samples at the output */
+      meter() {
+        if (!E) return null
+        const a = new Float32Array(E.meter.fftSize)
+        E.meter.getFloatTimeDomainData(a)
+        let sq = 0, pk = 0
+        for (const x of a) { sq += x * x; pk = Math.max(pk, Math.abs(x)) }
+        return { rms: +Math.sqrt(sq / a.length).toFixed(4), peak: +pk.toFixed(3) }
+      },
     }
   }
 
@@ -834,6 +1056,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
       clearTimeout(sayT); clearTimeout(rT)
       document.removeEventListener('keydown', onKey)
       window.removeEventListener('resize', onResize)
+      offSite?.()
       rmQuery.removeEventListener?.('change', onMotion)
       io.disconnect()
       ro?.disconnect()

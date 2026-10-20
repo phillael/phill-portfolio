@@ -191,7 +191,7 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
   - `MusicPlayer` registers the four via refs, like `toggle`; `onChange` listeners are called from an effect on `isPlaying`.
   - **Tests** (in `site-music.test.tsx` or the music tests, with the existing AudioContext mocks): `context()` returns the player's one context and creates no second `createMediaElementSource`; `pause()`/`play()` drive the player; an `onChange` listener hears play and pause, and stops hearing them after its unsubscribe.
   - **Done 2026-10-20:** `onChange` fires only on a change, not on mount. The three tests that fake a `SiteMusic` (experience-section, jelly-resume-canvas, jelly-play-hud) got the four new no-op members. Verification: `npx jest --no-watchman site-music music-` passed (10 suites, 159 tests); the faked-player suites passed too (13 suites, 224 tests); `npx tsc --noEmit` exit 0; eslint exit 0.
-- [ ] **T3: the engine.**
+- [x] **T3: the engine.**
   - `src/lib/skills/synth.ts` (`createSynth(ac, config = SKILL_SYNTH_CONFIG)`, the constants, `CHORDS`, `PARTS`, `ON_8TH`, `BEATS`) and `src/lib/skills/synthConfig.ts`, per Binding §2.
   - **Generate `synthConfig.ts`, don't type it:** write `docs/design/sound-lab/tools/bake-skills-config.mjs`. It loads `round6/synth.js` in Node with a stub `window` and writes `synthConfig.ts` from `defaults()`, typed and frozen, with a header saying it's generated and how. Run it.
   - **The recordings:** copy the files in the §2 table to `public/skills/sfx/` with `CREDITS.md`.
@@ -201,6 +201,22 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
     - the chord timeline;
     - a Cloud hit sets the chord and other hits snap to it (note choice per group, per `HIT`);
     - recorded sets fall back to the synth when `fetch` fails.
+  - **Done 2026-10-20:**
+    - **What changed in the port:**
+      - **Lab-only parts left out:** the schema, `clean`/`setPatch`/`diff` and the room cache (the config is fixed).
+      - **Pre-delay:** the node is only made when `rPre > 0`.
+      - **Loading:** files decode with the promise form of `decodeAudioData`, so a failed decode isn't an unhandled rejection. With no `fetch`, the synth plays.
+      - **Recorded sets:** only the four Phill picked are in `SETS`.
+      - **The ride's level:** 0.055, now named `RIDE_G`.
+      - **Unchanged:** the order of `Math.random` calls (the room, then the noise buffer), for T11's seeded comparison.
+    - **Test fake:** a shared fake AudioContext in `src/__tests__/helpers/fakeAudio.ts`, for T7/T8.
+    - **The checks:**
+      - `npx jest --no-watchman skills-synth`: 18 passed.
+      - Re-bake: `wrote src/lib/skills/synthConfig.ts: 9 parts, 189 settings`, and `git diff --exit-code` exit 0.
+      - Parity break: `kickPitch` 150 → 151 failed the test (`- "kickPitch": 150, + "kickPitch": 151`); reverted, 18 passed.
+      - `curl -sI localhost:3002/skills/sfx/ride-k.mp3`: `200 OK`, `Content-Type: audio/mpeg`, 75821 bytes.
+      - `public/skills/sfx/`: 380 KB.
+      - `npx tsc --noEmit` exit 0; eslint exit 0.
 - [ ] **T4: the rules as pure modules.** `src/lib/skills/rules.ts`, ported from `blaster-synth.js`:
   - `WAVES`/`waveCfg`/`planFor` (inject the RNG);
   - `KIND` points;

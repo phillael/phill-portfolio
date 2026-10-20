@@ -671,11 +671,15 @@ export function createSynth(ac: BaseAudioContext, config: Readonly<SkillSynthCon
       play([o], t, t + 0.1)
       return
     }
+    // variety: each shot dives for its own time, a little higher or lower, a little brighter or darker
+    const dive = p.sweep + Math.random() * Math.max(0, p.sweepMax - p.sweep)
+    const k = 2 ** (((Math.random() * 2 - 1) * p.pitchVar) / 12), from = p.from * k, to = p.to * k
+    const bright = Math.min(20000, p.bright * 2 ** ((Math.random() * 2 - 1) * p.filterVar))
     const vo = voice(sfx, p.delay, p.verb, p.level)
-    const lp = filter(vo, 'lowpass', p.bright, p.res)
-    lp.frequency.setValueAtTime(p.bright, t); lp.frequency.exponentialRampToValueAtTime(Math.max(60, p.to * 3), t + p.sweep)
-    const zs = unison(vo, p.wave, p.from, p.unison, p.detune, lp)
-    zs.forEach((o) => { o.frequency.setValueAtTime(p.from, t); o.frequency.exponentialRampToValueAtTime(p.to, t + p.sweep) })
+    const lp = filter(vo, 'lowpass', bright, p.res)
+    lp.frequency.setValueAtTime(bright, t); lp.frequency.exponentialRampToValueAtTime(Math.max(60, to * 3), t + dive)
+    const zs = unison(vo, p.wave, from, p.unison, p.detune, lp)
+    zs.forEach((o) => { o.frequency.setValueAtTime(from, t); o.frequency.exponentialRampToValueAtTime(to, t + dive) })
     const g = gain(vo); env(g.gain, t, 0.001, 0.09 * v, p.decay)
     if (p.drive > 0) lp.connect(shaper(vo, p.drive)).connect(g); else lp.connect(g)
     g.connect(vo.out)

@@ -125,6 +125,9 @@ window.SKILL_SYNTH = (() => {
   // and his second: the ride is the recorded K Zildjian, cut to 1.7 s (round 6's synthesized ride is "808 (round 6)")
   // and his third: the Meinl 18″ crash darker (0.66) and higher (1.16), the Percussive riser, the Bass drop boom pitched up (1.4)
   //   (round 6 had synthesized ones: "Synth (round 6)" in each)
+  // and his fourth, the Laser (new after his first local try: round 6's shot, now "Zap (round 6)", was "a really weak
+  //   sound"): three voices 1640 → 95.5 Hz, bite 19.5, length 0.8 s, drive 0.45, thump 1.34, crackle 2 (the range's top:
+  //   now up to 3), echo 0.13; and, his ask, variety per shot: the dive between 140 and 500 ms, pitch ±2 st, filter ±0.4 oct
   const SCHEMA = [
     { id: 'backend', label: 'Bass', group: 'Backend & data', c: PARTS.backend.c, about: 'Deep and round: two detuned sines an octave up, a little drive, a resonant filter that closes slowly and drifts, over a triangle sub. One note at a time from the chord’s root, gliding into the next.', sections: [
       { title: 'Oscillators', params: [
@@ -346,25 +349,30 @@ window.SKILL_SYNTH = (() => {
       { title: 'Zap', params: [
         pick('kind', 'Sound', 'blaster', [['blaster', 'Blaster'], ['round6', 'Zap (round 6)']]),
         pick('wave', 'Wave', 'sawtooth', WAVES),
-        num('unison', 'Voices', 2, 1, 4, 1, 'n'),
-        num('detune', 'Detune', 14, 0, 60, 1, 'c'),
-        num('from', 'Starts at', 1600, 200, 6000, 0, 'hz'),
-        num('to', 'Dives to', 120, 30, 1500, 0, 'hz'),
-        num('sweep', 'Dive time', 0.14, 0.02, 0.6, 0, 's', { log: true }),
-        num('bright', 'Filter', 5200, 300, 16000, 0, 'hz'),
-        num('res', 'Bite', 7, 0.1, 20, 0.1, 'q'),
-        num('decay', 'Length', 0.22, 0.04, 1, 0, 's', { log: true }),
-        num('drive', 'Drive', 0.35, 0, 1, 0.01, 'pct'),
+        num('unison', 'Voices', 3, 1, 4, 1, 'n'),
+        num('detune', 'Detune', 13, 0, 60, 1, 'c'),
+        num('from', 'Starts at', 1640, 200, 6000, 0, 'hz'),
+        num('to', 'Dives to', 95.5, 30, 1500, 0, 'hz'),
+        num('sweep', 'Shortest dive', 0.14, 0.02, 0.6, 0, 's', { log: true }),
+        num('bright', 'Filter', 5300, 300, 16000, 0, 'hz'),
+        num('res', 'Bite', 19.5, 0.1, 25, 0.1, 'q'),
+        num('decay', 'Length', 0.801, 0.04, 1.5, 0, 's', { log: true }),
+        num('drive', 'Drive', 0.45, 0, 1, 0.01, 'pct'),
+      ] },
+      { title: 'Variety', params: [ // every shot is a little different, so a run of them never grates
+        num('sweepMax', 'Longest dive', 0.5, 0.02, 1.2, 0, 's', { log: true }),
+        num('pitchVar', 'Pitch spread', 2, 0, 12, 0.5, 'stpm'),
+        num('filterVar', 'Filter spread', 0.4, 0, 2, 0.05, 'octpm'),
       ] },
       { title: 'Punch', params: [
-        num('thump', 'Thump', 0.8, 0, 2, 0.01, 'x'),
-        num('thumpPitch', 'Thump pitch', 140, 40, 400, 1, 'hzl'),
-        num('crackle', 'Crackle', 0.6, 0, 2, 0.01, 'x'),
-        num('crackleTone', 'Crackle tone', 4200, 500, 14000, 0, 'hz'),
+        num('thump', 'Thump', 1.34, 0, 3, 0.01, 'x'),
+        num('thumpPitch', 'Thump pitch', 142, 40, 400, 1, 'hzl'),
+        num('crackle', 'Crackle', 2, 0, 3, 0.01, 'x'),
+        num('crackleTone', 'Crackle tone', 4050, 500, 14000, 0, 'hz'),
       ] },
       { title: 'Mix', params: [
         num('level', 'Level', 1, 0, 2, 0.01, 'x'),
-        num('delay', 'Echo', 0.12, 0, 1, 0.01, 'pct'),
+        num('delay', 'Echo', 0.13, 0, 1, 0.01, 'pct'),
         num('verb', 'Reverb send', 0.12, 0, 1, 0.01, 'pct'),
       ] },
     ] },
@@ -884,11 +892,15 @@ window.SKILL_SYNTH = (() => {
         play([o], t, t + 0.1)
         return
       }
+      // variety: each shot dives for its own time, a little higher or lower, a little brighter or darker
+      const dive = p.sweep + Math.random() * Math.max(0, p.sweepMax - p.sweep)
+      const k = 2 ** (((Math.random() * 2 - 1) * p.pitchVar) / 12), from = p.from * k, to = p.to * k
+      const bright = Math.min(20000, p.bright * 2 ** ((Math.random() * 2 - 1) * p.filterVar))
       const vo = voice(sfx, p.delay, p.verb, p.level)
-      const lp = filter(vo, 'lowpass', p.bright, p.res)
-      lp.frequency.setValueAtTime(p.bright, t); lp.frequency.exponentialRampToValueAtTime(Math.max(60, p.to * 3), t + p.sweep)
-      const zs = unison(vo, p.wave, p.from, p.unison, p.detune, lp)
-      zs.forEach((o) => { o.frequency.setValueAtTime(p.from, t); o.frequency.exponentialRampToValueAtTime(p.to, t + p.sweep) })
+      const lp = filter(vo, 'lowpass', bright, p.res)
+      lp.frequency.setValueAtTime(bright, t); lp.frequency.exponentialRampToValueAtTime(Math.max(60, to * 3), t + dive)
+      const zs = unison(vo, p.wave, from, p.unison, p.detune, lp)
+      zs.forEach((o) => { o.frequency.setValueAtTime(from, t); o.frequency.exponentialRampToValueAtTime(to, t + dive) })
       const g = gain(vo); env(g.gain, t, 0.001, 0.09 * v, p.decay)
       if (p.drive > 0) lp.connect(shaper(vo, p.drive)).connect(g); else lp.connect(g)
       g.connect(vo.out)

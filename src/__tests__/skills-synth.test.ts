@@ -119,20 +119,46 @@ describe('the harmony', () => {
 })
 
 describe('the shot', () => {
-  it('a laser: detuned saws diving from 1.6 kHz to 120 Hz, a thump under them and a crackle, on the game’s bus', () => {
-    const { ac, E } = make()
+  const L = SKILL_SYNTH_CONFIG.laser
+  const steady = { ...SKILL_SYNTH_CONFIG, laser: { ...L, sweepMax: L.sweep, pitchVar: 0, filterVar: 0 } } // no variety
+
+  it('a laser: detuned saws diving in pitch through a filter, a thump under them and a crackle (Phill’s patch)', () => {
+    const ac = new FakeAudioContext(), E = createSynth(ac as unknown as AudioContext, steady)
     const from = ac.nodes.length
     E.laser(1)
     const oscs = ac.since(from, 'osc')
     const saws = oscs.filter((o) => o.type === 'sawtooth')
-    expect(saws).toHaveLength(SKILL_SYNTH_CONFIG.laser.unison)
+    expect(saws).toHaveLength(3)
     for (const o of saws) {
-      expect(o.frequency.calls).toContainEqual(['set', 1600, 1])
-      expect(o.frequency.calls).toContainEqual(['exp', 120, 1 + SKILL_SYNTH_CONFIG.laser.sweep])
+      expect(o.frequency.calls).toContainEqual(['set', 1640, 1])
+      expect(o.frequency.calls).toContainEqual(['exp', 95.5, 1 + 0.14])
     }
-    expect(oscs.some((o) => o.type === 'sine' && o.frequency.value === 140)).toBe(true) // the thump
+    expect(oscs.some((o) => o.type === 'sine' && o.frequency.value === 142)).toBe(true) // the thump
     expect(ac.since(from, 'source')).toHaveLength(1) // the crackle
     expect(ac.since(from, 'shaper')).toHaveLength(1) // the drive
+  })
+
+  it('every shot is a little different: the dive 140–500 ms, the pitch ±2 st, the filter ±0.4 oct', () => {
+    const { ac, E } = make()
+    const dives: number[] = [], pitches: number[] = [], filters: number[] = []
+    for (let i = 0; i < 40; i++) {
+      const from = ac.nodes.length
+      E.laser(10 + i)
+      const saw = ac.since(from, 'osc').find((o) => o.type === 'sawtooth')!
+      const [, start] = saw.frequency.calls.find(([k]) => k === 'set')!
+      const [, end, at] = saw.frequency.calls.find(([k]) => k === 'exp')!
+      const lp = ac.since(from, 'filter').find((f) => f.type === 'lowpass')!
+      dives.push(at! - (10 + i))
+      pitches.push(12 * Math.log2(start / 1640))
+      filters.push(Math.log2(lp.frequency.value / 5300))
+      expect(end / start).toBeCloseTo(95.5 / 1640) // the start and the end move together
+    }
+    expect(Math.min(...dives)).toBeGreaterThanOrEqual(0.14 - 1e-9)
+    expect(Math.max(...dives)).toBeLessThanOrEqual(0.5 + 1e-9)
+    expect(Math.max(...dives) - Math.min(...dives)).toBeGreaterThan(0.2) // they really spread
+    expect(Math.max(...pitches.map(Math.abs))).toBeLessThanOrEqual(2 + 1e-9)
+    expect(new Set(pitches.map((x) => x.toFixed(3))).size).toBeGreaterThan(30)
+    expect(Math.max(...filters.map(Math.abs))).toBeLessThanOrEqual(0.4 + 1e-9)
   })
 
   it('Zap (round 6) is the old blip', () => {

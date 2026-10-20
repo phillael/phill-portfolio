@@ -223,6 +223,9 @@ export interface SynthLaserConfig {
   res: number
   decay: number
   drive: number
+  sweepMax: number
+  pitchVar: number
+  filterVar: number
   thump: number
   thumpPitch: number
   crackle: number
@@ -458,21 +461,24 @@ export const SKILL_SYNTH_CONFIG: Readonly<SkillSynthConfig> = Object.freeze<Skil
   laser: Object.freeze<SynthLaserConfig>({
     kind: 'blaster',
     wave: 'sawtooth',
-    unison: 2,
-    detune: 14,
-    from: 1600,
-    to: 120,
+    unison: 3,
+    detune: 13,
+    from: 1640,
+    to: 95.5,
     sweep: 0.14,
-    bright: 5200,
-    res: 7,
-    decay: 0.22,
-    drive: 0.35,
-    thump: 0.8,
-    thumpPitch: 140,
-    crackle: 0.6,
-    crackleTone: 4200,
+    bright: 5300,
+    res: 19.5,
+    decay: 0.801,
+    drive: 0.45,
+    sweepMax: 0.5,
+    pitchVar: 2,
+    filterVar: 0.4,
+    thump: 1.34,
+    thumpPitch: 142,
+    crackle: 2,
+    crackleTone: 4050,
     level: 1,
-    delay: 0.12,
+    delay: 0.13,
     verb: 0.12,
   }),
   space: Object.freeze<SynthSpaceConfig>({

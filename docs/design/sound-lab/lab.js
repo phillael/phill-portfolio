@@ -265,6 +265,8 @@
       case 'beats': return `${v} beat${v === 1 ? '' : 's'}`
       case 'bars': return `${v} bar${v === 1 ? '' : 's'}`
       case 'oct': return v === 0 ? '0' : `${sign(v)}${Math.abs(v)} oct`
+      case 'stpm': return v === 0 ? 'None' : `±${v} st`
+      case 'octpm': return v === 0 ? 'None' : `±${v} oct`
       case 'pan': return Math.abs(v) < 0.005 ? 'Center' : `${R(Math.abs(v) * 100)}% ${v < 0 ? 'L' : 'R'}`
       case 'db': return `${v} dB`
       case 'six': return v === 0 ? 'Off' : `${v} × 16th`

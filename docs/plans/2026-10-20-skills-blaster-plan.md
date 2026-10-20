@@ -663,6 +663,17 @@ Phill: "it's amazing", with two fixes.
 
 `npx tsc --noEmit` exit 0; `npm run lint` exit 0; `npx jest --no-watchman`: 62 suites, 704 passed.
 
+3. **Phill's laser patch** (from the lab), baked into `synth.js`'s defaults, then `bake-skills-config.mjs`:
+   - **The sound:** three voices, detune 13¢, 1640 → 95.5 Hz, filter 5.3 kHz, bite 19.5, length 0.8 s, drive 0.45, thump 1.34 at 142 Hz, crackle 2 at 4.05 kHz, echo 0.13.
+   - **Ranges:** crackle sat at the slider's top, so it now goes to 3; thump goes to 3, length to 1.5 s.
+   - **Variety per shot** ("otherwise that sound will get annoying"), a new **Variety** section, so a run of shots never repeats:
+     - the dive picked between "Shortest dive" 140 ms (his 0.144) and "Longest dive" 500 ms;
+     - the pitch ±2 st, the start and the end moving together;
+     - the filter ±0.4 oct.
+   - **Loudness:** RMS over its first 150 ms −26.3 dB, ~2 dB over a snare.
+   - **Tests:** `skills-synth`: the patch with the variety off, and 40 shots within the ranges and spread.
+   - **The render comparison:** −124.9 dB on the laser (the same random draws in both engines).
+
 ## Stop conditions / open questions (for Phill)
 
 - **T12:** stop before pushing; Phill tries it on desktop and his phone and approves the PR text.

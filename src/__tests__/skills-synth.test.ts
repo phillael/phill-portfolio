@@ -118,6 +118,32 @@ describe('the harmony', () => {
   })
 })
 
+describe('the shot', () => {
+  it('a laser: detuned saws diving from 1.6 kHz to 120 Hz, a thump under them and a crackle, on the game’s bus', () => {
+    const { ac, E } = make()
+    const from = ac.nodes.length
+    E.laser(1)
+    const oscs = ac.since(from, 'osc')
+    const saws = oscs.filter((o) => o.type === 'sawtooth')
+    expect(saws).toHaveLength(SKILL_SYNTH_CONFIG.laser.unison)
+    for (const o of saws) {
+      expect(o.frequency.calls).toContainEqual(['set', 1600, 1])
+      expect(o.frequency.calls).toContainEqual(['exp', 120, 1 + SKILL_SYNTH_CONFIG.laser.sweep])
+    }
+    expect(oscs.some((o) => o.type === 'sine' && o.frequency.value === 140)).toBe(true) // the thump
+    expect(ac.since(from, 'source')).toHaveLength(1) // the crackle
+    expect(ac.since(from, 'shaper')).toHaveLength(1) // the drive
+  })
+
+  it('Zap (round 6) is the old blip', () => {
+    const { ac } = make()
+    const E = createSynth(ac as unknown as AudioContext, { ...SKILL_SYNTH_CONFIG, laser: { ...SKILL_SYNTH_CONFIG.laser, kind: 'round6' } })
+    const from = ac.nodes.length
+    E.laser(1)
+    expect(ac.since(from, 'osc').map((o) => [o.type, o.frequency.value])).toEqual([['triangle', 2600]])
+  })
+})
+
 describe('the recorded drums', () => {
   const realFetch = (global as { fetch?: unknown }).fetch
   afterEach(() => {

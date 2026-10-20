@@ -14,6 +14,7 @@
  *     .hit(group, k, t, v) a skill's sound: k = { gi, frac } (its place in its group); returns the chord when a
  *                          Cloud skill changes the harmony
  *     .beat(level, bar, pos, t, { drop, fill })  one 16th of the drums at BEATS[level]
+ *     .laser(t)            the shot
  *     .chordAt(t) · .setChord(ch, t) · .resetHarmony() · .mono (bass, lead, pad)
  *     .mbus · .glitch · .sfx · .master · .meter · .dbus   the buses the game drives
  */
@@ -201,6 +202,8 @@ export interface SkillSynth {
   D: Drums
   beat(level: number, bar: number, pos: number, t: number, opts?: { drop?: boolean; fill?: boolean }): void
   pump(t: number): void
+  /** the shot (the Sound lab's Laser part) */
+  laser(t: number, v?: number): void
   voice(to?: AudioNode, d?: number, r?: number, level?: number, pan?: number): Voice
   osc(v: Voice, type: OscillatorType, f: number): OscillatorNode
   gain(v: Voice, g?: number): GainNode
@@ -658,6 +661,38 @@ export function createSynth(ac: BaseAudioContext, config: Readonly<SkillSynthCon
     syn.gain.setTargetAtTime(S.synths * (1 - S.pump), t, 0.004)
     syn.gain.setTargetAtTime(S.synths, t + 0.05, S.pumpRelease)
   }
+  /* the shot (a game sound: straight to the master, past the track's fader; its echo and room go with the track) */
+  function laser(t: number, v = 1) {
+    const p = P.laser
+    if (p.kind === 'round6') { // round 6's blip
+      const vo = voice(sfx), o = osc(vo, 'triangle', 2600); o.frequency.exponentialRampToValueAtTime(320, t + 0.08)
+      const g = gain(vo); env(g.gain, t, 0.002, 0.03 * v, 0.09)
+      o.connect(g).connect(vo.out)
+      play([o], t, t + 0.1)
+      return
+    }
+    const vo = voice(sfx, p.delay, p.verb, p.level)
+    const lp = filter(vo, 'lowpass', p.bright, p.res)
+    lp.frequency.setValueAtTime(p.bright, t); lp.frequency.exponentialRampToValueAtTime(Math.max(60, p.to * 3), t + p.sweep)
+    const zs = unison(vo, p.wave, p.from, p.unison, p.detune, lp)
+    zs.forEach((o) => { o.frequency.setValueAtTime(p.from, t); o.frequency.exponentialRampToValueAtTime(p.to, t + p.sweep) })
+    const g = gain(vo); env(g.gain, t, 0.001, 0.09 * v, p.decay)
+    if (p.drive > 0) lp.connect(shaper(vo, p.drive)).connect(g); else lp.connect(g)
+    g.connect(vo.out)
+    const srcs: AudioScheduledSourceNode[] = [...zs]
+    if (p.thump > 0) {
+      const th = osc(vo, 'sine', p.thumpPitch); th.frequency.setValueAtTime(p.thumpPitch, t); th.frequency.exponentialRampToValueAtTime(40, t + 0.08)
+      const tg = gain(vo); env(tg.gain, t, 0.001, 0.28 * p.thump * v, 0.1)
+      th.connect(tg).connect(vo.out)
+      srcs.push(th)
+    }
+    play(srcs, t, t + Math.max(p.decay, 0.1) + 0.03)
+    if (p.crackle > 0) {
+      const n = noiseSrc(vo, t, 0.05), hp = filter(vo, 'highpass', p.crackleTone)
+      const ng = gain(vo); env(ng.gain, t, 0.0005, 0.12 * p.crackle * v, 0.035)
+      n.connect(hp).connect(ng).connect(vo.out)
+    }
+  }
   /* one 16th of the beat */
   function beat(level: number, bar: number, pos: number, t: number, { drop = false, fill = false } = {}) {
     const B = BEATS[level], odd = bar % 2 === 1
@@ -727,7 +762,7 @@ export function createSynth(ac: BaseAudioContext, config: Readonly<SkillSynthCon
 
   return {
     ac, P, master, comp, meter, mbus, glitch, syn, dbus, sfx, noise,
-    I, D, beat, pump, voice, osc, gain, filter, env, play, noiseSrc, release, mono,
+    I, D, beat, pump, laser, voice, osc, gain, filter, env, play, noiseSrc, release, mono,
     chordAt, setChord, resetHarmony() { chordLog = [] },
     hit: (group, k, t, v = 1) => HIT[group](k, t, v),
     releaseAll(t) { for (const key of Object.keys(mono) as (keyof typeof mono)[]) { release(mono[key], t); delete mono[key] } },

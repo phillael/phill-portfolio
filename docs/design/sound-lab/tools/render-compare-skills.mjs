@@ -38,6 +38,7 @@ const res = await page.evaluate(async () => {
     vox: (E) => { [0, 1, 2, 3].forEach((i) => E.hit('music', k(i, 6), 0.05 + i * BEAT, 1)) },
     drums: (E) => { for (const level of [0, 1, 2, 3, 4]) for (let s = 0; s < 16; s++) E.beat(level, level, s, 0.05 + (level * 16 + s) * SIX) },
     riser: (E) => { E.D.riser(0.05, 0.05 + 4 * BEAT); E.D.crash(0.05 + 4 * BEAT, 1); E.D.impact(0.05 + 4 * BEAT) },
+    laser: (E) => { for (let i = 0; i < 4; i++) E.laser(0.05 + i * 0.11) },
     song: (E) => {
       for (let s = 0; s < 64; s++) E.beat(2, (s / 16) | 0, s % 16, 0.05 + s * SIX)
       E.hit('cloud', k(0, 12), 0.05, 1); E.hit('backend', k(0, 14), 0.05, 1); E.hit('ai', k(4, 16), 0.05 + 2 * BEAT, 1)
@@ -45,7 +46,7 @@ const res = await page.evaluate(async () => {
       E.hit('quality', k(8, 10), 0.05 + 11 * BEAT, 1); E.hit('music', k(5, 6), 0.05 + 12 * BEAT, 1); E.hit('backend', k(13, 14), 0.05 + 12 * BEAT, 1)
     },
   }
-  const DUR = { bass1: 2, bass2: 2, bass: 2, chords: 5, arp: 2, lead: 4, bleeps: 2, bells: 3, vox: 3, drums: 8, riser: 4, song: 9 }
+  const DUR = { bass1: 2, bass2: 2, bass: 2, chords: 5, arp: 2, lead: 4, bleeps: 2, bells: 3, vox: 3, drums: 8, riser: 4, laser: 2, song: 9 }
   async function render(which, name) {
     seed(1234)
     const ctx = new OfflineAudioContext(2, SR * DUR[name], SR)
@@ -53,7 +54,7 @@ const res = await page.evaluate(async () => {
     if (which === 'old') N = SKILL_SYNTH.create(ctx, { drums: SYNTH_DRUMS }) // the lab's engine
     else { const C = SITE_SYNTH.SKILL_SYNTH_CONFIG; N = SITE_SYNTH.createSynth(ctx, { ...C, drums: { ...C.drums, ...SYNTH_DRUMS } }) } // the site's
     N.mbus.gain.value = 1
-    const E = { D: N.D, hit: N.hit, beat: N.beat }
+    const E = { D: N.D, hit: N.hit, beat: N.beat, laser: N.laser }
     CASES[name](E)
     const buf = await ctx.startRendering()
     return [buf.getChannelData(0), buf.getChannelData(1)]

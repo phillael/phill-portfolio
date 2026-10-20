@@ -175,6 +175,7 @@
     if (b.id === 'skills') {
       if (PARTS[id]) return SKILLS[id].map((k) => ({ label: k.name, sub: id === 'cloud' ? CHORDS[k.gi % CHORDS.length].name : '', g: id, k }))
       if (id === 'drums') return DRUMS.map(([label, fn]) => ({ label, drum: fn }))
+      if (id === 'laser') return [['Shot', 1], ['Rapid fire', 4], ['Machine gun', 10]].map(([label, n]) => ({ label, laser: n }))
       return ORDER.map((g) => ({ label: PARTS[g].label, g, any: true })) // Space: one of each part
     }
     return panelOf(b, id).pads.map(([label, cue, arg]) => ({ label, cue, arg }))
@@ -185,6 +186,13 @@
       const E = ensure()
       if (p.cue === 'grow') growHole(E)
       else E.cue(p.cue, p.arg)
+      flashPad(p)
+      kickScope()
+      return
+    }
+    if (p.laser) { // shots as fast as a mouse fires them
+      const E = ensure(), t0 = ac.currentTime + 0.012
+      for (let i = 0; i < p.laser; i++) E.laser(t0 + i * 0.11)
       flashPad(p)
       kickScope()
       return
@@ -303,7 +311,7 @@
     lab.dataset.bank = bank.id
     document.querySelectorAll('input[name="bank"]').forEach((i) => { i.checked = i.value === bank.id })
     parts.innerHTML = bank.S.SCHEMA.map((pn) => {
-      const ms = bank.id === 'skills' && pn.id !== 'space'
+      const ms = bank.id === 'skills' && pn.id !== 'space' && pn.id !== 'laser'
       return `<div class="prow" data-id="${pn.id}" style="--c:${pn.c}">
         <button type="button" class="ptab" data-id="${pn.id}"><i class="dot" aria-hidden="true"></i><span class="pn">${esc(pn.label)}</span><span class="pg">${esc(pn.group)}</span><span class="pc"></span></button>
         ${ms ? msHTML(pn) : bank.id === 'skills' ? '<span class="ms gap" aria-hidden="true"></span><span class="ms gap" aria-hidden="true"></span>' : ''}
@@ -326,7 +334,7 @@
       : 'Each one is what the 3D resume plays at that moment. O hears the original.'
     panel.innerHTML = `
       <div class="ph"><h2 class="pt" id="panel-h">${esc(pn.label)}</h2><span class="pg">${esc(pn.group)}</span>
-        <div class="pact"><span class="nchg" id="nchg"></span>${b.id === 'skills' && pn.id !== 'space' ? msHTML(pn) : ''}<button type="button" class="tbtn" data-act="reset-part">Reset ${esc(pn.label)}</button></div>
+        <div class="pact"><span class="nchg" id="nchg"></span>${b.id === 'skills' && pn.id !== 'space' && pn.id !== 'laser' ? msHTML(pn) : ''}<button type="button" class="tbtn" data-act="reset-part">Reset ${esc(pn.label)}</button></div>
       </div>
       <p class="about">${esc(pn.about)}</p>
       <div class="pads-box">
@@ -361,7 +369,7 @@
   }
   function drawMS() {
     document.querySelectorAll('.ms[data-ms]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.ms === 'm' ? mute : solo).has(b.dataset.g))))
-    if (bank.id === 'skills') parts.querySelectorAll('.prow').forEach((row) => row.classList.toggle('off', row.dataset.id !== 'space' && !audible(row.dataset.id)))
+    if (bank.id === 'skills') parts.querySelectorAll('.prow').forEach((row) => row.classList.toggle('off', row.dataset.id !== 'space' && row.dataset.id !== 'laser' && !audible(row.dataset.id)))
   }
   function drawTransport() {
     $('#beat').setAttribute('aria-pressed', String(L.on))

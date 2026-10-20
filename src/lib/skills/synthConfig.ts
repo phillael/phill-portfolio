@@ -210,6 +210,28 @@ export interface SynthDrumsConfig {
   verb: number
 }
 
+/** Laser (The shot) */
+export interface SynthLaserConfig {
+  kind: 'blaster' | 'round6'
+  wave: 'sine' | 'triangle' | 'sawtooth' | 'square'
+  unison: number
+  detune: number
+  from: number
+  to: number
+  sweep: number
+  bright: number
+  res: number
+  decay: number
+  drive: number
+  thump: number
+  thumpPitch: number
+  crackle: number
+  crackleTone: number
+  level: number
+  delay: number
+  verb: number
+}
+
 /** Space (Delay, reverb, mix) */
 export interface SynthSpaceConfig {
   dTime: 1 | 2 | 3 | 4 | 6
@@ -240,6 +262,7 @@ export interface SkillSynthConfig {
   product: Readonly<SynthProductConfig>
   music: Readonly<SynthMusicConfig>
   drums: Readonly<SynthDrumsConfig>
+  laser: Readonly<SynthLaserConfig>
   space: Readonly<SynthSpaceConfig>
 }
 
@@ -431,6 +454,26 @@ export const SKILL_SYNTH_CONFIG: Readonly<SkillSynthConfig> = Object.freeze<Skil
     impactPitch: 1.4,
     bus: 0.9,
     verb: 0.08,
+  }),
+  laser: Object.freeze<SynthLaserConfig>({
+    kind: 'blaster',
+    wave: 'sawtooth',
+    unison: 2,
+    detune: 14,
+    from: 1600,
+    to: 120,
+    sweep: 0.14,
+    bright: 5200,
+    res: 7,
+    decay: 0.22,
+    drive: 0.35,
+    thump: 0.8,
+    thumpPitch: 140,
+    crackle: 0.6,
+    crackleTone: 4200,
+    level: 1,
+    delay: 0.12,
+    verb: 0.12,
   }),
   space: Object.freeze<SynthSpaceConfig>({
     dTime: 3,

@@ -644,6 +644,25 @@ On a production build (`npm run build && npm run start`), in a fresh browser con
 
 **LOOP COMPLETE.** The branch is not pushed: it waits for Phill (T12).
 
+## Addendum: Phill's first local try (2026-10-20)
+
+Phill: "it's amazing", with two fixes.
+
+1. **"When you get a game over, the music continues and it kinda immediately starts over":**
+   - **Measured:** the tape stop did fade the music (meter RMS 0.138 → 0 in ~1.5 s). The arena and "shoot any skill to play again" stayed for 12 s, though, so a shot already flying at game over started a new game at once.
+   - **Now:** after game over the music fades (the tape stop), then the section is the list again: at 1.5 s (`OVER_FADE`) the arena goes and the song is handed back. Shots during that fade don't start a game. The readout keeps the score, the best and the Number Slayers link until 12 s, then goes.
+   - **Tests:** `skills-blaster` "game over" (2).
+2. **"The main laser sound from the weapon firing … is a really weak sound":** the shot was a 90 ms triangle blip at 0.03.
+   - **The new part:** a Laser in the Sound lab's engine (`round6/synth.js` `SCHEMA` + `laser(t)`, baked into `synthConfig.ts`, ported to `synth.ts`; the game's `SFX.zap` and the mockup's both call `E.laser`).
+   - **Its default, "Blaster":** detuned saws diving from 1.6 kHz to 120 Hz in 0.14 s through a biting lowpass (Q 7), drive 0.35, a sine thump (140 → 40 Hz), a 35 ms crackle, and a little echo and room.
+   - **Loudness** (offline, through the master): RMS over its first 150 ms −31.2 dB vs −51.2 for the old blip (+20 dB), ~3 dB under a snare (−28.1).
+   - **Tuning:** "Zap (round 6)" keeps the old one under Sound, for A/B. The lab's Laser panel has Shot / Rapid fire / Machine gun pads.
+   - **Tests:** `skills-synth` "the shot" (2), and the parity test covers the new part.
+   - **The render comparison** (`synth.js` vs `synth.ts`): the laser at −144…−146 dB on every run; every other case −124 dB or lower, except a ~0.00012–0.00026 difference (−77…−86 dB) that lands on bass1, bass2 or arp from run to run.
+     - That last one is Chrome's render noise: the lab's engine rendered against itself shows the same value (bass1 −85.8 dB, 0.000117 at 1.73 s), and it stays with the reverb's return at 0.
+
+`npx tsc --noEmit` exit 0; `npm run lint` exit 0; `npx jest --no-watchman`: 62 suites, 704 passed.
+
 ## Stop conditions / open questions (for Phill)
 
 - **T12:** stop before pushing; Phill tries it on desktop and his phone and approves the PR text.

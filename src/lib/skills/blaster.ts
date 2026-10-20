@@ -76,6 +76,8 @@ const BEST_KEY = 'skill-blaster-best'
 /** Arcade: the mockup's default intensity (the only one that ships) */
 const IN = { force: 1, sparks: 1, beam: 1, bloom: 1, shake: 5, crack: true, banner: true, wave: 1 }
 const RED = '355 100% 64%'
+/** game over: the tape stop fades the music, then the section is the list again (ms) */
+const OVER_FADE = 1500
 const RETICLE = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><g fill="none" stroke-linecap="round"><g stroke="#00131a" stroke-width="3.6"><circle cx="16" cy="16" r="8.5"/><path d="M16 2.5v6M16 23.5v6M2.5 16h6M23.5 16h6"/></g><g stroke="#80eaff" stroke-width="1.6"><circle cx="16" cy="16" r="8.5"/><path d="M16 2.5v6M16 23.5v6M2.5 16h6M23.5 16h6"/></g></g><circle cx="16" cy="16" r="1.7" fill="#fff"/></svg>`
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
@@ -214,13 +216,9 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   /* the game's own sounds (not in the track): the laser, booms, the enemy's lock-on and shot, a clank */
   const T = () => ac.currentTime + 0.005
   const SFX = {
-    zap() {
+    zap() { // the laser: the Sound lab's Laser part (synth.ts)
       if (muted || !E) return
-      const { voice, osc, gain, env, play, sfx } = E, t = T(), v = voice(sfx)
-      const o = osc(v, 'triangle', 2600); o.frequency.exponentialRampToValueAtTime(320, t + 0.08)
-      const g = gain(v); env(g.gain, t, 0.002, 0.03, 0.09)
-      o.connect(g).connect(v.out)
-      play([o], t, t + 0.1)
+      E.laser(T())
     },
     boom(size = 1) {
       if (muted || !E) return
@@ -646,7 +644,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   const G = {
     state: 'rest' as State,
     score: 0, best: loadBest(), wave: -1, cfg: null as WaveCfg | null, plan: [] as Kind[], spawned: 0, active: new Set<Target>(),
-    hp: MAX_HP, hpOn: false, lastShot: 0, kb: false, pendingSpawn: false, watch: 0, blind: 0, resumeTo: 'wave' as 'wave' | 'first' | 'next', eliteSeen: false,
+    hp: MAX_HP, hpOn: false, lastShot: 0, kb: false, pendingSpawn: false, watch: 0, blind: 0, resumeTo: 'wave' as 'wave' | 'first' | 'next', eliteSeen: false, settle: 0,
   }
   const cfgOf = () => G.cfg!
   const playing = () => G.state === 'intro' || G.state === 'wave' || G.state === 'between'
@@ -657,6 +655,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   const untilBar = (bar: number) => (barTime(bar) - ac.currentTime) * 1000
 
   function shootSkill(k: Key, shot: Shot) {
+    if (G.state === 'over' && now() < G.settle) return // game over: the music is fading, the list coming back
     init()
     const kb = shot.keyboard
     const p = kb ? centerOf(k.label) : { x: shot.x, y: shot.y }
@@ -888,12 +887,13 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     watchOff()
     ;[...G.active].forEach((t) => endTarget(t, 'quiet'))
     G.state = 'over'
+    G.settle = now() + OVER_FADE // the shots that were already flying don't start a new game
     const best = G.score > G.best
     if (best) { G.best = G.score; saveBest() }
     root.classList.remove('bl-on')
     MUS.tapeStop()
-    later(1500, () => { musicStop(0.05); handBack() })
-    later(12000, () => { if (G.state === 'over') { G.state = 'rest'; hudOff(); arenaOff() } }) // no second go: back to the list
+    later(OVER_FADE, () => { musicStop(0.05); handBack(); arenaOff() }) // the music fades out and the section is the list again (Phill)
+    later(12000, () => { if (G.state === 'over') { G.state = 'rest'; hudOff() } }) // the readout (the score, the best, Number Slayers) goes too
     banner('Game over', best ? 'New best' : `Best ${fmt(G.best)}`, RED)
     status(`<span class="foe">Game over</span> · <b>${fmt(G.score)}</b> · ${best ? '<span class="good">new best</span>' : `best ${fmt(G.best)}`} · shoot any skill to play again <a href="https://numberslayers.com" target="_blank" rel="noopener">Want more? Number Slayers ↗</a>`)
     tell(`Game over. ${fmt(G.score)} points${best ? ', a new best' : ''}. Shoot any skill to play again.`, true)

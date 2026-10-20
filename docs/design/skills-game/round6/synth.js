@@ -11,6 +11,7 @@
  *     .hit(group, k, t, v) a skill's sound: k = { gi, frac } (its place in its group); returns the
  *                        chord when a Cloud skill changes the harmony
  *     .beat(level, bar, pos, t, { drop, fill })  one 16th of the drums at BEATS[level]
+ *     .laser(t)          the shot
  *     .chordAt(t) · .setChord(ch, t) · .resetHarmony() · .mono (bass, lead, pad)
  *     .P                 the live patch (every setting below); .setPatch(diff) changes it, live
  *     .mbus · .glitch · .sfx · .master · .meter · .dbus   the buses the game drives
@@ -339,6 +340,32 @@ window.SKILL_SYNTH = (() => {
       { title: 'The bus', params: [
         num('bus', 'Drums level', 0.9, 0, 1.5, 0.01, 'x'),
         num('verb', 'Reverb send', 0.08, 0, 0.6, 0.01, 'pct'),
+      ] },
+    ] },
+    { id: 'laser', label: 'Laser', group: 'The shot', c: '186 100% 82%', about: 'Every shot fires it: detuned saws diving in pitch through a biting filter, a little drive, a thump under them and a crackle on top. Mostly dry, so it cuts through the beat. Zap (round 6) is the old blip, to compare.', sections: [
+      { title: 'Zap', params: [
+        pick('kind', 'Sound', 'blaster', [['blaster', 'Blaster'], ['round6', 'Zap (round 6)']]),
+        pick('wave', 'Wave', 'sawtooth', WAVES),
+        num('unison', 'Voices', 2, 1, 4, 1, 'n'),
+        num('detune', 'Detune', 14, 0, 60, 1, 'c'),
+        num('from', 'Starts at', 1600, 200, 6000, 0, 'hz'),
+        num('to', 'Dives to', 120, 30, 1500, 0, 'hz'),
+        num('sweep', 'Dive time', 0.14, 0.02, 0.6, 0, 's', { log: true }),
+        num('bright', 'Filter', 5200, 300, 16000, 0, 'hz'),
+        num('res', 'Bite', 7, 0.1, 20, 0.1, 'q'),
+        num('decay', 'Length', 0.22, 0.04, 1, 0, 's', { log: true }),
+        num('drive', 'Drive', 0.35, 0, 1, 0.01, 'pct'),
+      ] },
+      { title: 'Punch', params: [
+        num('thump', 'Thump', 0.8, 0, 2, 0.01, 'x'),
+        num('thumpPitch', 'Thump pitch', 140, 40, 400, 1, 'hzl'),
+        num('crackle', 'Crackle', 0.6, 0, 2, 0.01, 'x'),
+        num('crackleTone', 'Crackle tone', 4200, 500, 14000, 0, 'hz'),
+      ] },
+      { title: 'Mix', params: [
+        num('level', 'Level', 1, 0, 2, 0.01, 'x'),
+        num('delay', 'Echo', 0.12, 0, 1, 0.01, 'pct'),
+        num('verb', 'Reverb send', 0.12, 0, 1, 0.01, 'pct'),
       ] },
     ] },
     { id: 'space', label: 'Space', group: 'Delay, reverb, mix', c: '130 90% 60%', about: 'Where every synth goes: a ping-pong delay, a long reverb, the pump that ducks the synths on every kick, and the master.', sections: [
@@ -847,6 +874,38 @@ window.SKILL_SYNTH = (() => {
       syn.gain.setTargetAtTime(S.synths * (1 - S.pump), t, 0.004)
       syn.gain.setTargetAtTime(S.synths, t + 0.05, S.pumpRelease)
     }
+    /* the shot (a game sound: straight to the master, past the track's fader; its echo and room go with the track) */
+    function laser(t, v = 1) {
+      const p = P.laser
+      if (p.kind === 'round6') { // round 6's blip
+        const vo = voice(sfx), o = osc(vo, 'triangle', 2600); o.frequency.exponentialRampToValueAtTime(320, t + 0.08)
+        const g = gain(vo); env(g.gain, t, 0.002, 0.03 * v, 0.09)
+        o.connect(g).connect(vo.out)
+        play([o], t, t + 0.1)
+        return
+      }
+      const vo = voice(sfx, p.delay, p.verb, p.level)
+      const lp = filter(vo, 'lowpass', p.bright, p.res)
+      lp.frequency.setValueAtTime(p.bright, t); lp.frequency.exponentialRampToValueAtTime(Math.max(60, p.to * 3), t + p.sweep)
+      const zs = unison(vo, p.wave, p.from, p.unison, p.detune, lp)
+      zs.forEach((o) => { o.frequency.setValueAtTime(p.from, t); o.frequency.exponentialRampToValueAtTime(p.to, t + p.sweep) })
+      const g = gain(vo); env(g.gain, t, 0.001, 0.09 * v, p.decay)
+      if (p.drive > 0) lp.connect(shaper(vo, p.drive)).connect(g); else lp.connect(g)
+      g.connect(vo.out)
+      const srcs = [...zs]
+      if (p.thump > 0) {
+        const th = osc(vo, 'sine', p.thumpPitch); th.frequency.setValueAtTime(p.thumpPitch, t); th.frequency.exponentialRampToValueAtTime(40, t + 0.08)
+        const tg = gain(vo); env(tg.gain, t, 0.001, 0.28 * p.thump * v, 0.1)
+        th.connect(tg).connect(vo.out)
+        srcs.push(th)
+      }
+      play(srcs, t, t + Math.max(p.decay, 0.1) + 0.03)
+      if (p.crackle > 0) {
+        const n = noiseSrc(vo, t, 0.05), hp = filter(vo, 'highpass', p.crackleTone)
+        const ng = gain(vo); env(ng.gain, t, 0.0005, 0.12 * p.crackle * v, 0.035)
+        n.connect(hp).connect(ng).connect(vo.out)
+      }
+    }
     /* one 16th of the beat */
     function beat(level, bar, pos, t, { drop = false, fill = false } = {}) {
       const B = BEATS[level], odd = bar % 2 === 1
@@ -916,7 +975,7 @@ window.SKILL_SYNTH = (() => {
 
     return {
       ac, P, master, comp, meter, mbus, glitch, syn, dbus, sfx, noise,
-      I, D, beat, pump, voice, osc, gain, filter, env, play, noiseSrc, release, mono,
+      I, D, beat, pump, laser, voice, osc, gain, filter, env, play, noiseSrc, release, mono,
       chordAt, setChord, resetHarmony() { chordLog = [] },
       hit: (group, k, t, v = 1) => HIT[group](k, t, v),
       releaseAll(t) { for (const k of Object.keys(mono)) { release(mono[k], t); delete mono[k] } },

@@ -17,7 +17,9 @@ import { FakeAudioContext } from './helpers/fakeAudio'
 jest.mock('@/components/skills/SkillsPlay', () => ({ __esModule: true, default: () => null }))
 
 interface Dev {
-  G: { state: string; score: number; wave: number; active: Set<{ k: { el: HTMLElement; label: HTMLElement } }> }
+  G: { state: string; score: number; wave: number; hp: number; active: Set<{ foe: boolean; k: { el: HTMLElement; label: HTMLElement } }> }
+  M: { on: boolean }
+  jumpToDrop(): void
   E: { ac: unknown; master: { gain: { calls: unknown[][] } } } | null
   bandSize(): number
 }
@@ -269,5 +271,43 @@ describe('one screen', () => {
     pass(6100)
     expect(section).not.toHaveClass('bl-arena')
     expect(hud()).not.toHaveClass('on')
+  })
+})
+
+describe('game over', () => {
+  /** into the drop with one health, shooting at nothing (it keeps the idle pause away) until an enemy's shot lands */
+  const lose = () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    act(() => dev().jumpToDrop())
+    dev().G.hp = 1
+    const air = { skill: null, x: 5, y: 5, keyboard: false, target: document.querySelector('#skills h2')! }
+    for (let i = 0; i < 40 && dev().G.state !== 'over'; i++) { pass(500); act(() => game.shoot(air)) }
+    expect(dev().G.state).toBe('over')
+  }
+
+  it('the music fades out, then the section is the list again; the readout keeps the score a while', () => {
+    lose()
+    const section = document.getElementById('skills')!
+    expect(section).toHaveClass('bl-arena') // the banner and the tape stop first
+    pass(1700)
+    expect(dev().M.on).toBe(false)
+    expect(section).not.toHaveClass('bl-arena')
+    expect(hud()).toHaveClass('on')
+    expect(document.querySelector('.bl-hud .r2')!.textContent).toMatch(/Game over/)
+    pass(10600)
+    expect(dev().G.state).toBe('rest')
+    expect(hud()).not.toHaveClass('on')
+  })
+
+  it('a shot during the fade doesn’t start a new game; once the list is back, one does', () => {
+    lose()
+    const score = dev().G.score
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Redis' }))))
+    expect(dev().G.state).toBe('over')
+    expect(dev().G.score).toBe(score)
+    pass(1700)
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Redis' }))))
+    expect(dev().G.state).toBe('intro')
+    expect(dev().G.score).toBe(100)
   })
 })

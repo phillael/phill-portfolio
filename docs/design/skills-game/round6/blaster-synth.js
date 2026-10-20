@@ -168,13 +168,9 @@
   /* the game's own sounds (not in the track): the laser, booms, the enemy's lock-on and shot, a clank */
   const T = () => ac.currentTime + 0.005
   const SFX = {
-    zap() {
+    zap() { // the laser lives in synth.js (the Sound lab's Laser part)
       if (muted) return
-      const t = T(), v = voice(sfx)
-      const o = osc(v, 'triangle', 2600); o.frequency.exponentialRampToValueAtTime(320, t + 0.08)
-      const g = gain(v); env(g.gain, t, 0.002, 0.03, 0.09)
-      o.connect(g).connect(v.out)
-      play([o], t, t + 0.1)
+      E.laser(T())
     },
     boom(size = 1) {
       if (muted) return

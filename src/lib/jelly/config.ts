@@ -291,8 +291,8 @@ export type AwardKind = keyof typeof PLAY_R2.points
 /**
  * The 3D resume's sounds (sfx.ts): every number they're made of. Tuned by ear by Phill on 2026-10-20 in the Sound
  * lab (the sound design tool that lands with the Skills section); its Copy patch gives `panel: { 'cue.setting': v }`,
- * which goes here as `cue.setting` (the Space panel's settings are `space`). The cues he didn't touch keep the numbers
- * they had: the whoosh's shape, the black hole, the gulp and boom, the shrimp, the trip, the lasagna's sounds.
+ * which goes here as `cue.setting` (the Space panel's settings are `space`; a picked recording goes in `rec`). The cues he
+ * didn't touch keep the numbers they had: the whoosh's shape, the black hole, the gulp and boom, the shrimp, TINK.
  */
 type Wave = 'sine' | 'triangle' | 'sawtooth' | 'square'
 /** a tone that sweeps from one pitch to another, over a burst of noise through a filter that closes */
@@ -330,7 +330,15 @@ export interface SfxConfig {
   giantStep: ToneCrunch
   /** the room every sound goes through (reverb share, length s, decay, brightness) and the master (× the visitor's volume) and its compressor */
   space: { wet: number; rLen: number; rDecay: number; rBright: number; master: number; threshold: number; ratio: number }
+  /**
+   * The cues that play a recording instead of their synth: a CC0 8-bit sound in public/resume/sfx/ (CREDITS.md there),
+   * its gain (set so it's as loud as the cue's synth was) and playback rate. Until it has loaded, the synth plays.
+   * In the Sound lab a cue's Sound picks it; its Recording level multiplies `gain`, its Recording pitch is `rate`.
+   */
+  rec: Partial<Record<RecCue, { file: string; gain: number; rate: number }>>
 }
+/** every cue that can play a recording (all but the black hole's drone) */
+export type RecCue = 'gulp' | 'boom' | 'jump' | 'land' | 'smash' | 'coin' | 'shrimp' | 'mushroom' | 'finish' | 'ufoHit' | 'beam' | 'powerUp' | 'powerDown' | 'alert' | 'stomp' | 'kicked' | 'tink' | 'giantStep'
 
 export const SFX_CONFIG: Readonly<SfxConfig> = Object.freeze<SfxConfig>({
   whoosh: { wLen: 2.09, wCurve: 2.2, wBright: 0.5, wLevel: 0.35 },
@@ -354,4 +362,17 @@ export const SFX_CONFIG: Readonly<SfxConfig> = Object.freeze<SfxConfig>({
   tink: { wave: 'triangle', note: 2637, droop: 2600 / 2637, len: 0.35, level: 0.09, over: 3951 / 2637, droop2: 3900 / 3951, len2: 0.22, level2: 0.05 },
   giantStep: { wave: 'sine', from: 70, to: 38, len: 0.18, level: 0.12, nType: 'lowpass', nTone: 300, nLen: 0.08, noise: 0.06 },
   space: { wet: 0.25, rLen: 2.2, rDecay: 3, rBright: 0.4, master: 1, threshold: -14, ratio: 4 },
+  // Phill's picks (2026-10-20): Junkala's 512 retro sounds, Kenney's packs and celestialghost8's Victory
+  rec: {
+    mushroom: { file: 'mushroom.mp3', gain: 0.1153, rate: 1 },
+    finish: { file: 'finish.mp3', gain: 0.223, rate: 1 },
+    ufoHit: { file: 'ufo-hit.mp3', gain: 0.1509, rate: 1 },
+    beam: { file: 'beam.mp3', gain: 0.0244, rate: 1 },
+    powerUp: { file: 'power-up.mp3', gain: 0.0733, rate: 1 },
+    powerDown: { file: 'power-down.mp3', gain: 0.0258, rate: 1 },
+    alert: { file: 'alert.mp3', gain: 0.0252, rate: 1 },
+    stomp: { file: 'stomp.mp3', gain: 0.04, rate: 1 },
+    kicked: { file: 'kicked.mp3', gain: 0.0147, rate: 1 },
+    giantStep: { file: 'giant-step.mp3', gain: 0.0896, rate: 1 },
+  },
 })

@@ -4,6 +4,8 @@
  * Web Audio isn't in jsdom, so a small fake AudioContext records which sources get started.
  */
 
+import { existsSync } from 'fs'
+import path from 'path'
 import { createSfx, playEventSound } from '@/lib/jelly/sfx'
 import { SFX_CONFIG } from '@/lib/jelly/config'
 import type { PlayEvent } from '@/lib/jelly/play'
@@ -11,7 +13,7 @@ import type { PlayEvent } from '@/lib/jelly/play'
 const started: string[] = []
 const param = () => ({ value: 0, set: [] as number[], setValueAtTime(v: number) { this.set.push(v) }, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {} })
 const node = (kind: string) => ({
-  kind, type: '', buffer: null as unknown, frequency: param(), detune: param(), Q: param(), gain: param(), threshold: param(), ratio: param(),
+  kind, type: '', buffer: null as unknown, frequency: param(), detune: param(), Q: param(), gain: param(), threshold: param(), ratio: param(), playbackRate: param(),
   connect() {}, disconnect() {},
   start() { started.push(kind) },
   stop() {},
@@ -28,6 +30,7 @@ class FakeAudioContext {
   createOscillator() { return node('osc') }
   createBufferSource() { return node('noise') }
   createBuffer(ch: number, len: number) { return { getChannelData: () => new Float32Array(len) } }
+  decodeAudioData() { return Promise.resolve({ duration: 1 }) }
   resume() { return Promise.resolve() }
   close() { return Promise.resolve() }
 }
@@ -185,5 +188,55 @@ describe("round 2's sounds", () => {
     started.length = 0
     playEventSound(sfx, { type: 'smash', bodies: [], coins: [], pound: false })
     expect(started).toHaveLength(0) // (a smash at nothing: silent)
+  })
+})
+
+describe('the recorded cues (SFX_CONFIG.rec)', () => {
+  const files = Object.values(SFX_CONFIG.rec).map((r) => r!.file)
+  const g = globalThis as unknown as { fetch?: jest.Mock }
+  const flush = () => new Promise((r) => setTimeout(r, 0))
+  afterEach(() => { delete g.fetch })
+
+  it('every one is in public/resume/sfx', () => {
+    expect(files.length).toBeGreaterThan(0)
+    for (const f of files) expect(existsSync(path.join(process.cwd(), 'public/resume/sfx', f))).toBe(true)
+  })
+
+  it('a picked cue plays its synth until its recording is in, then the recording', async () => {
+    g.fetch = jest.fn(() => Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
+    const sfx = createSfx(() => ({ soundOn: true, volume: 0.7 }))
+    sfx.init()
+    started.length = 0
+    sfx.enemyAlert()
+    expect(started).toContain('osc') // (not fetched yet: the synth)
+    sfx.prepare()
+    expect(g.fetch).toHaveBeenCalledTimes(files.length)
+    await flush()
+    started.length = 0
+    sfx.enemyAlert()
+    expect(started).toEqual(['noise']) // one buffer source (the fake calls them all 'noise'): the recording
+  })
+
+  it('nothing is fetched with Sound off; turning it on fetches them', () => {
+    g.fetch = jest.fn(() => Promise.resolve({ ok: false }))
+    const st = { soundOn: false, volume: 0.7 }
+    const sfx = createSfx(() => st)
+    sfx.init()
+    sfx.prepare()
+    expect(g.fetch).not.toHaveBeenCalled()
+    st.soundOn = true
+    sfx.setVolume()
+    expect(g.fetch).toHaveBeenCalledTimes(files.length)
+  })
+
+  it("a recording that can't load leaves the synth playing", async () => {
+    g.fetch = jest.fn(() => Promise.reject(new Error('offline')))
+    const sfx = createSfx(() => ({ soundOn: true, volume: 0.7 }))
+    sfx.init()
+    sfx.prepare()
+    await flush()
+    started.length = 0
+    sfx.stomp()
+    expect(started).toContain('osc')
   })
 })

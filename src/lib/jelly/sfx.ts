@@ -3,11 +3,14 @@
  * gulps and boom, the entrance whoosh, and Play mode's jump, land, smash, coin and finish,
  * the shrimp, the UFO and its mushroom, the trip, and the lasagna's.
  * Clicks are silent (Phill: no musical notes); Play mode's sounds only come from playing.
- * Every number they're made of is in SFX_CONFIG (config.ts), tuned by ear in the Sound lab.
+ * Every number they're made of is in SFX_CONFIG (config.ts), tuned by ear in the Sound lab, and the cues
+ * in SFX_CONFIG.rec play a recording instead (CC0 8-bit sounds, public/resume/sfx/, fetched once Sound is on).
  */
 
 import type { PlayEvent } from './play'
-import { SFX_CONFIG, type ChordShape, type SfxConfig } from './config'
+import { SFX_CONFIG, type ChordShape, type RecCue, type SfxConfig } from './config'
+
+const SFX_DIR = '/resume/sfx/'
 
 export interface Sfx {
   /** the audio graph and the whoosh (on a gesture, or as the resume opens) */
@@ -59,6 +62,8 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
   let ac: AudioContext | null = null
   let out: GainNode, mix: GainNode, verb: ConvolverNode, noiseBuf: AudioBuffer | null = null, swellBuf: AudioBuffer
   let drone: Drone | null = null
+  const recs: Partial<Record<RecCue, AudioBuffer>> = {}
+  let recsAsked = false
   const live = () => !!ac && ac.state === 'running' && settings().soundOn && settings().volume > 0
   const level = () => (settings().soundOn ? settings().volume * C.space.master : 0)
   const render = (len: number, fn: (d: Float32Array, sr: number, c: number) => void, ch = 1) => {
@@ -104,7 +109,35 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
     })
   }
 
+  /** the recordings: fetched and decoded once there's an audio context and Sound is on (about 160 KB in all) */
+  function loadRecs() {
+    if (!ac || recsAsked || !settings().soundOn || typeof fetch !== 'function') return
+    recsAsked = true
+    const ctx = ac
+    for (const [cue, r] of Object.entries(C.rec) as [RecCue, { file: string }][]) {
+      fetch(SFX_DIR + r.file)
+        .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(r.file))))
+        .then((b) => ctx.decodeAudioData(b))
+        .then((buf) => { if (ac === ctx) recs[cue] = buf })
+        .catch(() => { /* the synth keeps playing it */ })
+    }
+  }
+  /** a cue's recording, if it has one and it's in: true when it played (k scales it: a softer landing, a farther step) */
+  function playRec(cue: RecCue, delay = 0, k = 1) {
+    const r = C.rec[cue], buf = recs[cue]
+    if (!r || !buf) return false
+    const s = ac!.createBufferSource(), g = ac!.createGain()
+    s.buffer = buf
+    s.playbackRate.value = r.rate
+    g.gain.value = r.gain * k
+    s.connect(g)
+    g.connect(mix)
+    s.start(ac!.currentTime + delay)
+    return true
+  }
+
   function prepare() {
+    loadRecs()
     if (!ac || noiseBuf) return
     const r = C.space
     verb.buffer = render(r.rLen, (d, sr) => {
@@ -122,6 +155,7 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
 
   function setVolume() {
     if (ac) out.gain.setTargetAtTime(level(), ac.currentTime, 0.05)
+    loadRecs()
   }
 
   /** The whoosh, timed to peak as the entrance lands `lead` seconds from now. */
@@ -179,7 +213,7 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
   }
 
   function gulp() {
-    if (!live()) return
+    if (!live() || playRec('gulp')) return
     const c = C.gulp, t = ac!.currentTime, o = ac!.createOscillator(), g = ac!.createGain()
     o.type = c.gWave
     o.frequency.setValueAtTime(c.gFrom + Math.random() * c.gSpread, t)
@@ -195,6 +229,7 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
   function boom() {
     if (!live()) return
     prepare()
+    if (playRec('boom')) return
     const c = C.boom, t = ac!.currentTime, o = ac!.createOscillator(), g = ac!.createGain()
     o.frequency.setValueAtTime(c.bFrom, t)
     o.frequency.exponentialRampToValueAtTime(c.bTo, t + c.bSweep)
@@ -264,19 +299,19 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
   /** a quick sweep up */
   function jump() {
     const c = C.jump
-    if (live()) tone(c.wave, c.from, c.to, c.len, c.level)
+    if (live() && !playRec('jump')) tone(c.wave, c.from, c.to, c.len, c.level)
   }
 
   /** a soft thud, louder the faster he fell (a gentle step makes none) */
   function land(speed: number) {
     const k = Math.min(1, (speed - 1.5) / 7)
-    if (!live() || k <= 0) return
+    if (!live() || k <= 0 || playRec('land', 0, k)) return
     toneCrunch(C.land, k)
   }
 
   /** a smash: a burst of noise and a falling sweep */
   function smash() {
-    if (!live()) return
+    if (!live() || playRec('smash')) return
     const c = C.smash
     crunch(c.nType, c.nTone, c.nLen, c.noise)
     tone(c.wave, c.from, c.to, c.len, c.level)
@@ -284,12 +319,12 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
 
   /** a bright two-note chime */
   function coin() {
-    if (live()) twoNotes(C.coin)
+    if (live() && !playRec('coin')) twoNotes(C.coin)
   }
 
   /** a short flourish up a chord, and a shimmer on its top note */
   function finish() {
-    if (!live()) return
+    if (!live() || playRec('finish')) return
     const c = C.finish, t = ac!.currentTime, r = ratios('finish', c.shape), top = c.root * r[r.length - 1]
     r.forEach((m, i) => { const f = c.root * m; tone(c.wave, f, f, i === r.length - 1 ? c.lastLen : c.len, c.level, t + i * c.step) })
     tone('sine', top, top, c.shLen, c.shimmer, t + (r.length - 1) * c.step)
@@ -299,14 +334,14 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
 
   /** a bubbly run up: the shrimp */
   function shrimp() {
-    if (!live()) return
+    if (!live() || playRec('shrimp')) return
     const c = C.shrimp, t = ac!.currentTime
     ratios('shrimp', c.shape).forEach((m, i) => { const f = c.root * m; tone(c.wave, f, f * c.bend, c.len, c.level, t + i * c.step) })
   }
 
   /** a UFO hit: a clang that falls, a ring over it, a hiss */
   function ufoHit() {
-    if (!live()) return
+    if (!live() || playRec('ufoHit')) return
     const c = C.ufoHit, t = ac!.currentTime
     tone(c.wave1, c.from1, c.to1, c.len1, c.level1, t)
     tone(c.wave2, c.from2, c.to2, c.len2, c.level2, t)
@@ -315,7 +350,7 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
 
   /** a rising sci-fi sweep: the beam */
   function beam(delay = 0) {
-    if (!live()) return
+    if (!live() || playRec('beam', delay)) return
     const c = C.beam, t = ac!.currentTime + delay
     tone(c.wave, c.from, c.to, c.len, c.level, t)
     tone(c.wave, c.from * c.harm, c.to * c.harm, c.len, c.level2, t + c.offset)
@@ -329,39 +364,39 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
 
   /** a ladder up: the mushroom appearing */
   function mushroomAppear() {
-    if (!live()) return
+    if (!live() || playRec('mushroom')) return
     const c = C.mushroom, t = ac!.currentTime
     ratios('mushroom').forEach((m, i) => { const f = c.root * m; tone(c.wave, f, f, c.len, c.level, t + i * c.step) })
   }
 
   /** a fast warbling rise: the trip starts */
   function powerUp() {
-    if (live()) ladder(C.powerUp)
+    if (live() && !playRec('powerUp')) ladder(C.powerUp)
   }
 
   /** the same, falling: the trip wears off */
   function powerDown() {
-    if (live()) ladder(C.powerDown)
+    if (live() && !playRec('powerDown')) ladder(C.powerDown)
   }
 
   /** two sharp beeps: "!" */
   function enemyAlert() {
-    if (live()) twoNotes(C.alert)
+    if (live() && !playRec('alert')) twoNotes(C.alert)
   }
 
   /** a squishy thump: a stomp */
   function stomp() {
-    if (live()) toneCrunch(C.stomp)
+    if (live() && !playRec('stomp')) toneCrunch(C.stomp)
   }
 
   /** a falling buzz: kicked */
   function kicked() {
-    if (live()) toneCrunch(C.kicked)
+    if (live() && !playRec('kicked')) toneCrunch(C.kicked)
   }
 
   /** a bright ping: TINK */
   function tink() {
-    if (!live()) return
+    if (!live() || playRec('tink')) return
     const c = C.tink, t = ac!.currentTime
     tone(c.wave, c.note, c.note * c.droop, c.len, c.level, t)
     tone('sine', c.note * c.over, c.note * c.over * c.droop2, c.len2, c.level2, t)
@@ -370,12 +405,14 @@ export function createSfx(settings: () => { soundOn: boolean; volume: number }, 
   /** a low, quiet thud: the giant's step (nothing when it's far) */
   function giantStep(near: number) {
     const k = Math.max(0, Math.min(1, near))
-    if (!live() || k < 0.05) return
+    if (!live() || k < 0.05 || playRec('giantStep', 0, k)) return
     toneCrunch(C.giantStep, k)
   }
 
   function dispose() {
     drone = null
+    for (const k of Object.keys(recs) as RecCue[]) delete recs[k]
+    recsAsked = false
     if (ac) ac.close().catch(() => {})
     ac = null
     noiseBuf = null

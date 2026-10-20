@@ -3,7 +3,7 @@ import HomePage from '@/app/page'
 import { buildStructuredData, serializeJsonLd } from '@/lib/structured-data'
 import { socials } from '@/data/socials'
 import { career } from '@/data/career'
-import skills from '@/data/skills.json'
+import { SKILLS } from '@/data/skills'
 import { SITE_URL } from '@/lib/site'
 
 // AboutSection reads shroom mode; the real provider lives in the root layout
@@ -32,8 +32,12 @@ describe('structured data', () => {
       worksFor: { '@type': 'Organization', name: career.jobs[0].company },
       sameAs: [socials.github, socials.linkedin],
     })
-    const technical = skills.find((c) => c.category === 'Technical Skills')!.skills
-    expect(person().knowsAbout).toEqual(technical)
+    const tech = SKILLS.groups
+      .filter((g) => ['ai', 'frontend', 'backend', 'cloud', 'quality'].includes(g.id))
+      .flatMap((g) => g.skills.map((s) => s.name))
+    expect(person().knowsAbout).toEqual(tech)
+    expect(person().knowsAbout).toEqual(expect.arrayContaining(['Claude Code', 'TypeScript', 'Postgres', 'Terraform', 'Playwright']))
+    expect(person().knowsAbout).not.toContain('Guitar') // music & product are not the tech list
     expect(person().image).toMatch(new RegExp(`^${SITE_URL}/`))
   })
 

@@ -177,7 +177,7 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
     - `npx jest --no-watchman`: 58 suites, 644 tests passed (6.5 s).
     - `npm run build`: exit 0 (Next 16.4.0 Turbopack, 13 static pages).
     - The baseline for T11: Lighthouse accessibility on `/` (production build, Lighthouse's default mobile run) = **100**. The only audit below 1 is `label-content-name-mismatch`, which has no weight in the score.
-- [ ] **T1: `src/data/skills.ts` and its consumers.** Per Binding §3:
+- [x] **T1: `src/data/skills.ts` and its consumers.** Per Binding §3:
   - Export `SKILLS` (headline, lede, groups `{ id, name, featured?, caption?, skills: { name, note? }[] }`) and a `skillCount`.
   - **The Wizard:** `wizard-prompt.ts`'s `{{SKILLS_JSON}}` becomes the groups as `{ group, skills: [name or "name: note"] }`.
   - **JSON-LD:** `structured-data.ts`'s `knowsAbout` becomes the skill names of the ai, frontend, backend, cloud and quality groups.
@@ -185,6 +185,7 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
   - **Tests:**
     - new `skills-data.test.ts`: 81 skills; the 7 groups in order with the counts above; every AI skill has a note and no other has one; names unique; "SSO / OIDC" and "Feature flags" present;
     - update `data-architecture`, `structured-data` and `wizard-prompt`: the prompt contains "MCP servers" and "a person confirms every write".
+  - **Done 2026-10-20:** `skills.ts` matches `skills.js` exactly, minus `power` (checked with a script that loads both). Until T5 rewrites it, the old section reads `SKILLS` mapped to its old `{ category, skills }` shape. `skills-section` and `integration` now expect the seven group headings instead of the old three categories. `SKILLS.groups` mapped to `{ group, skills }` in the Wizard's prompt; `TECH_GROUPS` for the JSON-LD. Verification: `npx jest --no-watchman skills-data data-architecture structured-data wizard-prompt skills-section integration` passed (8 suites, 81 tests); `npx tsc --noEmit` exit 0; eslint exit 0 on the touched files.
 - [ ] **T2: `SiteMusic.context()`, `pause()`, `play()`, `onChange()`.** Per Binding §4:
   - `useAudioPlayer` exposes `getAudioContext()`, which initializes if needed and returns the context.
   - `MusicPlayer` registers the four via refs, like `toggle`; `onChange` listeners are called from an effect on `isPlaying`.

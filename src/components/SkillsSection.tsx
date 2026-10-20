@@ -5,8 +5,7 @@ import AnimatedSection from '@/components/AnimatedSection'
 import SkillCategory from '@/components/SkillCategory'
 import GlitchText from '@/components/GlitchText'
 import { ScoreCounter, calculatePoints } from '@/components/SkillScore'
-import skillsData from '@/data/skills.json'
-import { SkillCategory as SkillCategoryType } from '@/types/content'
+import { SKILLS } from '@/data/skills'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface PointPopup {
@@ -23,8 +22,8 @@ interface PointPopup {
  * - Section ID for navigation anchor (#skills)
  * - Proper accessibility attributes (role, aria-label)
  * - Section heading with neon-text-purple effect
- * - Data imported from /src/data/skills.json
- * - SkillCategory for each category (Technical, Professional, Other)
+ * - Data imported from /src/data/skills.ts
+ * - SkillCategory for each group (AI, Frontend & mobile, …)
  * - AnimatedSection wrapper with slide-from-left variant for heading
  * - GlitchText effect on heading for hover interaction
  * - Responsive chip layout with flex-wrap
@@ -32,7 +31,7 @@ interface PointPopup {
  * - Skill Slayer scoring system with combo multipliers
  */
 const SkillsSection = () => {
-  const skills = skillsData as SkillCategoryType[]
+  const skills = SKILLS.groups.map((g) => ({ category: g.name, skills: g.skills.map((s) => s.name) }))
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
   const [isScoreVisible, setIsScoreVisible] = useState(false)

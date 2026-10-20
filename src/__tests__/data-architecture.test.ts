@@ -5,67 +5,14 @@
  * conform to their TypeScript interfaces.
  */
 
-import skillsData from '@/data/skills.json'
 import projectsData from '@/data/projects.json'
 import projectDetailsData from '@/data/project-details.json'
 import educationData from '@/data/education.json'
-import type { SkillCategory, Project, ProjectDetails, Education } from '@/types/content'
+import type { Project, ProjectDetails, Education } from '@/types/content'
 
 describe('Data Architecture', () => {
   // The career (the Experience section, the Wizard, the JSON-LD): src/__tests__/career-data.test.ts
-
-  describe('Skills Data', () => {
-    it('imports skills.json without errors', () => {
-      expect(skillsData).toBeDefined()
-      expect(Array.isArray(skillsData)).toBe(true)
-    })
-
-    it('contains three skill categories', () => {
-      expect(skillsData.length).toBe(3)
-    })
-
-    it('each category has required fields', () => {
-      skillsData.forEach((category) => {
-        const skillCategory = category as SkillCategory
-        expect(skillCategory.category).toBeDefined()
-        expect(typeof skillCategory.category).toBe('string')
-        expect(Array.isArray(skillCategory.skills)).toBe(true)
-        expect(skillCategory.skills.length).toBeGreaterThan(0)
-      })
-    })
-
-    it('includes Technical Skills category with core skills', () => {
-      const technicalSkills = skillsData.find(
-        (c) => c.category === 'Technical Skills'
-      )
-      expect(technicalSkills).toBeDefined()
-      expect(technicalSkills?.skills).toContain('JavaScript')
-      expect(technicalSkills?.skills).toContain('TypeScript')
-      expect(technicalSkills?.skills).toContain('React')
-    })
-
-    it('includes Professional Skills category', () => {
-      const professionalSkills = skillsData.find(
-        (c) => c.category === 'Professional Skills'
-      )
-      expect(professionalSkills).toBeDefined()
-      expect(professionalSkills?.skills).toContain('Software Engineering')
-      expect(professionalSkills?.skills).not.toContain('Agent OS')
-    })
-
-    it('lists the 2026 stack among the technical skills', () => {
-      const technical = skillsData.find((c) => c.category === 'Technical Skills')?.skills
-      for (const skill of ['Anthropic SDK', 'OpenAI Agents SDK', 'Terraform', 'Fastify', 'Postgres']) {
-        expect(technical).toContain(skill)
-      }
-    })
-
-    it('includes Other Skills category', () => {
-      const otherSkills = skillsData.find((c) => c.category === 'Other Skills')
-      expect(otherSkills).toBeDefined()
-      expect(otherSkills?.skills).toContain('Guitar')
-    })
-  })
+  // The skills (the Skills section, the Wizard, the JSON-LD): src/__tests__/skills-data.test.ts
 
   describe('Projects Data', () => {
     it('imports projects.json without errors', () => {

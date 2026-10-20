@@ -3,18 +3,17 @@
  *
  * Tests for the SkillsSection, SkillCategory, and SkillChip components:
  * - SkillsSection renders with correct ID (#skills)
- * - All three skill categories render with headings
+ * - A heading per skill group
  * - SkillChip components render for each skill
  * - Hover state applies scale and glow effect
- * - Skills are imported from JSON data
+ * - Skills are imported from skills.ts
  */
 
 import { render, screen, fireEvent } from '@testing-library/react'
 import SkillsSection from '@/components/SkillsSection'
 import SkillCategory from '@/components/SkillCategory'
 import SkillChip from '@/components/SkillChip'
-import skillsData from '@/data/skills.json'
-import { SkillCategory as SkillCategoryType } from '@/types/content'
+import { SKILLS } from '@/data/skills'
 
 // Helper to filter out framer-motion props
 const filterMotionProps = (props: Record<string, unknown>) => {
@@ -102,13 +101,12 @@ describe('SkillsSection', () => {
     expect(section).toBeInTheDocument()
   })
 
-  it('renders all three skill categories with headings', () => {
+  it('renders a heading per skill group', () => {
     render(<SkillsSection />)
 
-    // Check each category heading is rendered
-    expect(screen.getByText('Technical Skills')).toBeInTheDocument()
-    expect(screen.getByText('Professional Skills')).toBeInTheDocument()
-    expect(screen.getByText('Other Skills')).toBeInTheDocument()
+    for (const group of SKILLS.groups) {
+      expect(screen.getByRole('heading', { level: 3, name: group.name })).toBeInTheDocument()
+    }
   })
 
   it('has proper accessibility attributes', () => {
@@ -118,20 +116,19 @@ describe('SkillsSection', () => {
     expect(section).toBeInTheDocument()
   })
 
-  it('renders all skills from JSON data', () => {
+  it('renders every skill from skills.ts', () => {
     render(<SkillsSection />)
 
-    // Verify all skills from all categories are rendered
-    ;(skillsData as SkillCategoryType[]).forEach((category) => {
-      category.skills.forEach((skill) => {
-        expect(screen.getByText(skill)).toBeInTheDocument()
+    SKILLS.groups.forEach((group) => {
+      group.skills.forEach((skill) => {
+        expect(screen.getByText(skill.name)).toBeInTheDocument()
       })
     })
   })
 })
 
 describe('SkillCategory', () => {
-  const mockCategory: SkillCategoryType = {
+  const mockCategory = {
     category: 'Test Category',
     skills: ['Skill 1', 'Skill 2', 'Skill 3'],
   }

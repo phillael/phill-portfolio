@@ -1,16 +1,8 @@
 /**
  * TypeScript interfaces for portfolio content data structures.
  * These interfaces define the shape of data in /src/data/*.json files.
- * (The career, for the Experience section, is typed in src/data/career.ts.)
+ * (The career, for the Experience section, is typed in src/data/career.ts; the skills in src/data/skills.ts.)
  */
-
-/**
- * SkillCategory - Grouped skills for the skills showcase section
- */
-export interface SkillCategory {
-  category: string
-  skills: string[]
-}
 
 /**
  * Project - Featured project for the project gallery section

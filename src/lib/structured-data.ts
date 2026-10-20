@@ -1,5 +1,5 @@
 import { career } from '@/data/career'
-import skills from '@/data/skills.json'
+import { SKILLS, TECH_GROUPS } from '@/data/skills'
 import { socials } from '@/data/socials'
 import { SITE_URL } from '@/lib/site'
 
@@ -11,8 +11,9 @@ const PERSON_ID = `${SITE_URL}/#person`
  */
 export function buildStructuredData() {
   const [current] = career.jobs
-  const technicalSkills =
-    skills.find((category) => category.category === 'Technical Skills')?.skills ?? []
+  const technicalSkills = SKILLS.groups
+    .filter((group) => TECH_GROUPS.includes(group.id))
+    .flatMap((group) => group.skills.map((skill) => skill.name))
 
   return {
     '@context': 'https://schema.org',

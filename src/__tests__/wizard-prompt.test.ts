@@ -49,6 +49,15 @@ describe('buildWizardSystemPrompt', () => {
     expect(prompt).toMatch(/career-notes.*true/i)
   })
 
+  it('carries the skills from skills.ts, AI first with their notes', () => {
+    const skills = section(buildWizardSystemPrompt(), 'skills')
+    expect(skills).toContain('MCP servers')
+    expect(skills).toContain('a person confirms every write')
+    expect(skills).toContain('"Human-in-the-loop: a person confirms every write"')
+    expect(skills).toContain('"group": "Music & more"')
+    expect(skills.indexOf('"group": "AI"')).toBeLessThan(skills.indexOf('"group": "Frontend & mobile"'))
+  })
+
   it('includes project architecture details in the prompt', () => {
     const prompt = buildWizardSystemPrompt()
     expect(prompt).toContain('Colyseus')

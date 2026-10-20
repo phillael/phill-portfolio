@@ -1,24 +1,26 @@
-// Offline render comparison, Skill blaster engine: renders the same hits and beats through two engines with a seeded
+// Offline render comparison, Skill blaster engine: renders the same hits and beats through the lab's engine
+// (docs/design/skills-game/round6/synth.js) and the site's port (src/lib/skills/synth.ts, types stripped) with a seeded
 // Math.random in an OfflineAudioContext and prints the difference (relErrDb ≤ -100 = identical; Chrome's convolver adds
-// run-to-run noise of about -80…-150 dB even for one engine against itself). Written for the round 6 refactor (window.OLD,
-// built from the pre-refactor game script, vs round6/synth.js). For the site's TypeScript port, build the TS engine into a
-// plain script the way render-compare-jelly.mjs does (node:module stripTypeScriptTypes) and compare it to synth.js.
-// Serve the repo root first: python3 -m http.server 8765
+// run-to-run noise of about -80…-150 dB even for one engine against itself). The recorded kinds (ride, crash, riser,
+// boom) are set to their synth versions in both, so the comparison is seeded end to end.
+// Build the stripped script first (from the repo root):
+//   node -e 'const m=require("node:module"),fs=require("fs");const s=(f)=>m.stripTypeScriptTypes(fs.readFileSync(f,"utf8"),{mode:"strip"}).replace(/^import .*$/mg,"").replace(/^export (const|function|type|interface)/mg,"$1");fs.writeFileSync("docs/design/sound-lab/tools/synth-new.js","window.SITE_SYNTH=(()=>{\n"+s("src/lib/skills/synthConfig.ts")+"\n"+s("src/lib/skills/synth.ts")+"\nreturn{createSynth,SKILL_SYNTH_CONFIG}})()")'
+// then serve the repo root (python3 -m http.server 8765) and run: node docs/design/sound-lab/tools/render-compare-skills.mjs
+// (synth-new.js is a build artifact: don't commit it). The round 6 refactor's run compared the pre-refactor game
+// script (old-engine.js) with synth.js the same way.
 
-// Renders the same sounds through round 6's original engine and the refactored synth.js (seeded
-// Math.random, OfflineAudioContext) and compares the samples.
 const { default: puppeteer } = await import('/Users/phillipaelony/.npm/_npx/a6a54b540d72890f/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js')
 const fs = await import('node:fs')
-const dir = new URL('.', import.meta.url).pathname // (expects old-engine.js next to this file)
+const dir = new URL('.', import.meta.url).pathname // (expects synth-new.js next to this file)
 const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: 'new' })
 const page = await browser.newPage()
 page.on('pageerror', (e) => console.log('pageerror', e.message))
 page.on('console', (m) => { if (m.type() === 'error') console.log('console', m.text()) })
 await page.goto('http://127.0.0.1:8765/docs/design/skills-game/round6/blaster-synth.html')
 await page.addScriptTag({ url: '/docs/design/skills-game/round6/synth.js' })
-await page.addScriptTag({ content: fs.readFileSync(dir + 'old-engine.js', 'utf8') })
-const diff = process.argv[2] ? JSON.parse(process.argv[2]) : undefined
-const res = await page.evaluate(async (diff) => {
+await page.addScriptTag({ content: fs.readFileSync(dir + 'synth-new.js', 'utf8') })
+const res = await page.evaluate(async () => {
+  const SYNTH_DRUMS = { crashType: 'synth', rideType: 'metal', riserType: 'synth', impactType: 'synth' } // the recordings' synth versions
   const SR = 44100
   const seed = (s) => { let a = s >>> 0; Math.random = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
   const BEAT = 60 / 172, SIX = BEAT / 4
@@ -47,15 +49,11 @@ const res = await page.evaluate(async (diff) => {
   async function render(which, name) {
     seed(1234)
     const ctx = new OfflineAudioContext(2, SR * DUR[name], SR)
-    let E
-    if (which === 'old') {
-      const O = window.OLD(ctx)
-      E = { D: O.D, hit: (g, kk, t, v) => O.HIT[g](kk, t, v), beat: (level, bar, pos, t) => { O.M.level = level; O.drums(bar, pos, t) } }
-    } else {
-      const N = SKILL_SYNTH.create(ctx, diff)
-      N.mbus.gain.value = 1
-      E = { D: N.D, hit: N.hit, beat: N.beat }
-    }
+    let N
+    if (which === 'old') N = SKILL_SYNTH.create(ctx, { drums: SYNTH_DRUMS }) // the lab's engine
+    else { const C = SITE_SYNTH.SKILL_SYNTH_CONFIG; N = SITE_SYNTH.createSynth(ctx, { ...C, drums: { ...C.drums, ...SYNTH_DRUMS } }) } // the site's
+    N.mbus.gain.value = 1
+    const E = { D: N.D, hit: N.hit, beat: N.beat }
     CASES[name](E)
     const buf = await ctx.startRendering()
     return [buf.getChannelData(0), buf.getChannelData(1)]
@@ -68,6 +66,6 @@ const res = await page.evaluate(async (diff) => {
     out[name] = { at: +at.toFixed(4), rms: +Math.sqrt(ss / a[0].length / 2).toFixed(4), maxDiff: +max.toExponential(2), relErrDb: ss ? +(10 * Math.log10(se / ss || 1e-30)).toFixed(1) : null }
   }
   return out
-}, diff)
+})
 console.table(res)
 await browser.close()

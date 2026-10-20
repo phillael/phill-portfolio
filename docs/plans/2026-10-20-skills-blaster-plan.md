@@ -391,7 +391,7 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
       - `npm run lint` exit 0 (zero warnings);
       - `npx jest --no-watchman`: 62 suites, 700 passed (T0: 58/644);
       - `npm run build` exit 0 (13 static pages).
-- [ ] **T11: the browser pass** on a production build (`npm run build && npm run start`), at 1280×800 (mouse) and 375×812 (touch), in a fresh browser context. Use `docs/design/skills-game/tools/shoot.mjs` with a step file ported from `tools/flow-steps.mjs` to `window.__skills`; stub `/api/wizard/chat`. Check, and record here:
+- [x] **T11: the browser pass** on a production build (`npm run build && npm run start`), at 1280×800 (mouse) and 375×812 (touch), in a fresh browser context. Use `docs/design/skills-game/tools/shoot.mjs` with a step file ported from `tools/flow-steps.mjs` to `window.__skills`; stub `/api/wizard/chat`. Check, and record here:
   - the full flow (first shot starts the beat, waves 1–4, the drop at wave 3 with the recorded riser/crash/boom, a hit taken, game over + tape stop, idle pause, resume, Esc);
   - the site's music paused and handed back;
   - no voices left after stop (the dev handle's `active()`) and no leftover effect elements;
@@ -404,6 +404,61 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
   - Lighthouse accessibility on `/` ≥ the T0 baseline;
   - no console errors;
   - the offline render comparison of `synth.ts` against `synth.js` (adapt `docs/design/sound-lab/tools/render-compare-skills.mjs`; the recorded kinds set to their synth fallbacks for the seeded comparison): every case ≤ −80 dB.
+  - **Recorded 2026-10-20:**
+    - **Builds:** two production builds, fresh browser contexts each, `/api/wizard/chat` stubbed.
+      - **The real build** checked the network, reduced motion, keyboard, wizard, Lighthouse and console.
+      - **A debug build** ran the flows that need `window.__skills`, which production strips: the full flow, the arena sizes and the trace. It kept the handle through a one-line local edit in `blaster.ts`, reverted before the commit and never committed (the CLAUDE.md practice for `__jelly.playDev`).
+    - **The full flow** (1280×800 mouse, 375×812 touch; debug build):
+      - the site's song plays, then pauses at the first shot (the context `running`);
+      - waves 1–4; the band's pips and `bl-live` headings follow the parts;
+      - wave 2's clear places the riser (`dropBar` 15) with the recorded sets loaded (`samplesReady` true); the drop at wave 3 is level 2 (meter RMS 0.026 desk, 0.022 phone);
+      - a hit taken: health 4 of 5, the drums skip (`muteUntil` +0.2–0.4 s); wave 4 is level 3 with the recorded ride ready;
+      - game over: the tape stop; 2 s later 0 voices and the song handed back (playing again);
+      - shoot any skill to play again;
+      - pressing play on the player mid-game → "Paused · the music player is on";
+      - Esc: 0 voices, the layer empty, the screen only `bl-vig`;
+      - the idle pause after 5 s, a shot resumes, Esc → "Stopped. 200 points.";
+      - 12.6 s after game over the arena and the readout are gone (`rest`).
+    - **The arena** (debug build, T9's sizes): the same numbers as T9.
+      - 1280×800 fit 1, 81/81 visible; 1366×640 fit 0.88, 81/81; 1440×900 fit 1, 81/81; → 1024×700 refit 0.88, 81/81;
+      - 375×812 and 390×844 staged (bass + chords first), no horizontal scroll, no touch target under 44 px;
+      - 87 FLIP animations on desktop, 32 on phones; the section's top unchanged on stop.
+    - **Reduced motion** (real build):
+      - at rest, 0 running animations;
+      - in play, 0 letters, 0 beams, 0 FLIP, 0 transform animations; the ring dims (opacity 1 → 0.3).
+      - **Fix:** this check found the readout's 8 px slide-in (a CSS transition), now off under reduced motion in `blaster.css`, as the mockup's base styles did.
+    - **Keyboard only** (real build):
+      - Tab → Claude Code (`:focus-visible`, 2 px solid outline); Tab ×20 → React Native;
+      - Enter starts the game, and the live region speaks the start, with the L hint;
+      - L → the oldest lit skill (Turborepo, focus visible); Enter on it scores 100 → 300;
+      - Esc stops (focus stays in the section; "Stopped. 300 points.").
+    - **The readout** (real build, the wizard summoned): at 1280 centred at x 449 (the wizard ends at 311); at 375 the wizard steps aside (its box at −300…−108). Both are clear of the music and summon buttons.
+    - **The network** (real build):
+      - 14 chunks at load; none new while 900 px above the section;
+      - near the section, the game's CSS + 2 JS chunks;
+      - no audio before the first shot, the 7 recordings after it.
+    - **The trace** (debug build, emulated 390×844, 4× CPU, the drop through wave 4 into wave 5): 9,244 tasks, none over 50 ms (the longest 18.6 ms); 31 rAF callbacks, none with a layout.
+    - **Lighthouse accessibility** on `/` (real build): **100**, the same as T0. The only audit below 1 is the same weight-0 `label-content-name-mismatch`, on the hero's "Open the interactive resume" button.
+    - **Console:** no errors on `/`, on `/resume`, or on `/` with reduced motion. The hydration warning noted in T6 is dev-only.
+    - **The offline render** (`render-compare-skills.mjs`, now `synth.js` vs the type-stripped `synth.ts`; the recorded kinds on their synth versions):
+
+      | Case | dB |
+      |---|---|
+      | bass1 | −85.8 (−300 on a re-run: convolver noise) |
+      | bass2 | −300 |
+      | bass | −144.1 |
+      | chords | −139.1 |
+      | arp | −144.3 |
+      | lead | −143.9 |
+      | bleeps | −161.4 |
+      | bells | −147.1 |
+      | vox | −138.6 |
+      | drums | −123.7 (−142.5 on a re-run) |
+      | riser | −300 |
+      | song | −136.8 |
+
+      Every case is ≤ −80 dB.
+    - **Gates:** `npx tsc --noEmit` exit 0; `npm run lint` exit 0; `npx jest --no-watchman`: 62 suites, 700 passed; `npm run build` exit 0.
 - [ ] **T12: PR text. STOP before pushing:** Phill tries it locally on desktop and his phone first. Write the PR description under this task: summary, decisions, the measurements, the test plan, screenshots to take.
 
 ## Per-task verification

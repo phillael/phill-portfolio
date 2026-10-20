@@ -613,6 +613,10 @@
   .bl-score b.bump {
     animation: none;
   }
+  .bl-hud {
+    transform: none; /* the readout appears, it doesn't slide in */
+    transition: none;
+  }
   .bl-pts {
     animation: bl-pts-still 1s linear forwards;
   }

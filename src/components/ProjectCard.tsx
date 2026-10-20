@@ -18,7 +18,7 @@ interface ProjectCardProps {
  * - Gradient placeholder fallback when image is unavailable
  * - Project title with neon text effect
  * - Description text
- * - Tech stack rendered as badges (same pattern as SkillChip)
+ * - Tech stack rendered as badges
  * - Live Demo and View Code action buttons with neon border effects
  * - Gradient card base styling with hover hue-rotate effect
  * - External links open in a new tab with proper security attributes; this site's own pages in the same tab

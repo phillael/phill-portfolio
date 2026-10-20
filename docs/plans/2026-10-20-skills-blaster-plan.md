@@ -230,13 +230,25 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
     - **helpers:** `clearBonus`, `isFoe`, `lifeFor` (the 1.6× keyboard time) and `pickWeighted` (`pickTarget`'s weighted pick, same RNG order).
     - **The best-score key:** the mockup stores it as `skill-blaster-band-best`, Binding §1 says `skill-blaster-best`, and the plan's key wins (T7).
     - **Verification:** `npx jest --no-watchman skills-rules` 16 passed (it failed first with `Cannot find module`); `npx tsc --noEmit` exit 0; eslint exit 0.
-- [ ] **T5: the section at rest.**
+- [x] **T5: the section at rest.**
   - **Rewrite `SkillsSection.tsx`** from `skills.ts` to the mockup's rest markup: header, AI glass panel (each skill a button with name + note), the groups (h3 + a list of buttons with dots), every button `type="button" data-skill data-group`.
   - **Styles:** `src/components/skills/Skills.module.css`, ported from `skills.css` + `round2/base.css` + the round 6 static rules (tokens mapped to the site's, as the Experience section did).
   - **Line ends:** a client effect marks them on render and resize.
   - **Delete** `SkillCategory.tsx`, `SkillChip.tsx`, `SkillScore.tsx`, their CSS if any, and `particle-burst.test.tsx`.
   - **Rewrite `skills-section.test.tsx`:** region named Skills with `id="skills"`; the h2; 81 buttons named by the skill (the AI ones' names include the note); 7 group headings; dots `aria-hidden`.
   - **Visual:** match the mockup's rest state at 1280 and 375.
+  - **Done 2026-10-20:**
+    - **The markup:** `SkillsSection.tsx` is a server component.
+      - **Line ends:** `LineEnds.tsx` is a tiny client island running `markLineEnds` (`data-eol`, on render, when the fonts are in, and 120 ms after a resize). The pure function is named `markLineEnds.ts`, not `lineEnds.ts`: on macOS's case-insensitive disk that name shadowed `LineEnds.tsx`.
+      - **JS hooks for the game:** `data-skill`/`data-group` on each skill, `data-sk-group` on each group's box, `data-name` on an AI skill's name, `data-words` on a group's list, `data-sk-list`, and `data-sk-live` on the polite live region.
+      - **The AI buttons' names:** a space text node sits between name and note, so the accessible name is "name note" in every engine (a grid ignores it visually).
+      - **The AI list:** `aria-labelledby` its heading, like the other groups.
+    - **The header:** tokens and header classes as in the Experience section (`--magenta` = the site's secondary; the headline is `var(--ink)` + `neon-text-purple`), so the two sections match.
+    - **Measured against the mockup** (`#skills` top to h2, title, lede, AI panel, first group heading): identical at 1280×800 (128/155/244/370/920 px) and 375×812 (72/99/197/320/1557 px).
+      - **Height:** the section is 98 px shorter than the mockup's, because the mockup's hidden readout already takes space at rest (`visibility: hidden`); the readout comes in T7.
+      - **At 375:** `scrollWidth` 375 = `innerWidth` 375, and every skill button is ≥ 44 px (coarse pointer).
+      - **At 1280:** fine-pointer words are 34 px tall, as in the mockup.
+    - **Tests and gates:** `npx jest --no-watchman skills-section a11y landmarks integration navigation` passed (8 suites, 62 tests); `npx tsc --noEmit` exit 0; `npm run lint` exit 0.
 - [ ] **T6: the lean and the lazy start** (`src/components/skills/SkillsPlay.tsx`, a client island inside the section):
   - The magnet lean per Binding §1.
   - Prefetch the game chunk with an IntersectionObserver (rootMargin ~600px) or on the first pointerover/focus in the section.

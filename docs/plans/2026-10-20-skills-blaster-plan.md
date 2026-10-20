@@ -275,11 +275,33 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
       - **The lean:** a mouse near Docker leans 2 words (`translate3d(1.43px, 0.55px, 0px) rotate(1.43deg) scale(1.017)`), and none are left leaning once the pointer leaves.
       - **Reduced motion:** 0 words lean and 0 animations run.
     - **Noted for T11:** a React hydration-mismatch error appears only with reduced motion, from `AnimatedSection` (framer-motion `opacity`/`transform` styles in About, Projects, Contact and the footer). That code isn't touched here; T11 compares it with master.
-- [ ] **T7: the game, core.** `src/lib/skills/blaster.ts` + `src/lib/skills/blaster.css` (the `bl-*` classes).
+- [x] **T7: the game, core.** `src/lib/skills/blaster.ts` + `src/lib/skills/blaster.css` (the `bl-*` classes).
   - **Verify first with context7:** importing global CSS from a lazily imported module in the App Router. If that's not supported, inject the stylesheet from the module.
   - **Port everything in Binding §1 except the music and the arena:** shots and effects, waves, kinds, enemies, health, banners, the readout, game over, best score, idle/offscreen pause, stop, keyboard, the live region, reduced motion.
   - `window.__skills` in development only (`process.env.NODE_ENV !== 'production'`): `G`, `startWave`, `stop`, `jumpToDrop()`, `meter()`.
   - **Tests:** the pure parts are in T4. For the runtime, write a smoke test in jsdom with a fake engine: start → a lit target after the first bar; Esc stops; the live region speaks.
+  - **Done 2026-10-20:**
+    - **The CSS question:** context7 is behind an auth step here, so I read the docs Next ships in `node_modules/next/dist/docs/` (16.4.0) instead. They allow global CSS from any app component but don't cover a lazily imported module. So I checked it on a production build:
+      - `blaster.css` becomes its own file (`2--oa3osb91vt.css`), not in the initial HTML;
+      - it arrives with the game chunk (prefetched near the section);
+      - its 18 rules apply after the click.
+      - No stylesheet injection needed.
+    - **Seams for T8 and T9:** the music (`partHit`, `SFX`, `MUS`, `handOff`/`handBack`, the conductor's `musicState().on`) and the arena (`armArena`, `arenaOff`, `restage`) are no-op seams.
+    - **The clock** (`M.zero`, bars, `onGrid`) runs on the audio clock already, so waves start on a bar and enemies fire on a beat.
+    - **The dev handle:** `window.__skills` (`G`, `M`, `keys`, `ac`, `startWave`, `stop`, `jumpToDrop()`, `meter()`) is stripped from the production build (checked: `undefined`).
+    - **The best score:** stored under `skill-blaster-best`.
+    - **The Shroom Wizard** (a site system the mockup didn't have):
+      - no skill lights up under its box;
+      - while it's out, the readout centres where that clears it (desktop: 449–831 px vs the wizard ≤ 311);
+      - where it can't (phones), the wizard steps aside: Phill's call, 2026-10-20. `src/lib/wizard-aside.ts` carries it; `ShroomWizard3D` walks off and back with its walk, its canvas stops drawing while parked, and it leaves the tab order.
+    - **Esc layering:** while the game runs, Esc stops it and calls `stopPropagation()`, so the wizard and shroom mode (window listeners) don't also go. An open chat or the 3D resume still catch Esc first.
+    - **Tests:** `skills-blaster.test.tsx` (8): start, a lit skill after the first bar, a hit scores, Esc stops and says the score, Esc doesn't reach the wizard, the idle pause and resume, a graze scores nothing, the wizard steps aside and back. Plus `readoutClears` in `skills-rules`. `npx jest --no-watchman skills ShroomMode site-music`: 8 suites, 77 passed.
+    - **Gates:** `npx tsc --noEmit` exit 0; `npm run lint` exit 0; `npm run build` exit 0.
+    - **Browser** (dev, 1280×800 mouse and 375×812 touch, `__skills`):
+      - the full flow at both sizes: the first hit (letters, ring, +100), waves 1–4, red skills from wave 3, a hit taken (crack, vignette, health 4 of 5), game over (best saved, the Number Slayers link), the idle pause after 5 s, a shot resumes, Esc;
+      - no effect elements left (the layer holds 0 elements, the screen only `bl-vig`); the live region says "Stopped. 200 points.";
+      - the readout is clear of the music and summon buttons;
+      - with the wizard summoned: centred at 1280; at 375 the wizard parks at left −300 and walks back to −41 after Esc.
 - [ ] **T8: the game's music.**
   - Wire the engine (T3) to the game:
     - the clock and drums per wave;
@@ -368,6 +390,7 @@ On a production build (`npm run build && npm run start`), in a fresh browser con
 
 - **T12:** stop before pushing; Phill tries it on desktop and his phone and approves the PR text.
 - **The readout and the wizard** (Binding §1): if no clean placement keeps the readout clear of the summoned wizard at some width, stop and show Phill the options.
+  - **Resolved 2026-10-20:** no clean placement at 375 (the wizard's box is 192×144, the readout ~283 px wide). Phill picked "the wizard steps aside" over "the readout above the wizard", "the readout at the top" and "leave it". Desktop keeps the readout, centred while the wizard is out.
 - **Anything the mockup can't decide** (a site system it didn't have, e.g. shroom mode's hue cycle over the game's colours, or the wizard chat's Esc): pick the behaviour that keeps both working and note it here. Stop if it changes what Phill sees or hears.
 - **Freesound originals (not blocking):** the shipped ride/crash/riser/boom files were made from Freesound's ~180 kbps previews, because the original WAVs need a login. If Phill downloads the originals (their pages are in `public/skills/sfx/CREDITS.md`), re-encode them the same way (cut, fade, peak −1 dB, VBR mp3) and recheck the levels.
 - **New copy or numbers:** none beyond the mockup's. If a sentence is needed that the mockup doesn't have, stop.

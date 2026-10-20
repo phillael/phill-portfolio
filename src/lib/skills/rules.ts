@@ -131,3 +131,11 @@ export function stageOrder(wave: number): SkillGroupId[] {
   const core = CORE[wave % CORE.length], others = STAGE_ORDER.filter((g) => g !== core)
   return [core, ...others.map((_, i) => others[(i + 2 * wave) % others.length])]
 }
+
+/** the readout centred in the section (its content box from `left`, `inner` wide) clears the Shroom Wizard's box
+    (bottom-left, ending at `wizardRight`) and the music and summon buttons (the right 76 px); where it can't, the
+    wizard steps aside while the game plays */
+export const readoutClears = ({ left, inner, width, wizardRight, viewport }: { left: number; inner: number; width: number; wizardRight: number; viewport: number }) => {
+  const x = left + (inner - width) / 2
+  return x > wizardRight + 8 && x + width < viewport - 76
+}

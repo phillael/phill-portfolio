@@ -16,6 +16,7 @@ import {
   need,
   pickWeighted,
   planFor,
+  readoutClears,
   stageOrder,
   waveCfg,
   type Kind,
@@ -169,5 +170,15 @@ describe('phone staging', () => {
       ['ai', 'product', 'music', 'cloud', 'backend', 'frontend', 'quality'],
       ['cloud', 'ai', 'backend', 'frontend', 'quality', 'product', 'music'],
     ])
+  })
+})
+
+describe('the readout beside the Shroom Wizard', () => {
+  // the wizard's box ends at x 311 on desktop, 151 on a phone; the music and summon buttons take the right 76 px
+  it('centres where that clears the wizard (1280 wide)', () => {
+    expect(readoutClears({ left: 112, inner: 1056, width: 382, wizardRight: 311, viewport: 1280 })).toBe(true)
+  })
+  it('can’t on a phone (375 wide): the wizard steps aside instead', () => {
+    expect(readoutClears({ left: 16, inner: 343, width: 283, wizardRight: 151, viewport: 375 })).toBe(false)
   })
 })

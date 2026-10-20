@@ -1,10 +1,11 @@
 'use client'
 
-import { Suspense, useRef, useEffect, useState, useCallback } from 'react'
+import { Suspense, useRef, useEffect, useState, useCallback, useSyncExternalStore } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations, useCursor } from '@react-three/drei'
 import { motion, AnimatePresence } from 'framer-motion'
 import MushroomOfferBubble from './MushroomOfferBubble'
+import { isWizardAside, subscribeWizardAside } from '@/lib/wizard-aside'
 import * as THREE from 'three'
 
 // Animation names - CORRECTED MAPPING
@@ -261,12 +262,18 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
     }, WALK_DURATION * 1000)
   }
 
+  // The Skill blaster can ask the wizard to step aside while it plays (phones: its readout sits where the
+  // wizard stands). He walks off and back like his exit and entrance; parked off-screen, the canvas stops drawing
+  const aside = useSyncExternalStore(subscribeWizardAside, isWizardAside, () => false)
+  const [stepping, setStepping] = useState(false)
+  const [parked, setParked] = useState(false)
+
   // Determine if wizard should be walking
-  const isWalking = isEntering || isExiting
+  const isWalking = isEntering || isExiting || stepping
 
   // Calculate target position based on state
   const onScreenLeft = isDesktop ? ON_SCREEN_LEFT_DESKTOP : ON_SCREEN_LEFT_MOBILE
-  const targetLeft = isExiting ? OFF_SCREEN_LEFT : onScreenLeft
+  const targetLeft = isExiting || aside ? OFF_SCREEN_LEFT : onScreenLeft
 
   if (hasError) {
     return (
@@ -294,7 +301,10 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
         duration: WALK_DURATION,
         ease: 'easeInOut'
       }}
+      onAnimationStart={() => setStepping(true)}
       onAnimationComplete={() => {
+        setStepping(false)
+        setParked(aside)
         if (isExiting) {
           onExitComplete?.()
         }
@@ -330,7 +340,8 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
         ref={wizardButtonRef}
         role="button"
         aria-label={isActive ? 'Click to exit Shroom Mode' : 'Talk to the Shroom Wizard'}
-        tabIndex={0}
+        aria-hidden={aside || undefined}
+        tabIndex={aside ? -1 : 0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
@@ -339,6 +350,7 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
         }}
       >
         <Canvas
+          frameloop={aside && parked ? 'never' : 'always'}
           camera={{ position: [0, 0, 3], fov: 50 }}
           style={{ background: 'transparent', cursor: 'inherit' }}
           gl={{ alpha: true, antialias: true }}
@@ -356,7 +368,7 @@ const ShroomWizard3D = ({ onClick, isActive = false, showModal = false, onConfir
               onClick={TEST_MODE ? undefined : onClick}
               onLoaded={handleModelLoaded}
               isWalking={isWalking}
-              isExiting={isExiting}
+              isExiting={isExiting || aside}
             />
           </Suspense>
         </Canvas>

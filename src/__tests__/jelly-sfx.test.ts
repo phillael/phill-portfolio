@@ -1,14 +1,15 @@
 /**
  * The 3D resume's sound effects (synthesized, no files): Play mode's jump, land, smash, coin
- * and finish make sound only while Sound is on. Web Audio isn't in jsdom, so a small fake
- * AudioContext records which sources get started.
+ * and finish make sound only while Sound is on, and every number comes from SFX_CONFIG.
+ * Web Audio isn't in jsdom, so a small fake AudioContext records which sources get started.
  */
 
 import { createSfx, playEventSound } from '@/lib/jelly/sfx'
+import { SFX_CONFIG } from '@/lib/jelly/config'
 import type { PlayEvent } from '@/lib/jelly/play'
 
 const started: string[] = []
-const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {} })
+const param = () => ({ value: 0, set: [] as number[], setValueAtTime(v: number) { this.set.push(v) }, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {} })
 const node = (kind: string) => ({
   kind, type: '', buffer: null as unknown, frequency: param(), detune: param(), Q: param(), gain: param(), threshold: param(), ratio: param(),
   connect() {}, disconnect() {},
@@ -77,7 +78,45 @@ describe("Play mode's sounds", () => {
   })
 })
 
-describe("round 2's placeholder sounds (synth stand-ins until the sounds PR)", () => {
+describe('the sounds come from SFX_CONFIG', () => {
+  const oscs: ReturnType<typeof node>[] = []
+  let spy: jest.SpyInstance
+  beforeEach(() => {
+    oscs.length = 0
+    spy = jest.spyOn(FakeAudioContext.prototype, 'createOscillator').mockImplementation(() => { const o = node('osc'); oscs.push(o); return o })
+  })
+  afterEach(() => spy.mockRestore())
+
+  it('the jump is the tuned one: its wave and where it starts', () => {
+    const sfx = createSfx(() => ({ soundOn: true, volume: 0.7 }))
+    sfx.init()
+    sfx.jump()
+    expect(oscs).toHaveLength(1)
+    expect(oscs[0].type).toBe(SFX_CONFIG.jump.wave)
+    expect(oscs[0].frequency.set[0]).toBe(SFX_CONFIG.jump.from)
+  })
+
+  it('a config of its own changes the sound', () => {
+    const sfx = createSfx(() => ({ soundOn: true, volume: 0.7 }), { ...SFX_CONFIG, jump: { ...SFX_CONFIG.jump, wave: 'square', from: 300 } })
+    sfx.init()
+    sfx.jump()
+    expect(oscs[0].type).toBe('square')
+    expect(oscs[0].frequency.set[0]).toBe(300)
+  })
+
+  it('the finish climbs the chord its shape names (fifths: four notes, then the shimmer on the top one)', () => {
+    const sfx = createSfx(() => ({ soundOn: true, volume: 0.7 }))
+    sfx.init()
+    sfx.finish()
+    const f = oscs.map((o) => o.frequency.set[0]), root = SFX_CONFIG.finish.root
+    expect(SFX_CONFIG.finish.shape).toBe('fifths')
+    expect(f).toHaveLength(5)
+    ;[0, 7, 12, 19].forEach((st, i) => expect(f[i]).toBeCloseTo(root * 2 ** (st / 12), 6))
+    expect(f[4]).toBeCloseTo(f[3], 6)
+  })
+})
+
+describe("round 2's sounds", () => {
   const at: [number, number, number] = [0, 0, 0]
   /** every new event, and the cue it plays */
   const EVENTS: [string, PlayEvent][] = [

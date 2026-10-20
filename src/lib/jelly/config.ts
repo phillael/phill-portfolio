@@ -287,3 +287,71 @@ export const PLAY_R2 = Object.freeze({
 })
 
 export type AwardKind = keyof typeof PLAY_R2.points
+
+/**
+ * The 3D resume's sounds (sfx.ts): every number they're made of. Tuned by ear by Phill on 2026-10-20 in the Sound
+ * lab (the sound design tool that lands with the Skills section); its Copy patch gives `panel: { 'cue.setting': v }`,
+ * which goes here as `cue.setting` (the Space panel's settings are `space`). The cues he didn't touch keep the numbers
+ * they had: the whoosh's shape, the black hole, the gulp and boom, the shrimp, the trip, the lasagna's sounds.
+ */
+type Wave = 'sine' | 'triangle' | 'sawtooth' | 'square'
+/** a tone that sweeps from one pitch to another, over a burst of noise through a filter that closes */
+interface ToneCrunch { wave: Wave; from: number; to: number; len: number; level: number; nType: 'lowpass' | 'bandpass' | 'highpass'; nTone: number; nLen: number; noise: number }
+/** two notes, the second `gap` s after the first */
+interface TwoNotes { wave: Wave; note1: number; note2: number; gap: number; len1: number; len2: number; level: number }
+/** a run of `count` notes `interval` semitones apart, each bending `bend` semitones */
+interface Ladder { wave: Wave; root: number; count: number; interval: number; bend: number; step: number; len: number; level: number }
+/** a four-note chord's shape; 'major' is the notes sfx.ts always played (as typed there), the rest are equal-tempered */
+export type ChordShape = 'major' | 'minor' | 'sus' | 'add9' | 'fifths'
+export interface SfxConfig {
+  /** the entrance: a noise swell (length s, its curve, brightness, level) */
+  whoosh: { wLen: number; wCurve: number; wBright: number; wLevel: number }
+  /** the black hole's drone: wave, pitch (Hz), detune (cents), sub level, resonance, filter (Hz) small and how far it opens, pitch drop at full size (semitones), level */
+  grow: { dWave: Wave; dBase: number; dDetune: number; dSub: number; dRes: number; dCut: number; dOpen: number; dDrop: number; dLevel: number }
+  gulp: { gWave: Wave; gFrom: number; gSpread: number; gTo: number; gSweep: number; gDecay: number; gLevel: number }
+  boom: { bFrom: number; bTo: number; bSweep: number; bDecay: number; bLevel: number; bNTone: number; bNDecay: number; bNoise: number }
+  jump: { wave: Wave; from: number; to: number; len: number; level: number }
+  land: ToneCrunch
+  smash: ToneCrunch
+  coin: TwoNotes
+  shrimp: { wave: Wave; root: number; shape: ChordShape; bend: number; step: number; len: number; level: number }
+  mushroom: { wave: Wave; root: number; step: number; len: number; level: number }
+  finish: { wave: Wave; root: number; shape: ChordShape; step: number; len: number; lastLen: number; level: number; shLen: number; shimmer: number }
+  ufoHit: { wave1: Wave; from1: number; to1: number; len1: number; level1: number; wave2: Wave; from2: number; to2: number; len2: number; level2: number; nTone: number; nLen: number; noise: number }
+  /** the UFO's beam: a sweep and a second voice `harm` × higher; it opens `after` s after the hit */
+  beam: { wave: Wave; from: number; to: number; len: number; level: number; harm: number; offset: number; level2: number; after: number }
+  powerUp: Ladder
+  powerDown: Ladder
+  alert: TwoNotes
+  stomp: ToneCrunch
+  kicked: ToneCrunch
+  /** TINK: a note that droops a little, and an overtone `over` × higher */
+  tink: { wave: Wave; note: number; droop: number; len: number; level: number; over: number; droop2: number; len2: number; level2: number }
+  giantStep: ToneCrunch
+  /** the room every sound goes through (reverb share, length s, decay, brightness) and the master (× the visitor's volume) and its compressor */
+  space: { wet: number; rLen: number; rDecay: number; rBright: number; master: number; threshold: number; ratio: number }
+}
+
+export const SFX_CONFIG: Readonly<SfxConfig> = Object.freeze<SfxConfig>({
+  whoosh: { wLen: 2.09, wCurve: 2.2, wBright: 0.5, wLevel: 0.35 },
+  grow: { dWave: 'sawtooth', dBase: 55, dDetune: 8, dSub: 1, dRes: 6, dCut: 110, dOpen: 2400, dDrop: 7, dLevel: 0.32 },
+  gulp: { gWave: 'sine', gFrom: 700, gSpread: 500, gTo: 70, gSweep: 0.16, gDecay: 0.18, gLevel: 0.16 },
+  boom: { bFrom: 90, bTo: 32, bSweep: 0.5, bDecay: 0.9, bLevel: 0.7, bNTone: 600, bNDecay: 0.18, bNoise: 0.5 },
+  jump: { wave: 'sine', from: 192, to: 3820, len: 0.258, level: 0.06 },
+  land: { wave: 'sine', from: 142, to: 55, len: 0.14, level: 0.28, nType: 'lowpass', nTone: 2990, nLen: 0.06, noise: 0.12 },
+  smash: { wave: 'sawtooth', from: 583, to: 20, len: 0.678, level: 0.12, nType: 'highpass', nTone: 127, nLen: 1, noise: 0.34 },
+  coin: { wave: 'triangle', note1: 988, note2: 1319, gap: 0.0805, len1: 0.22, len2: 0.714, level: 0.13 },
+  shrimp: { wave: 'sine', root: 659.25, shape: 'major', bend: 1.06, step: 0.045, len: 0.11, level: 0.11 },
+  mushroom: { wave: 'square', root: 149, step: 0.09, len: 0.8, level: 0.105 },
+  finish: { wave: 'square', root: 535, shape: 'fifths', step: 0.0858, len: 0.18, lastLen: 0.7, level: 0.12, shLen: 1, shimmer: 0.26 },
+  ufoHit: { wave1: 'sine', from1: 909, to1: 73.5, len1: 1.07, level1: 0.07, wave2: 'triangle', from2: 2080, to2: 2010, len2: 0.528, level2: 0.055, nTone: 14000, nLen: 0.593, noise: 0.18 },
+  beam: { wave: 'sawtooth', from: 220, to: 880, len: 0.9, level: 0.05, harm: 1.5, offset: 0.04, level2: 0.03, after: 0.3 },
+  powerUp: { wave: 'triangle', root: 262, count: 8, interval: 2, bend: 3, step: 0.055, len: 0.09, level: 0.08 },
+  powerDown: { wave: 'triangle', root: 784, count: 6, interval: -2.4, bend: -3.6, step: 0.07, len: 0.1, level: 0.07 },
+  alert: { wave: 'square', note1: 1175, note2: 1568, gap: 0.08, len1: 0.06, len2: 0.08, level: 0.05 },
+  stomp: { wave: 'square', from: 320, to: 90, len: 0.12, level: 0.1, nType: 'lowpass', nTone: 900, nLen: 0.1, noise: 0.3 },
+  kicked: { wave: 'sawtooth', from: 420, to: 110, len: 0.28, level: 0.08, nType: 'bandpass', nTone: 1200, nLen: 0.08, noise: 0.25 },
+  tink: { wave: 'triangle', note: 2637, droop: 2600 / 2637, len: 0.35, level: 0.09, over: 3951 / 2637, droop2: 3900 / 3951, len2: 0.22, level2: 0.05 },
+  giantStep: { wave: 'sine', from: 70, to: 38, len: 0.18, level: 0.12, nType: 'lowpass', nTone: 300, nLen: 0.08, noise: 0.06 },
+  space: { wet: 0.25, rLen: 2.2, rDecay: 3, rBright: 0.4, master: 1, threshold: -14, ratio: 4 },
+})

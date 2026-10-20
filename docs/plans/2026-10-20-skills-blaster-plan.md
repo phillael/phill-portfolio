@@ -170,7 +170,13 @@ The game creates its engine on `getSiteMusic()?.context()`. Only if no player is
 
 Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T2, T3 and T7. T9 needs T7.
 
-- [ ] **T0: baseline.** On `feat/skills-section`, which is already fast-forwarded to master and holds the design + this plan in one commit, run the four gates. Record them here.
+- [x] **T0: baseline.** On `feat/skills-section`, which is already fast-forwarded to master and holds the design + this plan in one commit, run the four gates. Record them here.
+  - **2026-10-20, at 4c929e1 (v1.7.0):**
+    - `npx tsc --noEmit`: exit 0.
+    - `npm run lint`: exit 0, zero warnings.
+    - `npx jest --no-watchman`: 58 suites, 644 tests passed (6.5 s).
+    - `npm run build`: exit 0 (Next 16.4.0 Turbopack, 13 static pages).
+    - The baseline for T11: Lighthouse accessibility on `/` (production build, Lighthouse's default mobile run) = **100**. The only audit below 1 is `label-content-name-mismatch`, which has no weight in the score.
 - [ ] **T1: `src/data/skills.ts` and its consumers.** Per Binding §3:
   - Export `SKILLS` (headline, lede, groups `{ id, name, featured?, caption?, skills: { name, note? }[] }`) and a `skillCount`.
   - **The Wizard:** `wizard-prompt.ts`'s `{{SKILLS_JSON}}` becomes the groups as `{ group, skills: [name or "name: note"] }`.

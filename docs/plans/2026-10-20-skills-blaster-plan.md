@@ -459,7 +459,127 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
 
       Every case is ≤ −80 dB.
     - **Gates:** `npx tsc --noEmit` exit 0; `npm run lint` exit 0; `npx jest --no-watchman`: 62 suites, 700 passed; `npm run build` exit 0.
-- [ ] **T12: PR text. STOP before pushing:** Phill tries it locally on desktop and his phone first. Write the PR description under this task: summary, decisions, the measurements, the test plan, screenshots to take.
+- [x] **T12: PR text. STOP before pushing:** Phill tries it locally on desktop and his phone first. Write the PR description under this task: summary, decisions, the measurements, the test plan, screenshots to take.
+  - **Written 2026-10-20. NOT pushed:** the branch waits for Phill's go after he tries it on desktop and his phone. Title: `feat(skills): the Skill blaster: the Skills section, AI first, with a game you stumble on (v1.8.0)`
+
+````markdown
+## Summary
+
+The home page's Skills section, rebuilt from the six mockup rounds (docs/design/skills-game/, round 6 is the spec).
+
+**At rest it's content.** The header ("AI first. Full stack."), the 16 AI skills in a glass panel with a note each, and the other six groups as quiet lines of words: 81 skills, every one a text-styled button. Words lean toward a mouse like magnets.
+
+**The first click starts the Skill blaster:**
+- **The shot:** a laser, the word bursts into letters that snap home, and a 172 BPM liquid drum and bass beat starts.
+- **Waves 1–2:** whack-a-mole, with a closing ring as the timer.
+- **Wave 3:** the drop (a riser, a breath, a crash and a boom), then red skills shoot back (5 health). Elites take 3 hits; gold is worth 500.
+- **The music is yours:** the drums are the only part that plays by itself. Each group is a band part (Cloud = a new chord, Backend = bass, AI = lead, Frontend = arp, Quality = bleeps, Product = bells, Music & more = vox). Hits are quantized into the chord, and the parts heard in the last two bars are the multiplier.
+- **One screen:** the section tightens to fit the screen while you play. On phones, groups fold and take turns each wave.
+- **Game over:** the score, your best, and a link to numberslayers.com.
+
+It's all synthesized in Web Audio except four CC0 drum recordings (the ride, crash, riser and boom you picked in the Sound lab), on the site player's AudioContext: one track at a time.
+
+## What's in it
+
+**The content**
+- `src/data/skills.ts`: the mockup's copy, exact. It replaces `skills.json` and feeds the Wizard's prompt and the JSON-LD `knowsAbout` (the five tech groups).
+
+**The section** (`SkillsSection.tsx`, `components/skills/`)
+- The rest markup + `Skills.module.css`.
+- `LineEnds` (the dots never end a line).
+- `SkillsPlay`: the magnet lean, and the game's lazy start. The game is prefetched as the section nears, imported on the first click, and gets the AudioContext inside that click.
+- The old chips, particles and `SkillScore` are gone.
+
+**The game** (`src/lib/skills/`, one lazy chunk with its CSS)
+- `blaster.ts` + `blaster.css`: imperative DOM, no React state per frame, no layout reads in rAF.
+- `rules.ts`: pure, tested.
+- `synth.ts`: a port of the Sound lab's engine.
+- `synthConfig.ts`: generated from the lab's defaults by `docs/design/sound-lab/tools/bake-skills-config.mjs`; a parity test holds them together.
+- `lean.ts`: the magnets.
+
+**The player** (`SiteMusic`)
+- Gains `context()`, `pause()`, `play()` and `onChange()`: the game plays through the player's audio graph, pauses the song while it runs, and hands it back.
+
+**The wizard** (`src/lib/wizard-aside.ts` + `ShroomWizard3D`)
+- The summoned wizard steps aside while the game plays on a phone.
+
+**Recordings**
+- `public/skills/sfx/`: 7 files, 380 KB, CC0, with credits.
+
+**Docs**
+- CLAUDE.md (Key Files: the Sound lab's bake path, the gotchas).
+- The plan: docs/plans/2026-10-20-skills-blaster-plan.md.
+- v1.8.0.
+
+## Decisions
+
+**Phill's**
+- Everything in the design rounds.
+- On a phone, the summoned Shroom Wizard steps aside while you play, because the readout sits where he stands. He walks off and back, and his canvas stops drawing while he's parked. On desktop the readout centres beside him instead.
+
+**Where the site had a system the mockup didn't**
+- **Esc:** while the game runs, Esc stops only the game. The wizard and shroom mode don't also go; an open wizard chat still catches Esc first.
+- **The wizard's spot:** no skill lights up under the summoned wizard.
+- **Resizing:** after a width change, the arena scrolls back under the nav (the sections above reflow).
+- **Reduced motion:** the readout appears without its slide-in.
+
+**Small notes**
+- **The best score:** `localStorage['skill-blaster-best']`, the plan's key; the mockup used `skill-blaster-band-best`.
+- **Intensity:** only Arcade ships (the mockup's default).
+- **A tight phone fit:** at 375×812, wave 4 (AI as the only open group, 44 px targets) is 36 px taller than the room under the nav. Every skill that can light up is on screen above the readout; only the folded headings slide partly under it. Every other wave and size fits.
+- **The CSS:** importing global CSS from the lazily imported module works on a production build (its own CSS file, loaded with the game chunk). Checked in Next 16.4's bundled docs and the build.
+
+## Measurements (production build)
+
+- **Network:**
+  - nothing of the game's at load (14 chunks), nor while scrolling 900 px above the section;
+  - near the section, the game's CSS + 2 JS chunks;
+  - no audio before the first shot.
+- **The trace** (emulated 390×844, 4× CPU, the drop through wave 4): 9,244 tasks, none over 50 ms (the longest 18.6 ms); 31 rAF callbacks, none with a layout.
+- **Lighthouse accessibility** on `/`: 100 (the same as before).
+- **The sound:** the site's engine against the lab's engine, an offline seeded render, every case ≤ −80 dB (most −124…−300 dB: bit-exact or Chrome's convolver noise).
+- **The arena:**
+  - 1280×800 fits at type scale 1 with all 81 skills on screen;
+  - 1366×640 at 0.88;
+  - 1440×900 at 1;
+  - phones are staged, with no horizontal scroll and no touch target under 44 px.
+- **The end of a game:** 0 voices left and no leftover effect elements; the site's song is handed back.
+- **Tests:** 62 suites / 700 tests (from 58 / 644).
+- **Gates:** `npx tsc --noEmit`, `npm run lint` (zero warnings) and `npm run build` all green.
+
+## Test plan (Phill, locally, desktop and phone)
+
+`npm run build && npm run start`, then `/`:
+
+**Desktop**
+- [ ] At rest: the section reads as content; words lean toward the mouse; the dots never end a line.
+- [ ] With the site's music playing, click any skill: the song pauses, the beat starts, the word bursts, and the section fits the screen.
+- [ ] Waves 1–2: hit the lit skills. Cloud skills change the chord; the band lights and the multiplier follow what you play.
+- [ ] The drop into wave 3: the riser, the breath, the crash + boom. Red skills shoot back (the crack, the red flash, health).
+- [ ] Wave 4: the ride comes in. Lose (or press Esc): the tape stop, then the song comes back.
+- [ ] Stop shooting for 5 s: it pauses. Shoot: it picks up. Press play on the site's player mid-game: the game pauses.
+- [ ] Keyboard only: Tab to a skill, Enter shoots, L jumps to a lit skill, Esc stops.
+- [ ] Summon the wizard, then play: the readout centres.
+- [ ] Reduced motion (the OS setting): nothing moves by itself, and the rings dim.
+
+**Phone**
+- [ ] Tap a skill: the groups fold and take turns each wave.
+- [ ] The readout clears the buttons; with the wizard summoned, he walks off while you play and back after.
+
+## Screenshots to take
+
+1. Desktop at rest.
+2. Desktop, the first hit (letters + "+100").
+3. Desktop, the arena mid-wave (band pips lit).
+4. The drop banner at wave 3.
+5. A hit taken (crack + red vignette).
+6. Game over with the Number Slayers link.
+7. Phone at rest.
+8. Phone, staged mid-wave.
+9. Phone with the wizard stepped aside.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+````
 
 ## Per-task verification
 
@@ -503,6 +623,26 @@ On a production build (`npm run build && npm run start`), in a fresh browser con
 8. **Lazy loading:** no game JS or audio requested before the section nears the viewport or a click.
 9. **The Wizard and JSON-LD:** the Wizard's prompt carries the new skills (tested). The JSON-LD `knowsAbout` lists the tech skills.
 10. **Clean:** no console errors on `/` and `/resume`; all four gates green.
+
+**Results, 2026-10-20** (production builds, fresh contexts; the debug-build parts are as recorded under T11):
+1. **The rest state:** offsets from the section's top identical to the mockup (128/155/244/370/920 px at 1280×800). The 26 line ends are marked and their dots hidden; 0 visible dots end a line. A mouse near Docker leans 3 words.
+2. **The first click:** the arena holds 81/81 visible at fit 1. Through wave 4: the drop at wave 3 with the recorded riser, crash and boom loaded (`samplesReady`); red skills fire (health 4 of 5). (T11)
+3. **Every pitched note from a hit:**
+   - a Cloud hit changes the harmony (`skills-synth`, `skills-blaster`; its chord name shows in the readout);
+   - the band pips, the lit headings and the multiplier follow the parts played;
+   - wave 4 runs on level 3 with the recorded K Zildjian ride ready. (T11)
+4. **The site's music:** it pauses at the first shot and is handed back after; play mid-game pauses the game. (T11)
+5. **375×812 touch:** staged, groups take turns per wave, every target ≥ 44 px, no horizontal scroll. The arena fits, except wave 4's AI-only stage: 36 px below the fold under the nav, every lit-able skill still on screen (noted under T9). (T9, T11)
+6. **Keyboard only:**
+   - Tab, Enter, L and Esc work, with focus visible (T11).
+   - The live region spoke the start, every hit as "{name}. {score} points." at least 1,298 ms apart, "Wave 1 clear.", "Wave 2.", "Wave 3, the drop. …" and "Paused. shoot any skill to go on" (18 messages in a short game).
+   - Game over speaks "Game over. … points" (`gameOver()`, alongside its status line seen in T11).
+7. **Reduced motion:** 0 running animations at rest; in play no letters, beams, FLIP or transforms; the rings dim. (T11)
+8. **Lazy loading:** no game JS before the section is within 600 px, and no audio before the first shot. (T11)
+9. **The Wizard and the JSON-LD:** the Wizard's prompt carries the new skills; the JSON-LD `knowsAbout` lists the five tech groups (`wizard-prompt`, `structured-data`).
+10. **Clean:** no console errors on `/` or `/resume`; all four gates green (62 suites, 700 tests). (T11)
+
+**LOOP COMPLETE.** The branch is not pushed: it waits for Phill (T12).
 
 ## Stop conditions / open questions (for Phill)
 

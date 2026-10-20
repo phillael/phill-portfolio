@@ -467,7 +467,7 @@ describe('touch', () => {
     await playOnTouch()
     expect(document.documentElement).toHaveClass('jelly-play-touch')
     const toggle = jest.fn()
-    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle, open: jest.fn() })
+    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle, open: jest.fn(), context: () => null, pause: () => {}, play: () => {}, onChange: () => () => {} })
     fireEvent.click(screen.getByRole('button', { name: 'Play or pause the music' }))
     expect(toggle).toHaveBeenCalled()
     registerSiteMusic(null)

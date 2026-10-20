@@ -38,6 +38,8 @@ export interface AudioPlayerActions {
   getFrequencyData: () => Uint8Array<ArrayBuffer> | null
   /** The audio source node (null until the first play), for other analysers to tap */
   getSourceNode: () => MediaElementAudioSourceNode | null
+  /** The player's one AudioContext, created (with its source) on the first call; for other sounds to share */
+  getAudioContext: () => AudioContext | null
 }
 
 /**
@@ -356,6 +358,11 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
 
   const getSourceNode = useCallback(() => sourceRef.current, [])
 
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current) initializeAudioContext()
+    return audioContextRef.current
+  }, [initializeAudioContext])
+
   return {
     // State
     isPlaying,
@@ -376,7 +383,8 @@ export function useAudioPlayer(tracks: Track[]): UseAudioPlayerReturn {
     setVolume,
     toggleMute,
     getFrequencyData,
-    getSourceNode
+    getSourceNode,
+    getAudioContext
   }
 }
 

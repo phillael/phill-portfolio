@@ -249,12 +249,32 @@ Order matters as written. T5 needs T1. T6 needs T5. T7 needs T3–T6. T8 needs T
       - **At 375:** `scrollWidth` 375 = `innerWidth` 375, and every skill button is ≥ 44 px (coarse pointer).
       - **At 1280:** fine-pointer words are 34 px tall, as in the mockup.
     - **Tests and gates:** `npx jest --no-watchman skills-section a11y landmarks integration navigation` passed (8 suites, 62 tests); `npx tsc --noEmit` exit 0; `npm run lint` exit 0.
-- [ ] **T6: the lean and the lazy start** (`src/components/skills/SkillsPlay.tsx`, a client island inside the section):
+- [x] **T6: the lean and the lazy start** (`src/components/skills/SkillsPlay.tsx`, a client island inside the section):
   - The magnet lean per Binding §1.
   - Prefetch the game chunk with an IntersectionObserver (rootMargin ~600px) or on the first pointerover/focus in the section.
   - **On the first activation of a skill:** get the audio context synchronously in the click handler (`getSiteMusic()?.context() ?? new AudioContext()`, then `resume()`), then `await import('@/lib/skills/blaster')` and start it with that button and the click's point (keyboard: the button's centre).
   - **Later clicks** go to the running game.
   - **Test:** clicking a skill calls the mocked module's start with that skill; Enter on a focused skill does too.
+  - **Done 2026-10-20:**
+    - **The lean:** `src/lib/skills/lean.ts` (`createLean`), ported from the mockup's magnets.
+      - **Measuring:** the words are measured on the pointer's first move after it enters the section, or after a resize, never in the frame. `measure()` is exposed for the game's reflows.
+      - **The game:** `labelOf` is shared with it.
+    - **The island:** `SkillsPlay.tsx` does four things:
+      - prefetches `import('@/lib/skills/blaster')` (IO with `rootMargin: 600px 0px`, or on the first `pointerover`/`focusin`);
+      - on the first skill click, makes and resumes the AudioContext inside the click;
+      - then imports the game and runs `createBlaster({ section, ac, lean }).shoot(shot)`;
+      - forwards every later click in the section to `shoot`, with `skill: null` for a shot at nothing.
+    - **Held keys:** a held Enter or Space doesn't repeat.
+    - **`blaster.ts` for now:** it only holds the API (`Shot`, `BlasterOptions`, `Blaster`); T7 fills it.
+    - **Verification:**
+      - `npx jest --no-watchman skills-play skills-section` passed (13 tests).
+      - A test trap, noted in the test: `toMatchObject` on DOM nodes walks React's fiber tree and hangs Jest at 99% CPU, so DOM nodes are compared with `toBe`.
+      - `npx tsc --noEmit` exit 0; `npm run lint` exit 0.
+    - **Browser** (dev server, 1280×800, fresh contexts, `/api/wizard/chat` stubbed):
+      - **The chunk:** no game JS or audio is requested at the top of the page. `src_lib_skills_blaster_ts_….js` arrives once the section is within 600 px, or right away on a load at `#skills`.
+      - **The lean:** a mouse near Docker leans 2 words (`translate3d(1.43px, 0.55px, 0px) rotate(1.43deg) scale(1.017)`), and none are left leaning once the pointer leaves.
+      - **Reduced motion:** 0 words lean and 0 animations run.
+    - **Noted for T11:** a React hydration-mismatch error appears only with reduced motion, from `AnimatedSection` (framer-motion `opacity`/`transform` styles in About, Projects, Contact and the footer). That code isn't touched here; T11 compares it with master.
 - [ ] **T7: the game, core.** `src/lib/skills/blaster.ts` + `src/lib/skills/blaster.css` (the `bl-*` classes).
   - **Verify first with context7:** importing global CSS from a lazily imported module in the App Router. If that's not supported, inject the stylesheet from the module.
   - **Port everything in Binding §1 except the music and the arena:** shots and effects, waves, kinds, enemies, health, banners, the readout, game over, best score, idle/offscreen pause, stop, keyboard, the live region, reduced motion.

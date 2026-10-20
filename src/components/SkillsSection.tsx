@@ -1,5 +1,6 @@
 import { SKILLS } from '@/data/skills'
 import LineEnds from '@/components/skills/LineEnds'
+import SkillsPlay from '@/components/skills/SkillsPlay'
 import css from '@/components/skills/Skills.module.css'
 
 /**
@@ -7,7 +8,8 @@ import css from '@/components/skills/Skills.module.css'
  * (docs/design/skills-game/round6/blaster-synth.html; plan docs/plans/2026-10-20-skills-blaster-plan.md),
  * from src/data/skills.ts: the header, the AI skills in a glass panel with a note each, then the other
  * groups as quiet lines of words. Every skill is a button that looks like text, so the list stays the
- * content (readable, focusable, searchable); a click is what reveals the game. JS hooks: data-skill and
+ * content (readable, focusable, searchable); a click is what reveals the game (SkillsPlay: the magnet lean,
+ * and the Skill blaster, imported on the first click). JS hooks: data-skill and
  * data-group on each skill, data-sk-group on each group's box, data-name on an AI skill's name.
  */
 const SkillsSection = () => {
@@ -70,6 +72,7 @@ const SkillsSection = () => {
 
       <p className={css.live} aria-live="polite" data-sk-live="" />
       <LineEnds />
+      <SkillsPlay />
     </section>
   )
 }

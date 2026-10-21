@@ -467,6 +467,23 @@ Always: `npx jest --no-watchman <the task's test files>` shows them passing; `np
 6. **The network** on a fresh load: no `/api/skills/*` call until the first shot; then exactly one `POST /api/skills/run`; the GET at game over; the POST on Save.
 7. **Cleanup:** `node --env-file=.env.local scripts/scoreboard.mjs clear --env development`, and `list` shows it empty. `git status` shows only intended files.
 
+### Acceptance run (2026-10-21, at 7c6c69d)
+
+1. **The gates:** tsc 0; lint 0 warnings; Jest 68 suites / 828 tests; build OK. `obscenity` is in no client chunk. The built `.sb` CSS has both the `-webkit-` and the unprefixed blur.
+2. **The production build on :3000, real games:**
+   - **Desktop:** a mouse game over after 58 s of play (wave 4), 1,600 points, saved (200), "Saved · you’re #1 of 1", and `list` shows it.
+   - **Phone:** a touch game over after 59 s.
+   - **Keyboard only:** a game over after 76 s.
+   - The real bounds took all three.
+3. **curl:**
+   - no Origin → 403; with it → 200 and an empty geo;
+   - 999,999 at wave 4 at once → 422 `score`; the same run again → 410 `run`;
+   - a fresh run named `sh1t` → 422 `name`; the same run with a good name and 20,000 at wave 4, after waiting 13 s → 200 (the accepted fake that waits; removed with `rm`).
+4. **The phone (375×812 touch):** the board fits; the backdrop is the dialog, so nothing behind it is clickable; focus stays on the heading, so no keyboard pops up; the Save row saves.
+5. **Keyboard only (reduced motion on):** Tab ×21 reaches the first skill and Enter starts the game. At game over the name is focused; Enter saves and focuses the row; Esc closes it with focus back on the skill. The opening was fades only.
+6. **The network on a fresh load:** no `/api/skills/*` call until the first shot, then one `POST /run`, the `GET` at game over and the `POST` on Save.
+7. **Cleanup:** `clear --env development`, and `list` shows it empty. The servers I started are stopped and the worktree is removed. `git status` shows only the untracked files that were there before (AGENTS.md, the round 1 experience-refresh files).
+
 ## Stop conditions / open questions (for Phill)
 
 - **T10:** stop before pushing. Phill tries it locally and approves the PR text.

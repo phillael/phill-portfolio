@@ -13,6 +13,8 @@ import {
   inBand,
   lifeFor,
   levelFor,
+  maxScoreFor,
+  minSecondsFor,
   need,
   pickWeighted,
   planFor,
@@ -182,5 +184,27 @@ describe('the readout beside the Shroom Wizard', () => {
   })
   it('can’t on a phone (375 wide): the wizard steps aside instead', () => {
     expect(readoutClears({ left: 16, inner: 343, width: 283, wizardRight: 151, viewport: 375 })).toBe(false)
+  })
+})
+
+describe('the scoreboard’s bounds (what a real run can reach)', () => {
+  it('the most a run can score through each of the first five waves', () => {
+    expect([0, 1, 2, 3, 4].map((w) => maxScoreFor(w, 0))).toEqual([5950, 16250, 33800, 60800, 100050])
+  })
+  it('each resume adds its free hit (100)', () => {
+    expect(maxScoreFor(3, 1)).toBe(60900)
+    expect(maxScoreFor(3, 4) - maxScoreFor(3, 0)).toBe(400)
+  })
+  it('the least time to reach each of the first five waves', () => {
+    expect(BAR).toBeCloseTo(240 / 172, 9)
+    const at = [0, 1, 2, 3, 4].map((w) => minSecondsFor(w))
+    ;[1.395, 5.331, 10.941, 15.497, 20.312].forEach((s, i) => expect(at[i]).toBeCloseTo(s, 3))
+  })
+  it('both keep growing past the table', () => {
+    for (let w = 1; w <= 40; w++) {
+      expect(maxScoreFor(w, 0)).toBeGreaterThan(maxScoreFor(w - 1, 0))
+      expect(minSecondsFor(w)).toBeGreaterThan(minSecondsFor(w - 1))
+    }
+    expect(Number.isFinite(maxScoreFor(500, 10000))).toBe(true)
   })
 })

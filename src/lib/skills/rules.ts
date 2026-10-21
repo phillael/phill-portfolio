@@ -1,6 +1,6 @@
 /**
  * The Skill blaster's rules, pure: the waves, the kinds of lit skill and their points, what lights up next
- * (the conductor), the band and the phone staging order. Ported from the round 6 mockup
+ * (the conductor), the band, the phone staging order and the scoreboard's bounds. Ported from the round 6 mockup
  * (docs/design/skills-game/round6/blaster-synth.js); the runtime is blaster.ts. Tests: skills-rules.test.ts.
  */
 
@@ -139,4 +139,32 @@ export function stageOrder(wave: number): SkillGroupId[] {
 export const readoutClears = ({ left, inner, width, wizardRight, viewport }: { left: number; inner: number; width: number; wizardRight: number; viewport: number }) => {
   const x = left + (inner - width) / 2
   return x > wizardRight + 8 && x + width < viewport - 76
+}
+
+/* the scoreboard's check (the score route imports these on the server): what a real run can reach by a wave */
+
+/** an elite's shields (blaster.ts lights an elite with 3 hits; the last one downs it) */
+const ELITE_SHIELDS = 2
+/** the most a run can score through the end of wave `wave` (from 0): every lit skill hit with the whole band
+    playing, each elite's shields, each wave's clear bonus, and the free hit (100) of the first shot and of each resume */
+export function maxScoreFor(wave: number, resumes: number) {
+  let score = 100 * (1 + resumes)
+  for (let i = 0; i <= wave; i++) {
+    const cfg = waveCfg(i), elites = Math.min(cfg.elite || 0, cfg.foes), gold = cfg.gold || 0
+    const moles = Math.max(0, cfg.n - cfg.foes - gold) // planFor's kinds: the rest are moles
+    const lit = (cfg.foes - elites) * KIND.foe.pts + elites * KIND.elite.pts + gold * KIND.gold.pts + moles * KIND.mole.pts
+    score += lit * ORDER.length + elites * ELITE_SHIELDS * SHIELD_PTS + clearBonus(i)
+  }
+  return score
+}
+/** the least time (seconds from the first shot) to reach wave `wave`: the first wave starts a bar after the first
+    shot; a wave's first skill lights ≥ 0.3 s in and each next one ≥ 0.4 × its gap after a hit (blaster's queueSpawn
+    is "at least sec away"); a clear waits ≥ a bar for the next wave, 2 into the drop */
+export function minSecondsFor(wave: number) {
+  let t = BAR
+  for (let i = 0; i < wave; i++) {
+    const { n, gap } = waveCfg(i)
+    t += 0.3 + (n - 1) * 0.4 * gap + (i + 1 === FIRST_FOE_WAVE ? 2 : 1) * BAR
+  }
+  return t
 }

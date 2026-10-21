@@ -279,7 +279,7 @@ export type SaveResult = { ok: true; board: Board } | { ok: false; error: SaveEr
 
 Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the client on T4's shapes, and T8–T10 finish.
 
-- [ ] **T1: The plausibility rules in `rules.ts`.**
+- [x] **T1: The plausibility rules in `rules.ts`.**
   - `maxScoreFor(wave, resumes)` and `minSecondsFor(wave)`, per §5.
   - Tests in `skills-rules.test.ts`:
     - the expected values for waves 0–4;

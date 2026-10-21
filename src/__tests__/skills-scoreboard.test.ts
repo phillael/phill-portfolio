@@ -48,7 +48,9 @@ const runOf = (o: Partial<BoardRun> = {}): BoardRun => ({ score: 6200, wave: 3, 
 
 let onClose: jest.Mock
 let sb: ReturnType<typeof createScoreboard>
-const dlg = () => document.querySelector<HTMLDialogElement>('dialog.sb')!
+/** the board's dialog (kept after it closes, when it leaves <body>) */
+let lastDlg: HTMLDialogElement | null = null
+const dlg = () => (lastDlg = document.querySelector<HTMLDialogElement>('dialog.sb') ?? lastDlg)!
 const $ = <T extends Element = HTMLElement>(s: string) => dlg().querySelector<T>(s)!
 const rows = () => [...dlg().querySelectorAll<HTMLElement>('.sb-list > li')]
 const nums = () => rows().map((li) => li.querySelector('.sb-n')?.textContent ?? li.textContent)
@@ -78,6 +80,7 @@ beforeEach(() => {
   localStorage.clear()
   document.body.innerHTML = '<h2 id="skills-h">Skills</h2><button id="shot">a skill</button><p data-sk-live aria-live="polite"></p>'
   onClose = jest.fn()
+  lastDlg = null
   sb = createScoreboard({ onClose })
 })
 afterEach(() => {
@@ -116,11 +119,15 @@ describe('opening', () => {
     expect(mFetch).toHaveBeenCalledWith('p-me', 6200)
     expect($('.sb-list').hasAttribute('aria-busy')).toBe(false)
   })
-  it('makes one dialog and reuses it', async () => {
+  it('makes one dialog and reuses it; closed, it leaves <body>', async () => {
     await show(board({ at: 4 }))
+    const first = dlg()
     sb.close(true)
+    expect(first.isConnected).toBe(false)
+    expect(document.querySelector('dialog')).toBeNull()
     await show(board({ at: 4 }))
     expect(document.querySelectorAll('dialog.sb')).toHaveLength(1)
+    expect(dlg()).toBe(first)
   })
 })
 
@@ -407,8 +414,10 @@ describe('closing', () => {
     let answer!: (b: Board) => void
     mFetch.mockReturnValueOnce(new Promise((r) => { answer = r }))
     sb.open(runOf())
+    const d = dlg()
     sb.close(true)
-    expect(dlg().open).toBe(false)
+    expect(d.open).toBe(false)
+    expect(d.isConnected).toBe(false)
     expect(onClose).not.toHaveBeenCalled()
     answer(board({ at: 7 }))
     await settle()

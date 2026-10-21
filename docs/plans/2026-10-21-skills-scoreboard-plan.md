@@ -335,7 +335,7 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
     - the focus rules (kb / fine / touch);
     - the live region inside the dialog;
     - reduced motion.
-- [ ] **T7: Wire it into the game.**
+- [x] **T7: Wire it into the game.**
   - `blaster.ts` per §6.
   - Update the "game over" tests in `skills-blaster.test.tsx`:
     - the board is open at 1.7 s;

@@ -13,8 +13,18 @@ import { BAR } from '@/lib/skills/synth'
 import { isWizardAside, setWizardAside, subscribeWizardAside } from '@/lib/wizard-aside'
 import { registerSiteMusic, type SiteMusic } from '@/lib/site-music'
 import { FakeAudioContext } from './helpers/fakeAudio'
+import { fetchBoard, saveScore, startRun } from '@/lib/skills/scoreboard-api'
 
 jest.mock('@/components/skills/SkillsPlay', () => ({ __esModule: true, default: () => null }))
+jest.mock('@/lib/skills/scoreboard-api', () => ({
+  startRun: jest.fn(),
+  fetchBoard: jest.fn(),
+  saveScore: jest.fn(),
+  playerId: () => 'p-me',
+  loadProfile: () => null,
+  saveProfile: jest.fn(),
+}))
+const mStartRun = startRun as jest.Mock, mFetchBoard = fetchBoard as jest.Mock, mSaveScore = saveScore as jest.Mock
 
 interface Dev {
   G: { state: string; score: number; wave: number; hp: number; active: Set<{ foe: boolean; k: { el: HTMLElement; label: HTMLElement } }> }
@@ -29,6 +39,13 @@ const realMatchMedia = window.matchMedia
 const realRect = HTMLElement.prototype.getBoundingClientRect
 beforeAll(() => {
   window.matchMedia = ((q: string) => ({ matches: q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia
+  // jsdom has no <dialog> modality: the scoreboard's dialog opens and closes as an attribute
+  HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) { this.setAttribute('open', '') }
+  HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+    if (!this.open) return
+    this.removeAttribute('open')
+    this.dispatchEvent(new Event('close'))
+  }
   Element.prototype.animate = function () {
     return { cancel() {}, pause() {}, play() {}, onfinish: null, oncancel: null, effect: { getComputedTiming: () => ({ endTime: 0 }) } } as unknown as Animation
   }
@@ -54,6 +71,9 @@ let game: Blaster
 beforeEach(() => {
   jest.useFakeTimers()
   localStorage.clear()
+  jest.clearAllMocks()
+  mStartRun.mockResolvedValue({ runId: 'run-1', geo: { city: '', country: '' } })
+  mFetchBoard.mockResolvedValue({ top: [], total: 0, mine: null, at: 1 })
   render(<SkillsSection />)
   ac = new FakeAudioContext()
   game = createBlaster({ section: document.getElementById('skills')!, ac: ac as unknown as AudioContext, lean: null })
@@ -319,38 +339,104 @@ describe('one screen', () => {
 
 describe('game over', () => {
   /** into the drop with one health, shooting at nothing (it keeps the idle pause away) until an enemy's shot lands */
-  const lose = () => {
-    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+  const drop = () => {
     act(() => dev().jumpToDrop())
     dev().G.hp = 1
     const air = { skill: null, x: 5, y: 5, keyboard: false, target: document.querySelector('#skills h2')! }
     for (let i = 0; i < 40 && dev().G.state !== 'over'; i++) { pass(500); act(() => game.shoot(air)) }
     expect(dev().G.state).toBe('over')
   }
+  const lose = () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    drop()
+  }
+  const board = () => document.querySelector<HTMLDialogElement>('dialog.sb')
+  const boardOpen = () => !!board()?.open
+  /** the board's answers (mocked, already resolved) land */
+  const flush = () => act(async () => { for (let i = 0; i < 6; i++) await Promise.resolve() })
 
-  it('the music fades out, then the section is the list again; the readout keeps the score a while', () => {
+  it('the music fades out, the list comes back and the scoreboard opens; the readout stays until it closes', () => {
     lose()
     const section = document.getElementById('skills')!
     expect(section).toHaveClass('bl-arena') // the banner and the tape stop first
+    expect(boardOpen()).toBe(false)
     pass(1700)
     expect(dev().M.on).toBe(false)
     expect(section).not.toHaveClass('bl-arena')
+    expect(boardOpen()).toBe(true)
+    expect(board()!.parentElement).toBe(document.body)
     expect(hud()).toHaveClass('on')
     expect(document.querySelector('.bl-hud .r2')!.textContent).toMatch(/Game over/)
-    pass(10600)
+    pass(12000) // no timer sends it to rest: the board does
+    expect(dev().G.state).toBe('over')
+    expect(hud()).toHaveClass('on')
+  })
+
+  it('closing the board puts the section at rest and the readout goes', () => {
+    lose()
+    pass(1700)
+    act(() => board()!.querySelector<HTMLButtonElement>('.sb-x')!.click())
+    expect(boardOpen()).toBe(false)
     expect(dev().G.state).toBe('rest')
     expect(hud()).not.toHaveClass('on')
   })
 
-  it('a shot during the fade doesn’t start a new game; once the list is back, one does', () => {
+  it('a shot during the fade doesn’t start a new game; once the list is back, one does, and the board closes', () => {
     lose()
     const score = dev().G.score
     act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Redis' }))))
     expect(dev().G.state).toBe('over')
     expect(dev().G.score).toBe(score)
     pass(1700)
+    expect(boardOpen()).toBe(true)
     act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Redis' }))))
     expect(dev().G.state).toBe('intro')
     expect(dev().G.score).toBe(100)
+    expect(boardOpen()).toBe(false)
+  })
+
+  it('asks for a run ticket once a game, at its first shot, and nothing before', () => {
+    expect(mStartRun).not.toHaveBeenCalled()
+    expect(mFetchBoard).not.toHaveBeenCalled()
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    expect(mStartRun).toHaveBeenCalledTimes(1)
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Redis' })))) // a shot in the game: no new run
+    pass(300)
+    expect(mStartRun).toHaveBeenCalledTimes(1)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    expect(mStartRun).toHaveBeenCalledTimes(2)
+  })
+
+  it('the board gets the run: its score, wave, ticket and the resumes it took', async () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    pass(BAR * 1000 + 5600) // idle: paused
+    expect(dev().G.state).toBe('paused')
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Redis' })))) // a resume
+    drop()
+    const { score, wave } = dev().G
+    pass(1700)
+    await flush()
+    expect(mFetchBoard).toHaveBeenCalledWith('p-me', score)
+    const name = board()!.querySelector<HTMLInputElement>('[name="name"]')!
+    name.value = 'Ana'
+    mSaveScore.mockResolvedValue({ ok: true, board: { top: [{ rank: 1, name: 'Ana', city: '', country: '', score, me: true }], total: 1, mine: { rank: 1, name: 'Ana', city: '', country: '', score, me: true }, at: 1 } })
+    act(() => { board()!.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true })) })
+    await flush()
+    expect(mSaveScore).toHaveBeenCalledWith(expect.objectContaining({ runId: 'run-1', score, wave, resumes: 1, name: 'Ana' }))
+  })
+
+  it('Esc or ✕ mid-game is a quit: no board', () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    pass(300)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    pass(2000)
+    expect(boardOpen()).toBe(false)
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    pass(300)
+    act(() => hud().querySelector<HTMLButtonElement>('.bl-stop')!.click())
+    pass(2000)
+    expect(boardOpen()).toBe(false)
+    expect(mFetchBoard).not.toHaveBeenCalled()
   })
 })

@@ -7,7 +7,8 @@
  *   createScoreboard({ onClose }) → { open(run), close(silent?), isOpen() }
  *
  * - The dialog is made on the first open and appended to <body>, outside the shroom wrappers (a filter on an ancestor
- *   breaks fixed positioning). showModal() gives the top layer, `inert` everywhere else, the focus trap and Esc.
+ *   breaks fixed positioning), and it leaves <body> when it closes (nothing is left behind if the game is made again).
+ *   showModal() gives the top layer, `inert` everywhere else, the focus trap and Esc.
  * - It carries the section's tokens itself (it's outside #skills) and its own live region (showModal() makes the
  *   section's inert, and inert content isn't announced).
  * - Esc: the dialog's keydown stops it reaching the wizard's, shroom mode's and the game's listeners; the native
@@ -87,7 +88,6 @@ export function createScoreboard({ onClose }: { onClose: () => void }): Scoreboa
     d.addEventListener('cancel', (e) => { e.preventDefault(); close() }) // closed our way (animated)
     d.addEventListener('close', () => { if (state !== 'closed' && !d.open) finish(false) }) // closed by the browser anyway
     d.addEventListener('click', (e) => { if (e.target === d) close() }) // no padding, one wrapper fills it: only the backdrop
-    document.body.append(d)
     return d
   }
 
@@ -129,6 +129,7 @@ export function createScoreboard({ onClose }: { onClose: () => void }): Scoreboa
   function open(r: BoardRun) {
     close(true)
     dialog ??= make()
+    if (!dialog.isConnected) document.body.append(dialog)
     run = r
     ticket = null
     savedNow = false
@@ -165,6 +166,7 @@ export function createScoreboard({ onClose }: { onClose: () => void }): Scoreboa
     if (d.open) d.close()
     const back = lastFocus instanceof HTMLElement && lastFocus.isConnected ? lastFocus : document.getElementById('skills-h')
     back?.focus({ preventScroll: true })
+    d.remove()
     if (!silent) onClose()
   }
 

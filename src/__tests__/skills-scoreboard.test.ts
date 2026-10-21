@@ -33,7 +33,7 @@ beforeAll(() => {
   }
   Element.prototype.getAnimations = function () { return [] }
   window.matchMedia = ((q: string) => ({
-    matches: q.includes('reduce') ? media.reduce : q.includes('fine') ? media.fine : false,
+    matches: q.includes('reduce') ? media.reduce : q.includes('fine') ? media.fine : q.includes('coarse') ? !media.fine : false, // touch unless fine
     media: q, addEventListener() {}, removeEventListener() {},
   })) as unknown as typeof window.matchMedia
 })
@@ -401,14 +401,42 @@ describe('closing', () => {
     expect(onWin).toHaveBeenCalledTimes(1)
     window.removeEventListener('keydown', onWin)
   })
+  /** a press (pointerdown) on `from`, then the click the browser fires on the common ancestor `on` */
+  const pressThenClick = (from: Element, on: Element) => {
+    from.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    on.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  }
+  const closing = () => anims.some((x) => x.o?.duration === 180)
   it('a click on the backdrop closes; a click inside doesn’t', async () => {
     await show(board({ at: 7 }))
-    $('.sb-h').click()
-    $('.sb-in').click()
-    expect(anims.some((x) => x.o?.duration === 180)).toBe(false)
-    dlg().click()
+    pressThenClick($('.sb-h'), $('.sb-h'))
+    pressThenClick($('.sb-in'), $('.sb-in'))
+    expect(closing()).toBe(false)
+    pressThenClick(dlg(), dlg())
     anims.at(-1)!.a.onfinish!()
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+  it('a drag that starts in the panel and ends on the backdrop doesn’t close it (the click lands on the dialog)', async () => {
+    await show(board({ at: 7 }))
+    pressThenClick(input('name'), dlg())
+    expect(closing()).toBe(false)
+    expect(sb.isOpen()).toBe(true)
+  })
+  it('on touch, a backdrop tap while a field has the keyboard up only puts it away; the next one closes', async () => {
+    await show(board({ at: 7 }))
+    input('name').focus()
+    pressThenClick(dlg(), dlg())
+    expect(closing()).toBe(false)
+    input('name').blur()
+    pressThenClick(dlg(), dlg())
+    expect(closing()).toBe(true)
+  })
+  it('with a fine pointer, a backdrop click closes even while the name has focus', async () => {
+    media.fine = true
+    await show(board({ at: 7 }))
+    expect(document.activeElement).toBe(input('name'))
+    pressThenClick(dlg(), dlg())
+    expect(closing()).toBe(true)
   })
   it('the browser closing it anyway (a second Esc) still ends it', async () => {
     await show(board({ at: 7 }))

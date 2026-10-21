@@ -11,8 +11,10 @@
  *   showModal() gives the top layer, `inert` everywhere else, the focus trap and Esc.
  * - It carries the section's tokens itself (it's outside #skills) and its own live region (showModal() makes the
  *   section's inert, and inert content isn't announced).
- * - Esc: the dialog's keydown stops it reaching the wizard's, shroom mode's and the game's listeners; the native
- *   `cancel` closes it (animated). ✕ and a click on the backdrop close it too; `onClose` follows, unless silent.
+ * - Esc: the dialog's keydown stops it reaching shroom mode's and the game's listeners (they listen further out, in the
+ *   bubble phase); the wizard chat's capture-phase listener leaves an Esc from inside a modal <dialog> alone. The
+ *   native `cancel` closes it (animated). ✕ and a click on the backdrop close it too (a press that started on the
+ *   backdrop; on touch, not the tap that only puts a field's keyboard away); `onClose` follows, unless silent.
  * - User text (names, cities) only ever goes in through textContent. Tests: skills-scoreboard.test.ts.
  */
 
@@ -87,7 +89,15 @@ export function createScoreboard({ onClose }: { onClose: () => void }): Scoreboa
     d.addEventListener('keydown', (e) => { if (e.key === 'Escape') e.stopPropagation() }) // the native cancel still runs
     d.addEventListener('cancel', (e) => { e.preventDefault(); close() }) // closed our way (animated)
     d.addEventListener('close', () => { if (state !== 'closed' && !d.open) finish(false) }) // closed by the browser anyway
-    d.addEventListener('click', (e) => { if (e.target === d) close() }) // no padding, one wrapper fills it: only the backdrop
+    // the backdrop (no padding, one wrapper fills it: a click whose target is the dialog). Only a press that started
+    // there: a drag out of the panel also clicks the dialog. On touch, a tap there while a field has the keyboard up
+    // only puts it away (the run isn't saved yet)
+    let fromBackdrop = false
+    d.addEventListener('pointerdown', (e) => {
+      const typing = window.matchMedia?.('(pointer: coarse)').matches && !!document.activeElement?.matches?.('.sb-form input, .sb-form select')
+      fromBackdrop = e.target === d && !typing
+    })
+    d.addEventListener('click', (e) => { if (e.target === d && fromBackdrop) close(); fromBackdrop = false })
     return d
   }
 

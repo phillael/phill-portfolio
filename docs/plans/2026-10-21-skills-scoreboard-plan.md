@@ -494,7 +494,7 @@ Always: `npx jest --no-watchman <the task's test files>` shows them passing; `np
 - **New copy:** anything beyond §2 (including its three new strings) → stop.
 - **Upstash:** if `.env.local`'s Upstash vars are missing or the DB doesn't answer, stop (it's shared with production; don't create a new DB).
 - **A real run fails the bounds** in acceptance (2): that's a bug in §5's numbers. Fix the formula from the game's own timing, not by widening the slack blindly, and note it here.
-- **The wizard chat open behind the board:** WizardChat's capture-phase Esc stops propagation, so one Esc may close both the chat and the board (the browser's `cancel` still runs). That's acceptable, and noted here. Stop only if either one ends up stuck.
+- **The wizard chat open behind the board:** WizardChat's capture-phase Esc stops propagation, so one Esc may close both the chat and the board (the browser's `cancel` still runs). That's acceptable, and noted here. Stop only if either one ends up stuck. *Fixed in PR #45's review: WizardChat now leaves an Escape from inside an open modal `<dialog>` to it, so Esc closes the board only. The backdrop also closes only on a press that started there (not a drag out of the panel), and on touch not while a field has the keyboard up.*
 - **Vercel:** no env changes are needed (no new secret). Previews write `sb:preview:*`.
 - **Found at T9 (fixed on this branch):**
   - **Under your best, the total counts the run:** `at` ranks the run beside the player's own best, so with `{total}` alone a run lowest on the board read "#413 of 412" (the mockup had the same flaw). It's now `#{at} of {total + 1}`, as a pending run's total (§2's wording unchanged).

@@ -172,6 +172,21 @@ describe('WizardChat', () => {
     offerButton.remove()
   })
 
+  it('leaves an Escape from inside another open modal <dialog> (the scoreboard) to it', () => {
+    const onClose = jest.fn()
+    render(<WizardChat onClose={onClose} onFallback={() => {}} onOfferMushroom={() => {}} />)
+    const board = document.createElement('dialog')
+    board.setAttribute('open', '')
+    board.innerHTML = '<input aria-label="Your name">'
+    document.body.append(board)
+    const reached = jest.fn()
+    board.addEventListener('keydown', reached)
+    fireEvent.keyDown(board.querySelector('input')!, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(reached).toHaveBeenCalledTimes(1) // the board's own handler still gets it
+    board.remove()
+  })
+
   it('keeps Escape from reaching listeners behind the chat', () => {
     const behind = jest.fn()
     document.body.addEventListener('keydown', behind)

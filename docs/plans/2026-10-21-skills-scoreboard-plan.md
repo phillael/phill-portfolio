@@ -369,11 +369,66 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
     - no console errors.
   - Screenshots are compared with the mockup's look B.
   - Finish with `clear --env development`.
-- [ ] **T10: The version and the PR text.**
+- [x] **T10: The version and the PR text.**
   - `package.json` → 1.9.0.
   - Write the PR text in this plan (Summary, What's in it, Decisions, Test plan for Phill, Screenshots to take).
   - Run the gates.
   - **Stop. Don't push:** the PR waits for Phill's go.
+
+## PR text (T10; waits for Phill's go before any push)
+
+**Title:** `feat(skills): the Skill blaster scoreboard: the all-time top 10 at game over (v1.9.0)`
+
+### Summary
+
+At every game over, once the music has faded and the list is back, a dialog in the middle of the screen opens with the all-time top 10 (look B, "Centre stage", of the mockup). The run is already a row in it: a name, then city and country prefilled from where the visitor is (Vercel's IP geolocation), all editable; Save puts it on the board. Everyone gets a rank ("#212 of 413"); each player is on the board once, with their best run.
+
+### What's in it
+
+- **The board:** `src/lib/skills/scoreboard.ts` (+ the `.sb` styles in `blaster.css`). A native `<dialog>` with `showModal()` on `<body>`: pending (the form at its rank, or under "· · ·"), a new #1, saved, under your best, offline with Try again, and no ticket. Its own tokens and live region; Esc stops at the dialog and the native `cancel` closes it; ✕ and the backdrop close it too; user text through `textContent` only.
+- **The client:** `src/lib/skills/scoreboard-api.ts` (`startRun` at the first shot, `fetchBoard`, `saveScore`, the player id and the remembered profile).
+- **The routes:** `POST /api/skills/run` (a run ticket in Redis + the geo), `GET /api/skills/scores` (public) and `POST /api/skills/scores` (checked in order: Origin, shape, name/city, rate limit, the ticket taken once, the plausibility check, not under the player's best, save). `src/lib/allowed-origin.ts` is now shared with the wizard chat.
+- **The store:** `src/lib/scoreboard/store.ts` on the wizard's Upstash DB, keys `sb:{VERCEL_ENV}:*` (previews and local runs never touch production's board); no IP stored (a truncated hash for the rate limits, expiring within a day).
+- **The checks:** `validate.ts` (the `obscenity` English matcher, server-only, with Penistone and Dickinson whitelisted), `text.ts`, `src/data/countries.ts` (250 codes), and `maxScoreFor`/`minSecondsFor` in `rules.ts`.
+- **The game:** `blaster.ts` asks for a ticket at a game's first shot (nothing before), counts resumes, opens the board at game over; closing it puts the section at rest.
+- **Moderation:** `node --env-file=.env.local scripts/scoreboard.mjs list | rm <playerId> | clear [--env …]` (`clear` refuses production).
+- CLAUDE.md, v1.9.0.
+
+### Decisions
+
+- **Phill's calls:** all-time only; anyone can save and see their rank; city (optional) and country, prefilled and editable; moderation = the filter at entry + the `rm` script; look B.
+- **Mine, in the mockup Phill approved:** one entry per player (their best; a random id in localStorage).
+- **The approach:** run tickets in Redis (no new secret, no Vercel env change). Medium anti-cheat: one save per ticket; a score the wave allows; the wave no sooner than the game allows. A believable fake still passes once it waits, and that's accepted. Esc or ✕ mid-game is a quit (no board). Ties share a rank.
+- **Fixed during the browser checks:**
+  - the blur (the build kept only `-webkit-backdrop-filter`);
+  - a run under your best reading "#413 of 412";
+  - tied ranks sharing the top colours.
+- **Not this PR's (master):**
+  - the readout's blur is missing in Chrome for the same CSS reason;
+  - with reduced motion on, the home page logs a hydration-attribute warning at load.
+- **For Phill's review:** the no-ticket live-region line reuses §2's strings (the plan's Stop conditions note).
+
+### Test plan for Phill
+
+1. `npm run dev`. Play the Skill blaster to a game over: play, or in the console `__skills.jumpToDrop(); __skills.G.hp = 1` and shoot at nothing until hit.
+   - After the fade, the board opens.
+   - Type a name and Save: your row is highlighted with your rank.
+2. Lose again with a lower score: the board shows your best where it ranks, with no form.
+3. Close with Esc, ✕ or a click outside, then shoot a skill: a new game starts.
+4. Keyboard only: Enter on a skill; at game over the name is focused; Enter saves; Esc closes; focus is back on the skill.
+5. On a phone, or devtools at 375×812 with touch:
+   - the board fits;
+   - no keyboard pops up when it opens;
+   - Save works.
+6. `node --env-file=.env.local scripts/scoreboard.mjs list` shows your entry. Then `… clear` (the default env is development).
+7. After the deploy, on production:
+   - play once and check `… list --env production`;
+   - `rm` anything the filter lets through.
+
+### Screenshots to take
+
+- Desktop (1280×800): pending in the top 10, saved, under your best, offline.
+- Phone (375×812): pending (the form's two lines), saved.
 
 ## Per-task verification
 

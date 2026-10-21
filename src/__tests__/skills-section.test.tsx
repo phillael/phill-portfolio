@@ -1,176 +1,89 @@
 /**
- * Skills Section Tests
- *
- * Tests for the SkillsSection, SkillCategory, and SkillChip components:
- * - SkillsSection renders with correct ID (#skills)
- * - All three skill categories render with headings
- * - SkillChip components render for each skill
- * - Hover state applies scale and glow effect
- * - Skills are imported from JSON data
+ * The Skills section at rest (mockup: docs/design/skills-game/round6/blaster-synth.html, its rest state):
+ * the header, the AI skills in a glass panel with a note each, the other groups as quiet lines of words.
+ * Every skill is a button that looks like text: the list stays the content for readers, search and
+ * screen readers, and a click is what reveals the game.
  */
 
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import SkillsSection from '@/components/SkillsSection'
-import SkillCategory from '@/components/SkillCategory'
-import SkillChip from '@/components/SkillChip'
-import skillsData from '@/data/skills.json'
-import { SkillCategory as SkillCategoryType } from '@/types/content'
-
-// Helper to filter out framer-motion props
-const filterMotionProps = (props: Record<string, unknown>) => {
-  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
-  const filtered: Record<string, unknown> = {}
-  Object.keys(props).forEach(key => {
-    if (!motionProps.includes(key)) {
-      filtered[key] = props[key]
-    }
-  })
-  return filtered
-}
-
-// Mock framer-motion to avoid animation issues in tests
-jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({
-      children,
-      className,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLDivElement>>) => (
-      <div className={className} {...filterMotionProps(props)}>{children}</div>
-    ),
-    h2: ({
-      children,
-      className,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) => (
-      <h2 className={className} {...filterMotionProps(props)}>{children}</h2>
-    ),
-    h3: ({
-      children,
-      className,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) => (
-      <h3 className={className} {...filterMotionProps(props)}>{children}</h3>
-    ),
-    span: ({
-      children,
-      className,
-      onClick,
-      onKeyDown,
-      role,
-      tabIndex,
-      ...props
-    }: React.PropsWithChildren<
-      React.HTMLAttributes<HTMLSpanElement> & {
-        role?: string
-        tabIndex?: number
-      }
-    >) => (
-      <span
-        className={className}
-        onClick={onClick}
-        onKeyDown={onKeyDown}
-        role={role}
-        tabIndex={tabIndex}
-        {...filterMotionProps(props)}
-      >
-        {children}
-      </span>
-    ),
-    p: ({
-      children,
-      className,
-      ...props
-    }: React.PropsWithChildren<React.HTMLAttributes<HTMLParagraphElement>>) => (
-      <p className={className} {...filterMotionProps(props)}>{children}</p>
-    ),
-  },
-  AnimatePresence: ({ children }: React.PropsWithChildren<object>) => (
-    <>{children}</>
-  ),
-  LayoutGroup: ({ children }: React.PropsWithChildren<object>) => (
-    <>{children}</>
-  ),
-  useReducedMotion: () => false,
-}))
+import { markLineEnds } from '@/components/skills/markLineEnds'
+import { SKILLS, skillCount } from '@/data/skills'
 
 describe('SkillsSection', () => {
-  it('renders with correct ID (#skills)', () => {
+  it('is the region named Skills, at #skills', () => {
     render(<SkillsSection />)
-
-    const section = document.getElementById('skills')
-    expect(section).toBeInTheDocument()
+    const region = screen.getByRole('region', { name: 'Skills' })
+    expect(region).toHaveAttribute('id', 'skills')
+    expect(screen.getByRole('heading', { level: 2, name: 'Skills' })).toHaveAttribute('id', 'skills-h')
   })
 
-  it('renders all three skill categories with headings', () => {
+  it('says what it is: the headline and the lede', () => {
     render(<SkillsSection />)
-
-    // Check each category heading is rendered
-    expect(screen.getByText('Technical Skills')).toBeInTheDocument()
-    expect(screen.getByText('Professional Skills')).toBeInTheDocument()
-    expect(screen.getByText('Other Skills')).toBeInTheDocument()
+    expect(screen.getByText(SKILLS.headline)).toBeInTheDocument()
+    expect(screen.getByText(SKILLS.lede)).toBeInTheDocument()
   })
 
-  it('has proper accessibility attributes', () => {
+  it('has a heading per group, AI first, and each group’s list is labelled by it', () => {
     render(<SkillsSection />)
-
-    const section = screen.getByRole('region', { name: /skills/i })
-    expect(section).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(SKILLS.groups.map((g) => g.name))
+    for (const g of SKILLS.groups) expect(screen.getByRole('list', { name: g.name })).toBeInTheDocument()
   })
 
-  it('renders all skills from JSON data', () => {
+  it('makes every skill a button named by the skill (an AI skill’s name includes its note)', () => {
     render(<SkillsSection />)
+    const region = screen.getByRole('region', { name: 'Skills' })
+    expect(within(region).getAllByRole('button')).toHaveLength(skillCount)
+    for (const g of SKILLS.groups) {
+      for (const s of g.skills) {
+        const button = within(region).getByRole('button', { name: s.note ? `${s.name} ${s.note}` : s.name })
+        expect(button).toHaveAttribute('type', 'button')
+        expect(button).toHaveAttribute('data-skill', s.name)
+        expect(button).toHaveAttribute('data-group', g.id)
+      }
+    }
+  })
 
-    // Verify all skills from all categories are rendered
-    ;(skillsData as SkillCategoryType[]).forEach((category) => {
-      category.skills.forEach((skill) => {
-        expect(screen.getByText(skill)).toBeInTheDocument()
-      })
-    })
+  it('hides the dots between words from screen readers', () => {
+    render(<SkillsSection />)
+    const dots = screen.getAllByText('·')
+    expect(dots).toHaveLength(skillCount - SKILLS.groups[0].skills.length) // one after every word outside the AI panel
+    for (const dot of dots) expect(dot).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('has a polite live region for the game', () => {
+    render(<SkillsSection />)
+    const region = screen.getByRole('region', { name: 'Skills' })
+    expect(region.querySelector('[aria-live="polite"]')).toBeInTheDocument()
   })
 })
 
-describe('SkillCategory', () => {
-  const mockCategory: SkillCategoryType = {
-    category: 'Test Category',
-    skills: ['Skill 1', 'Skill 2', 'Skill 3'],
+describe('the dots never end a line', () => {
+  /** a list whose items sit at these offsetTops (jsdom has no layout) */
+  const list = (tops: number[]) => {
+    const root = document.createElement('div')
+    const ul = document.createElement('ul')
+    ul.setAttribute('data-words', '')
+    for (const top of tops) {
+      const li = document.createElement('li')
+      Object.defineProperty(li, 'offsetTop', { value: top, configurable: true })
+      ul.appendChild(li)
+    }
+    root.appendChild(ul)
+    return { root, items: [...ul.children] }
   }
 
-  it('renders category heading', () => {
-    render(<SkillCategory category={mockCategory.category} skills={mockCategory.skills} />)
-
-    expect(screen.getByText('Test Category')).toBeInTheDocument()
+  it('marks the last word on each visual line but the last', () => {
+    const { root, items } = list([0, 0, 0, 30, 30, 60])
+    markLineEnds(root)
+    expect(items.map((li) => li.hasAttribute('data-eol'))).toEqual([false, false, true, false, true, false])
   })
 
-  it('renders all skills as chips', () => {
-    render(<SkillCategory category={mockCategory.category} skills={mockCategory.skills} />)
-
-    mockCategory.skills.forEach((skill) => {
-      expect(screen.getByText(skill)).toBeInTheDocument()
-    })
-  })
-})
-
-describe('SkillChip', () => {
-  it('renders skill name', () => {
-    render(<SkillChip skill="React" />)
-
-    expect(screen.getByText('React')).toBeInTheDocument()
-  })
-
-  it('applies base styling classes', () => {
-    render(<SkillChip skill="TypeScript" />)
-
-    const chip = screen.getByText('TypeScript')
-
-    // Check that the chip has the expected base classes
-    expect(chip).toHaveClass('text-accent')
-    expect(chip).toHaveClass('bg-card/80')
-
-    // Verify transition class is present
-    expect(chip.className).toMatch(/transition/)
-
-    // Verify cursor pointer for click affordance
-    expect(chip).toHaveClass('cursor-pointer')
+  it('unmarks words that no longer end a line', () => {
+    const { root, items } = list([0, 30])
+    items[0].setAttribute('data-eol', '')
+    Object.defineProperty(items[1], 'offsetTop', { value: 0 })
+    markLineEnds(root)
+    expect(items[0].hasAttribute('data-eol')).toBe(false)
   })
 })

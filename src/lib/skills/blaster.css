@@ -1,0 +1,623 @@
+/*
+ * The Skill blaster's styles: global, because the game sets these classes from script (blaster.ts), and in the
+ * game's own chunk (imported by blaster.ts, so nothing here loads before the first shot). Ported from the round 6
+ * mockup (docs/design/skills-game/round6/blaster-synth.html). Inside #skills the section's tokens apply
+ * (Skills.module.css); .bl-screen lives on <body> (a filter on #shroom-target would break position: fixed).
+ */
+
+/* while the game runs: a round reticle, and rapid clicks never select text */
+#skills.bl-on,
+#skills.bl-on [data-skill] {
+  cursor: var(--reticle, crosshair);
+}
+#skills.bl-on {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* a lit skill: a mole (its part's colour), a bonus (amber), an enemy (red) */
+.bl-lit,
+.bl-lit:hover {
+  color: #fff !important;
+  opacity: 1 !important;
+  text-shadow: 0 0 6px hsl(var(--c)), 0 0 18px hsl(var(--c) / 0.8) !important;
+}
+.bl-gold,
+.bl-gold:hover {
+  color: hsl(48 100% 90%) !important;
+  opacity: 1 !important;
+  text-shadow: 0 0 6px hsl(45 100% 60%), 0 0 18px hsl(45 100% 55% / 0.85) !important;
+}
+.bl-foe,
+.bl-foe:hover {
+  color: hsl(355 100% 78%) !important;
+  opacity: 1 !important;
+  text-shadow: 0 0 6px hsl(355 100% 58%), 0 0 16px hsl(355 100% 55% / 0.9), 0 0 30px hsl(355 100% 50% / 0.5) !important;
+}
+.bl-foe.bl-hot {
+  animation: bl-flicker 0.16s steps(2, jump-none) infinite;
+}
+@keyframes bl-flicker {
+  50% {
+    opacity: 0.55;
+  }
+}
+/* a group's heading lights in its part's colour while that part plays (blaster.ts sets --pc) */
+#skills [data-sk-group] h3.bl-live {
+  color: hsl(var(--pc));
+  text-shadow: 0 0 10px hsl(var(--pc) / 0.65);
+}
+#skills [data-sk-group='ai'] h3.bl-live {
+  color: hsl(300 100% 92%);
+  text-shadow: 0 0 6px var(--magenta), 0 0 16px hsl(290 100% 70%), 0 0 34px hsl(290 100% 60% / 0.85);
+}
+/* a blown-up word: its text goes clear (the button keeps its place, name and focus) while its letters fly */
+.bl-gone,
+.bl-gone:hover {
+  color: transparent !important;
+  text-shadow: none !important;
+  transition: none !important;
+}
+
+/* the effects: one layer in the section (letters, rings, sparks, points) and one on the screen (beams, shots) */
+.bl-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+}
+.bl-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  overflow: hidden;
+}
+.bl-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 999px;
+  border: 2px solid hsl(var(--c));
+  box-shadow: 0 0 10px hsl(var(--c) / 0.7), inset 0 0 8px hsl(var(--c) / 0.3);
+  will-change: transform, opacity;
+}
+.bl-ring.elite::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+  border: 1px solid hsl(var(--c) / 0.75);
+  box-shadow: 0 0 8px hsl(var(--c) / 0.5);
+}
+.bl-ring.hot {
+  border-width: 2.5px;
+  box-shadow: 0 0 16px hsl(var(--c)), inset 0 0 10px hsl(var(--c) / 0.5);
+}
+.bl-word {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.bl-letter {
+  position: absolute;
+  white-space: pre;
+  will-change: transform;
+}
+.bl-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 6px var(--c), 0 0 12px var(--c);
+  animation: bl-spark var(--t) cubic-bezier(0.15, 0.8, 0.3, 1) forwards;
+}
+@keyframes bl-spark {
+  from {
+    transform: translate(var(--x0), var(--y0)) scale(1.3);
+    opacity: 1;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--x1), var(--y1)) scale(0);
+    opacity: 0;
+  }
+}
+.bl-shock {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  margin: -45px 0 0 -45px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--c));
+  box-shadow: 0 0 14px hsl(var(--c) / 0.8), inset 0 0 10px hsl(var(--c) / 0.5);
+}
+.bl-bloom {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  margin: -90px 0 0 -90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 12%, hsl(var(--c) / 0.75) 30%, hsl(var(--c) / 0) 68%);
+  mix-blend-mode: screen;
+}
+.bl-pts {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: 400 1rem/1 var(--font-heading);
+  color: hsl(var(--c));
+  text-shadow: 0 0 10px hsl(var(--c) / 0.8);
+  animation: bl-pts 0.9s var(--ease) forwards;
+}
+.bl-pts.big {
+  font-size: 1.45rem;
+}
+.bl-pts i {
+  font-style: normal;
+  margin-left: 0.35em;
+  font-size: 0.75em;
+  color: #fff;
+  text-shadow: 0 0 8px hsl(var(--c));
+}
+@keyframes bl-pts {
+  from {
+    transform: translateX(-50%) scale(0.7);
+    opacity: 0;
+  }
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -10px) scale(1);
+  }
+  to {
+    transform: translate(-50%, -50px);
+    opacity: 0;
+  }
+}
+@keyframes bl-pts-still {
+  from {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.bl-beam {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  margin-top: -1px;
+  transform-origin: 0 50%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, hsl(190 100% 75% / 0), hsl(190 100% 75% / 0.85) 65%, #fff);
+  box-shadow: 0 0 8px hsl(190 100% 70% / 0.9);
+}
+.bl-flash {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 18%, hsl(190 100% 75% / 0.7) 40%, hsl(190 100% 75% / 0) 70%);
+}
+.bl-bolt {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 18%, hsl(355 100% 66%) 42%, hsl(355 100% 55% / 0) 72%);
+  will-change: transform;
+}
+.bl-crack {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
+  filter: drop-shadow(0 0 3px hsl(355 100% 60% / 0.9));
+}
+.bl-vig {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 140px 36px hsl(355 100% 50% / 0.55);
+  opacity: 0;
+}
+.bl-banner {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0;
+}
+.bl-banner b {
+  display: block;
+  font: 400 clamp(2.4rem, 8vw, 4.6rem) / 1 var(--font-heading);
+  color: hsl(180 100% 96%);
+  text-shadow: 0 0 8px hsl(var(--c)), 0 0 22px hsl(var(--c)), 0 0 46px hsl(var(--c) / 0.6);
+}
+.bl-banner span {
+  display: block;
+  margin-top: 0.7rem;
+  font: 700 clamp(0.8rem, 2.4vw, 1rem) / 1 var(--font-body);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: hsl(var(--c));
+}
+
+/* the readout: score, multiplier, wave, health, the band; appears with the first shot, rides the bottom-left */
+.bl-hud {
+  position: sticky;
+  z-index: 20;
+  bottom: 16px;
+  width: max-content;
+  max-width: calc(100% - 76px);
+  margin: 2.5rem auto 0 0;
+  display: grid;
+  gap: 0.3rem;
+  padding: 5px 5px 7px;
+  border-radius: 26px;
+  font: 700 0.8rem/1.2 var(--font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: hsl(220 30% 5% / 0.92);
+  border: 1px solid var(--hair-strong);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px -12px hsl(190 100% 50% / 0.35);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease), box-shadow 0.3s var(--ease);
+  visibility: hidden;
+}
+.bl-hud.on {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+}
+/* the Shroom Wizard is out (bottom-left): the readout centres, where that clears it (blaster.ts placeHud) */
+.bl-hud.bl-mid {
+  margin-left: auto;
+  margin-right: auto;
+}
+.bl-hud.hurt {
+  box-shadow: 0 0 0 1px hsl(355 100% 66% / 0.7), 0 10px 30px -8px hsl(355 100% 55% / 0.6);
+}
+.bl-hud .r1 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.bl-hud .r2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.9rem;
+  padding: 0 9px;
+  min-height: 1.2rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+.bl-hud .r2:empty {
+  display: none;
+}
+.bl-hud .r2 .foe {
+  color: hsl(355 100% 74%);
+}
+.bl-hud .r2 .good {
+  color: var(--green);
+}
+.bl-hud .r2 b {
+  color: #fff;
+}
+.bl-hud .r2 a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -12px 0;
+  color: var(--cyan);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 0.85rem;
+}
+/* the band: one light per part (the group that plays it), lit while it's playing */
+.bl-band {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-2);
+}
+.bl-band .pips {
+  display: inline-flex;
+  gap: 4px;
+}
+.bl-band i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px hsl(var(--c) / 0.5);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.bl-band i.on {
+  background: hsl(var(--c));
+  box-shadow: 0 0 8px hsl(var(--c));
+}
+.bl-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding-left: 0.15rem;
+}
+.bl-score b {
+  display: inline-block;
+  min-width: 3.2ch;
+  font: 400 1.3rem/1 var(--font-heading);
+  letter-spacing: 0;
+  color: #fff;
+  text-shadow: 0 0 14px hsl(190 100% 70% / 0.5);
+  font-feature-settings: 'tnum' 1;
+}
+.bl-score b.bump {
+  animation: bl-bump 0.3s var(--ease);
+}
+@keyframes bl-bump {
+  40% {
+    transform: scale(1.16);
+    text-shadow: 0 0 16px var(--green);
+  }
+}
+.bl-mult {
+  color: var(--green);
+  letter-spacing: 0.04em;
+  font-size: 0.85rem;
+  text-shadow: 0 0 8px hsl(130 90% 55% / 0.6);
+}
+.bl-mult:empty {
+  display: none;
+}
+.bl-hud .sep {
+  width: 1px;
+  height: 1.1rem;
+  background: var(--hair-strong);
+}
+.bl-wave b {
+  color: #fff;
+}
+.bl-hp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.bl-hp[hidden] {
+  display: none;
+}
+.bl-hp .bar {
+  display: inline-flex;
+  gap: 3px;
+}
+.bl-hp i {
+  width: 11px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--green);
+  box-shadow: 0 0 6px hsl(130 90% 55% / 0.7);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.bl-hp i.out {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px hsl(355 100% 66% / 0.55);
+}
+.bl-hp.low i:not(.out) {
+  background: hsl(355 100% 64%);
+  box-shadow: 0 0 8px hsl(355 100% 60% / 0.8);
+}
+.bl-hud .hbtn-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--cyan);
+  background: hsl(190 100% 75% / 0.08);
+  border: 1px solid hsl(190 100% 75% / 0.35);
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.bl-hud .hbtn-ico:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px -2px hsl(190 100% 70% / 0.6);
+}
+.bl-hud .hbtn-ico:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+.bl-hud .hbtn-ico svg {
+  width: 20px;
+  height: 20px;
+}
+.bl-mute .off,
+.bl-mute[aria-pressed='true'] .on {
+  display: none;
+}
+.bl-mute[aria-pressed='true'] .off {
+  display: block;
+}
+.bl-mute[aria-pressed='true'] {
+  color: var(--ink-3);
+}
+.bl-hud .bl-stop {
+  color: var(--ink-2);
+}
+@media (max-width: 560px) {
+  .bl-hud {
+    max-width: calc(100% - 60px);
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+  }
+  .bl-hud .r1 {
+    gap: 0.5rem;
+  }
+  .bl-hud .r1 > .sep,
+  .bl-wave .lbl {
+    display: none;
+  }
+  .bl-wave::before {
+    content: 'W';
+  }
+  .bl-hp .lbl {
+    display: none;
+  }
+  .bl-hp i {
+    width: 8px;
+  }
+  .bl-mult {
+    display: none; /* the band's lights carry it on phones */
+  }
+  .bl-score b {
+    font-size: 1.15rem;
+  }
+  .bl-hud .r2 {
+    font-size: 0.68rem;
+  }
+}
+
+/* ===== one screen: the arena (while the game runs). The section tightens to fit the screen: the header, the AI
+   caption and notes hide, the type scales by --fit (blaster.ts fitArena); where it still can't fit (phones, short
+   windows), groups fold to "HEADING · n" for a wave and take turns (bl-staged, bl-folded) ===== */
+#skills.bl-arena {
+  --fit: 1;
+  padding-top: 10px;
+  padding-bottom: 6px;
+}
+#skills.bl-arena > header,
+#skills.bl-arena [data-sk-group='ai'] h3 + p,
+#skills.bl-arena [data-name] + span {
+  display: none;
+}
+#skills.bl-arena [data-sk-list] {
+  margin-top: 0;
+  gap: calc(var(--fit) * 14px);
+}
+#skills.bl-arena [data-sk-group='ai'] {
+  padding: calc(var(--fit) * 12px) calc(var(--fit) * 22px) calc(var(--fit) * 10px);
+}
+#skills.bl-arena [data-sk-group] h3 {
+  font-size: calc(var(--fit) * 0.74rem);
+}
+#skills.bl-arena [data-sk-group='ai'] h3 {
+  font-size: calc(var(--fit) * 1.3rem);
+}
+#skills.bl-arena [data-sk-group='ai'] ul {
+  margin-top: calc(var(--fit) * 6px);
+  gap: 0 1.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr));
+}
+#skills.bl-arena [data-skill][data-group='ai'] {
+  min-height: calc(var(--fit) * 36px);
+  font-size: calc(var(--fit) * 1.0625rem);
+}
+#skills.bl-arena [data-sk-groups] {
+  gap: calc(var(--fit) * 12px) 2.25rem;
+}
+#skills.bl-arena [data-words] {
+  margin-top: calc(var(--fit) * 4px);
+}
+#skills.bl-arena [data-words] [data-skill] {
+  font-size: calc(var(--fit) * 1.0625rem);
+  min-height: calc(var(--fit) * 31px);
+}
+#skills.bl-arena .bl-hud {
+  margin-top: calc(var(--fit) * 12px);
+}
+#skills.bl-arena .bl-hud .r2 {
+  display: flex;
+  min-height: 1.3em; /* a steady height, so the fit holds when the status changes */
+}
+@media (max-width: 560px) {
+  #skills.bl-arena .bl-hud .r2 {
+    min-height: 2.8em;
+    align-content: flex-start;
+  }
+}
+@media (pointer: coarse) {
+  #skills.bl-arena [data-words] [data-skill],
+  #skills.bl-arena [data-skill][data-group='ai'] {
+    min-height: 44px; /* touch targets never shrink */
+  }
+}
+@media (max-width: 560px) {
+  /* phones: the AI names run on like the other lines */
+  #skills.bl-arena [data-sk-group='ai'] ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.1rem;
+  }
+  #skills.bl-arena [data-sk-group='ai'] li {
+    flex: 0 0 auto;
+  }
+  #skills.bl-arena [data-sk-group='ai'] {
+    padding: 10px 14px 8px;
+  }
+}
+/* phones and short windows: groups that don't fit fold to their heading for a wave (they take turns) */
+#skills.bl-staged [data-sk-groups] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+#skills.bl-staged [data-sk-groups] > [data-sk-group] {
+  flex: 1 1 100%;
+}
+#skills.bl-staged [data-sk-groups] > .bl-folded {
+  flex: 0 1 auto;
+}
+#skills .bl-folded [data-words],
+#skills .bl-folded[data-sk-group='ai'] ul {
+  display: none;
+}
+#skills .bl-folded h3::after {
+  content: ' · ' attr(data-n);
+  opacity: 0.7;
+}
+#skills.bl-staged .bl-folded[data-sk-group='ai'] {
+  padding: 8px 14px;
+}
+#skills.bl-staged .bl-folded[data-sk-group='ai'] h3 {
+  font-size: 1rem;
+}
+
+/* reduced motion: nothing moves by itself (the points sit still and fade) */
+@media (prefers-reduced-motion: reduce) {
+  .bl-foe.bl-hot,
+  .bl-score b.bump {
+    animation: none;
+  }
+  .bl-hud {
+    transform: none; /* the readout appears, it doesn't slide in */
+    transition: none;
+  }
+  .bl-pts {
+    animation: bl-pts-still 1s linear forwards;
+  }
+}

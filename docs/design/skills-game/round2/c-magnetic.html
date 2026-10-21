@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magnetic Words</title>
+<link rel="stylesheet" href="../../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="../skills.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  /* ===== C · Magnetic words: the old exploding chips, evolved (2D DOM, transforms only) ===== */
+  .sk-groups, .sk-group { position: relative; }
+  .sk-w, .sk-ai-item, .mg-fly { touch-action: pan-y; -webkit-tap-highlight-color: transparent; } /* sideways drags fling; vertical drags still scroll */
+  .sk-ai-item .sk-name { justify-self: start; } /* the name's box hugs its text, so it leans and lifts from its own centre */
+
+  /* a word that's away leaves a faint ghost in its slot (the line still reads, nothing shifts) */
+  .sk-w.mg-away, .sk-w.mg-away:hover { opacity: .2; text-shadow: none; }
+  .sk-ai-item .sk-name.mg-away { opacity: .22; text-shadow: none; }
+
+  /* the flyers: a lifted copy of the word that turns into a small glass capsule */
+  .mg-layer { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+  .mg-fly {
+    position: absolute; left: 0; top: 0; padding: .22em .7em; border-radius: 999px; white-space: nowrap; pointer-events: auto; cursor: grab;
+    font: 400 1.0625rem/1.2 var(--font-text); color: var(--cyan); user-select: none; -webkit-user-select: none;
+    background: transparent; border: 1px solid transparent; will-change: transform;
+    transition: background-color .22s var(--ease), border-color .22s var(--ease), box-shadow .22s var(--ease);
+  }
+  .mg-fly.lift { background-color: hsl(205 45% 7% / .92); border-color: hsl(190 100% 75% / .42); box-shadow: inset 0 1px 0 hsl(190 100% 90% / .14), 0 0 18px -6px hsl(190 100% 70% / .7); }
+  .mg-fly.ai { font-weight: 700; color: #fff; }
+  .mg-fly.ai.lift { background-color: hsl(275 40% 9% / .92); border-color: hsl(290 100% 80% / .55); box-shadow: inset 0 1px 0 hsl(300 100% 92% / .16), 0 0 20px -6px hsl(290 100% 70% / .8); }
+  .mg-fly.music { color: hsl(295 80% 88%); }
+  .mg-fly.music.lift { border-color: hsl(290 100% 80% / .45); }
+  .mg-fly.grab { cursor: grabbing; }
+  body.mg-grabbing, body.mg-grabbing * { user-select: none !important; -webkit-user-select: none !important; cursor: grabbing !important; }
+
+  /* the floor the pile rests on: a hairline that shows while anything is down there */
+  .mg-floor { position: absolute; left: 6px; right: 6px; height: 1px; pointer-events: none; opacity: 0; transition: opacity .5s var(--ease); background: linear-gradient(90deg, transparent, hsl(190 100% 75% / .4), transparent); }
+  .mg-floor.ai { left: 22px; right: 22px; background: linear-gradient(90deg, transparent, hsl(290 100% 80% / .4), transparent); }
+  .mg-floor.on { opacity: 1; }
+
+  /* the pop: a few sparks and a "+points" that rises and fades */
+  .mg-spark { position: absolute; left: 0; top: 0; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c), 0 0 12px var(--c); pointer-events: none; animation: mg-spark var(--t) cubic-bezier(.15, .8, .3, 1) forwards; }
+  @keyframes mg-spark { from { transform: translate(var(--x0), var(--y0)) scale(1.2); opacity: 1; } 55% { opacity: 1; } to { transform: translate(var(--x1), var(--y1)) scale(0); opacity: 0; } }
+  .mg-pts { position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap; font: 400 .95rem/1 var(--font-display); color: var(--green); text-shadow: 0 0 10px hsl(130 90% 55% / .8); animation: mg-pts .85s var(--ease) forwards; }
+  .mg-pts i { font-style: normal; margin-left: .35em; font-size: .78em; color: #fff; text-shadow: 0 0 8px var(--green); }
+  @keyframes mg-pts { from { transform: translate(var(--x), var(--y)) translateX(-50%) scale(.7); opacity: 0; } 18% { opacity: 1; transform: translate(var(--x), calc(var(--y) - 10px)) translateX(-50%) scale(1); } to { transform: translate(var(--x), calc(var(--y) - 46px)) translateX(-50%) scale(1); opacity: 0; } }
+
+  /* reduced motion: nothing moves; a click lights the word and shows its points in place */
+  .mg-lit, .mg-lit:hover { color: #fff !important; opacity: 1 !important; text-shadow: 0 0 12px hsl(130 90% 55% / .9), 0 0 2px #fff !important; }
+  .mg-static-pts { position: absolute; z-index: 6; pointer-events: none; white-space: nowrap; transform: translate(-50%, -100%); padding: .3rem .55rem; border-radius: 999px; font: 400 .8rem/1 var(--font-display); color: var(--green); background: hsl(220 30% 5% / .92); border: 1px solid hsl(130 90% 55% / .35); }
+
+  /* the score readout (base.css's quiet pill) */
+  .mg-score .sep { color: var(--ink-3); }
+</style>
+</head>
+<body>
+<p class="mock-note">Round 2 · C · Magnetic words. It's the plain list until you bring your cursor close. Then click a word, or grab one and throw it.</p>
+
+<section class="section" id="skills" aria-labelledby="skills-h"></section>
+
+<script src="../skills.js"></script>
+<script src="base.js"></script>
+<script>
+(() => {
+  const { mount, say, reducedMotion, onReducedMotion, esc } = SECTION2
+  const S = mount({ title: 'Round 2 · C · Magnetic words' })
+  const root = S.root
+  const TOTAL = S.words.length
+
+  /* ---------- tuning ---------- */
+  const LEAN_R = 120          // px: how far the cursor's pull reaches
+  const LEAN_PX = 4.5         // px: the most a word slides toward the cursor
+  const LEAN_DEG = 7          // deg: the most a word turns to line up with it
+  const GRAVITY = 2600        // px/s²
+  const IDLE_MS = 3000        // quiet time before the pile drifts home
+  const COMBO_MS = 1100       // pops closer than this chain a combo
+  const HOME_K = 70, HOME_ZETA = 0.62 // the spring home (a soft, slightly bouncy drift)
+
+  const fine = window.matchMedia('(hover: hover) and (pointer: fine)')
+  const rand = (a, b) => a + Math.random() * (b - a)
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+
+  /* ---------- words, zones and the layout cache (all layout reads happen here, never in rAF) ---------- */
+  const words = S.words.map((w, i) => ({
+    ...w, i,
+    lean: w.ai ? w.el.querySelector('.sk-name') : w.el,
+    cx: 0, cy: 0,                 // the slot's centre, page coordinates
+    lx: 0, ly: 0, lr: 0, ls: 0,   // the current lean (slide, turn, swell)
+    zone: null, fly: null, lit: 0,
+  }))
+  const byEl = new Map(words.map((w) => [w.el, w]))
+  let zones = []
+
+  function makeZone(el, kind) {
+    const layer = document.createElement('div')
+    layer.className = 'mg-layer'
+    layer.setAttribute('aria-hidden', 'true')
+    const floor = document.createElement('div')
+    floor.className = 'mg-floor' + (kind === 'ai' ? ' ai' : '')
+    layer.appendChild(floor)
+    el.appendChild(layer)
+    return { el, kind, layer, floorEl: floor, px: 0, py: 0, w: 0, h: 0, left: 0, right: 0, floorY: 0, flyers: 0 }
+  }
+
+  function measureZone(z) {
+    const r = z.el.getBoundingClientRect()
+    z.px = r.left + window.scrollX + z.el.clientLeft
+    z.py = r.top + window.scrollY + z.el.clientTop
+    z.w = z.el.clientWidth
+    z.h = z.el.clientHeight
+    if (z.kind === 'ai') { z.left = 12; z.right = z.w - 12; z.floorY = z.h - 12 }
+    else if (z.kind === 'groups') { z.left = 0; z.right = z.w; z.floorY = z.h + 36 } // the empty band under the lines
+    else { z.left = 0; z.right = z.w; z.floorY = z.h + 26 } // one group (phones): its own floor, in the gap below it
+    z.floorEl.style.top = z.floorY + 'px'
+  }
+
+  function layout() {
+    snapAllHome()
+    words.forEach((w) => { w.lean.style.transform = ''; w.lx = w.ly = w.lr = w.ls = 0 })
+    zones.forEach((z) => z.layer.remove())
+    const groupsEl = root.querySelector('.sk-groups')
+    const groupEls = S.groups
+    // one column (phones): each group piles at its own foot, so a popped word stays on screen
+    const oneColumn = groupEls.length > 1 && groupEls[0].offsetLeft === groupEls[1].offsetLeft
+    const ai = makeZone(S.panel, 'ai')
+    const groupZones = oneColumn ? groupEls.map((g) => makeZone(g, 'group')) : [makeZone(groupsEl, 'groups')]
+    zones = [ai, ...groupZones]
+    zones.forEach(measureZone)
+    words.forEach((w) => {
+      const r = w.lean.getBoundingClientRect()
+      w.cx = r.left + window.scrollX + r.width / 2
+      w.cy = r.top + window.scrollY + r.height / 2
+      w.zone = w.ai ? ai : oneColumn ? groupZones[groupEls.findIndex((g) => g.contains(w.el))] : groupZones[0]
+    })
+  }
+
+  /* ---------- the loop: one rAF, only while something moves, paused offscreen ---------- */
+  let raf = 0, last = 0, visible = true
+  const flyers = []
+  const ptr = { on: false, cx: 0, cy: 0, x: 0, y: 0, moved: false }
+
+  function kick() {
+    if (raf || !visible || reducedMotion()) return
+    last = performance.now()
+    raf = requestAnimationFrame(frame)
+  }
+
+  function frame(t) {
+    raf = 0
+    const dt = Math.min(0.033, Math.max(0.001, (t - last) / 1000))
+    last = t
+    const leaning = stepLean(dt)
+    const flying = stepFlyers(dt, t)
+    render()
+    if ((leaning || flying) && visible) raf = requestAnimationFrame(frame)
+  }
+
+  new IntersectionObserver((entries) => {
+    visible = entries[0].isIntersecting
+    if (visible) kick()
+    else if (raf) { cancelAnimationFrame(raf); raf = 0 }
+  }, { rootMargin: '120px 0px' }).observe(root)
+
+  /* ---------- the lean: words turn toward the cursor like iron filings (fine pointers only) ---------- */
+  function stepLean(dt) {
+    const k = 1 - Math.exp(-dt * 14)
+    let busy = false
+    for (const w of words) {
+      let tx = 0, ty = 0, tr = 0, ts = 0
+      if (ptr.on && !w.fly) {
+        const dx = ptr.x - w.cx, dy = ptr.y - w.cy
+        const d = Math.hypot(dx, dy)
+        if (d < LEAN_R && d > 0.5) {
+          const s = (1 - d / LEAN_R) ** 2
+          tx = (dx / d) * LEAN_PX * s
+          ty = (dy / d) * LEAN_PX * s
+          let a = Math.atan2(dy, dx) * 180 / Math.PI // a filing has no head or tail: line up within ±90°
+          if (a > 90) a -= 180
+          if (a < -90) a += 180
+          tr = clamp(a * 0.2, -LEAN_DEG, LEAN_DEG) * s
+          ts = 0.05 * s
+        }
+      }
+      const nx = w.lx + (tx - w.lx) * k, ny = w.ly + (ty - w.ly) * k, nr = w.lr + (tr - w.lr) * k, ns = w.ls + (ts - w.ls) * k
+      const settled = Math.abs(nx - tx) < 0.02 && Math.abs(ny - ty) < 0.02 && Math.abs(nr - tr) < 0.02 && Math.abs(ns - ts) < 0.0005
+      const fx = settled ? tx : nx, fy = settled ? ty : ny, fr = settled ? tr : nr, fs = settled ? ts : ns
+      if (fx !== w.lx || fy !== w.ly || fr !== w.lr || fs !== w.ls) {
+        w.lx = fx; w.ly = fy; w.lr = fr; w.ls = fs
+        w.lean.style.transform = fx || fy || fr || fs ? `translate3d(${fx.toFixed(2)}px, ${fy.toFixed(2)}px, 0) rotate(${fr.toFixed(2)}deg) scale(${(1 + fs).toFixed(4)})` : ''
+      }
+      if (!settled) busy = true
+    }
+    return busy
+  }
+
+  root.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse' || !fine.matches || reducedMotion()) return
+    ptr.on = true; ptr.cx = e.clientX; ptr.cy = e.clientY; ptr.x = e.pageX; ptr.y = e.pageY
+    kick()
+  }, { passive: true })
+  root.addEventListener('pointerleave', () => { ptr.on = false; kick() })
+  window.addEventListener('scroll', () => {
+    if (!ptr.on) return
+    ptr.x = ptr.cx + window.scrollX; ptr.y = ptr.cy + window.scrollY
+    kick()
+  }, { passive: true })
+
+  /* ---------- flyers: pop, tumble, pile, fling, drift home ---------- */
+  function extents(f) {
+    const a = f.a * Math.PI / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a))
+    f.ex = c * f.hw + s * f.hh
+    f.ey = s * f.hw + c * f.hh
+  }
+
+  // a word falls to its zone's floor, or to the bottom of the screen when the floor is below it
+  // (the AI panel on a phone is taller than the screen); never above its own slot
+  function floorFor(z, slotY) {
+    const screenFloor = window.scrollY + window.innerHeight - 84 - z.py // clear of the score pill
+    return Math.min(z.floorY, Math.max(screenFloor, slotY + 48))
+  }
+
+  function createFlyer(w) {
+    const z = w.zone
+    const el = document.createElement('span')
+    el.className = 'mg-fly' + (w.ai ? ' ai' : '') + (w.group === 'music' ? ' music' : '')
+    el.textContent = w.name
+    z.layer.appendChild(el)
+    const f = {
+      w, z, el,
+      hw: el.offsetWidth / 2, hh: el.offsetHeight / 2, ex: 0, ey: 0,
+      x: w.cx - z.px, y: w.cy - z.py, vx: 0, vy: 0, a: 0, av: 0,
+      floor: floorFor(z, w.cy - z.py),
+      tilt: rand(-3.5, 3.5), state: 'free', asleep: false, still: 0, support: false, homeAt: 0,
+      gx: 0, gy: 0, samples: [],
+    }
+    f.hx = f.x; f.hy = f.y
+    extents(f)
+    w.fly = f
+    w.lean.classList.add('mg-away')
+    w.lean.style.transform = ''; w.lx = w.ly = w.lr = w.ls = 0
+    flyers.push(f)
+    z.flyers++
+    z.floorEl.style.top = f.floor + 'px'
+    z.floorEl.classList.add('on')
+    bindFlyer(f)
+    return f
+  }
+
+  function launch(f) {
+    f.state = 'free'; f.asleep = false; f.still = 0
+    f.vx = rand(90, 280) * (Math.random() < 0.5 ? -1 : 1)
+    f.vy = -rand(560, 800)
+    f.av = rand(160, 420) * (Math.random() < 0.5 ? -1 : 1)
+    f.el.classList.add('lift'); f.lifted = true
+  }
+
+  const wakeZone = (z) => flyers.forEach((o) => { if (o.z === z && o.state === 'free') { o.asleep = false; o.still = 0 } })
+
+  function land(f) {
+    f.el.remove()
+    flyers.splice(flyers.indexOf(f), 1)
+    f.z.flyers--
+    if (!f.z.flyers) f.z.floorEl.classList.remove('on')
+    const w = f.w
+    w.fly = null
+    w.lean.classList.remove('mg-away')
+    const glow = w.ai ? 'hsl(290 100% 78% / .95)' : 'hsl(190 100% 75% / .95)'
+    w.lean.animate([{ textShadow: '0 0 0 transparent' }, { textShadow: `0 0 14px ${glow}, 0 0 2px #fff`, offset: 0.3 }, { textShadow: '0 0 0 transparent' }], { duration: 550, easing: 'ease-out' })
+    if (!flyers.length) say('All skills are back in place.')
+  }
+
+  function stepFlyers(dt, now) {
+    if (!flyers.length) return false
+    const n = 2, h = dt / n
+    for (let s = 0; s < n; s++) {
+      for (const f of flyers) {
+        if (f.state === 'grab') {
+          f.x += (f.gx - f.x) * Math.min(1, h * 40)
+          f.y += (f.gy - f.y) * Math.min(1, h * 40)
+          f.a += (clamp(f.vx / 45, -22, 22) - f.a) * Math.min(1, h * 12)
+        } else if (f.state === 'home') {
+          if (now < f.homeAt) continue
+          const k = HOME_K, c = 2 * Math.sqrt(k) * HOME_ZETA
+          f.vx += (k * (f.hx - f.x) - c * f.vx) * h
+          f.vy += (k * (f.hy - f.y) - c * f.vy) * h
+          f.x += f.vx * h; f.y += f.vy * h
+          f.a += (0 - f.a) * Math.min(1, h * 7)
+          if (f.lifted && Math.hypot(f.hx - f.x, f.hy - f.y) < 28) { f.el.classList.remove('lift'); f.lifted = false } // melt back into the line
+        } else if (!f.asleep) {
+          f.vy += GRAVITY * h
+          f.vx *= 1 - 0.25 * h
+          f.x += f.vx * h; f.y += f.vy * h
+          f.a += f.av * h
+          f.support = false
+        }
+        extents(f)
+      }
+      collide(h)
+    }
+    let busy = false
+    for (let i = flyers.length - 1; i >= 0; i--) {
+      const f = flyers[i]
+      if (f.state === 'home') {
+        if (now >= f.homeAt && Math.hypot(f.x - f.hx, f.y - f.hy) < 0.7 && Math.hypot(f.vx, f.vy) < 8) { land(f); continue }
+        busy = true
+      } else if (f.state === 'grab') busy = true
+      else if (!f.asleep) {
+        if (f.support) {
+          f.vx *= 1 - Math.min(1, dt * 7)
+          f.av *= 1 - Math.min(1, dt * 12)
+          let target = f.tilt // settle upright, a little askew, like a word dropped on a desk
+          while (f.a - target > 180) target += 360
+          while (target - f.a > 180) target -= 360
+          f.a += (target - f.a) * Math.min(1, dt * 9)
+          const quiet = Math.abs(f.vx) < 14 && Math.abs(f.vy) < 14 && Math.abs(f.a - target) < 0.6
+          f.still = quiet ? f.still + dt : 0
+          if (f.still > 0.22) { f.asleep = true; f.vx = f.vy = f.av = 0; f.a = target; extents(f) }
+        }
+        busy = true
+      }
+    }
+    return busy
+  }
+
+  /* rough box stacking: rotated bounding boxes, the floor and the zone's walls */
+  function collide(h) {
+    for (const f of flyers) {
+      if (f.state === 'home' || f.state === 'grab') continue
+      const z = f.z
+      if (f.y + f.ey > f.floor) {
+        f.y = f.floor - f.ey
+        if (f.vy > 0) { f.vy = f.vy > 90 ? -f.vy * 0.3 : 0; f.av *= 0.6 }
+        f.support = true
+      }
+      if (f.x - f.ex < z.left) { f.x = z.left + f.ex; if (f.vx < 0) f.vx = -f.vx * 0.5 }
+      if (f.x + f.ex > z.right) { f.x = z.right - f.ex; if (f.vx > 0) f.vx = -f.vx * 0.5 }
+    }
+    for (let i = 0; i < flyers.length; i++) {
+      const a = flyers[i]
+      if (a.state === 'home') continue
+      for (let j = i + 1; j < flyers.length; j++) {
+        const b = flyers[j]
+        if (b.state === 'home' || a.z !== b.z) continue
+        const dx = b.x - a.x, px = a.ex + b.ex - Math.abs(dx)
+        if (px <= 0) continue
+        const dy = b.y - a.y, py = a.ey + b.ey - Math.abs(dy)
+        if (py <= 0) continue
+        if (a.asleep && b.asleep) continue
+        // which one gives way: a held word or a sleeping one doesn't
+        const aFix = a.state === 'grab' || a.asleep, bFix = b.state === 'grab' || b.asleep
+        if ((a.state === 'grab' && b.asleep) || (b.state === 'grab' && a.asleep)) {
+          const o = a.asleep ? a : b
+          o.asleep = false; o.still = 0
+        }
+        const wa = aFix && !bFix ? 0 : bFix && !aFix ? 1 : 0.5
+        if (py < px) {
+          const sgn = dy > 0 ? 1 : -1 // +1: b is below a
+          a.y -= sgn * py * (1 - wa); b.y += sgn * py * wa
+          const top = sgn > 0 ? a : b, bot = sgn > 0 ? b : a
+          if (top.state !== 'grab') {
+            const rv = top.vy - bot.vy
+            if (rv > 0) { top.vy = bot.vy - (rv > 120 ? rv * 0.22 : 0); top.av *= 0.7 }
+            top.support = true
+            top.vx += (bot.vx - top.vx) * Math.min(1, h * 6)
+          }
+        } else {
+          const sgn = dx > 0 ? 1 : -1
+          a.x -= sgn * px * (1 - wa); b.x += sgn * px * wa
+          if (a.state !== 'grab' && b.state !== 'grab') {
+            const avg = (a.vx + b.vx) / 2
+            if (!a.asleep) a.vx = avg - sgn * 30
+            if (!b.asleep) b.vx = avg + sgn * 30
+          } else {
+            const g = a.state === 'grab' ? a : b, o = g === a ? b : a
+            o.vx = g.vx * 0.6 + sgn * (o === b ? 1 : -1) * 60
+          }
+        }
+      }
+    }
+  }
+
+  function render() {
+    for (const f of flyers) {
+      if (f.asleep && f.drawn) continue
+      f.el.style.transform = `translate3d(${(f.x - f.hw).toFixed(1)}px, ${(f.y - f.hh).toFixed(1)}px, 0) rotate(${f.a.toFixed(2)}deg)`
+      f.drawn = f.asleep
+    }
+  }
+
+  /* ---------- drifting home after a few quiet seconds ---------- */
+  let idleT = 0
+  function scheduleHome() { clearTimeout(idleT); idleT = setTimeout(goHome, IDLE_MS) }
+  function goHome(now = false) {
+    if (flyers.some((f) => f.state === 'grab')) return scheduleHome()
+    if (!visible) return snapAllHome() // nobody's watching: be back in place when they return
+    const t0 = performance.now()
+    const going = flyers.filter((f) => f.state !== 'home').sort((p, q) => p.w.i - q.w.i)
+    const gap = Math.min(now ? 20 : 45, 1100 / Math.max(1, going.length)) // the whole wave takes ≤ ~1 s
+    going.forEach((f, k) => {
+      f.state = 'home'; f.asleep = false; f.drawn = false
+      f.homeAt = t0 + k * gap
+      f.vx *= 0.3; f.vy = Math.min(f.vy, 0) * 0.3
+      f.a = ((f.a % 360) + 540) % 360 - 180 // the short way upright, not every turn it took
+    })
+    kick()
+  }
+  function snapAllHome() {
+    clearTimeout(idleT)
+    while (flyers.length) {
+      const f = flyers.pop()
+      f.el.remove(); f.z.flyers = 0; f.z.floorEl.classList.remove('on')
+      f.w.fly = null; f.w.lean.classList.remove('mg-away')
+    }
+  }
+
+  /* ---------- the pop: sparks, points, combo, the readout ---------- */
+  const COLORS = ['hsl(190 100% 75%)', 'hsl(290 100% 80%)', 'hsl(130 90% 60%)', 'hsl(180 100% 96%)']
+  function sparks(z, x, y) {
+    for (let k = 0; k < 10; k++) {
+      const s = document.createElement('i')
+      s.className = 'mg-spark'
+      const ang = (k / 10) * Math.PI * 2 + rand(-0.3, 0.3), r0 = rand(4, 10), r1 = rand(34, 74)
+      s.style.cssText = `--c:${COLORS[k % COLORS.length]};--t:${rand(380, 560).toFixed(0)}ms;--x0:${(x + Math.cos(ang) * r0).toFixed(1)}px;--y0:${(y + Math.sin(ang) * r0).toFixed(1)}px;--x1:${(x + Math.cos(ang) * r1).toFixed(1)}px;--y1:${(y + Math.sin(ang) * r1 * 0.75).toFixed(1)}px`
+      z.layer.appendChild(s)
+      setTimeout(() => s.remove(), 620)
+    }
+  }
+  function floatPoints(z, x, y, pts, combo) {
+    const p = document.createElement('span')
+    p.className = 'mg-pts'
+    p.innerHTML = `+${pts.toLocaleString()}${combo > 1 ? `<i>×${combo}</i>` : ''}`
+    p.style.cssText = `--x:${x.toFixed(1)}px;--y:${y.toFixed(1)}px`
+    z.layer.appendChild(p)
+    setTimeout(() => p.remove(), 900)
+  }
+
+  const scorePill = document.createElement('div')
+  scorePill.className = 'sk-found mg-score'
+  scorePill.setAttribute('aria-hidden', 'true')
+  root.appendChild(scorePill)
+  let score = 0, combo = 0, lastPop = 0
+  const knocked = new Set()
+  const drawScore = () => { scorePill.innerHTML = `<b class="pts">${score.toLocaleString()}</b><span>points</span><span class="sep">·</span><b>${knocked.size}</b><span>of ${TOTAL}</span>` }
+  drawScore() // filled from the start, so showing it never changes the section's size
+  function bumpScore() {
+    drawScore()
+    scorePill.classList.add('on')
+    scorePill.querySelector('.pts').classList.add('bump')
+  }
+  let sayT = 0
+  function hit(w, x, y, z) {
+    const now = performance.now()
+    combo = now - lastPop < COMBO_MS ? combo + 1 : 1
+    lastPop = now
+    const pts = 100 * combo
+    score += pts
+    knocked.add(w.name)
+    bumpScore()
+    if (z) floatPoints(z, x, y - 14, pts, combo)
+    clearTimeout(sayT)
+    sayT = setTimeout(() => say(`${w.name} knocked loose${combo > 1 ? `, combo times ${combo}` : ''}. ${score.toLocaleString()} points.`), 350)
+    return pts
+  }
+
+  function pop(w) {
+    if (reducedMotion()) return staticHit(w)
+    let f = w.fly
+    if (!f) {
+      f = createFlyer(w)
+      sparks(f.z, f.x, f.y)
+    } else if (f.state === 'grab') return
+    wakeZone(f.z)
+    launch(f)
+    hit(w, f.x, f.y, f.z)
+    scheduleHome()
+    kick()
+  }
+
+  /* reduced motion: the word lights up in place and its points sit beside it, nothing moves */
+  function staticHit(w) {
+    const r = w.lean.getBoundingClientRect(), sr = root.getBoundingClientRect()
+    hit(w, 0, 0, null)
+    w.lean.classList.add('mg-lit')
+    const tag = document.createElement('span')
+    tag.className = 'mg-static-pts'
+    tag.setAttribute('aria-hidden', 'true')
+    tag.textContent = `+${(100 * combo).toLocaleString()}${combo > 1 ? ` ×${combo}` : ''}`
+    tag.style.left = (r.left - sr.left + r.width / 2) + 'px'
+    tag.style.top = (r.top - sr.top - 2) + 'px'
+    root.appendChild(tag)
+    clearTimeout(w.lit)
+    w.lit = setTimeout(() => { w.lean.classList.remove('mg-lit'); tag.remove() }, 1200)
+  }
+
+  /* ---------- pointer gestures: a click pops, a drag grabs and throws ---------- */
+  let suppressClick = false
+  function startGesture(e, w, f) {
+    if (e.button !== 0 || reducedMotion()) return
+    const touch = e.pointerType !== 'mouse'
+    // grabbing a word's ghost while it's away pulls its flyer straight to the pointer
+    const fromGhost = !!f && e.currentTarget === w.el
+    const g = { id: e.pointerId, x0: e.clientX, y0: e.clientY, w, f, grabbing: false, offX: 0, offY: 0 }
+    const toLocal = (z, ev) => ({ x: ev.pageX - z.px, y: ev.pageY - z.py })
+    const move = (ev) => {
+      if (ev.pointerId !== g.id) return
+      const dx = ev.clientX - g.x0, dy = ev.clientY - g.y0
+      if (!g.grabbing) {
+        if (Math.hypot(dx, dy) < (touch ? 10 : 6)) return
+        if (touch && Math.abs(dy) > Math.abs(dx)) return end(ev) // a vertical swipe is a scroll
+        g.grabbing = true
+        document.body.classList.add('mg-grabbing')
+        getSelection().removeAllRanges()
+        if (!g.f) {
+          g.f = createFlyer(g.w)
+          sparks(g.f.z, g.f.x, g.f.y)
+          hit(g.w, g.f.x, g.f.y, g.f.z)
+        }
+        const p = toLocal(g.f.z, ev)
+        g.offX = fromGhost ? 0 : g.f.x - p.x; g.offY = fromGhost ? 0 : g.f.y - p.y
+        g.f.state = 'grab'; g.f.asleep = false; g.f.drawn = false
+        g.f.el.classList.add('grab', 'lift'); g.f.lifted = true
+        wakeZone(g.f.z)
+        clearTimeout(idleT)
+      }
+      ev.preventDefault()
+      const p = toLocal(g.f.z, ev)
+      g.f.gx = p.x + g.offX; g.f.gy = p.y + g.offY
+      const now = performance.now()
+      g.f.samples.push({ t: now, x: g.f.gx, y: g.f.gy })
+      while (g.f.samples.length > 2 && now - g.f.samples[0].t > 90) g.f.samples.shift()
+      const s0 = g.f.samples[0], s1 = g.f.samples[g.f.samples.length - 1]
+      if (s1.t > s0.t) g.f.vx = (s1.x - s0.x) / ((s1.t - s0.t) / 1000)
+      kick()
+    }
+    const end = (ev) => {
+      if (ev.pointerId !== g.id) return
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+      document.body.classList.remove('mg-grabbing')
+      if (g.grabbing) {
+        const f = g.f, s = f.samples, s0 = s[0], s1 = s[s.length - 1]
+        let vx = 0, vy = 0
+        if (s.length > 1 && s1.t > s0.t && performance.now() - s1.t < 80) {
+          const sec = (s1.t - s0.t) / 1000
+          vx = (s1.x - s0.x) / sec; vy = (s1.y - s0.y) / sec
+        }
+        const sp = Math.hypot(vx, vy), max = 2800
+        if (sp > max) { vx *= max / sp; vy *= max / sp }
+        f.state = 'free'; f.vx = vx; f.vy = vy; f.av = clamp(vx * 0.25, -500, 500)
+        f.samples = []
+        f.el.classList.remove('grab')
+        suppressClick = true
+        setTimeout(() => { suppressClick = false }, 0)
+        scheduleHome()
+        kick()
+      } else if (ev.type === 'pointerup' && g.f && !g.w.el.contains(ev.target)) {
+        pop(g.w) // a tap on a word in the pile kicks it back up
+      }
+    }
+    window.addEventListener('pointermove', move, { passive: false })
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
+  }
+
+  words.forEach((w) => {
+    w.el.addEventListener('pointerdown', (e) => startGesture(e, w, w.fly && w.fly.state !== 'home' ? w.fly : null))
+    w.el.addEventListener('click', (e) => { if (suppressClick) return e.preventDefault(); pop(w) })
+  })
+  function bindFlyer(f) {
+    f.el.addEventListener('pointerdown', (e) => {
+      if (f.state === 'home') { f.state = 'free'; f.el.classList.add('lift'); f.lifted = true }
+      startGesture(e, f.w, f)
+    })
+  }
+
+  /* Esc: everything goes home now */
+  root.addEventListener('keydown', (e) => { if (e.key === 'Escape' && flyers.length) goHome(true) })
+
+  /* ---------- reduced motion, resize ---------- */
+  onReducedMotion((on) => {
+    if (on) {
+      snapAllHome()
+      ptr.on = false
+      words.forEach((w) => { w.lean.style.transform = ''; w.lx = w.ly = w.lr = w.ls = 0 })
+      if (raf) { cancelAnimationFrame(raf); raf = 0 }
+    }
+  })
+  document.fonts.ready.then(layout)
+  layout()
+  // re-measure only when the section really reflows (a new width, or its height changes)
+  let rT = 0, rw = 0, rh = 0
+  new ResizeObserver(([entry]) => {
+    const { width, height } = entry.contentRect
+    if (Math.abs(width - rw) < 1 && Math.abs(height - rh) < 2) return
+    rw = width; rh = height
+    clearTimeout(rT)
+    rT = setTimeout(() => { if (!flyers.some((f) => f.state === 'grab')) layout() }, 150)
+  }).observe(root)
+
+  window.__mg = { words, flyers, pop: (name) => pop(words.find((w) => w.name === name)), goHome, layout, get score() { return score } }
+})()
+</script>
+</body>
+</html>

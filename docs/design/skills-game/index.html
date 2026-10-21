@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skills Rethink</title>
+<link rel="stylesheet" href="../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="skills.css">
+<style>
+  .dirs { margin-top: clamp(3rem, 7vw, 4.5rem); list-style: none; padding: 0; }
+  .dirs li + li { border-top: 1px solid transparent; border-image: linear-gradient(90deg, var(--hair-strong), transparent) 1; }
+  .dirs a { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; gap: 1.25rem; align-items: baseline; padding: 1.6rem 0; text-decoration: none; color: var(--ink); }
+  .dirs .k { font: 400 1.4rem/1 var(--font-display); color: var(--cyan); text-shadow: 0 0 14px hsl(190 100% 70% / .4); }
+  .dirs h2 { font: 400 1.45rem/1.2 var(--font-display); color: #fff; }
+  .dirs p { margin-top: .4rem; color: var(--ink-2); }
+  .dirs .go { color: var(--cyan); font-weight: 700; white-space: nowrap; }
+  .dirs a:hover h2, .dirs a:focus-visible h2 { text-shadow: 0 0 16px hsl(190 100% 70% / .5); }
+  .cols { margin-top: clamp(3.5rem, 8vw, 5rem); display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+  .cols .hud { padding: 1.75rem; }
+  .cols h3 { font: 700 .78rem/1 var(--font-text); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-3); }
+  .cols ul { margin: 1rem 0 0; padding-left: 1.1rem; display: grid; gap: .6rem; color: var(--ink-2); }
+  .cols li strong { color: var(--ink); }
+  @media (max-width: 520px) { .dirs a { grid-template-columns: 2.2rem minmax(0, 1fr); } .dirs .go { display: none; } }
+</style>
+</head>
+<body>
+<section class="section" aria-labelledby="t">
+  <p class="eyebrow cyan">Skills rethink · Round 1</p>
+  <h1 class="title neon-purple" id="t">Your skills, as a game</h1>
+  <p class="lede">The old section is gone. Both ideas share one new section: AI first in a glass panel, the rest as quiet lines, in the Experience section's look. Press Play and it becomes a game made of your skills. Same list in both (<code>skills.js</code>), built from your resume and both handoffs.</p>
+
+  <ul class="dirs">
+    <li><a href="a-breaker.html"><span class="k">A</span><span><h2>Skill Breaker</h2><p>A brick breaker where the skills are the bricks. Press Play and the AI words fly out of the list into level 1. Levels are your skill groups, AI first. AI bricks take two hits and drop their own power-ups: Claude Code splits the ball into three subagents, MCP servers widen the paddle, prompt caching doubles points, extended thinking slows time, and human-in-the-loop lays a net that saves one miss. Mouse, touch drag or arrow keys.</p></span><span class="go">Play →</span></a></li>
+    <li><a href="b-type-invaders.html"><span class="k">B</span><span><h2>Type Invaders</h2><p>Space Invaders where you shoot by typing. Your skills march down in waves, AI first; type a skill's name to lock on and blast it, letter by letter. The one game where playing means reading every skill. On a phone, tap a skill to zap it.</p></span><span class="go">Play →</span></a></li>
+  </ul>
+
+  <div class="cols">
+    <div class="hud">
+      <h3>New in the list</h3>
+      <ul>
+        <li><strong>AI first:</strong> 16 skills, each with a few words from your handoffs (Claude Code with skills and subagents, MCP servers with scoped keys, human-in-the-loop, agent evals, PHI guardrails, LLM-as-judge…)</li>
+        <li><strong>Your resume's groups:</strong> Frontend & mobile, Backend & data, Cloud & DevOps, plus Quality & security, Product, Music & more</li>
+        <li><strong>Product</strong> (the PM side): stakeholder discovery, UX & product design, roadmapping, legal & compliance review, release comms</li>
+        <li>Vendor SaaS named generically (SSO / OIDC, feature flags), per the public-repo rule</li>
+      </ul>
+    </div>
+    <div class="hud">
+      <h3>Folded in or dropped</h3>
+      <ul>
+        <li><strong>Folded in:</strong> AI-Assisted Workflows, Spec-Driven Development, Prompt Engineering (→ the AI group); CI/CD (→ GitHub Actions); SQL/NoSQL (→ Postgres, MySQL, MongoDB, Redis); Microservices (→ event-driven); Vitest/Jest (→ both, plus Playwright, Testing Library, TDD)</li>
+        <li><strong>Dropped as too generic:</strong> Software Engineering, SDLC, SOA, Data Structures, Cloud Computing, Agile, Responsive Design, Full-Stack, Testing, Git, Postman, Cursor</li>
+        <li><strong>Dropped, maybe want back:</strong> Leadership, Systems Architecture, Game Development, Piano, Cooking, Fitness/Nutrition</li>
+      </ul>
+    </div>
+    <div class="hud">
+      <h3>For you</h3>
+      <ul>
+        <li>A, B, or a mix (for example: Type Invaders on desktop, Skill Breaker on phones)?</li>
+        <li>Headline: “AI first. Full stack.” OK?</li>
+        <li>Anything to add, cut or rename in the list?</li>
+        <li>Both games are opt-in: the list is what recruiters and screen readers get, and nothing moves until you press Play.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</body>
+</html>

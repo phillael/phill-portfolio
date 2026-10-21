@@ -49,26 +49,46 @@ const MusicPlayer = () => {
     setTrack,
     setVolume,
     toggleMute,
-    getSourceNode
+    getSourceNode,
+    getAudioContext,
+    pause
   } = useAudioPlayer(tracks)
 
-  // One player for the whole site: the 3D resume dances to it, P toggles it and the
+  // One player for the whole site: the 3D resume dances to it, P toggles it, the
   // Experience section's Listen opens it (the panel then moves focus in, as on a FAB click)
+  // and the Skill blaster plays through its AudioContext, pausing the song while it runs
   const playingRef = useRef(isPlaying)
   const toggleRef = useRef(toggle)
+  const playRef = useRef(play)
+  const pauseRef = useRef(pause)
+  const listenersRef = useRef(new Set<(playing: boolean) => void>())
   useEffect(() => {
-    playingRef.current = isPlaying
     toggleRef.current = toggle
-  }, [isPlaying, toggle])
+    playRef.current = play
+    pauseRef.current = pause
+  }, [toggle, play, pause])
   useEffect(() => {
+    if (playingRef.current === isPlaying) return
+    playingRef.current = isPlaying
+    for (const cb of [...listenersRef.current]) cb(isPlaying)
+  }, [isPlaying])
+  useEffect(() => {
+    const listeners = listenersRef.current
     registerSiteMusic({
       getSource: () => getSourceNode(),
       isPlaying: () => playingRef.current,
       toggle: () => toggleRef.current(),
       open: () => setIsExpanded(true),
+      context: () => getAudioContext(),
+      pause: () => pauseRef.current(),
+      play: () => playRef.current(),
+      onChange: (cb) => {
+        listeners.add(cb)
+        return () => listeners.delete(cb)
+      },
     })
     return () => registerSiteMusic(null)
-  }, [getSourceNode])
+  }, [getSourceNode, getAudioContext])
 
   // Toggle panel expansion
   const handleToggleExpand = useCallback(() => {

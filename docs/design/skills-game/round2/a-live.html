@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Skills</title>
+<link rel="stylesheet" href="../../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="../skills.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  /* ===== A · Live skills: every skill does what it says, right where it sits ===== */
+  .lv-layer { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+  .g { color: var(--green); } .r { color: hsl(355 100% 72%); } .a { color: var(--amber); } .m { color: var(--magenta); } .c { color: var(--cyan); } .dim { color: var(--ink-3); }
+
+  /* a small label that floats over a word */
+  .lv-tag {
+    position: absolute; left: 0; top: 0; padding: .35rem .65rem; border-radius: 9px; white-space: nowrap;
+    font: 700 .8rem/1.25 var(--font-text); letter-spacing: .01em; color: #fff;
+    background: hsl(220 30% 6% / .9); border: 1px solid var(--hair-strong);
+    box-shadow: 0 10px 26px -12px hsl(190 100% 50% / .55);
+    opacity: 0; transform: translateY(5px); transition: opacity .25s var(--ease), transform .25s var(--ease);
+  }
+  .lv-tag.on { opacity: 1; transform: none; }
+  .lv-tag.ok { border-color: hsl(130 90% 55% / .55); }
+  .lv-tag.warn { border-color: hsl(355 100% 70% / .55); }
+  .lv-tag.mag { border-color: hsl(290 100% 80% / .55); }
+
+  /* the one popover a demo can open, under its skill */
+  .lv-pop {
+    position: absolute; z-index: 18; left: 0; top: 0; padding: 1rem 1.1rem 1.05rem; border-radius: 16px;
+    background: linear-gradient(180deg, hsl(290 100% 80% / .07), transparent 45%), hsl(220 32% 6% / .94);
+    border: 1px solid hsl(290 100% 80% / .38);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 26px 60px -24px hsl(290 100% 50% / .45), inset 0 1px 0 hsl(300 100% 92% / .08);
+    opacity: 0; transform: translateY(6px) scale(.985); transform-origin: top left;
+    transition: opacity .22s var(--ease), transform .22s var(--ease);
+  }
+  .lv-pop.on { opacity: 1; transform: none; }
+  .lv-pop .lv-k { font: 700 .72rem/1.2 var(--font-text); letter-spacing: .18em; text-transform: uppercase; color: var(--magenta); }
+  .lv-pop .lv-k + * { margin-top: .6rem; }
+  .lv-pop p { font-size: .94rem; line-height: 1.45; color: var(--ink-2); }
+  .lv-pop p + p { margin-top: .45rem; }
+  .lv-pop .lv-foot { margin-top: .7rem; font-size: .84rem; color: var(--ink-3); }
+  .lv-pop .lv-say { color: #fff; }
+  .lv-term .ln { min-height: 1.45em; font-size: .9rem; line-height: 1.45; color: var(--ink-2); font-feature-settings: 'tnum' 1; }
+  .lv-term .ln.cmd { color: #fff; font-weight: 700; }
+  .lv-term .ln.ok { color: var(--green); font-weight: 700; }
+  .lv-code { font-size: .88rem; line-height: 1.5; white-space: pre; color: var(--ink-3); }
+  .lv-code .k { color: var(--magenta); } .lv-code .s { color: hsl(150 80% 72%); }
+  .lv-rows { display: grid; gap: .4rem; }
+  .lv-row { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; font-size: .92rem; color: var(--ink-2); }
+  .lv-row b { white-space: nowrap; font-size: .8rem; letter-spacing: .04em; }
+  .lv-stamp { display: inline-block; padding: .15rem .5rem; border-radius: 6px; font: 800 .72rem/1.3 var(--font-text); letter-spacing: .08em; border: 1px solid currentColor; }
+  .lv-bubble { max-width: 88%; padding: .5rem .75rem; border-radius: 14px; font-size: .92rem; line-height: 1.4; }
+  .lv-bubble.me { margin-left: auto; color: hsl(222 45% 7%); background: hsl(186 100% 80%); border-bottom-right-radius: 4px; }
+  .lv-bubble.ai { margin-top: .5rem; color: #fff; background: hsl(290 100% 80% / .12); border: 1px solid hsl(290 100% 80% / .3); border-bottom-left-radius: 4px; min-height: 2.4em; }
+  .lv-actions { margin-top: .9rem; display: flex; gap: .6rem; }
+  .lv-btn { min-height: 44px; padding: 0 1.1rem; border-radius: 10px; cursor: pointer; font: 700 .95rem/1 var(--font-text); color: var(--ink); background: hsl(190 100% 75% / .06); border: 1px solid var(--hair-strong); }
+  .lv-btn:hover { border-color: var(--cyan); }
+  .lv-btn.primary { color: hsl(222 45% 7%); background: linear-gradient(180deg, hsl(186 100% 80%), hsl(190 100% 62%)); border-color: hsl(186 100% 86%); }
+  .lv-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  .lv-pill { display: inline-block; padding: .1rem .55rem; border-radius: 999px; font: 800 .72rem/1.4 var(--font-text); letter-spacing: .06em; color: hsl(222 45% 7%); background: var(--green); transition: background .3s var(--ease); }
+  .lv-pill.merged { background: var(--magenta); }
+  .lv-pr-title { margin-top: .5rem; color: #fff; font-weight: 700; }
+  .lv-spin { display: inline-block; width: .8em; height: .8em; margin-right: .35em; vertical-align: -.05em; border-radius: 50%; border: 2px solid hsl(190 100% 75% / .3); border-top-color: var(--cyan); animation: lv-rot .8s linear infinite; }
+  @keyframes lv-rot { to { transform: rotate(360deg); } }
+  .lv-think { background: linear-gradient(90deg, var(--magenta) 0%, #fff 50%, var(--magenta) 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent !important; animation: lv-shimmer 1.4s linear infinite; }
+  @keyframes lv-shimmer { to { background-position: -200% 0; } }
+  .lv-thought { font-style: italic; color: var(--ink-3) !important; }
+
+  /* demo states on the list itself */
+  .sk-note.lv-live { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sk-ai-item.lv-hot { border-left-color: var(--magenta); }
+  .sk-ai-item.lv-hot .sk-name { text-shadow: 0 0 14px hsl(290 100% 72% / .9); }
+  .sk-ai-item.lv-wave .sk-name { color: hsl(300 100% 92%); text-shadow: 0 0 16px hsl(290 100% 72%); }
+  .sk-w.lv-hot { color: #fff; opacity: 1; text-shadow: 0 0 14px hsl(190 100% 70% / .9); }
+  .sk-w.lv-ring { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  .sk-w.lv-3d { color: #fff; text-shadow: 1px 1px 0 hsl(190 100% 55%), 2px 2px 0 hsl(195 100% 42%), 3px 3px 0 hsl(200 100% 32%), 4px 4px 8px hsl(200 100% 10% / .8); animation: lv-turn 1.5s var(--ease) 2; }
+  @keyframes lv-turn { from { transform: perspective(260px) rotateY(0); } to { transform: perspective(260px) rotateY(360deg); } }
+  .sk-w.lv-plasma { background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--green), var(--amber), var(--cyan)); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; animation: lv-plasma 1.6s linear infinite; }
+  @keyframes lv-plasma { to { background-position: -300% 0; } }
+  .sk-w.lv-fail { color: hsl(355 100% 72%); text-shadow: 0 0 12px hsl(355 100% 60% / .7); }
+  .sk-w.lv-pass { color: var(--green); text-shadow: 0 0 12px hsl(130 90% 50% / .7); }
+  .sk-w.lv-pluck { animation: lv-string .09s linear 9; }
+  @keyframes lv-string { 50% { transform: translateY(1.5px); } }
+  .sk-w.lv-bob { animation: lv-bob 1.2s ease-in-out 2; }
+  @keyframes lv-bob { 50% { transform: translateY(-6px); } }
+  .sk-w.lv-slide { transition: transform .55s var(--ease); }
+
+  /* layer pieces */
+  .lv-box { position: absolute; left: 0; top: 0; border-radius: 8px; }
+  .lv-flash { border: 2px solid hsl(175 100% 60%); box-shadow: 0 0 14px hsl(175 100% 60% / .6); animation: lv-fade 1s var(--ease) forwards; }
+  @keyframes lv-fade { to { opacity: 0; } }
+  .lv-container { border: 1.5px solid hsl(200 100% 65%); background: hsl(200 100% 60% / .07); box-shadow: 0 0 18px -4px hsl(200 100% 60% / .7); animation: lv-in .35s var(--ease); }
+  @keyframes lv-in { from { opacity: 0; transform: scale(1.15); } }
+  .lv-bm-m, .lv-bm-p, .lv-bm-c { mix-blend-mode: screen; }
+  .lv-bm-m { background: hsl(30 100% 55% / .30); border: 1px dashed hsl(30 100% 65% / .8); border-radius: 4px; }
+  .lv-bm-p { background: hsl(130 80% 42% / .40); border-radius: 3px; }
+  .lv-bm-c { background: hsl(210 100% 55% / .50); border-radius: 2px; }
+  .lv-frame { border: 1.5px solid hsl(210 100% 65%); border-radius: 2px; }
+  .lv-frame i { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 1.5px solid hsl(210 100% 60%); }
+  .lv-frame .lbl { position: absolute; left: -1px; top: -1.45rem; font: 700 .7rem/1 var(--font-text); color: hsl(210 100% 75%); white-space: nowrap; }
+  .lv-snap { background: #fff; animation: lv-fade .45s ease-out forwards; }
+  .lv-dot { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); transition: transform .6s var(--ease), opacity .3s; }
+  .lv-cursor { position: absolute; left: 0; top: 0; transition: transform .55s var(--ease); }
+  .lv-cursor svg { width: 18px; height: 18px; filter: drop-shadow(0 0 6px currentColor); }
+  .lv-cursor span { position: absolute; left: 14px; top: 16px; padding: .15rem .45rem; border-radius: 6px; font: 800 .7rem/1.2 var(--font-text); color: hsl(222 45% 7%); background: currentColor; white-space: nowrap; }
+  .lv-cursor span b { color: hsl(222 45% 7%); }
+  .lv-bar { height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--cyan), #fff); box-shadow: 0 0 10px var(--cyan); transform-origin: left; transform: scaleX(0); transition: transform .9s var(--ease); }
+  .lv-note { position: absolute; font: 700 1.15rem/1 var(--font-text); color: hsl(300 100% 88%); text-shadow: 0 0 10px hsl(290 100% 70%); animation: lv-rise 1.4s var(--ease) forwards; }
+  @keyframes lv-rise { from { opacity: 0; transform: translateY(6px); } 25% { opacity: 1; } to { opacity: 0; transform: translateY(-36px) rotate(-14deg); } }
+  .lv-ping { border: 1.5px solid var(--cyan); border-radius: 999px; animation: lv-ping .7s var(--ease) forwards; }
+  @keyframes lv-ping { from { opacity: .9; transform: scale(.9); } to { opacity: 0; transform: scale(1.35); } }
+
+  /* one sweep of light across the AI panel the first time it shows up: the only hint */
+  .lv-shine { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+  .lv-shine::before { content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(90deg, transparent, hsl(290 100% 85% / .10), hsl(0 0% 100% / .14), hsl(190 100% 80% / .10), transparent); opacity: 0; }
+  .lv-shine.go::before { animation: lv-sweep 1.8s var(--ease) forwards; }
+  @keyframes lv-sweep { 0% { opacity: 0; } 15%, 80% { opacity: 1; } 100% { left: 120%; opacity: 0; } }
+
+  .rm .lv-tag, .rm .lv-pop { transition: none; }
+</style>
+</head>
+<body>
+<p class="mock-note">Round 2 · A · Live skills. It reads like the list you approved. Click a skill, then another.</p>
+
+<section class="section" id="skills" aria-labelledby="skills-h"></section>
+
+<script src="../skills.js"></script>
+<script src="base.js"></script>
+<script src="live.js"></script>
+</body>
+</html>

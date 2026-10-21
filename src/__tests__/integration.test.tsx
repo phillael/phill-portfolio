@@ -9,9 +9,10 @@
  * - Navigation to sections works
  */
 
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import HomePage from '@/app/page'
 import Nav from '@/components/Nav'
+import { SKILLS } from '@/data/skills'
 
 // Helper to filter out framer-motion props
 const filterMotionProps = (props: Record<string, unknown>) => {
@@ -296,12 +297,13 @@ describe('Integration Tests', () => {
       expect(timelycareMentions.length).toBeGreaterThanOrEqual(1)
     })
 
-    it('Skills section displays all skill categories', () => {
+    it('Skills section displays every skill group', () => {
       render(<HomePage />)
 
-      expect(screen.getByText('Technical Skills')).toBeInTheDocument()
-      expect(screen.getByText('Professional Skills')).toBeInTheDocument()
-      expect(screen.getByText('Other Skills')).toBeInTheDocument()
+      const skills = within(document.getElementById('skills')!)
+      for (const group of SKILLS.groups) {
+        expect(skills.getByRole('heading', { level: 3, name: group.name })).toBeInTheDocument()
+      }
     })
 
     it('Projects section displays all three projects', () => {

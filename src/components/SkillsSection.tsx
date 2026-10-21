@@ -1,168 +1,79 @@
-'use client'
-
-import { useState, useCallback, useRef, useEffect } from 'react'
-import AnimatedSection from '@/components/AnimatedSection'
-import SkillCategory from '@/components/SkillCategory'
-import GlitchText from '@/components/GlitchText'
-import { ScoreCounter, calculatePoints } from '@/components/SkillScore'
-import skillsData from '@/data/skills.json'
-import { SkillCategory as SkillCategoryType } from '@/types/content'
-import { motion, AnimatePresence } from 'framer-motion'
-
-interface PointPopup {
-  id: number
-  points: number
-  x: number
-  y: number
-}
+import { SKILLS } from '@/data/skills'
+import LineEnds from '@/components/skills/LineEnds'
+import SkillsPlay from '@/components/skills/SkillsPlay'
+import css from '@/components/skills/Skills.module.css'
 
 /**
- * SkillsSection - Skills showcase section with grouped chips and scoring
- *
- * Features:
- * - Section ID for navigation anchor (#skills)
- * - Proper accessibility attributes (role, aria-label)
- * - Section heading with neon-text-purple effect
- * - Data imported from /src/data/skills.json
- * - SkillCategory for each category (Technical, Professional, Other)
- * - AnimatedSection wrapper with slide-from-left variant for heading
- * - GlitchText effect on heading for hover interaction
- * - Responsive chip layout with flex-wrap
- * - overflow-x-hidden to prevent particle effects from causing horizontal scroll
- * - Skill Slayer scoring system with combo multipliers
+ * SkillsSection - the skills as the Skill blaster mockup lays them out at rest
+ * (docs/design/skills-game/round6/blaster-synth.html; plan docs/plans/2026-10-20-skills-blaster-plan.md),
+ * from src/data/skills.ts: the header, the AI skills in a glass panel with a note each, then the other
+ * groups as quiet lines of words. Every skill is a button that looks like text, so the list stays the
+ * content (readable, focusable, searchable); a click is what reveals the game (SkillsPlay: the magnet lean,
+ * and the Skill blaster, imported on the first click). JS hooks: data-skill and
+ * data-group on each skill, data-sk-group on each group's box (data-sk-groups around the non-AI ones), data-name on
+ * an AI skill's name.
  */
 const SkillsSection = () => {
-  const skills = skillsData as SkillCategoryType[]
-  const [score, setScore] = useState(0)
-  const [combo, setCombo] = useState(0)
-  const [isScoreVisible, setIsScoreVisible] = useState(false)
-  const [pointPopups, setPointPopups] = useState<PointPopup[]>([])
-  const comboTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const scoreHideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const popupIdRef = useRef(0)
-
-  // Clean up timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (comboTimeoutRef.current) {
-        clearTimeout(comboTimeoutRef.current)
-      }
-      if (scoreHideTimeoutRef.current) {
-        clearTimeout(scoreHideTimeoutRef.current)
-      }
-    }
-  }, [])
-
-  const handleSkillDestroyed = useCallback((skill: string, element?: HTMLElement) => {
-    // Calculate base points
-    const basePoints = calculatePoints(skill)
-
-    // Increase combo
-    const newCombo = combo + 1
-    setCombo(newCombo)
-
-    // Apply combo multiplier (1x, 1.5x, 2x, 2.5x, etc.)
-    const comboMultiplier = 1 + (newCombo - 1) * 0.5
-    const totalPoints = Math.round(basePoints * comboMultiplier)
-
-    // Add points to score
-    setScore(prev => prev + totalPoints)
-
-    // Show the score counter
-    setIsScoreVisible(true)
-
-    // Create floating point popup
-    const popupId = popupIdRef.current++
-    let x = window.innerWidth / 2
-    let y = window.innerHeight / 2
-
-    if (element) {
-      const rect = element.getBoundingClientRect()
-      x = rect.left + rect.width / 2
-      y = rect.top
-    }
-
-    setPointPopups(prev => [...prev, { id: popupId, points: totalPoints, x, y }])
-
-    // Remove popup after animation
-    setTimeout(() => {
-      setPointPopups(prev => prev.filter(p => p.id !== popupId))
-    }, 1000)
-
-    // Reset combo after 2 seconds of inactivity
-    if (comboTimeoutRef.current) {
-      clearTimeout(comboTimeoutRef.current)
-    }
-    comboTimeoutRef.current = setTimeout(() => {
-      setCombo(0)
-    }, 2000)
-
-    // Hide score counter after 10 seconds of inactivity
-    if (scoreHideTimeoutRef.current) {
-      clearTimeout(scoreHideTimeoutRef.current)
-    }
-    scoreHideTimeoutRef.current = setTimeout(() => {
-      setIsScoreVisible(false)
-    }, 10000)
-  }, [combo])
+  const [ai, ...rest] = SKILLS.groups
 
   return (
-    <section
-      id="skills"
-      aria-labelledby="skills-heading"
-      role="region"
-      className="min-h-screen py-20 md:py-32 px-4 md:px-6 overflow-x-hidden"
-    >
-      {/* Score Counter - Fixed position, auto-hides after 5 seconds */}
-      <ScoreCounter score={score} combo={combo} isVisible={isScoreVisible} />
+    <section id="skills" aria-labelledby="skills-h" className={css.section}>
+      <header className={css.head}>
+        <h2 id="skills-h" className={css.eyebrow}>
+          Skills
+        </h2>
+        <p className={`${css.title} neon-text-purple`}>{SKILLS.headline}</p>
+        <p className={css.lede}>{SKILLS.lede}</p>
+      </header>
 
-      {/* Floating Point Popups */}
-      <div className="fixed inset-0 pointer-events-none z-50">
-        <AnimatePresence>
-          {pointPopups.map((popup) => (
-            <motion.div
-              key={popup.id}
-              className="absolute pointer-events-none font-heading text-2xl md:text-3xl font-bold"
-              style={{
-                left: popup.x,
-                top: popup.y,
-                textShadow: '0 0 10px hsl(130, 100%, 50%), 0 0 20px hsl(130, 100%, 50%), 0 0 30px hsl(130, 100%, 50%)',
-                color: 'hsl(130, 100%, 60%)',
-              }}
-              initial={{ opacity: 1, y: 0, x: '-50%', scale: 0.5 }}
-              animate={{ opacity: 0, y: -100, x: '-50%', scale: 1.5 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-            >
-              +{popup.points.toLocaleString()}
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+      <div className={css.list} data-sk-list="">
+        <div className={css.ai} data-sk-group={ai.id}>
+          <div className={css.aiHead}>
+            <h3 id={`skg-${ai.id}`} className={css.h}>
+              {ai.name}
+            </h3>
+            <p className={css.cap}>{ai.caption}</p>
+          </div>
+          <ul className={css.aiGrid} aria-labelledby={`skg-${ai.id}`}>
+            {ai.skills.map((s) => (
+              <li key={s.name}>
+                <button type="button" className={css.aiItem} data-skill={s.name} data-group={ai.id}>
+                  <span className={css.name} data-name="">
+                    {s.name}
+                  </span>{' '}
+                  <span className={css.note}>{s.note}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-      <div className="max-w-4xl mx-auto">
-        {/* Section Heading - slide-from-left animation variant with glitch effect */}
-        <AnimatedSection variant="slide-from-left">
-          <h2 id="skills-heading" className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
-            <GlitchText as="span" className="neon-text-purple">
-              Skills
-            </GlitchText>
-          </h2>
-        </AnimatedSection>
-
-        {/* Skill Categories */}
-        <div className="space-y-6 md:space-y-8">
-          {skills.map((category, index) => (
-            <SkillCategory
-              key={category.category}
-              category={category.category}
-              skills={category.skills}
-              delay={0.1 * (index + 1)}
-              onSkillDestroyed={handleSkillDestroyed}
-            />
+        <div className={css.groups} data-sk-groups="">
+          {rest.map((g) => (
+            <div key={g.id} className={g.id === 'music' ? `${css.group} ${css.music}` : css.group} data-sk-group={g.id}>
+              <h3 id={`skg-${g.id}`} className={css.h}>
+                {g.name}
+              </h3>
+              <ul className={css.words} data-words="" aria-labelledby={`skg-${g.id}`}>
+                {g.skills.map((s) => (
+                  <li key={s.name}>
+                    <button type="button" className={css.w} data-skill={s.name} data-group={g.id}>
+                      {s.name}
+                    </button>
+                    <span className={css.dot} aria-hidden="true">
+                      ·
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
         </div>
       </div>
+
+      <p className={css.live} aria-live="polite" data-sk-live="" />
+      <LineEnds />
+      <SkillsPlay />
     </section>
   )
 }

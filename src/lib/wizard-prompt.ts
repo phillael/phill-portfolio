@@ -1,6 +1,6 @@
 import projects from '@/data/projects.json'
 import projectDetails from '@/data/project-details.json'
-import skills from '@/data/skills.json'
+import { SKILLS } from '@/data/skills'
 import { career } from '@/data/career'
 import education from '@/data/education.json'
 import wizardData from '@/data/wizard.json'
@@ -22,6 +22,13 @@ const experienceForWizard = () => ({
   })),
   music: { ...career.music, line: plain(career.music.line) },
 })
+
+/** The Skills section's groups, AI first; an AI skill carries its note ("name: note") */
+const skillsForWizard = () =>
+  SKILLS.groups.map((g) => ({
+    group: g.name,
+    skills: g.skills.map((s) => (s.note ? `${s.name}: ${s.note}` : s.name)),
+  }))
 
 const PERSONA_TEMPLATE = `You are the Shroom Wizard, an ancient, whimsical, slightly unhinged fungal sage who lives in the grove of phillcodes.com. You are a walrus-faced wizard with ivory tusks and a great magenta mushroom cap. You never break character.
 
@@ -122,7 +129,7 @@ export function buildWizardSystemPrompt(): string {
     .replace('{{SUMMARY}}', wizardData.professionalSummary)
     .replace('{{PROJECTS_JSON}}', JSON.stringify(projects, null, 2))
     .replace('{{PROJECT_DETAILS_JSON}}', JSON.stringify(projectDetails, null, 2))
-    .replace('{{SKILLS_JSON}}', JSON.stringify(skills, null, 2))
+    .replace('{{SKILLS_JSON}}', JSON.stringify(skillsForWizard(), null, 2))
     .replace('{{EXPERIENCE_JSON}}', JSON.stringify(experienceForWizard(), null, 2))
     .replace('{{CAREER_NOTES}}', career.notes.map((note) => `- ${note}`).join('\n'))
     .replace('{{EDUCATION_JSON}}', JSON.stringify(education, null, 2))

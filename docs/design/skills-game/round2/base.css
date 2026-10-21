@@ -1,0 +1,56 @@
+/*
+ * Skills rethink, round 2: the section every idea shares. Loads after
+ * ../../experience-refresh/round2/hud.css and ../skills.css (round 1's look, which Phill
+ * loved: the AI glass panel and the quiet group lines). No Play button, no game window:
+ * every skill is a plain-looking button, and a click is what reveals it does something.
+ */
+
+/* the AI panel: each skill is one button (name + note), styled as text */
+.sk-ai-grid li { padding-left: 0; border-left: 0; }
+.sk-ai-item {
+  position: relative; display: grid; gap: .1rem; width: 100%; min-height: 44px; margin: 0; padding: .15rem 0 .15rem .9rem;
+  text-align: left; cursor: pointer; background: none; border: 0; border-left: 1px solid hsl(290 100% 80% / .35); border-radius: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color .3s var(--ease);
+}
+.sk-ai-item:hover { border-left-color: hsl(290 100% 85% / .9); }
+.sk-ai-item:hover .sk-name { text-shadow: 0 0 12px hsl(290 100% 75% / .7); }
+.sk-ai-item:focus-visible { outline: 2px solid var(--magenta); outline-offset: 4px; border-radius: 6px; }
+.sk-name, .sk-note { display: block; }
+.sk-name { transition: text-shadow .3s var(--ease); }
+
+/* the other groups: one quiet line of words; dots never end a line (base.js marks .eol) */
+.sk-words { list-style: none; margin: .6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; }
+.sk-words li { display: inline-flex; align-items: center; }
+.sk-words .dot { width: 1.05em; text-align: center; color: var(--ink-3); flex: none; user-select: none; }
+.sk-words li:last-child .dot, .sk-words li.eol .dot { visibility: hidden; }
+.sk-w {
+  position: relative; display: inline-flex; align-items: center; min-height: 34px; margin: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 1.0625rem; color: var(--cyan); opacity: .92; white-space: nowrap; background: none; border: 0; border-radius: 6px;
+  -webkit-tap-highlight-color: transparent;
+  transition: text-shadow .3s var(--ease), color .3s var(--ease), opacity .3s var(--ease);
+}
+.sk-w:hover { opacity: 1; color: hsl(186 100% 88%); text-shadow: 0 0 12px hsl(190 100% 70% / .75); }
+.sk-w:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.sk-group.music .sk-w { color: hsl(295 80% 88%); }
+.sk-group.music .sk-w:hover { color: #fff; text-shadow: 0 0 12px hsl(290 100% 75% / .75); }
+@media (pointer: coarse) { .sk-w { min-height: 44px; } } /* 44px touch targets */
+
+/* the quiet "found" readout: shows up after the first discovery, rides the bottom of the screen
+   while the section is on it */
+.sk-found {
+  position: sticky; z-index: 20; bottom: 16px; width: max-content; max-width: calc(100% - 32px); margin: 2.5rem 0 0 auto;
+  display: flex; align-items: center; gap: .6rem; padding: .55rem .95rem; border-radius: 999px;
+  font: 700 .8rem/1.2 var(--font-text); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2);
+  background: hsl(220 30% 5% / .78); border: 1px solid var(--hair-strong);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px -12px hsl(190 100% 50% / .35);
+  opacity: 0; transform: translateY(8px); transition: opacity .4s var(--ease), transform .4s var(--ease); pointer-events: none;
+}
+.sk-found.on { opacity: 1; transform: none; pointer-events: auto; }
+.sk-found b { color: #fff; letter-spacing: .04em; font-feature-settings: 'tnum' 1; }
+.sk-found .bump { animation: found-bump .5s var(--ease); }
+@keyframes found-bump { 40% { transform: scale(1.35); color: var(--green); text-shadow: 0 0 10px var(--green); } }
+
+.sk-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#skills { position: relative; overflow-anchor: none; }

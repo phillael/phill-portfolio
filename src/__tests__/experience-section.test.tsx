@@ -105,7 +105,7 @@ describe('ExperienceSection', () => {
 
   it("Listen opens the site's music player", async () => {
     const open = jest.fn()
-    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle: () => {}, open })
+    registerSiteMusic({ getSource: () => null, isPlaying: () => false, toggle: () => {}, open, context: () => null, pause: () => {}, play: () => {}, onChange: () => () => {} })
     render(<ExperienceSection />)
     const listen = screen.getByRole('button', { name: 'Listen: open the music player' })
     expect(listen).toHaveTextContent('Listen')

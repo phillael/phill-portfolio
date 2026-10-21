@@ -114,9 +114,9 @@ beforeAll(() => {
       getByteFrequencyData: jest.fn(),
       connect: jest.fn()
     }),
-    createMediaElementSource: () => ({
+    createMediaElementSource: jest.fn(() => ({
       connect: jest.fn()
-    }),
+    })),
     resume: jest.fn().mockResolvedValue(undefined),
     close: jest.fn()
   }))
@@ -371,6 +371,29 @@ describe('Audio Engine - useAudioPlayer Hook', () => {
         treble: 0,
         intensity: 0
       })
+    })
+  })
+
+  describe('The shared audio context', () => {
+    it('getAudioContext() makes the one context and source on first call, and play() reuses them', async () => {
+      const { result } = renderHook(() => useAudioPlayer(mockTracks))
+      const AC = global.AudioContext as unknown as jest.Mock
+
+      let ctx: AudioContext | null = null
+      act(() => {
+        ctx = result.current.getAudioContext()
+      })
+      expect(ctx).not.toBeNull()
+      expect(AC).toHaveBeenCalledTimes(1)
+      expect(result.current.getAudioContext()).toBe(ctx) // the same context, every call
+
+      await act(async () => {
+        await result.current.play()
+      })
+      expect(AC).toHaveBeenCalledTimes(1) // play didn't make a second one
+      const made = AC.mock.results[0].value as { createMediaElementSource: jest.Mock }
+      expect(made.createMediaElementSource).toHaveBeenCalledTimes(1)
+      expect(result.current.getSourceNode()).not.toBeNull()
     })
   })
 })

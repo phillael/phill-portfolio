@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Blaster Band</title>
+<link rel="stylesheet" href="../../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="../skills.css">
+<link rel="stylesheet" href="../round2/base.css">
+<style>
+  /* ===== Round 5 · Skill blaster, with a band: the first shot starts a beat, hits play the parts ===== */
+  .sk-ai-item .sk-name { display: block; width: max-content; max-width: 100%; }
+  #skills .sk-w, #skills .sk-ai-item { touch-action: manipulation; } /* fast taps never zoom */
+
+  /* while the game runs: a round reticle, and rapid clicks never select text */
+  #skills.bl-on, #skills.bl-on .sk-w, #skills.bl-on .sk-ai-item { cursor: var(--reticle, crosshair); }
+  #skills.bl-on { user-select: none; -webkit-user-select: none; }
+
+  /* a lit skill: a mole (cyan; magenta in the AI panel), a bonus (amber), an enemy (red) */
+  .bl-lit, .bl-lit:hover { color: #fff !important; opacity: 1 !important; text-shadow: 0 0 6px hsl(var(--c)), 0 0 18px hsl(var(--c) / .8) !important; }
+  .bl-gold, .bl-gold:hover { color: hsl(48 100% 90%) !important; opacity: 1 !important; text-shadow: 0 0 6px hsl(45 100% 60%), 0 0 18px hsl(45 100% 55% / .85) !important; }
+  .bl-foe, .bl-foe:hover { color: hsl(355 100% 78%) !important; opacity: 1 !important; text-shadow: 0 0 6px hsl(355 100% 58%), 0 0 16px hsl(355 100% 55% / .9), 0 0 30px hsl(355 100% 50% / .5) !important; }
+  .bl-foe.bl-hot { animation: bl-flicker .16s steps(2, jump-none) infinite; }
+  @keyframes bl-flicker { 50% { opacity: .55; } }
+  html.rm .bl-foe.bl-hot { animation: none; }
+  /* a blown-up word: its text goes clear (the button keeps its place, name and focus) while its letters fly */
+  .bl-gone, .bl-gone:hover { color: transparent !important; text-shadow: none !important; transition: none !important; }
+
+  /* the effects: one layer in the section (letters, rings, sparks) and one on the screen (beams, shots) */
+  .bl-layer { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+  .bl-screen { position: fixed; inset: 0; z-index: 45; pointer-events: none; overflow: hidden; }
+  .bl-ring { position: absolute; left: 0; top: 0; border-radius: 999px; border: 2px solid hsl(var(--c)); box-shadow: 0 0 10px hsl(var(--c) / .7), inset 0 0 8px hsl(var(--c) / .3); will-change: transform, opacity; }
+  .bl-ring.elite::after { content: ''; position: absolute; inset: -7px; border-radius: inherit; border: 1px solid hsl(var(--c) / .75); box-shadow: 0 0 8px hsl(var(--c) / .5); }
+  .bl-ring.hot { border-width: 2.5px; box-shadow: 0 0 16px hsl(var(--c)), inset 0 0 10px hsl(var(--c) / .5); }
+  .bl-word { position: absolute; left: 0; top: 0; }
+  .bl-letter { position: absolute; white-space: pre; will-change: transform; }
+  .bl-spark { position: absolute; left: 0; top: 0; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c), 0 0 12px var(--c); animation: bl-spark var(--t) cubic-bezier(.15, .8, .3, 1) forwards; }
+  @keyframes bl-spark { from { transform: translate(var(--x0), var(--y0)) scale(1.3); opacity: 1; } 55% { opacity: 1; } to { transform: translate(var(--x1), var(--y1)) scale(0); opacity: 0; } }
+  .bl-shock { position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%; border: 2px solid hsl(var(--c)); box-shadow: 0 0 14px hsl(var(--c) / .8), inset 0 0 10px hsl(var(--c) / .5); }
+  .bl-bloom { position: absolute; width: 180px; height: 180px; margin: -90px 0 0 -90px; border-radius: 50%; background: radial-gradient(circle, #fff 0 12%, hsl(var(--c) / .75) 30%, hsl(var(--c) / 0) 68%); mix-blend-mode: screen; }
+  .bl-pts { position: absolute; left: var(--x); top: var(--y); transform: translateX(-50%); white-space: nowrap; font: 400 1rem/1 var(--font-display); color: hsl(var(--c)); text-shadow: 0 0 10px hsl(var(--c) / .8); animation: bl-pts .9s var(--ease) forwards; }
+  .bl-pts.big { font-size: 1.45rem; }
+  .bl-pts i { font-style: normal; margin-left: .35em; font-size: .75em; color: #fff; text-shadow: 0 0 8px hsl(var(--c)); }
+  @keyframes bl-pts { from { transform: translateX(-50%) scale(.7); opacity: 0; } 16% { opacity: 1; transform: translate(-50%, -10px) scale(1); } to { transform: translate(-50%, -50px); opacity: 0; } }
+  html.rm .bl-pts { animation: bl-pts-still 1s linear forwards; } /* reduced motion: the points sit still and fade */
+  @keyframes bl-pts-still { from { opacity: 1; } 70% { opacity: 1; } to { opacity: 0; } }
+  .bl-beam { position: absolute; left: 0; top: 0; height: 2px; margin-top: -1px; transform-origin: 0 50%; border-radius: 2px; background: linear-gradient(90deg, hsl(190 100% 75% / 0), hsl(190 100% 75% / .85) 65%, #fff); box-shadow: 0 0 8px hsl(190 100% 70% / .9); }
+  .bl-beam.max { height: 4px; margin-top: -2px; box-shadow: 0 0 14px hsl(190 100% 70%), 0 0 30px hsl(190 100% 60% / .6); }
+  .bl-flash { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: radial-gradient(circle, #fff 0 18%, hsl(190 100% 75% / .7) 40%, hsl(190 100% 75% / 0) 70%); }
+  .bl-bolt { position: absolute; left: 0; top: 0; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: radial-gradient(circle, #fff 0 18%, hsl(355 100% 66%) 42%, hsl(355 100% 55% / 0) 72%); will-change: transform; }
+  .bl-crack { position: absolute; width: 260px; height: 260px; margin: -130px 0 0 -130px; filter: drop-shadow(0 0 3px hsl(355 100% 60% / .9)); }
+  .bl-vig { position: absolute; inset: 0; box-shadow: inset 0 0 140px 36px hsl(355 100% 50% / .55); opacity: 0; }
+  .bl-banner { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
+  .bl-banner b { display: block; font: 400 clamp(2.4rem, 8vw, 4.6rem)/1 var(--font-display); font-weight: 400; color: hsl(180 100% 96%); text-shadow: 0 0 8px hsl(var(--c)), 0 0 22px hsl(var(--c)), 0 0 46px hsl(var(--c) / .6); }
+  .bl-banner span { display: block; margin-top: .7rem; font: 700 clamp(.8rem, 2.4vw, 1rem)/1 var(--font-text); letter-spacing: .24em; text-transform: uppercase; color: hsl(var(--c)); }
+
+  /* the readout: score, combo, wave, health; appears with the first shot, rides the bottom-left */
+  .bl-hud {
+    position: sticky; z-index: 20; bottom: 16px; width: max-content; max-width: calc(100% - 76px); margin: 2.5rem auto 0 0;
+    display: grid; gap: .3rem; padding: 5px 5px 7px; border-radius: 26px;
+    font: 700 .8rem/1.2 var(--font-text); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2);
+    background: hsl(220 30% 5% / .92); border: 1px solid var(--hair-strong);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 10px 30px -12px hsl(190 100% 50% / .35);
+    opacity: 0; transform: translateY(8px); transition: opacity .4s var(--ease), transform .4s var(--ease), box-shadow .3s var(--ease); visibility: hidden;
+  }
+  .bl-hud.on { opacity: 1; transform: none; visibility: visible; }
+  .bl-hud.hurt { box-shadow: 0 0 0 1px hsl(355 100% 66% / .7), 0 10px 30px -8px hsl(355 100% 55% / .6); }
+  .bl-hud .r1 { display: flex; align-items: center; gap: .75rem; }
+  .bl-hud .r2 { display: flex; align-items: center; flex-wrap: wrap; gap: .1rem .9rem; padding: 0 9px; min-height: 1.2rem; font-size: .74rem; letter-spacing: .08em; color: var(--ink); }
+  .bl-hud .r2:empty { display: none; }
+  .bl-hud .r2 .foe { color: hsl(355 100% 74%); }
+  .bl-hud .r2 .good { color: var(--green); }
+  .bl-hud .r2 b { color: #fff; }
+  /* the band: one light per part (the group that plays it), lit while it's playing */
+  .bl-band { display: inline-flex; align-items: center; gap: .5rem; color: var(--ink-2); }
+  .bl-band .pips { display: inline-flex; gap: 4px; }
+  .bl-band i { width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1px hsl(var(--c) / .5); transition: background .2s, box-shadow .2s; }
+  .bl-band i.on { background: hsl(var(--c)); box-shadow: 0 0 8px hsl(var(--c)); }
+  /* a group's heading lights in its part's colour while that part plays */
+  .sk-h { transition: color .3s var(--ease), text-shadow .3s var(--ease); }
+  .sk-group .sk-h.bl-live { color: hsl(var(--pc)); text-shadow: 0 0 10px hsl(var(--pc) / .65); }
+  .sk-ai-head .sk-h.bl-live { text-shadow: 0 0 6px var(--magenta), 0 0 16px hsl(290 100% 70%), 0 0 34px hsl(290 100% 60% / .85); }
+  .bl-hud .r2 a { display: inline-flex; align-items: center; min-height: 44px; margin: -12px 0; color: var(--cyan); text-transform: none; letter-spacing: .02em; font-size: .85rem; }
+  .bl-score { display: inline-flex; align-items: baseline; gap: .45rem; padding-left: .15rem; }
+  .bl-score b { font: 400 1.3rem/1 var(--font-display); letter-spacing: 0; color: #fff; min-width: 3.2ch; text-shadow: 0 0 14px hsl(190 100% 70% / .5); font-feature-settings: 'tnum' 1; display: inline-block; }
+  .bl-score b.bump { animation: bl-bump .3s var(--ease); }
+  @keyframes bl-bump { 40% { transform: scale(1.16); text-shadow: 0 0 16px var(--green); } }
+  html.rm .bl-score b.bump { animation: none; }
+  .bl-mult { color: var(--green); letter-spacing: .04em; font-size: .85rem; text-shadow: 0 0 8px hsl(130 90% 55% / .6); }
+  .bl-mult:empty { display: none; }
+  .bl-hud .sep { width: 1px; height: 1.1rem; background: var(--hair-strong); }
+  .bl-wave b { color: #fff; }
+  .bl-hp { display: inline-flex; align-items: center; gap: .5rem; }
+  .bl-hp .bar { display: inline-flex; gap: 3px; }
+  .bl-hp i { width: 11px; height: 8px; border-radius: 3px; background: var(--green); box-shadow: 0 0 6px hsl(130 90% 55% / .7); transition: background .2s, box-shadow .2s; }
+  .bl-hp i.out { background: transparent; box-shadow: inset 0 0 0 1px hsl(355 100% 66% / .55); }
+  .bl-hp.low i:not(.out) { background: hsl(355 100% 64%); box-shadow: 0 0 8px hsl(355 100% 60% / .8); }
+  .hbtn-ico {
+    display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; cursor: pointer; color: var(--cyan); padding: 0;
+    background: hsl(190 100% 75% / .08); border: 1px solid hsl(190 100% 75% / .35); transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hbtn-ico:hover { border-color: var(--cyan); box-shadow: 0 0 16px -2px hsl(190 100% 70% / .6); }
+  .hbtn-ico:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 50%; }
+  .hbtn-ico svg { width: 20px; height: 20px; }
+  .bl-mute .off, .bl-mute[aria-pressed="true"] .on { display: none; }
+  .bl-mute[aria-pressed="true"] .off { display: block; }
+  .bl-mute[aria-pressed="true"] { color: var(--ink-3); }
+  .bl-stop { color: var(--ink-2); }
+  @media (max-width: 560px) {
+    .bl-hud { max-width: calc(100% - 60px); font-size: .72rem; letter-spacing: .05em; }
+    .bl-hud .r1 { gap: .5rem; }
+    .bl-hud .r1 > .sep, .bl-wave .lbl { display: none; }
+    .bl-wave::before { content: 'W'; }
+    .bl-hp .lbl { display: none; }
+    .bl-hp i { width: 8px; }
+    .bl-mult { display: none; } /* the band's lights carry it on phones */
+    .bl-score b { font-size: 1.15rem; }
+    .bl-hud .r2 { font-size: .68rem; }
+  }
+
+  /* ===== mockup only: a stand-in for the site's one music player (MusicFAB, bottom right) ===== */
+  .sp { position: fixed; z-index: 50; right: 16px; bottom: 16px; display: flex; align-items: center; gap: .6rem; }
+  @media (min-width: 768px) { .sp { right: 24px; bottom: 24px; } }
+  .sp-fab {
+    display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; color: var(--cyan);
+    background: hsl(220 30% 6%); border: 2px solid hsl(190 100% 75% / .5); box-shadow: 0 0 8px hsl(190 100% 70% / .4), 0 0 16px hsl(190 100% 70% / .2);
+  }
+  @media (min-width: 768px) { .sp-fab { width: 56px; height: 56px; } }
+  .sp-fab svg { width: 22px; height: 22px; }
+  .sp-fab:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 50%; }
+  .sp.playing .sp-fab { box-shadow: 0 0 15px hsl(190 100% 60%), 0 0 30px hsl(190 100% 60% / .5); }
+  .sp-title {
+    padding: .45rem .8rem; border-radius: 999px; font: 700 .82rem/1.2 var(--font-text); color: var(--ink); white-space: nowrap;
+    background: hsl(220 30% 5% / .85); border: 1px solid hsl(190 100% 75% / .35); opacity: 0; transform: translateX(8px);
+    transition: opacity .35s var(--ease), transform .35s var(--ease); pointer-events: none;
+  }
+  .sp.playing .sp-title { opacity: 1; transform: none; }
+  @media (max-width: 1100px) { .sp-title { display: none; } }
+  .mock-bar select { min-height: 32px; padding: 0 .4rem; border-radius: 6px; font: 600 .85rem/1 var(--font-text); color: hsl(42 100% 75%); background: hsl(220 30% 8%); border: 1px solid hsl(42 100% 62% / .45); }
+  .mock-bar .int { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; }
+  @media (max-width: 560px) { .mock-bar { position: static; } } /* mockup chrome: on phones it scrolls away instead of covering the game */
+  .mock-bar button.mb { min-height: 32px; padding: 0 .7rem; border-radius: 6px; cursor: pointer; font: 600 .85rem/1 var(--font-text); color: hsl(42 100% 75%); background: transparent; border: 1px dashed hsl(42 100% 62% / .5); }
+</style>
+</head>
+<body>
+<p class="mock-note">Round 5 · Skill blaster, with a band. Sound on. Your first shot starts a liquid drum-and-bass beat (D minor, 172 BPM). Every group is a part of the band: hit a lit Backend skill and the bass line comes in, Cloud brings the pads, AI the melody. Keep hitting a group's skills to keep its part playing. Notes always land on the beat and in key, so just shoot. The beat builds each wave and drops at wave 3, when the red ones start shooting back. “Jump to wave 3” rides the riser into the drop. The ♫ bottom right stands in for the site's player: if it's playing when you start, the game pauses it and hands it back when you stop.</p>
+
+<section class="section" id="skills" aria-labelledby="skills-h"></section>
+
+<!-- mockup only: the stand-in for the site's one player (its single <audio>) -->
+<div class="sp" id="sp">
+  <span class="sp-title" id="sp-title" aria-hidden="true"></span>
+  <button type="button" class="sp-fab" id="sp-fab" aria-label="Play Number Slayers">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  </button>
+  <audio id="sp-audio" preload="none"></audio>
+</div>
+
+<script src="../skills.js"></script>
+<script src="../round2/base.js"></script>
+<script src="blaster-band.js"></script>
+</body>
+</html>

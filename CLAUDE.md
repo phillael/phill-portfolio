@@ -20,6 +20,8 @@ npm run start       # Serve the production build
 npm run lint        # ESLint (`eslint .`; `next lint` no longer exists in Next 16)
 npm test            # Jest (jsdom; API route tests opt into the node env)
 npx tsc --noEmit    # Typecheck
+node --env-file=.env.local scripts/scoreboard.mjs list|rm <playerId>|clear [--env development|preview|production]
+                    # The Skill blaster scoreboard (default --env development; clear refuses production)
 ```
 
 Gates before a PR: `npx tsc --noEmit`, `npm run lint` (zero warnings), `npm test`, `npm run build`.
@@ -33,18 +35,22 @@ src/
 │   ├── page.tsx              # Section composition
 │   ├── resume/page.tsx       # /resume: the semantic resume (+ the 3D overlay on a direct visit)
 │   ├── @modal/(.)resume/     # /resume from the home page: the 3D overlay over the still-mounted home page
-│   └── api/wizard/
-│       ├── chat/route.ts     # POST: origin check → validate → reserve → Claude Haiku → settle usage
-│       └── keepalive/route.ts# Daily Vercel cron (CRON_SECRET) so free-tier Upstash isn't deleted
+│   └── api/
+│       ├── wizard/chat/route.ts      # POST: origin check → validate → reserve → Claude Haiku → settle usage
+│       ├── wizard/keepalive/route.ts # Daily Vercel cron (CRON_SECRET) so free-tier Upstash isn't deleted
+│       ├── skills/run/route.ts       # POST: the Skill blaster run's scoreboard ticket (+ the visitor's geo)
+│       └── skills/scores/route.ts    # GET the all-time board; POST a run to it
 ├── components/               # PascalCase, one per file; ui/ = primitives, music/ = player, jelly/ = 3D resume host/overlay/HUD, experience/ = the Experience section's parts, skills/ = the Skills section's
 ├── context/                  # ShroomModeContext (global shroom-mode on/off)
 ├── data/                     # Content source of truth: resume.ts, career.ts, skills.ts, *.json, testimonials.ts, wizard.json
 ├── hooks/                    # useAudioPlayer, useMediaQuery
-├── lib/                      # rate-limit, wizard-prompt, wizard-tools, canvas/audio utils, site-music, wizard-aside
+├── lib/                      # rate-limit, allowed-origin, wizard-prompt, wizard-tools, canvas/audio utils, site-music, wizard-aside
 │   ├── jelly/                # the 3D resume engine (plain TS + WebGL2)
+│   ├── scoreboard/           # the Skill blaster scoreboard's server side (store, validate) + shared types and text rules
 │   └── skills/               # the Skill blaster (the Skills section's game, its own chunk)
 ├── types/
 └── __tests__/                # Jest + Testing Library
+scripts/scoreboard.mjs        # The scoreboard's admin script (list, rm, clear)
 public/models/                # Wizard GLB (meshopt + WebP textures)
 public/skills/sfx/            # The Skill blaster's recorded drums (CC0, CREDITS.md): fetched 400 ms after the first shot
 public/resume/                # The 3D resume's snapshot (snapshot.json + text.webp + decor.webp, no phone or email) and its cast (phill.glb with Play mode's clips, shrimp.glb, lasagna.glb: Play's enemy, fetched only once Play starts)
@@ -58,6 +64,7 @@ public/resume/                # The 3D resume's snapshot (snapshot.json + text.w
 - `src/data/skills.ts` — **the Skills content**: 81 skills in seven groups, AI first with a note each (the mockup's copy, exact). It feeds the Skills section, the Wizard's `<skills>` (`wizard-prompt.ts`) and the JSON-LD's `knowsAbout` (the five tech groups, `structured-data.ts`). `src/__tests__/skills-data.test.ts` holds the shape. Employer SaaS stays generic ("SSO / OIDC", "Feature flags").
 - `src/components/SkillsSection.tsx` + `src/components/skills/` — the Skills section (mockup `docs/design/skills-game/round6/blaster-synth.html`, plan `docs/plans/2026-10-20-skills-blaster-plan.md`). At rest it's content: the header, the AI glass panel, the quiet group lines; every skill is a text-styled `<button data-skill data-group>`. `Skills.module.css`; `LineEnds` (the dots never end a line); `SkillsPlay` (the magnet lean from `lib/skills/lean.ts`, and the game's lazy start: prefetched as the section nears, imported on the first click, which makes and resumes the AudioContext inside the click; later clicks go to the game).
 - `src/lib/skills/` — **the Skill blaster**, the game a click reveals (one chunk with its CSS and engine). `blaster.ts` + `blaster.css`: the game (imperative DOM, no React state; the `bl-*` classes are global because script sets them; the arena keys off the section's data hooks; the dev-only handle is `window.__skills`). `rules.ts`: the waves, points, the conductor, the band, the phone staging (pure, `skills-rules.test.ts`). `synth.ts`: the sound engine, a port of the Sound lab's `docs/design/skills-game/round6/synth.js`. `synthConfig.ts` is **GENERATED** from `synth.js`'s defaults by `docs/design/sound-lab/tools/bake-skills-config.mjs`; never hand-edit it (`skills-synth.test.ts` fails while they disagree). The recordings are in `public/skills/sfx/`.
+- **The Skill blaster scoreboard** (plan `docs/plans/2026-10-21-skills-scoreboard-plan.md`, mockup `docs/design/skills-game/scoreboard/`, look B): at every game over, the all-time top 10 in a modal `<dialog>`, the run a row in it ready for a name, city and country (prefilled from Vercel's IP geolocation; the last saved profile wins). One entry per player (a random id in `localStorage['skill-blaster-player']`), their best. `src/lib/skills/scoreboard.ts` (the dialog, `createScoreboard`; its `.sb` styles are in `blaster.css`) and `scoreboard-api.ts` (the client: `startRun` at the first shot, `fetchBoard`, `saveScore`, the player id and profile). Server side in `src/lib/scoreboard/`: `store.ts` (Redis), `validate.ts` (names and cities through `obscenity`, server-only; countries from `src/data/countries.ts`; `checkRun`, the plausibility check against `rules.ts`'s `maxScoreFor`/`minSecondsFor`), `text.ts` (the character rules the board shares), `types.ts`. Routes: `api/skills/run` (a ticket in Redis, taken once by the save) and `api/skills/scores` (GET public; POST checked in the plan's order). `src/lib/allowed-origin.ts` is the wizard chat's and the scoreboard's Origin check. Moderation: `scripts/scoreboard.mjs rm <playerId>`.
 - **The Sound lab** (`docs/design/sound-lab/`, a static design tool): serve the repo root (`python3 -m http.server 8765`) and open `/docs/design/sound-lab/`. A Skill blaster patch Phill sends goes into `round6/synth.js`'s `SCHEMA` defaults (the lab's source), then `node docs/design/sound-lab/tools/bake-skills-config.mjs`, then `npx jest --no-watchman skills-synth`. The lab's Skill blaster bank also tunes the weapon's shot (its Laser part). A Jelly bank patch goes into `SFX_CONFIG` (`src/lib/jelly/config.ts`).
 - `src/components/ShroomMode.tsx` — summon button, wizard lifecycle, chat/ceremony state, and the shroom-mode visual effect.
 - `src/components/ShroomWizard3D.tsx` — R3F canvas, GLB load, animation state machine (idle / spell → dance / walk).
@@ -113,6 +120,9 @@ This site is animation-heavy; these are the patterns that keep it fast.
 - **Measuring Play's worst case** (the trip + the giant + SHRIMP!) needs `__jelly.playDev`, which a production build strips: stage it with a local build that keeps the debug object (one line in `engine.ts`), never committed, and say so with the numbers.
 - **Editing the engine under `npm run dev`:** a hot reload can remount the overlay on a lost WebGL context, which sets the session's plain-page flag (`jelly-resume-plain` in sessionStorage) and you get the plain `/resume`. Clear sessionStorage and reload.
 - **Upstash free tier deletes a database after 14 days without commands.** The keepalive cron in `vercel.json` prevents that. If the wizard chat ever shows the farewell line on every message, check that the DB still exists first.
+- **The scoreboard's Redis keys are `sb:{VERCEL_ENV ?? development}:*`** (board, who, run tickets, rate limits): previews never touch production's board. **`.env.local` points at production's Upstash DB**, so local runs write `sb:development:*` only; never write, `rm` or `clear` `sb:production:*`/`sb:preview:*` from a local check, and never touch `wiz:*`. End a local session with `node --env-file=.env.local scripts/scoreboard.mjs clear --env development`.
+- **The scoreboard dialog lives on `<body>`, outside `#skills`:** it carries the section's tokens itself (`.sb` in `blaster.css`; `.hbtn-ico` is scoped to `.bl-hud`, so the ✕ has its own style) and its own live region (`showModal()` makes the section's `[data-sk-live]` inert, and inert content isn't announced). It leaves `<body>` when it closes. Esc: its keydown stops propagation at the dialog (the wizard, shroom mode and the game listen further out) and the native `cancel` closes it, animated (`preventDefault` + our close; a browser that closes it anyway still ends it through `close`). A click whose target is the dialog itself is the backdrop (no padding; `.sb-in` fills it). User text goes in through `textContent` only.
+- **One `next dev` per project directory (Next 16's `.next/dev/lock`):** if Phill's dev server is already up (e.g. :3002), a second one on :3000 refuses to start. For a separate dev server, use a throwaway `git worktree add --detach` with `cp -cR node_modules` (an APFS clone) and a symlinked `.env.local`, and remove it after.
 - **jsdom gaps** (`matchMedia`, `IntersectionObserver`, `scrollTo`) are stubbed in `jest.setup.ts`. Components loaded with `next/dynamic` render asynchronously in tests, so use `findBy*`. Web Audio, Web Animations, `fetch`, `ResizeObserver`, `scrollBy` and layout are not: the Skill blaster's tests fake them (`src/__tests__/helpers/fakeAudio.ts`, box stubs). Compare DOM nodes with `toBe`: `toMatchObject` on a node walks React's fiber tree hanging off it and hangs Jest at 100% CPU.
 - **The disk is case-insensitive (macOS):** `lineEnds.ts` next to `LineEnds.tsx` resolves `./LineEnds` to the `.ts` file (no default export). Never give two modules names that differ only by case.
 - **Next 16 + React 19:** verify library compatibility and current APIs before assuming a pattern works.

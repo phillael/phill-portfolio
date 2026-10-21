@@ -345,7 +345,7 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
     - `begin()` asks for a run once;
     - a resume counts.
   - Add a test: Esc or ✕ mid-game opens no board.
-- [ ] **T8: The removal script and the docs.**
+- [x] **T8: The removal script and the docs.**
   - `scripts/scoreboard.mjs`, run as `node --env-file=.env.local scripts/scoreboard.mjs <cmd> [--env development|preview|production]` (default development):
     - `list [--n 20]` (rank, score, name, place, wave, date, player id);
     - `rm <playerId>` (`ZREM` + `HDEL`);

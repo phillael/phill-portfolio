@@ -2,7 +2,8 @@
  * The Skill blaster: the game the Skills section hides. The first click on a skill fires a laser, bursts the
  * word into letters that snap home and starts the game: waves 1–2 are whack-a-mole (lit skills, a closing ring
  * as the timer), from wave 3 red skills shoot back (5 health), elites take 3 hits, gold is worth 500; game over
- * shows the score and the best. It pauses after 5 s without a shot (9 s by keyboard) or offscreen; ✕ and Esc stop.
+ * shows the score and the best, then the scoreboard (scoreboard.ts). It pauses after 5 s without a shot (9 s by
+ * keyboard) or offscreen; ✕ and Esc stop (a quit: no scoreboard).
  *
  * Its own chunk, imported on the first click (src/components/skills/SkillsPlay.tsx), with its engine (synth.ts),
  * its rules (rules.ts) and its styles (blaster.css). Imperative DOM, like the 3D resume: no React state, no layout
@@ -20,6 +21,9 @@ import {
 import { labelOf, type Lean } from './lean'
 import { setWizardAside } from '@/lib/wizard-aside'
 import { getSiteMusic } from '@/lib/site-music'
+import type { RunTicket } from '@/lib/scoreboard/types'
+import { createScoreboard } from './scoreboard'
+import { startRun } from './scoreboard-api'
 
 /** a click in the section: on a skill (or on nothing), where, and whether it came from Enter or Space */
 export interface Shot {
@@ -645,9 +649,13 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     state: 'rest' as State,
     score: 0, best: loadBest(), wave: -1, cfg: null as WaveCfg | null, plan: [] as Kind[], spawned: 0, active: new Set<Target>(),
     hp: MAX_HP, hpOn: false, lastShot: 0, kb: false, pendingSpawn: false, watch: 0, blind: 0, resumeTo: 'wave' as 'wave' | 'first' | 'next', eliteSeen: false, settle: 0,
+    /** the run's scoreboard ticket (asked for at its first shot) and the resumes it took */
+    run: null as Promise<RunTicket | null> | null, resumes: 0,
   }
   const cfgOf = () => G.cfg!
   const playing = () => G.state === 'intro' || G.state === 'wave' || G.state === 'between'
+  /* the scoreboard (scoreboard.ts): it opens at game over; closing it puts the section at rest */
+  const board = createScoreboard({ onClose: () => { if (G.state === 'over') { G.state = 'rest'; hudOff() } } })
   const timers = new Set<number>()
   function later(ms: number, fn: () => void) { const id = window.setTimeout(() => { timers.delete(id); fn() }, Math.max(0, ms)); timers.add(id); return id }
   function cancel(id: number) { clearTimeout(id); timers.delete(id) }
@@ -676,6 +684,8 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   /* the first shot: the discovery. The beat starts with it; the first wave comes in on the next bar */
   function begin(k: Key, p: Pt, kb: boolean) {
     resetRun()
+    G.run = startRun() // the scoreboard's ticket: no request goes out before this first shot
+    G.resumes = 0
     G.kb = kb
     handOff() // one track at a time
     root.classList.add('bl-on')
@@ -892,8 +902,8 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     if (best) { G.best = G.score; saveBest() }
     root.classList.remove('bl-on')
     MUS.tapeStop()
-    later(OVER_FADE, () => { musicStop(0.05); handBack(); arenaOff() }) // the music fades out and the section is the list again (Phill)
-    later(12000, () => { if (G.state === 'over') { G.state = 'rest'; hudOff() } }) // the readout (the score, the best, Number Slayers) goes too
+    const run = { score: G.score, wave: G.wave, resumes: G.resumes, best, kb: G.kb, ticket: G.run ?? Promise.resolve(null) }
+    later(OVER_FADE, () => { musicStop(0.05); handBack(); arenaOff(); board.open(run) }) // the music fades out, the section is the list again (Phill), and the scoreboard opens over it; closing it lets the readout go
     banner('Game over', best ? 'New best' : `Best ${fmt(G.best)}`, RED)
     status(`<span class="foe">Game over</span> · <b>${fmt(G.score)}</b> · ${best ? '<span class="good">new best</span>' : `best ${fmt(G.best)}`} · shoot any skill to play again <a href="https://numberslayers.com" target="_blank" rel="noopener">Want more? Number Slayers ↗</a>`)
     tell(`Game over. ${fmt(G.score)} points${best ? ', a new best' : ''}. Shoot any skill to play again.`, true)
@@ -914,6 +924,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   }
   function resume() { // the beat starts again with the shot that resumes; waves pick up on the next bar
     clearLater()
+    G.resumes++ // each comes with a free hit: the scoreboard's check allows for it
     handOff() // the song may have come on while it was paused
     root.classList.add('bl-on')
     hudOn()
@@ -929,6 +940,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   }
   function stop() {
     clearLater()
+    board.close(true)
     watchOff()
     ;[...G.active].forEach((t) => endTarget(t, 'quiet'))
     if (G.score > G.best) { G.best = G.score; saveBest() }
@@ -942,6 +954,7 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
   }
   function resetRun() {
     clearLater()
+    board.close(true) // a new game drops an unsaved entry
     G.score = 0; G.wave = -1; G.hp = MAX_HP; G.hpOn = false; G.spawned = 0; G.blind = 0; G.eliteSeen = false
     joinedOnce = false
     hpEl.hidden = true

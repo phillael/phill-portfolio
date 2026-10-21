@@ -155,10 +155,13 @@ export default function WizardChat({
 
   // Escape closes the chat and nothing behind it. Capture phase + stopPropagation
   // keeps ShroomMode's window listener from also dismissing the wizard. While
-  // the mushroom offer is up, the offer handles Escape (decline).
+  // the mushroom offer is up, the offer handles Escape (decline). An Escape from
+  // inside another open modal <dialog> (the Skill blaster's scoreboard, over the
+  // chat) is that dialog's: it closes the dialog, not the chat.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
+      if (e.target instanceof Element && e.target.closest('dialog[open]')) return
       e.stopPropagation()
       if (!pendingOfferRef.current) onCloseRef.current()
     }

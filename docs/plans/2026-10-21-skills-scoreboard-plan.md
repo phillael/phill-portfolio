@@ -179,6 +179,7 @@ export type SaveResult = { ok: true; board: Board } | { ok: false; error: SaveEr
     - `geo` comes from `x-vercel-ip-city` (URL-decoded, run through the city check, `''` if it fails) and `x-vercel-ip-country` (`''` unless it's in the country list).
   - **Redis down or unconfigured** → 503 `{ error: 'unavailable' }`.
 - **`GET /api/skills/scores?player=<uuid>&score=<int>`** (both optional; there's no Origin check, because a same-origin GET carries none; it's public data):
+  - **The rate limit** (120 reads per IP per hour; added 2026-10-21 at Phill's go, after the loop: the board is public and its Redis is the wizard's too) is hit → 429 `{ error: 'rate_limited' }`, before the board is read. The board shows its offline state.
   - 200 `Board`:
     - `top`: up to 10, best first, with the shared ranks;
     - `me: true` on the requesting player's row;
@@ -208,13 +209,14 @@ export type SaveResult = { ok: true; board: Board } | { ok: false; error: SaveEr
 - **`sb:{env}:who`:** a hash, player id → `{ name, city, country, wave, at }` (`at` = ms).
 - **`sb:{env}:run:{runId}`:** the run's start time in ms, with `EX 10800`.
 - **`sb:{env}:lim:run:{ipHash}:{YYYY-MM-DDTHH}`:** `INCR` + `EXPIRE 3600`.
+- **`sb:{env}:lim:read:{ipHash}:{YYYY-MM-DDTHH}`:** `INCR` + `EXPIRE 3600` (the board reads).
 - **`sb:{env}:lim:save:{ipHash}:{YYYY-MM-DD}`:** `INCR` + `EXPIRE 93600`.
   - `ipHash` = the first 16 hex characters of SHA-256 of `x-real-ip` (or `'unknown'`). No IP is stored as-is.
 - **A save:**
   - `ZADD sb:{env}:board GT {score} {playerId}` and `HSET sb:{env}:who {playerId} {json}`, in one pipeline;
   - the board read: `ZRANGE … 0 9 REV WITHSCORES`, `HMGET who …ids`, `ZCARD`, `ZSCORE` + `ZCOUNT` + `HGET` for `mine`, and `ZCOUNT ({score} +inf` for `at`, in one pipeline.
   - Mind `@upstash/redis`'s automatic JSON (de)serialization of hash values.
-- **Volume:** about 20 commands per game (run 3, board 7, save ~10), well inside the free tier.
+- **Volume:** about 22 commands per game (run 3, board 9 with its read limit, save ~10), well inside the free tier.
 
 ### 5. Validation and the plausibility check
 
@@ -387,7 +389,7 @@ At every game over, once the music has faded and the list is back, a dialog in t
 
 - **The board:** `src/lib/skills/scoreboard.ts` (+ the `.sb` styles in `blaster.css`). A native `<dialog>` with `showModal()` on `<body>`: pending (the form at its rank, or under "· · ·"), a new #1, saved, under your best, offline with Try again, and no ticket. Its own tokens and live region; Esc stops at the dialog and the native `cancel` closes it; ✕ and the backdrop close it too; user text through `textContent` only.
 - **The client:** `src/lib/skills/scoreboard-api.ts` (`startRun` at the first shot, `fetchBoard`, `saveScore`, the player id and the remembered profile).
-- **The routes:** `POST /api/skills/run` (a run ticket in Redis + the geo), `GET /api/skills/scores` (public) and `POST /api/skills/scores` (checked in order: Origin, shape, name/city, rate limit, the ticket taken once, the plausibility check, not under the player's best, save). `src/lib/allowed-origin.ts` is now shared with the wizard chat.
+- **The routes:** `POST /api/skills/run` (a run ticket in Redis + the geo), `GET /api/skills/scores` (public, 120 reads per IP an hour) and `POST /api/skills/scores` (checked in order: Origin, shape, name/city, rate limit, the ticket taken once, the plausibility check, not under the player's best, save). `src/lib/allowed-origin.ts` is now shared with the wizard chat.
 - **The store:** `src/lib/scoreboard/store.ts` on the wizard's Upstash DB, keys `sb:{VERCEL_ENV}:*` (previews and local runs never touch production's board); no IP stored (a truncated hash for the rate limits, expiring within a day).
 - **The checks:** `validate.ts` (the `obscenity` English matcher, server-only, with Penistone and Dickinson whitelisted), `text.ts`, `src/data/countries.ts` (250 codes), and `maxScoreFor`/`minSecondsFor` in `rules.ts`.
 - **The game:** `blaster.ts` asks for a ticket at a game's first shot (nothing before), counts resumes, opens the board at game over; closing it puts the section at rest.
@@ -398,6 +400,7 @@ At every game over, once the music has faded and the list is back, a dialog in t
 
 - **Phill's calls:** all-time only; anyone can save and see their rank; city (optional) and country, prefilled and editable; moderation = the filter at entry + the `rm` script; look B.
 - **Mine, in the mockup Phill approved:** one entry per player (their best; a random id in localStorage).
+- **Spam guards:** per IP, 60 games an hour, 120 board reads an hour and 20 saves a day (failed attempts count); one save per game's ticket; Save disables itself while it sends.
 - **The approach:** run tickets in Redis (no new secret, no Vercel env change). Medium anti-cheat: one save per ticket; a score the wave allows; the wave no sooner than the game allows. A believable fake still passes once it waits, and that's accepted. Esc or ✕ mid-game is a quit (no board). Ties share a rank.
 - **Fixed during the browser checks:**
   - the blur (the build kept only `-webkit-backdrop-filter`);

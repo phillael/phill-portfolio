@@ -1,5 +1,5 @@
 import { allowedOrigin } from '@/lib/allowed-origin'
-import { readBoard, saveEntry, takeRun, limitSave } from '@/lib/scoreboard/store'
+import { limitRead, limitSave, readBoard, saveEntry, takeRun } from '@/lib/scoreboard/store'
 import type { SaveBody, SaveError, SaveResult } from '@/lib/scoreboard/types'
 import { checkCity, checkName, checkRun, isCountry } from '@/lib/scoreboard/validate'
 
@@ -21,12 +21,14 @@ function parseBody(raw: unknown): SaveBody | null {
   return { runId: b.runId, playerId: b.playerId, score: b.score, wave: b.wave, resumes: b.resumes, name: b.name, city: b.city, country: b.country as string }
 }
 
-/** the all-time board (plan §3): public, so no Origin check (a same-origin GET carries none). `player` marks their
-    entry, `score` asks where a run would land; bad values are ignored */
+/** the all-time board (plan §3): public, so no Origin check (a same-origin GET carries none), but 120 reads per IP an
+    hour (429 past it; its Redis is the wizard's too). `player` marks their entry, `score` asks where a run would
+    land; bad values are ignored */
 export async function GET(request: Request): Promise<Response> {
   const q = new URL(request.url).searchParams
   const player = q.get('player') ?? '', score = q.get('score') ?? ''
   try {
+    if (!(await limitRead(request.headers.get('x-real-ip')))) return Response.json({ error: 'rate_limited' }, { status: 429, headers })
     const board = await readBoard({
       player: UUID.test(player) ? player : undefined,
       score: /^\d{1,8}$/.test(score) && Number(score) <= 10_000_000 ? Number(score) : undefined,

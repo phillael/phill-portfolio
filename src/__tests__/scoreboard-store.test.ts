@@ -3,7 +3,7 @@
  */
 /** The scoreboard's Redis store (src/lib/scoreboard/store.ts), on an in-memory @upstash/redis. */
 import { fakeRedis } from './helpers/fakeRedis'
-import { createRun, envPrefix, ipHash, limitRun, limitSave, readBoard, saveEntry, takeRun } from '../lib/scoreboard/store'
+import { createRun, envPrefix, ipHash, limitRead, limitRun, limitSave, readBoard, saveEntry, takeRun } from '../lib/scoreboard/store'
 
 jest.mock('@upstash/redis', () => require('./helpers/fakeRedis').upstashModule)
 
@@ -147,6 +147,14 @@ describe('the rate limits', () => {
     expect(key).toMatch(/^sb:development:lim:save:[0-9a-f]{16}:\d{4}-\d\d-\d\d$/)
     expect(fakeRedis.ttl(key)).toBe(93600)
   })
+  it('read: 120 an hour per IP (the board is public, but its Redis is the wizard’s too)', async () => {
+    for (let i = 0; i < 120; i++) expect(await limitRead('1.2.3.4')).toBe(true)
+    expect(await limitRead('1.2.3.4')).toBe(false)
+    expect(await limitRead('5.6.7.8')).toBe(true)
+    const key = fakeRedis.keys().find((k) => k.includes(':lim:read:'))!
+    expect(key).toMatch(/^sb:development:lim:read:[0-9a-f]{16}:\d{4}-\d\d-\d\dT\d\d$/)
+    expect(fakeRedis.ttl(key)).toBe(3600)
+  })
   it('never stores an IP as-is', async () => {
     await limitRun('203.0.113.7')
     await limitSave('203.0.113.7')
@@ -159,7 +167,7 @@ describe('the rate limits', () => {
 
 describe('when Redis fails', () => {
   it('every call rejects', async () => {
-    for (const call of [() => createRun('r'), () => takeRun('r'), () => readBoard({}), () => limitRun('1.1.1.1'), () => limitSave('1.1.1.1'),
+    for (const call of [() => createRun('r'), () => takeRun('r'), () => readBoard({}), () => limitRun('1.1.1.1'), () => limitSave('1.1.1.1'), () => limitRead('1.1.1.1'),
       () => saveEntry({ playerId: ME, score: 1, wave: 2, name: 'A', city: '', country: '' })]) {
       fakeRedis.failNext = true
       await expect(call()).rejects.toThrow()

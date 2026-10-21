@@ -7,6 +7,7 @@
  *   sb:{env}:who                       hash: player id → { name, city, country, wave, at }
  *   sb:{env}:run:{runId}               a run's start time (ms), 3 h
  *   sb:{env}:lim:run:{ip}:{hour}       runs per IP per hour
+ *   sb:{env}:lim:read:{ip}:{hour}      board reads per IP per hour (the board is public; its DB is the wizard's too)
  *   sb:{env}:lim:save:{ip}:{day}       saves per IP per day
  *
  * Player ids are the key to an entry: they never leave this module. Every call throws when Redis fails or isn't
@@ -19,6 +20,7 @@ import type { Board, BoardEntry } from './types'
 
 export const RUN_TTL = 3 * 60 * 60
 export const RUNS_PER_HOUR = 60
+export const READS_PER_HOUR = 120
 export const SAVES_PER_DAY = 20
 const RUN_LIM_TTL = 60 * 60
 const SAVE_LIM_TTL = 26 * 60 * 60
@@ -37,7 +39,7 @@ function getRedis(): Redis {
 export const envPrefix = () => `sb:${process.env.VERCEL_ENV || 'development'}`
 const keys = () => {
   const p = envPrefix()
-  return { board: `${p}:board`, who: `${p}:who`, run: (id: string) => `${p}:run:${id}`, lim: (kind: 'run' | 'save', ip: string, at: string) => `${p}:lim:${kind}:${ip}:${at}` }
+  return { board: `${p}:board`, who: `${p}:who`, run: (id: string) => `${p}:run:${id}`, lim: (kind: Limit, ip: string, at: string) => `${p}:lim:${kind}:${ip}:${at}` }
 }
 
 /** the first 16 hex characters of the IP's SHA-256 ('unknown' without one): no IP is stored as-is */
@@ -53,13 +55,16 @@ export async function takeRun(runId: string): Promise<number | null> {
   return v === null ? null : Number(v)
 }
 
-async function underLimit(kind: 'run' | 'save', ip: string | null, at: string, limit: number, ttl: number) {
+type Limit = 'run' | 'read' | 'save'
+async function underLimit(kind: Limit, ip: string | null, at: string, limit: number, ttl: number) {
   const key = keys().lim(kind, ipHash(ip), at)
   const [n] = (await getRedis().multi().incr(key).expire(key, ttl).exec()) as [number, number]
   return n <= limit
 }
 /** counts a run against the IP's hour; false past 60 */
 export const limitRun = (ip: string | null) => underLimit('run', ip, new Date().toISOString().slice(0, 13), RUNS_PER_HOUR, RUN_LIM_TTL)
+/** counts a board read against the IP's hour; false past 120 */
+export const limitRead = (ip: string | null) => underLimit('read', ip, new Date().toISOString().slice(0, 13), READS_PER_HOUR, RUN_LIM_TTL)
 /** counts a save against the IP's day; false past 20 */
 export const limitSave = (ip: string | null) => underLimit('save', ip, new Date().toISOString().slice(0, 10), SAVES_PER_DAY, SAVE_LIM_TTL)
 

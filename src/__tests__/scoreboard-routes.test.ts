@@ -18,7 +18,7 @@ const RUN = '11111111-1111-4111-8111-111111111111'
 
 const runReq = (headers: Record<string, string> = { origin: ORIGIN }) =>
   new Request(`${ORIGIN}/api/skills/run`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-real-ip': '1.2.3.4', ...headers }, body: '{}' })
-const scoresGet = (q = '') => new Request(`${ORIGIN}/api/skills/scores${q}`)
+const scoresGet = (q = '', ip = '1.2.3.4') => new Request(`${ORIGIN}/api/skills/scores${q}`, { headers: { 'x-real-ip': ip } })
 const body = (o: Record<string, unknown> = {}) => ({ runId: RUN, playerId: ME, score: 5000, wave: 2, resumes: 0, name: 'Ana', city: 'Lisbon', country: 'PT', ...o })
 const saveReq = (b: unknown, headers: Record<string, string> = { origin: ORIGIN }) =>
   new Request(`${ORIGIN}/api/skills/scores`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-real-ip': '1.2.3.4', ...headers }, body: typeof b === 'string' ? b : JSON.stringify(b) })
@@ -104,6 +104,16 @@ describe('GET /api/skills/scores', () => {
     expect(await (await getScores(scoresGet('?player=nope&score=1.5'))).json()).toMatchObject({ total: 1, mine: null, at: null })
     expect(await (await getScores(scoresGet('?score=-3'))).json()).toMatchObject({ at: null })
     expect(await (await getScores(scoresGet('?score=0'))).json()).toMatchObject({ at: 2 })
+  })
+  it('429s past 120 reads an hour from one IP, before reading the board', async () => {
+    for (let i = 0; i < 120; i++) expect((await getScores(scoresGet())).status).toBe(200)
+    fakeRedis.log = []
+    const res = await getScores(scoresGet())
+    expect(res.status).toBe(429)
+    expect(await res.json()).toEqual({ error: 'rate_limited' })
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(fakeRedis.log.map(([c]) => c)).toEqual(['incr', 'expire']) // the board itself isn't read
+    expect((await getScores(scoresGet('', '5.6.7.8'))).status).toBe(200)
   })
   it('503s when Redis is down', async () => {
     fakeRedis.failNext = true

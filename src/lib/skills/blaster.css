@@ -621,3 +621,516 @@
     animation: bl-pts-still 1s linear forwards;
   }
 }
+
+/*
+ * The scoreboard (scoreboard.ts): a modal <dialog> on <body> at game over, look B ("Centre stage") of the mockup
+ * (docs/design/skills-game/scoreboard/board.css). It's outside #skills, so it carries the section's tokens itself.
+ * The dialog has no padding and .sb-in fills it, so a click whose target is the dialog is a click on the backdrop.
+ */
+.sb {
+  --cyan: hsl(var(--primary));
+  --green: hsl(var(--accent));
+  --ink: hsl(var(--foreground));
+  --ink-2: hsl(195 18% 72%);
+  --ink-3: hsl(198 14% 56%);
+  --hair: hsl(190 100% 75% / 0.14);
+  --hair-strong: hsl(190 100% 75% / 0.32);
+  --glass-hi: hsl(190 100% 75% / 0.06);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  box-sizing: border-box;
+  width: min(500px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 22px;
+  font: 400 1rem/1.35 var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  background: hsl(220 30% 5% / 0.94);
+  border: 1px solid var(--hair-strong);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -24px hsl(190 100% 50% / 0.45), inset 0 1px 0 var(--glass-hi);
+  font-feature-settings: 'tnum' 1;
+}
+.sb[open] {
+  display: flex;
+  flex-direction: column;
+}
+.sb::backdrop {
+  background: hsl(220 30% 3% / 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.sb[open]::backdrop {
+  animation: sb-dim 0.26s ease both;
+}
+.sb.sb-rm[open]::backdrop {
+  animation-duration: 0.2s;
+}
+.sb.sb-closing::backdrop {
+  animation: sb-undim 0.18s ease both;
+}
+@keyframes sb-dim {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sb-undim {
+  to {
+    opacity: 0;
+  }
+}
+.sb-in {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 6px;
+}
+.sb .sr,
+.sb-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.sb-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-right: -8px;
+}
+.sb-over {
+  font: 700 0.74rem/1 var(--font-body);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: hsl(355 100% 72%);
+}
+/* the ✕: the readout's round icon button (.hbtn-ico is scoped to .bl-hud) */
+.sb-x {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--ink-2);
+  background: hsl(190 100% 75% / 0.08);
+  border: 1px solid hsl(190 100% 75% / 0.35);
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+.sb-x:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px -2px hsl(190 100% 70% / 0.6);
+}
+.sb-x:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+.sb-x svg {
+  width: 20px;
+  height: 20px;
+}
+.sb-you {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.8rem;
+}
+.sb-score {
+  font: 400 2rem/1.05 var(--font-heading);
+  color: #fff;
+  text-shadow: 0 0 18px hsl(190 100% 70% / 0.5);
+  font-feature-settings: 'tnum' 1;
+}
+.sb-rank {
+  font: 700 0.88rem/1.3 var(--font-body);
+  color: var(--ink-2);
+}
+.sb-rank .good {
+  color: var(--green);
+}
+.sb-rank .gold {
+  color: hsl(45 100% 66%);
+  text-shadow: 0 0 10px hsl(45 100% 55% / 0.6);
+}
+.sb-h {
+  margin: 12px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+  font: 700 0.72rem/1 var(--font-body);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.sb-h:focus {
+  outline: none;
+}
+/* --nw: the widest rank's characters (scoreboard.ts), so #1,234 fits its column */
+.sb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 2px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* a row: rank, name and place, score */
+.sb-row,
+.sb-form {
+  display: grid;
+  grid-template-columns: calc(var(--nw, 2) * 0.62rem + 0.5rem) minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 0.65rem;
+}
+.sb-row {
+  min-height: 34px;
+  padding: 7px 6px 6px 4px;
+  border-bottom: 1px solid hsl(190 100% 75% / 0.07);
+}
+.sb-row:last-child {
+  border-bottom: 0;
+}
+.sb-n {
+  font: 400 0.9rem/1 var(--font-heading);
+  color: var(--ink-3);
+  text-align: right;
+  font-feature-settings: 'tnum' 1;
+}
+.sb-who {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  overflow: hidden;
+}
+.sb-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sb-from {
+  flex: 0 2 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+.sb-pts {
+  font: 400 1rem/1 var(--font-heading);
+  color: var(--cyan);
+  text-align: right;
+  font-feature-settings: 'tnum' 1;
+}
+.sb-list > .sb-row:nth-child(1) .sb-n {
+  color: hsl(45 100% 66%);
+  text-shadow: 0 0 8px hsl(45 100% 55% / 0.55);
+}
+.sb-list > .sb-row:nth-child(2) .sb-n,
+.sb-list > .sb-row:nth-child(3) .sb-n {
+  color: var(--ink-2);
+}
+.sb-gap {
+  min-height: 18px;
+  line-height: 18px;
+  text-align: center;
+  letter-spacing: 0.3em;
+  color: var(--ink-3);
+}
+
+/* you: a cyan edge and a little light */
+.sb-me {
+  border-radius: 10px;
+  border-bottom-color: transparent;
+  background: linear-gradient(90deg, hsl(190 100% 75% / 0.11), hsl(190 100% 75% / 0) 80%);
+  box-shadow: inset 2px 0 0 var(--cyan);
+}
+.sb-me:focus {
+  outline: none;
+}
+.sb-me:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.sb-me .sb-name {
+  color: #fff;
+}
+.sb-me .sb-pts {
+  color: #fff;
+  text-shadow: 0 0 10px hsl(190 100% 70% / 0.7);
+}
+.sb-tag {
+  flex: none;
+  font: 700 0.64rem/1 var(--font-body);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+/* your entry: the name in your row, the place under it */
+.sb-edit {
+  padding: 6px 6px 10px 4px;
+}
+.sb-form {
+  grid-column: 1 / -1;
+  grid-template-areas: 'n name pts' '. place save' '. err err';
+  row-gap: 6px;
+  align-items: center;
+}
+.sb-form .sb-n {
+  grid-area: n;
+}
+.sb-form .sb-pts {
+  grid-area: pts;
+}
+.sb-fname {
+  grid-area: name;
+}
+.sb-place {
+  grid-area: place;
+  display: flex;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.sb-fcity {
+  flex: 1 1 52%;
+  min-width: 0;
+}
+.sb-fcountry {
+  flex: 1 1 48%;
+  min-width: 0;
+}
+.sb-f {
+  display: block;
+}
+.sb-f input,
+.sb-f select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  padding: 4px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--hair-strong);
+  border-radius: 0;
+  font: 700 1rem/1.2 var(--font-body); /* 16px at least: no zoom on focus in iOS */
+  color: #fff;
+  background: transparent;
+  caret-color: var(--cyan);
+  outline: none;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.sb-fname input {
+  font-size: 1.06rem;
+}
+.sb-f input::placeholder {
+  font-weight: 600;
+  color: var(--ink-3);
+  opacity: 1;
+}
+.sb-f input:focus,
+.sb-f select:focus {
+  border-bottom-color: var(--cyan);
+  box-shadow: 0 1px 0 var(--cyan);
+}
+.sb-f input[aria-invalid='true'] {
+  border-bottom-color: hsl(355 100% 66%);
+  box-shadow: 0 1px 0 hsl(355 100% 66%);
+}
+.sb-f select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 20px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  text-overflow: ellipsis;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2380e6ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+    no-repeat right 2px center / 14px;
+}
+.sb-f select option {
+  color: var(--ink);
+  background: hsl(220 30% 8%);
+}
+.sb-save {
+  grid-area: save;
+  min-height: 40px;
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 700 0.8rem/1 var(--font-body);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(220 30% 5%);
+  background: var(--cyan);
+  box-shadow: 0 0 18px -4px hsl(190 100% 70% / 0.8);
+  transition: box-shadow 0.2s var(--ease), opacity 0.2s;
+}
+.sb-save:hover {
+  box-shadow: 0 0 22px -2px hsl(190 100% 70% / 0.95);
+}
+.sb-save:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+.sb-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.sb-err {
+  grid-area: err;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: hsl(355 100% 74%);
+}
+.sb-err:empty {
+  display: none;
+}
+/* no ticket: the run's rank and score, and why it can't be saved */
+.sb-note {
+  grid-column: 2 / -1;
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.sb-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.9rem;
+  margin: 6px 0 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--hair);
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+.sb-foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--cyan);
+  text-decoration: none;
+}
+.sb-foot a:hover {
+  text-decoration: underline;
+}
+.sb-foot a:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* loading: ghost rows */
+.sb-ghost i {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: hsl(190 100% 75% / 0.08);
+}
+.sb-ghost .gn {
+  width: 1rem;
+  justify-self: end;
+}
+.sb-ghost .gw {
+  width: calc(38% + var(--w));
+}
+.sb-ghost .gp {
+  width: 3.6rem;
+}
+.sb-loading .sb-ghost i {
+  animation: sb-pulse 1s ease-in-out infinite alternate;
+}
+@keyframes sb-pulse {
+  to {
+    background: hsl(190 100% 75% / 0.17);
+  }
+}
+
+/* the scoreboard is out */
+.sb-off {
+  padding: 18px 4px 12px;
+}
+.sb-off p {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sb-off .sub {
+  margin-top: 4px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.sb-retry {
+  min-height: 40px;
+  margin-top: 12px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 700 0.8rem/1 var(--font-body);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  background: hsl(190 100% 75% / 0.08);
+  border: 1px solid hsl(190 100% 75% / 0.4);
+}
+.sb-retry:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+@media (pointer: coarse) {
+  .sb-f input,
+  .sb-f select,
+  .sb-save,
+  .sb-retry {
+    min-height: 44px;
+  }
+}
+@media (max-width: 560px) {
+  .sb-in {
+    padding: 10px 12px 4px;
+  }
+  .sb-score {
+    font-size: 1.7rem;
+  }
+  .sb-row {
+    min-height: 30px;
+    padding-top: 5px;
+    padding-bottom: 4px;
+  }
+  .sb-h {
+    margin-top: 8px;
+    padding-top: 10px;
+  }
+  .sb-form {
+    grid-template-areas: 'n name pts' '. place place' '. err save';
+  }
+  .sb-save {
+    justify-self: end;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-ghost i,
+  .sb-loading .sb-ghost i {
+    animation: none;
+  }
+}

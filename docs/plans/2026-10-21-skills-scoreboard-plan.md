@@ -322,7 +322,7 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
 - [x] **T5: The client API.**
   - `src/lib/skills/scoreboard-api.ts`, per §6.
   - Tests in `skills-scoreboard-api.test.ts` (`fetch` mocked): the shapes, the failure mappings, and the player id and profile in storage (including storage throwing).
-- [ ] **T6: The board.**
+- [x] **T6: The board.**
   - `src/lib/skills/scoreboard.ts` + the `.sb` styles in `blaster.css`, a port of the mockup's look B per §1–2.
   - Tests in `skills-scoreboard.test.ts` (jsdom; stub `HTMLDialogElement.prototype.showModal`/`close` if jsdom lacks them; the API mocked):
     - each state: loading, pending in the top 10 and below the gap, a new #1, saved, under your best, offline + Try again, no ticket;
@@ -421,3 +421,4 @@ Always: `npx jest --no-watchman <the task's test files>` shows them passing; `np
 - **A real run fails the bounds** in acceptance (2): that's a bug in §5's numbers. Fix the formula from the game's own timing, not by widening the slack blindly, and note it here.
 - **The wizard chat open behind the board:** WizardChat's capture-phase Esc stops propagation, so one Esc may close both the chat and the board (the browser's `cancel` still runs). That's acceptable, and noted here. Stop only if either one ends up stuck.
 - **Vercel:** no env changes are needed (no new secret). Previews write `sb:preview:*`.
+- **Noted at T6 (for Phill's review, not blocking):** §2 has no live-region line for the no-ticket state, so it reuses §2's own strings rather than new copy: the pending line's first sentence + the no-ticket line ("Game over. {score} points: number {at} of {total} on the scoreboard. Can’t be saved: the scoreboard was out when this run started."). The visible no-ticket row shows the run's rank and score with the "You" tag.

@@ -319,7 +319,7 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
     - geo from headers;
     - `Cache-Control: no-store`;
     - 503 when Redis throws.
-- [ ] **T5: The client API.**
+- [x] **T5: The client API.**
   - `src/lib/skills/scoreboard-api.ts`, per §6.
   - Tests in `skills-scoreboard-api.test.ts` (`fetch` mocked): the shapes, the failure mappings, and the player id and profile in storage (including storage throwing).
 - [ ] **T6: The board.**

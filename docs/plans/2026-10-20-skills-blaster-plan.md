@@ -548,7 +548,7 @@ It's all synthesized in Web Audio except four CC0 drum recordings (the ride, cra
   - 1440×900 at 1;
   - phones are staged, with no horizontal scroll and no touch target under 44 px.
 - **The end of a game:** 0 voices left and no leftover effect elements; the site's song is handed back.
-- **Tests:** 62 suites / 705 tests (from 58 / 644).
+- **Tests:** 62 suites / 708 tests (from 58 / 644).
 - **Gates:** `npx tsc --noEmit`, `npm run lint` (zero warnings) and `npm run build` all green.
 
 ## Test plan (Phill, locally, desktop and phone)
@@ -678,6 +678,23 @@ Phill: "it's amazing", with two fixes.
    - **Loudness:** RMS over its first 150 ms −26.3 dB, ~2 dB over a snare.
    - **Tests:** `skills-synth`: the patch with the variety off, and 40 shots within the ranges and spread.
    - **The render comparison:** −124.9 dB on the laser (the same random draws in both engines).
+
+## Addendum: Phill's review of PR #44 (2026-10-21)
+
+Three findings, none crashing; all three fixed, each with a test that failed first.
+
+1. **Esc was swallowed after a pause.** A paused game stays `'paused'` after its 6 s timer hides the readout, and Esc checked `G.state !== 'rest'`. So Esc stopped a game nobody could see, and the wizard or shroom mode needed a second press.
+   - **Now:** Esc stops the game only while its readout is up (`hud.classList.contains('on')`). After that the game stays paused, a shot still picks it up, and Esc is the site's.
+   - **Test:** `skills-blaster` "once a pause has let the readout go, Escape is the site's again".
+2. **Resuming didn't pause the site's song.** `handOff()` only ran in `begin()`, so play pressed mid-game (or during an idle pause), then a shot, put the beat over the song.
+   - **Now:** `resume()` calls `handOff()`. It does nothing when the song isn't playing.
+   - **His "your call":** the 6 s timer in `pause()` also calls `handBack()`. A visitor who scrolls on (or just stops) gets their song back along with the list, the same as at game over, and the next shot takes it again.
+   - **Tests:** `skills-blaster` "the shot that picks the game up again pauses the song again…" and "a pause that lasts gives the song back with the list…".
+3. **Wave 3 lost its gold about 1 run in 4.** `rest.slice(2)` dropped the first two non-enemy kinds to make room for the two leading moles, and the gold was one of them 2 times in 8.
+   - **Now:** `planFor` takes two `'mole'`s out of the rest instead. The kinds are the wave's exactly, and the RNG draws are unchanged.
+   - **Test:** `skills-rules` "holds every kind…" now loops 100 seeds for every wave (it failed on the gold before the fix).
+
+`npx tsc --noEmit` exit 0; `npm run lint` exit 0; `npx jest --no-watchman`: 62 suites, 708 passed.
 
 ## Stop conditions / open questions (for Phill)
 

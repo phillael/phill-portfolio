@@ -126,6 +126,22 @@ describe('the Skill blaster', () => {
     window.removeEventListener('keydown', behind)
   })
 
+  it('once a pause has let the readout go, Escape is the site’s again (the game stays paused)', () => {
+    const behind = jest.fn()
+    window.addEventListener('keydown', behind) // ShroomMode's listener
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    pass(BAR * 1000 + 5600) // idle: paused
+    expect(dev().G.state).toBe('paused')
+    pass(6100) // the readout and the arena go
+    expect(hud()).not.toHaveClass('on')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(behind).toHaveBeenCalledTimes(1)
+    expect(dev().G.state).toBe('paused')
+    pass(100)
+    expect(live()).not.toMatch(/^Stopped/)
+    window.removeEventListener('keydown', behind)
+  })
+
   it('pauses after 5 s without a shot, and a shot picks it up again', () => {
     act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
     pass(BAR * 1000 + 4500)
@@ -224,6 +240,33 @@ describe('the music', () => {
     expect(document.querySelector('.bl-hud .r2')!.textContent).toContain('Paused · the music player is on')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(music.play).not.toHaveBeenCalled() // it's already playing: nothing to hand back
+  })
+
+  it('the shot that picks the game up again pauses the song again, and stopping gives it back', () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    pass(300)
+    act(() => music.set(true)) // play pressed mid-game: the game pauses, the song plays
+    expect(dev().G.state).toBe('paused')
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Redis' }))))
+    expect(dev().G.state).not.toBe('paused')
+    expect(music.isPlaying()).toBe(false) // never the beat over the song
+    expect(music.pause).toHaveBeenCalledTimes(2)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(music.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('a pause that lasts gives the song back with the list; a shot takes it again', () => {
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Docker' }))))
+    pass(BAR * 1000 + 5600) // idle: paused
+    expect(dev().G.state).toBe('paused')
+    expect(music.play).not.toHaveBeenCalled() // a moment's pause keeps the song off
+    pass(6100) // the readout and the arena go
+    expect(music.play).toHaveBeenCalledTimes(1)
+    expect(dev().G.state).toBe('paused')
+    act(() => game.shoot(shotAt(screen.getByRole('button', { name: 'Redis' }))))
+    expect(['wave', 'between']).toContain(dev().G.state)
+    expect(music.pause).toHaveBeenCalledTimes(2)
+    expect(music.isPlaying()).toBe(false)
   })
 
   it('mute silences the master', () => {

@@ -910,10 +910,11 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     root.classList.remove('bl-on')
     status(msg)
     tell(msg.replace(' ·', '.'))
-    later(6000, () => { if (G.state === 'paused') { hudOff(); arenaOff() } }) // still reading? the readout and the arena get out of the way
+    later(6000, () => { if (G.state === 'paused') { hudOff(); arenaOff(); handBack() } }) // still reading? the readout and the arena get out of the way, and the site's song comes back
   }
   function resume() { // the beat starts again with the shot that resumes; waves pick up on the next bar
     clearLater()
+    handOff() // the song may have come on while it was paused
     root.classList.add('bl-on')
     hudOn()
     musicStart(levelFor(Math.max(0, G.wave)))
@@ -1049,10 +1050,11 @@ export function createBlaster({ section: root, ac, lean }: BlasterOptions): Blas
     if (!playing() || shot.target.closest('.bl-hud, a, button, input, select')) return
     shootAir(shot) // a shot at nothing, inside the section, while the game runs
   }
-  // Esc stops the game and nothing behind it: the wizard and shroom mode listen on window, after this
-  // (an open wizard chat or the 3D resume catch Esc first, in the capture phase, and close themselves)
+  // Esc stops the game and nothing behind it while its readout is up: the wizard and shroom mode listen on window,
+  // after this (an open wizard chat or the 3D resume catch Esc first, in the capture phase, and close themselves).
+  // Once a pause or a game over has let the readout go, Esc is the site's again
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && G.state !== 'rest') { e.stopPropagation(); stop(); return }
+    if (e.key === 'Escape' && G.state !== 'rest' && hud.classList.contains('on')) { e.stopPropagation(); stop(); return }
     if ((e.key === 'l' || e.key === 'L') && G.state === 'wave' && root.contains(document.activeElement)) {
       const t = [...G.active][0] // the oldest lit skill
       if (!t) return

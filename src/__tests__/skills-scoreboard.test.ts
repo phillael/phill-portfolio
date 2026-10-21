@@ -170,6 +170,7 @@ describe('a run to save (pending)', () => {
     await show(board({ top, total: 4, at: 2 }), { score: 8000 })
     expect(nums()).toEqual(['1', '2', '2', '2', '5'])
     expect(rows()[3].querySelector('form')).not.toBeNull()
+    expect(rows().map((li) => li.dataset.top)).toEqual(['1', '2', '2', '2', undefined]) // the top three's colours go by rank
     expect(rankLine()).toBe('#2 of 5')
   })
   it('replaces the player’s own entry (no +1 to the total)', async () => {
@@ -284,7 +285,7 @@ describe('the errors', () => {
     const mine = entry('Ana', 8000, 3, { me: true })
     await submit('Ana', { ok: false, error: 'not_best', board: board({ top: [...TEN.slice(0, 2), mine, ...TEN.slice(3)], mine, at: 7 }) })
     expect(dlg().querySelector('form')).toBeNull()
-    expect(rankLine()).toBe('#7 of 412 · your best, 8,000, is #3')
+    expect(rankLine()).toBe('#7 of 413 · your best, 8,000, is #3')
   })
 })
 
@@ -295,9 +296,14 @@ describe('a run under your best', () => {
     expect(dlg().querySelector('form')).toBeNull()
     expect(rows()[2].classList.contains('sb-me')).toBe(true)
     expect(rows()[2].querySelector('.sb-tag')!.textContent).toBe('You')
-    expect(rankLine()).toBe('#7 of 412 · your best, 8,000, is #3')
-    expect(live()).toBe('Game over. 6,000 points: number 7 of 412. Your best is number 3.')
+    expect(rankLine()).toBe('#7 of 413 · your best, 8,000, is #3') // the run counts as one more entry, beside your best
+    expect(live()).toBe('Game over. 6,000 points: number 7 of 413. Your best is number 3.')
     expect(document.activeElement).toBe($('.sb-h'))
+  })
+  it('a run lowest on the board still reads within the total', async () => {
+    const mine = entry('Ana', 4200, 1, { me: true })
+    await show(board({ top: [mine], total: 1, mine, at: 2 }), { score: 1500 })
+    expect(rankLine()).toBe('#2 of 2 · your best, 4,200, is #1')
   })
   it('your best under the gap when it’s outside the top 10', async () => {
     const mine = entry('Ana', 2000, 1234, { country: 'PT' })
@@ -306,7 +312,7 @@ describe('a run under your best', () => {
     expect(nums()[11]).toBe('1,234')
     expect(rows()[11].classList.contains('sb-me')).toBe(true)
     expect(rows()[11].querySelector('.sb-from')!.textContent).toBe('Portugal')
-    expect(rankLine()).toBe('#2,000 of 412 · your best, 2,000, is #1,234')
+    expect(rankLine()).toBe('#2,000 of 413 · your best, 2,000, is #1,234')
   })
 })
 

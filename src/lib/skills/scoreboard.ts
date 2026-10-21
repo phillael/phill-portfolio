@@ -318,13 +318,18 @@ export function createScoreboard({ onClose }: { onClose: () => void }): Scoreboa
         rankEl.replaceChildren(h('span', 'good', 'Saved'), ` · you’re #${myRank} of ${fmt(b.total)}`)
         msg = `Saved. You’re number ${myRank} of ${fmt(b.total)}.`
       } else {
-        rankEl.replaceChildren(`#${at} of ${fmt(b.total)} · your best, ${fmt(mine?.score ?? 0)}, is #${myRank}`)
-        msg = `Game over. ${fmt(r.score)} points: number ${at} of ${fmt(b.total)}. Your best is number ${myRank}.`
+        const total = fmt(b.total + 1) // `at` ranks this run beside your best: one more entry, as a pending run's total
+        rankEl.replaceChildren(`#${at} of ${total} · your best, ${fmt(mine?.score ?? 0)}, is #${myRank}`)
+        msg = `Game over. ${fmt(r.score)} points: number ${at} of ${total}. Your best is number ${myRank}.`
       }
     }
 
     const list = q<HTMLOListElement>('.sb-list')
     list.replaceChildren(...items)
+    list.querySelectorAll<HTMLElement>('.sb-row').forEach((li) => { // #1 gold, #2–3 brighter: by rank, so ties share it
+      const n = li.querySelector('.sb-n')?.textContent
+      if (n === '1' || n === '2' || n === '3') li.dataset.top = n
+    })
     list.style.setProperty('--nw', String(Math.max(2, ...[...list.querySelectorAll('.sb-n')].map((n) => n.textContent!.length))))
     if (!rm) items.forEach((li, i) => anim(li, [{ opacity: 0 }, { opacity: 1 }], { duration: 240, delay: i * 18, fill: 'backwards' }))
     const form = list.querySelector('form')

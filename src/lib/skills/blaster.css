@@ -651,8 +651,7 @@
   color: var(--ink);
   background: hsl(220 30% 5% / 0.94);
   border: 1px solid var(--hair-strong);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px); /* unprefixed only: the build adds -webkit- (written after it, the build keeps only the prefix, which Chrome ignores) */
   box-shadow: 0 24px 60px -24px hsl(190 100% 50% / 0.45), inset 0 1px 0 var(--glass-hi);
   font-feature-settings: 'tnum' 1;
 }
@@ -663,7 +662,6 @@
 .sb::backdrop {
   background: hsl(220 30% 3% / 0.62);
   backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
 }
 .sb[open]::backdrop {
   animation: sb-dim 0.26s ease both;
@@ -838,12 +836,12 @@
   text-align: right;
   font-feature-settings: 'tnum' 1;
 }
-.sb-list > .sb-row:nth-child(1) .sb-n {
+.sb-row[data-top='1'] .sb-n {
   color: hsl(45 100% 66%);
   text-shadow: 0 0 8px hsl(45 100% 55% / 0.55);
 }
-.sb-list > .sb-row:nth-child(2) .sb-n,
-.sb-list > .sb-row:nth-child(3) .sb-n {
+.sb-row[data-top='2'] .sb-n,
+.sb-row[data-top='3'] .sb-n {
   color: var(--ink-2);
 }
 .sb-gap {

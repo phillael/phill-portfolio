@@ -355,7 +355,7 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
     - Gotchas: the dialog's own tokens and live region, Esc and `cancel`, the `sb:{env}` keys, and that `.env.local` shares production's DB;
     - Commands: the script.
   - Verify `list` and `clear` against `--env development` only.
-- [ ] **T9: Browser verification (dev server on :3000).**
+- [x] **T9: Browser verification (dev server on :3000).**
   - **Desktop 1280×800 (mouse) and phone 375×812 (touch):**
     - lose a real run: `__skills.jumpToDrop()`, `G.hp = 1`, shoot air until hit;
     - save a name;
@@ -421,4 +421,10 @@ Always: `npx jest --no-watchman <the task's test files>` shows them passing; `np
 - **A real run fails the bounds** in acceptance (2): that's a bug in §5's numbers. Fix the formula from the game's own timing, not by widening the slack blindly, and note it here.
 - **The wizard chat open behind the board:** WizardChat's capture-phase Esc stops propagation, so one Esc may close both the chat and the board (the browser's `cancel` still runs). That's acceptable, and noted here. Stop only if either one ends up stuck.
 - **Vercel:** no env changes are needed (no new secret). Previews write `sb:preview:*`.
+- **Found at T9 (fixed on this branch):**
+  - **Under your best, the total counts the run:** `at` ranks the run beside the player's own best, so with `{total}` alone a run lowest on the board read "#413 of 412" (the mockup had the same flaw). It's now `#{at} of {total + 1}`, as a pending run's total (§2's wording unchanged).
+  - **The backdrop's blur was missing in Chrome:** with `backdrop-filter` then `-webkit-backdrop-filter`, the build keeps only the prefixed one. `.sb` now writes it unprefixed (CLAUDE.md gotcha).
+  - **Ties share the top colours:** #1 is gold and #2–3 brighter by rank, not by row (the mockup's `nth-child` had no ties).
+- **Found at T9, not this branch's (for Phill, not blocking):** the readout's `.bl-hud` blur is missing in Chrome for the same CSS reason (master's code); and with reduced motion on, the home page logs a React hydration-attribute warning at load, before any click (it's on master's components: this branch changes no rendered component).
+- **T9's dev server:** Phill's `next dev` on :3002 holds the project's `.next/dev/lock`, so :3000 ran from a throwaway worktree (`git worktree add --detach`, cloned `node_modules`, a symlinked `.env.local`), removed after.
 - **Noted at T6 (for Phill's review, not blocking):** §2 has no live-region line for the no-ticket state, so it reuses §2's own strings rather than new copy: the pending line's first sentence + the no-ticket line ("Game over. {score} points: number {at} of {total} on the scoreboard. Can’t be saved: the scoreboard was out when this run started."). The visible no-ticket row shows the run's rank and score with the "You" tag.

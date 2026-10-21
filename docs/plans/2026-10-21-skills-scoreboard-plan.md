@@ -306,7 +306,7 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
     - no player id in the output;
     - the env prefix (development, preview, production);
     - the TTLs.
-- [ ] **T4: The routes.**
+- [x] **T4: The routes.**
   - `src/app/api/skills/run/route.ts` (POST) and `src/app/api/skills/scores/route.ts` (GET, POST), per §3.
   - Move the wizard chat's `allowedOrigin()` into `src/lib/allowed-origin.ts` and use it in both. The wizard's tests must stay green.
   - Route tests (`/** @jest-environment node */`, `scoreboard-routes.test.ts`, on `fakeRedis`):

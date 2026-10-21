@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { buildWizardSystemPrompt } from '@/lib/wizard-prompt'
 import { WIZARD_TOOLS } from '@/lib/wizard-tools'
 import { checkAndReserve, settleUsage } from '@/lib/rate-limit'
+import { allowedOrigin } from '@/lib/allowed-origin'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -32,12 +33,6 @@ const MAX_MESSAGES = 40
 const MAX_USER_CHARS = 200
 const MAX_ASSISTANT_CHARS = 2000
 const MAX_TOTAL_CHARS = 20000
-
-function allowedOrigin(origin: string | null): boolean {
-  if (!origin) return false
-  const allowed = (process.env.WIZARD_ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim())
-  return allowed.includes(origin)
-}
 
 function validateBody(raw: unknown): raw is ChatRequestBody {
   if (typeof raw !== 'object' || raw === null) return false

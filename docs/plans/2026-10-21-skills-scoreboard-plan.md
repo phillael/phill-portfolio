@@ -295,7 +295,7 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
     - each rule of §5, including the must-pass list and the leetspeak fails;
     - `geoFrom` decodes `S%C3%A3o%20Paulo` and drops a bad country;
     - `checkRun` on the boundaries.
-- [ ] **T3: The store.**
+- [x] **T3: The store.**
   - `src/lib/scoreboard/store.ts`: the key layout of §4, `createRun`, `takeRun`, `readBoard({ player, score })`, `saveEntry`, the two rate limits, and `envPrefix()`.
   - A fake for tests: `src/__tests__/helpers/fakeRedis.ts`, an in-memory `@upstash/redis` with the commands used, including `pipeline().exec()`, `zrange` with `{ rev, withScores }`, `getdel`, `zadd` with `{ gt }`, and JSON values.
   - Tests in `scoreboard-store.test.ts`:

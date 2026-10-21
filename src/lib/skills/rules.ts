@@ -82,7 +82,8 @@ export function planFor(cfg: WaveCfg, i: number, rng: Rng = Math.random): Kind[]
   if (i === FIRST_FOE_WAVE) { // the very first enemy comes third, after two moles
     const rest = kinds.filter((x) => x !== 'foe')
     const foes = kinds.filter((x) => x === 'foe')
-    return ['mole', 'mole', foes.pop()!, ...shuffle([...rest.slice(2), ...foes], rng)]
+    for (let m = 0; m < 2; m++) rest.splice(rest.indexOf('mole'), 1) // the two leading moles come out of the rest, never the gold
+    return ['mole', 'mole', foes.pop()!, ...shuffle([...rest, ...foes], rng)]
   }
   return kinds
 }

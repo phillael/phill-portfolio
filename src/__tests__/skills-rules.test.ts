@@ -67,15 +67,17 @@ describe('the waves', () => {
 })
 
 describe('a wave’s plan', () => {
-  it('holds every kind the wave asks for, the rest moles', () => {
+  it('holds every kind the wave asks for, the rest moles, whatever the shuffle', () => {
     for (let i = 0; i < 8; i++) {
-      const cfg = waveCfg(i), plan = planFor(cfg, i, seeded(i + 1))
-      const elites = Math.min(cfg.elite ?? 0, cfg.foes)
-      expect(plan).toHaveLength(cfg.n)
-      expect(count(plan, 'elite')).toBe(elites)
-      expect(count(plan, 'foe')).toBe(cfg.foes - elites)
-      expect(count(plan, 'gold')).toBe(cfg.gold)
-      expect(count(plan, 'mole')).toBe(cfg.n - cfg.foes - cfg.gold)
+      for (let seed = 1; seed <= 100; seed++) {
+        const cfg = waveCfg(i), plan = planFor(cfg, i, seeded(seed))
+        const elites = Math.min(cfg.elite ?? 0, cfg.foes)
+        expect(plan).toHaveLength(cfg.n)
+        expect(count(plan, 'elite')).toBe(elites)
+        expect(count(plan, 'foe')).toBe(cfg.foes - elites)
+        expect(count(plan, 'gold')).toBe(cfg.gold)
+        expect(count(plan, 'mole')).toBe(cfg.n - cfg.foes - cfg.gold)
+      }
     }
   })
 

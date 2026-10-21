@@ -286,7 +286,7 @@ Order matters: T1–T3 are the server's pieces, T4 needs them, T5–T7 build the
     - monotonic past the table;
     - each resume adds 100;
     - a node-env test (`src/__tests__/scoreboard-rules-node.test.ts`) that imports `rules.ts` without browser globals.
-- [ ] **T2: The country list and the validation.**
+- [x] **T2: The country list and the validation.**
   - `src/data/countries.ts` (`COUNTRY_CODES`, a literal; generate it once with Node's `Intl` the way the mockup does, then commit the list).
   - `src/lib/scoreboard/validate.ts`: `cleanText`, `checkName`, `checkCity`, `isCountry`, `geoFrom(headers)`, `checkRun({ wave, score, resumes, elapsed })`.
   - `npm i obscenity`.

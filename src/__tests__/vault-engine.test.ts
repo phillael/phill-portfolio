@@ -6,7 +6,9 @@
 import projectsData from '@/data/projects.json'
 import media from '@/data/projects-media.json'
 import type { Project } from '@/types/content'
-import { createVault, type MediaEntry, type Vault, type VaultOpts } from '@/lib/vault/vault'
+import { registerSiteMusic, type SiteMusic } from '@/lib/site-music'
+import { createVault, type MediaEntry, type VaultOpts } from '@/lib/vault/vault'
+import { FakeAudioContext } from './helpers/fakeAudio'
 
 const mockRender = jest.fn()
 const mockRendererDispose = jest.fn()
@@ -360,6 +362,44 @@ describe('createVault', () => {
       expect(opts.onNear).toHaveBeenCalledWith(4)
       expect(dlg()?.open).toBe(true)
       expect(dlg()!.querySelector('video source')?.getAttribute('src')).toBe('/projects/pickleball-2079.webm')
+    })
+  })
+
+  describe('sound', () => {
+    let ac: FakeAudioContext
+    let context: jest.Mock
+    beforeEach(() => {
+      ac = new FakeAudioContext()
+      context = jest.fn(() => ac)
+      registerSiteMusic({ context, isPlaying: () => false, onChange: () => () => {} } as unknown as SiteMusic)
+    })
+    afterEach(() => registerSiteMusic(null))
+    const oscs = () => ac.nodes.filter((n) => n.kind === 'osc').length
+
+    it('is silent until armSound() (from a click), then the sets’ changes sound', async () => {
+      const { vault } = await ready()
+      vault.go(2)
+      await frames(120)
+      expect(context).not.toHaveBeenCalled()
+      vault.armSound()
+      vault.armSound()
+      expect(context).toHaveBeenCalledTimes(1)
+      vault.go(3)
+      expect(oscs()).toBe(1) // the power-off
+      await frames(120)
+      expect(oscs()).toBe(5) // + the power-on
+    })
+
+    it('keeps a set powering on as the hall scrolls back in silent', async () => {
+      const { vault } = await ready()
+      vault.armSound()
+      onScreen(false)
+      vault.go(4)
+      const before = oscs()
+      await frames(120)
+      onScreen(true)
+      await frames(30)
+      expect(oscs()).toBe(before)
     })
   })
 

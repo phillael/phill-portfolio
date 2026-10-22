@@ -262,7 +262,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
     - a drag out of the panel doesn't close;
     - focus goes back to the opener;
     - the video element is back in the holder after close.
-- [ ] **T7: The sound effects** (`sfx.ts`).
+- [x] **T7: The sound effects** (`sfx.ts`).
   - The mockup's four cues; silent until `arm(ac)` is called from a click in the section.
   - Tests with `helpers/fakeAudio.ts`: nothing is scheduled before `arm`; each cue schedules nodes after it; there's no `createMediaElementSource`.
 - [ ] **T8: The section.**

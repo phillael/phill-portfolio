@@ -4,7 +4,7 @@
  * at a time through its set's CRT. Ported from the mockup (docs/design/projects-vault/vault.js); the React island
  * (components/projects/ProjectsVault.tsx) owns the tabs, panels, buttons and the live region, and calls in.
  * Watch opens the hologram (holo.ts) on the set's own video; without WebGL it lifts from the fallback's screen
- * (the stage's `[data-vault-screen]`).
+ * (the stage's `[data-vault-screen]`). The sound effects (sfx.ts) stay silent until armSound() from a click.
  *
  * Rules it keeps: no layout reads and no callbacks per frame (sizes come from the ResizeObserver; onNear fires on
  * index changes only); the loop runs only while the stage is on screen (or the hologram is up) and the tab is
@@ -19,6 +19,7 @@ import { createHall, type Hall } from './hall'
 import { createHolo } from './holo'
 import { R, SCREEN_Y, START, angleOf, clamp, coverCrop, dragPer, easeOut, holoBack, lerp, lookUp, scanLines, type Pt, type Quad } from './math'
 import { buildExhibit, type Exhibit } from './sets'
+import { contextFromClick, createSfx } from './sfx'
 import { createState, dragEnd, dragMove, go as goTo, tick, watch as watchSet, type Hooks } from './state'
 import './vault.css'
 
@@ -58,6 +59,8 @@ export type Vault = {
   watch(i: number): void
   setPaused(paused: boolean): void
   setReducedMotion(rm: boolean): void
+  /** the sound effects may play from now on: call it inside a click in the section (it makes the AudioContext) */
+  armSound(): void
   destroy(): void
 }
 
@@ -110,6 +113,10 @@ export function createVault(opts: VaultOpts): Vault {
   let quiet = 0
   let didInteract = false
   const cleanups: (() => void)[] = []
+  const sfx = createSfx()
+  let ownAc: AudioContext | null = null
+  // a set powering on because the hall scrolled into view is silent; one the visitor asked for isn't
+  let scrolledIn = false
   const listen = <T extends Event>(el: EventTarget, type: string, fn: (ev: T) => void, o?: AddEventListenerOptions) => {
     el.addEventListener(type, fn as EventListener, o)
     cleanups.push(() => el.removeEventListener(type, fn as EventListener, o))
@@ -188,6 +195,7 @@ export function createVault(opts: VaultOpts): Vault {
       setU(u, { uOpenX: 1, uOpenY: 1, uFlash: 0, uWobble: CRT.wobble, uStatic: 0, uBright: 1.05 })
       return
     }
+    if (!scrolledIn) sfx.on()
     tween(e, 1.1, (t) =>
       setU(u, {
         uOpenX: easeOut(clamp(t / 0.13)),
@@ -208,6 +216,7 @@ export function createVault(opts: VaultOpts): Vault {
       e.tween = null
       return setIdle(e, true)
     }
+    sfx.off()
     const from = u.uBright.value
     tween(
       e,
@@ -278,10 +287,12 @@ export function createVault(opts: VaultOpts): Vault {
     onOpen() {
       S.hcTo = 1
       E[S.holo].emit = 0.85
+      sfx.holo()
       kick()
     },
     onClosing() {
       S.hcTo = 0
+      sfx.holoClose()
       kick()
     },
     onClosed() {
@@ -540,6 +551,7 @@ export function createVault(opts: VaultOpts): Vault {
 
   /* ================= input ================= */
   function interacted() {
+    scrolledIn = false
     if (didInteract) return
     didInteract = true
     opts.onInteract?.()
@@ -558,6 +570,7 @@ export function createVault(opts: VaultOpts): Vault {
   let drag: Drag | null = null
   listen(canvas, 'pointerdown', (ev: PointerEvent) => {
     if (ev.button !== 0 || S.holo >= 0 || !built || failed) return
+    scrolledIn = false
     drag = { x: ev.clientX, y: ev.clientY, pos0: S.pos, axis: null, lastX: ev.clientX, lastT: performance.now(), v: 0, id: ev.pointerId }
     S.held = true
     kick()
@@ -662,6 +675,7 @@ export function createVault(opts: VaultOpts): Vault {
   view.h = stage.clientHeight
   const io = new IntersectionObserver(
     ([en]) => {
+      if (en.isIntersecting && !S.visible) scrolledIn = true
       S.visible = en.isIntersecting
       const v = S.on >= 0 ? E[S.on].video : null
       if (v) {
@@ -719,6 +733,13 @@ export function createVault(opts: VaultOpts): Vault {
       S.rm = rm
       kick()
     },
+    armSound() {
+      if (sfx.armed() || destroyed) return
+      const c = contextFromClick()
+      if (!c) return
+      sfx.arm(c.ac)
+      if (c.own) ownAc = c.ac
+    },
     destroy() {
       if (destroyed) return
       destroyed = true
@@ -726,6 +747,8 @@ export function createVault(opts: VaultOpts): Vault {
       cancelAnimationFrame(buildRaf)
       raf = buildRaf = 0
       holo.destroy()
+      sfx.dispose()
+      void ownAc?.close()
       cleanups.forEach((fn) => fn())
       ro.disconnect()
       io.disconnect()

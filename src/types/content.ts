@@ -4,16 +4,24 @@
  * (The career, for the Experience section, is typed in src/data/career.ts; the skills in src/data/skills.ts.)
  */
 
+/** The television an exhibit stands on in the Relic Vault (each one is built in src/lib/vault/sets.ts) */
+export type ProjectTv = 'pocket' | 'tube' | 'terminal' | 'sphere' | 'portable' | 'console'
+
 /**
- * Project - Featured project for the project gallery section
+ * Project - an exhibit in the Projects section (the Relic Vault); its video and poster are in projects-media.json
  */
 export interface Project {
   id: string
   title: string
+  /** the tab's name when the title is long */
+  short?: string
+  /** the repo's first commit: "Recovered from {year}" */
+  year: number
+  tv: ProjectTv
+  /** the caption: "Displayed on {set}." */
+  set: string
   description: string
   techStack: string[]
-  /** none yet: the card shows a placeholder */
-  imageUrl?: string
   /** an internal path (e.g. /resume) opens in the same tab */
   liveUrl?: string
   repoUrl?: string

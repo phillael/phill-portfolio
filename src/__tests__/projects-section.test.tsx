@@ -9,6 +9,7 @@
  * - Images have proper alt text
  */
 
+import type { ComponentProps } from 'react'
 import { render, screen } from '@testing-library/react'
 import ProjectsSection from '@/components/ProjectsSection'
 import ProjectCard from '@/components/ProjectCard'
@@ -73,7 +74,7 @@ describe('ProjectsSection', () => {
     expect(section).toBeInTheDocument()
   })
 
-  it('renders the five project cards, in order, without a TimelyCare card', () => {
+  it('renders the six project cards, in order, without a TimelyCare card', () => {
     render(<ProjectsSection />)
 
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
@@ -81,6 +82,7 @@ describe('ProjectsSection', () => {
       'Number Slayers',
       'Rezmancer',
       'Jelly Resume',
+      'Pickleball 2079',
       'Pong Multiverse Alpaca Squadron',
     ])
     expect((projectsData as Project[]).map((p) => p.title)).not.toContain('TimelyCare')
@@ -107,7 +109,7 @@ describe('ProjectsSection', () => {
 })
 
 describe('ProjectCard', () => {
-  const mockProject: Project = {
+  const mockProject: ComponentProps<typeof ProjectCard>['project'] = {
     id: 'test-project',
     title: 'Test Project',
     description: 'A test project description for testing purposes.',
@@ -168,7 +170,7 @@ describe('ProjectCard', () => {
   })
 
   it('does not render View Code button when repoUrl is not provided', () => {
-    const projectWithoutRepo: Project = {
+    const projectWithoutRepo: ComponentProps<typeof ProjectCard>['project'] = {
       ...mockProject,
       repoUrl: undefined,
     }

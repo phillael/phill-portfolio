@@ -5,8 +5,13 @@ import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { Project } from '@/types/content'
 
+/** The card's fields (projects.json has no screenshots any more, so it shows the placeholder) */
+type CardProject = Pick<Project, 'id' | 'title' | 'description' | 'techStack' | 'liveUrl' | 'repoUrl'> & {
+  imageUrl?: string
+}
+
 interface ProjectCardProps {
-  project: Project
+  project: CardProject
   delay?: number
 }
 

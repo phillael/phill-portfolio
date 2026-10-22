@@ -28,5 +28,11 @@
     "architecture": "Plain TypeScript on one raw WebGL2 canvas on this site: spring soft bodies per word, a glyph atlas and skinned GLB characters, with custom physics and Web Audio.",
     "keyPatterns": "Lazy chunks, paused while hidden, and never mounted for reduced motion.",
     "notableDetails": "The hero photo dissolves into a copy of Phill's resume you can knock apart. Play mode reads its level off the resume's text lines (one-way platforms, role checkpoints, Impact coins) and turns it into a run from his name to the last line."
+  },
+  {
+    "id": "pickleball-2079",
+    "architecture": "A pnpm monorepo: a pure, deterministic 60 Hz simulation package (the rules, the ball, the players, rally scoring to 11, win by 2) and a Vite + TypeScript web app that draws it with plain three.js from a sideline camera.",
+    "keyPatterns": "The sim is pure and seeded, so a match replays bit-exact from its inputs; CPU players run on the same sim, and replays print a point-by-point timeline for debugging. The characters are modular voxel figures built in code: species presets mixed with outfit kits.",
+    "notableDetails": "Wacky arcade pickleball in the NBA Jam mould, in development: local matches against the CPU work today, online play and touch controls are next. Players who get hit by the ball explode into cubes and rebuild."
   }
 ]

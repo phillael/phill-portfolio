@@ -1,0 +1,110 @@
+{
+  "quadzilla": {
+    "w": 540,
+    "h": 960,
+    "duration": 11.1,
+    "audio": false,
+    "placeholder": true,
+    "poster": "/projects/quadzilla.jpg",
+    "sources": [
+      {
+        "src": "/projects/quadzilla.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "/projects/quadzilla.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "number-slayers": {
+    "w": 960,
+    "h": 540,
+    "duration": 14,
+    "audio": false,
+    "placeholder": true,
+    "poster": "/projects/number-slayers.jpg",
+    "sources": [
+      {
+        "src": "/projects/number-slayers.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "/projects/number-slayers.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "rezmancer": {
+    "w": 960,
+    "h": 540,
+    "duration": 5.9,
+    "audio": false,
+    "placeholder": true,
+    "poster": "/projects/rezmancer.jpg",
+    "sources": [
+      {
+        "src": "/projects/rezmancer.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "/projects/rezmancer.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "jelly-resume": {
+    "w": 960,
+    "h": 540,
+    "duration": 14,
+    "audio": false,
+    "placeholder": true,
+    "poster": "/projects/jelly-resume.jpg",
+    "sources": [
+      {
+        "src": "/projects/jelly-resume.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "/projects/jelly-resume.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "pickleball-2079": {
+    "w": 960,
+    "h": 540,
+    "duration": 14,
+    "audio": false,
+    "placeholder": true,
+    "poster": "/projects/pickleball-2079.jpg",
+    "sources": [
+      {
+        "src": "/projects/pickleball-2079.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "/projects/pickleball-2079.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "pong": {
+    "w": 960,
+    "h": 540,
+    "duration": 14,
+    "audio": false,
+    "placeholder": true,
+    "poster": "/projects/pong.jpg",
+    "sources": [
+      {
+        "src": "/projects/pong.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "/projects/pong.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  }
+}

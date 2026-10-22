@@ -208,7 +208,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
   - `projects.json` (six, new fields, no `imageUrl`), the `Project` type, and the `project-details.json` entry.
   - `ProjectCard.tsx` stays compiling until T8: give it a local optional `imageUrl` or render the placeholder, and don't touch its look.
   - Update `data-architecture.test.ts` (six in order; each has `year`, `tv` in the set list, and `set`; links valid) and keep `wizard-prompt.test.ts` green.
-- [ ] **T2: The media pipeline.** §4.
+- [x] **T2: The media pipeline.** §4.
   - `.gitignore` gets `video-masters/`.
   - Write `scripts/encode-projects.mjs`, then run it. Masters exist for whatever Phill has dropped in; the rest are placeholders.
   - Commit `public/projects/*` and the generated `src/data/projects-media.json`.

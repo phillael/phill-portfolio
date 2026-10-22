@@ -213,7 +213,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
   - Write `scripts/encode-projects.mjs`, then run it. Masters exist for whatever Phill has dropped in; the rest are placeholders.
   - Commit `public/projects/*` and the generated `src/data/projects-media.json`.
   - Test `projects-media.test.ts`: every project id has an entry; its files exist under `public/`; `w`/`h`/`duration` are sane; the sources' order is webm then mp4.
-- [ ] **T3: The pure math and state** (`src/lib/vault/math.ts`, `state.ts`).
+- [x] **T3: The pure math and state** (`src/lib/vault/math.ts`, `state.ts`).
   - Tests `vault-math.test.ts` and `vault-state.test.ts`:
     - `sq2quad` maps the unit square's corners onto the quad, and an affine quad gives `g = h = 0`;
     - `cssH` round-trips a point;

@@ -141,6 +141,8 @@ export function createVault(opts: VaultOpts): Vault {
     v.playsInline = true
     v.setAttribute('playsinline', '')
     v.preload = 'auto'
+    // the clips are on Vercel Blob: without CORS the CRT's VideoTexture is black and the spill's colour read throws
+    v.crossOrigin = 'anonymous'
     v.poster = e.m.poster // the hologram shows it while a clip that never played loads
     for (const s of e.m.sources) {
       const el = document.createElement('source')
@@ -507,7 +509,7 @@ export function createVault(opts: VaultOpts): Vault {
 
   /* ================= the staged build ================= */
   // one step per frame, so mounting never makes a long task: the renderer, the reflections, each set, the shaders
-  const loader = new THREE.TextureLoader()
+  const loader = new THREE.TextureLoader() // anonymous CORS by default: the posters are on Vercel Blob
   function buildSet(e: Exh) {
     const h = hall!
     const ex = buildExhibit(e.p.tv, e.i, N, h.M, e.tv ?? undefined)

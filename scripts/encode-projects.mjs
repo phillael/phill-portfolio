@@ -6,33 +6,43 @@
  *
  * For each project in src/data/projects.json it reads the master `video-masters/<id>.(mp4|mov|m4v|webm)` (gitignored,
  * never committed), or, when there's none, the mockup's `docs/design/projects-vault/media/<id>.mp4` as a PLACEHOLDER
- * (placeholders never ship: the PR waits for every master). It writes:
- *   public/projects/<id>.webm   AV1 (SVT-AV1, crf 34, preset 6), Opus 96k when the master has sound
- *   public/projects/<id>.mp4    H.264 High (crf 23, preset slow, ≤ 3 Mb/s, faststart), AAC 128k when it has sound
- *   public/projects/<id>.jpg    the poster: the frame at POSTER_AT[id] (default 1.5 s), 960 px on the long side, ~80 KB
- * Video: the long side at 1280 (never upscaled), 30 fps. Then src/data/projects-media.json (GENERATED: never hand-edit;
- * `--id` updates that one entry). It warns past 40 s, past 4 MB for a file, on a master under 720 px on its short side,
- * and on an HDR master (ffmpeg here has no zscale to tone-map it: export it SDR).
+ * (placeholders never ship: the PR waits for every master). It encodes into video-masters/encoded/ (gitignored too):
+ *   <id>.webm   AV1 (SVT-AV1, crf 34, preset 6), Opus 96k when the master has sound
+ *   <id>.mp4    H.264 High (crf 23, preset slow, ≤ 3 Mb/s, faststart), AAC 128k when it has sound
+ *   <id>.jpg    the poster: the frame at POSTER_AT[id] (default 0: a brag master's frame 0 is its designed poster),
+ *               960 px on the long side, ~80 KB
+ * Video: the long side at 1280 (never upscaled), 30 fps. Then it uploads the three to Vercel Blob (the public store
+ * phill-portfolio-media: no binaries in git history, and the clips get re-cut) as projects/<id>-<sha256, 12 hex>.<ext>.
+ * A re-cut gets a new name, so a year's cache never serves a stale clip; a name already in the store isn't sent again.
+ * The token is BLOB_READ_WRITE_TOKEN, from the environment or .env.local (`vercel env pull .env.local`). Old files stay
+ * in the store (a live deploy may still point at them): prune them by hand once a deploy no longer does.
+ * Then src/data/projects-media.json (GENERATED: never hand-edit; `--id` updates that one entry) with the Blob URLs.
+ * It warns past 40 s, past 15 MB for a file (the vault loads one clip at a time, when its set powers on), on a master
+ * under 720 px on its short side, and on an HDR master (ffmpeg here has no zscale to tone-map it: export it SDR).
  */
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { BlobNotFoundError, head, put } from '@vercel/blob'
 
-/** The poster frame per id, in seconds (a good, busy frame of the clip) */
+/** The poster frame per id, in seconds, when it isn't the master's frame 0 */
 const POSTER_AT = {}
-const POSTER_AT_DEFAULT = 1.5
+const POSTER_AT_DEFAULT = 0
 
 const LONG_SIDE = 1280
 const POSTER_LONG_SIDE = 960
 const POSTER_BYTES = 80 * 1024
 const FPS = 30
 const MAX_SECONDS = 40
-const MAX_BYTES = 4 * 1024 * 1024
+const MAX_BYTES = 15 * 1024 * 1024
 const MIN_SHORT_SIDE = 720
 const MASTER_EXTS = ['mp4', 'mov', 'm4v', 'webm']
 const WEBM_TYPE = 'video/webm; codecs=av01.0.05M.08'
+const CONTENT_TYPE = { webm: 'video/webm', mp4: 'video/mp4', jpg: 'image/jpeg' }
+const YEAR = 365 * 24 * 60 * 60
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const at = (...p) => path.join(root, ...p)
@@ -82,8 +92,27 @@ const projects = JSON.parse(fs.readFileSync(at('src/data/projects.json'), 'utf8'
 const ids = projects.map((p) => p.id)
 if (onlyId !== undefined && !ids.includes(onlyId)) die(`--id ${onlyId}: not in src/data/projects.json (${ids.join(', ')})`)
 
+if (!process.env.BLOB_READ_WRITE_TOKEN && fs.existsSync(at('.env.local'))) process.loadEnvFile(at('.env.local'))
+const token = process.env.BLOB_READ_WRITE_TOKEN
+if (!token) die('No BLOB_READ_WRITE_TOKEN: `vercel env pull .env.local` (the Blob store phill-portfolio-media)')
+
+/** Upload an encode to Blob as projects/<id>-<sha256, 12 hex>.<ext>, unless the store already has it */
+async function upload(id, file) {
+  const body = fs.readFileSync(file)
+  const ext = path.extname(file).slice(1)
+  const pathname = `projects/${id}-${createHash('sha256').update(body).digest('hex').slice(0, 12)}.${ext}`
+  try {
+    return { url: (await head(pathname, { token })).url, sent: false }
+  } catch (e) {
+    if (!(e instanceof BlobNotFoundError)) throw e
+  }
+  const { url } = await put(pathname, body, { access: 'public', token, contentType: CONTENT_TYPE[ext], addRandomSuffix: false, cacheControlMaxAge: YEAR })
+  return { url, sent: true }
+}
+
 const previous = fs.existsSync(MANIFEST) ? JSON.parse(fs.readFileSync(MANIFEST, 'utf8')) : {}
-fs.mkdirSync(at('public/projects'), { recursive: true })
+const ENCODED = at('video-masters/encoded')
+fs.mkdirSync(ENCODED, { recursive: true })
 
 const rows = []
 const warnings = []
@@ -105,7 +134,7 @@ for (const id of ids) {
 
   const [w, h] = fit(m.w, m.h, LONG_SIDE)
   const vf = `fps=${FPS},scale=${w}:${h}:flags=lanczos,setsar=1`
-  const out = (e) => at('public/projects', `${id}.${e}`)
+  const out = (e) => path.join(ENCODED, `${id}.${e}`)
 
   ffmpeg([
     '-i', src, '-map', '0:v:0', ...(m.audio ? ['-map', '0:a:0'] : []), '-vf', vf,
@@ -137,16 +166,18 @@ for (const id of ids) {
     if (sizes[e] > MAX_BYTES) warnings.push(`${id}.${e}: ${(sizes[e] / 1048576).toFixed(2)} MB, past ${MAX_BYTES / 1048576} MB`)
   }
 
+  const [webm, mp4, jpg] = await Promise.all(['webm', 'mp4', 'jpg'].map((e) => upload(id, out(e))))
+
   entries[id] = {
     w: enc.w,
     h: enc.h,
     duration: Math.round(enc.duration * 100) / 100,
     audio: enc.audio,
     placeholder,
-    poster: `/projects/${id}.jpg`,
+    poster: jpg.url,
     sources: [
-      { src: `/projects/${id}.webm`, type: WEBM_TYPE },
-      { src: `/projects/${id}.mp4`, type: 'video/mp4' },
+      { src: webm.url, type: WEBM_TYPE },
+      { src: mp4.url, type: 'video/mp4' },
     ],
   }
   const kb = (n) => `${Math.round(n / 1024)} KB`
@@ -159,6 +190,7 @@ for (const id of ids) {
     webm: kb(sizes.webm),
     mp4: kb(sizes.mp4),
     poster: kb(sizes.jpg),
+    uploaded: [webm, mp4, jpg].filter((u) => u.sent).length,
   })
 }
 

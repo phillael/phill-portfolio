@@ -93,6 +93,8 @@ jest.mock('three/examples/jsm/postprocessing/OutputPass.js', () => ({ OutputPass
 
 const projects = projectsData as Project[]
 const MEDIA = media as Record<string, MediaEntry>
+/** a clip's URL from the generated manifest (Vercel Blob): 0 the AV1 webm, 1 the H.264 mp4 */
+const clip = (id: string, i = 0) => MEDIA[id].sources[i].src
 
 /* ---------- frames on a clock we own ---------- */
 let clock = 1000
@@ -246,8 +248,10 @@ describe('createVault', () => {
     await frames(10)
     const [v] = videos(m.videoHolder)
     expect(videos(m.videoHolder)).toHaveLength(1)
-    expect([...v.querySelectorAll('source')].map((s) => s.getAttribute('src'))).toEqual(['/projects/number-slayers.webm', '/projects/number-slayers.mp4'])
+    expect([...v.querySelectorAll('source')].map((s) => s.getAttribute('src'))).toEqual([clip('number-slayers'), clip('number-slayers', 1)])
     expect(v.muted && v.loop && v.playsInline).toBe(true)
+    // the clips are cross-origin: without CORS, WebGL can't draw them
+    expect(v.crossOrigin).toBe('anonymous')
     expect(v.paused).toBe(false)
   })
 
@@ -269,7 +273,7 @@ describe('createVault', () => {
     expect(near(opts)).toEqual([2, 3, 4])
     const [slayers, pickleball] = videos(videoHolder)
     expect(slayers.paused).toBe(true)
-    expect(pickleball.querySelector('source')?.getAttribute('src')).toBe('/projects/pickleball-2079.webm')
+    expect(pickleball.querySelector('source')?.getAttribute('src')).toBe(clip('pickleball-2079'))
     expect(pickleball.paused).toBe(false)
   })
 
@@ -399,7 +403,7 @@ describe('createVault', () => {
       expect(dlg()?.open).toBeFalsy()
       await frames(200)
       expect(dlg()?.open).toBe(true)
-      expect(dlg()!.querySelector('video source')?.getAttribute('src')).toBe('/projects/jelly-resume.webm')
+      expect(dlg()!.querySelector('video source')?.getAttribute('src')).toBe(clip('jelly-resume'))
     })
 
     /** a click on the stage at (fx, fy) of its size (the engine reads offsetX/Y) */
@@ -437,7 +441,7 @@ describe('createVault', () => {
       vault.watch(4)
       expect(opts.onNear).toHaveBeenCalledWith(4)
       expect(dlg()?.open).toBe(true)
-      expect(dlg()!.querySelector('video source')?.getAttribute('src')).toBe('/projects/pickleball-2079.webm')
+      expect(dlg()!.querySelector('video source')?.getAttribute('src')).toBe(clip('pickleball-2079'))
     })
   })
 

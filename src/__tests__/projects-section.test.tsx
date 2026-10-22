@@ -8,6 +8,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { axe } from 'jest-axe'
 import ProjectsSection from '@/components/ProjectsSection'
 import projectsData from '@/data/projects.json'
+import media from '@/data/projects-media.json'
 import type { Project } from '@/types/content'
 import type { Vault, VaultOpts } from '@/lib/vault/vault'
 
@@ -250,7 +251,7 @@ describe('ProjectsSection', () => {
     await near()
     act(() => mockOpts!.onFail())
     const screenEl = document.querySelector('[data-vault-screen]')!
-    expect(screenEl.querySelector('img')?.getAttribute('src')).toBe('/projects/number-slayers.jpg')
+    expect(screenEl.querySelector('img')?.getAttribute('src')).toBe(media['number-slayers'].poster)
     expect(screenEl.querySelector('img')?.getAttribute('alt')).toBe('')
     act(() => mockOpts!.onNear(0))
     expect(document.querySelector('[data-vault-screen]')?.getAttribute('data-tall')).toBe('true')

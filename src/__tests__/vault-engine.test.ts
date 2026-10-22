@@ -251,6 +251,18 @@ describe('createVault', () => {
     expect(opts.onAnnounce).toHaveBeenCalledWith(3)
   })
 
+  it('step() goes from where the hall is heading, so quick presses add up (and wrap)', async () => {
+    const { vault, opts } = await ready()
+    vault.step(1)
+    vault.step(1)
+    expect((opts.onAnnounce as jest.Mock).mock.calls.map(([i]) => i)).toEqual([2, 3])
+    await frames(200)
+    expect(near(opts).at(-1)).toBe(3)
+    vault.go(0)
+    vault.step(-1)
+    expect(opts.onAnnounce).toHaveBeenLastCalledWith(5)
+  })
+
   it('setPaused(true) pauses the front video; false plays it again', async () => {
     const { vault, videoHolder } = await ready()
     const [v] = videos(videoHolder)

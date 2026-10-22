@@ -1,182 +1,286 @@
 /**
- * Projects Section Tests
- *
- * Tests for the ProjectsSection and ProjectCard components:
- * - ProjectsSection renders with correct ID (#projects)
- * - All 3 project cards render from JSON data
- * - ProjectCard displays title, description, and tech stack
- * - Action links (Live Demo, View Code) render with correct hrefs
- * - Images have proper alt text
+ * The Projects section: the Relic Vault (src/components/ProjectsSection.tsx + components/projects/ProjectsVault.tsx).
+ * The engine (src/lib/vault/vault.ts) is mocked: these tests cover the HTML (every exhibit's tab panel, the copy, the
+ * links), the APG tabs, the stage's buttons, the lazy import as the section nears, and the no-WebGL fallback.
  */
 
-import type { ComponentProps } from 'react'
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import ProjectsSection from '@/components/ProjectsSection'
-import ProjectCard from '@/components/ProjectCard'
 import projectsData from '@/data/projects.json'
-import { Project } from '@/types/content'
+import type { Project } from '@/types/content'
+import type { Vault, VaultOpts } from '@/lib/vault/vault'
 
-// Helper to filter out framer-motion props
-const filterMotionProps = (props: Record<string, unknown>) => {
-  const motionProps = ['initial', 'animate', 'exit', 'whileHover', 'whileTap', 'whileInView', 'whileFocus', 'whileDrag', 'variants', 'transition', 'viewport', 'layout', 'layoutId', 'onAnimationComplete', 'onAnimationStart']
-  const filtered: Record<string, unknown> = {}
-  Object.keys(props).forEach(key => {
-    if (!motionProps.includes(key)) {
-      filtered[key] = props[key]
+const mockVault: jest.Mocked<Vault> = {
+  go: jest.fn(),
+  step: jest.fn(),
+  watch: jest.fn(),
+  setPaused: jest.fn(),
+  setReducedMotion: jest.fn(),
+  armSound: jest.fn(),
+  destroy: jest.fn(),
+}
+let mockOpts: VaultOpts | null = null
+const mockCreate = jest.fn((o: VaultOpts) => {
+  mockOpts = o
+  return mockVault
+})
+jest.mock('@/lib/vault/vault', () => ({ createVault: (o: VaultOpts) => mockCreate(o) }))
+
+const projects = projectsData as Project[]
+
+/* the IntersectionObserver: the section nears when a test says so */
+let observers: { cb: IntersectionObserverCallback; margin?: string }[] = []
+const realIO = window.IntersectionObserver
+beforeEach(() => {
+  observers = []
+  mockOpts = null
+  mockCreate.mockClear()
+  Object.values(mockVault).forEach((f) => f.mockClear())
+  window.IntersectionObserver = class {
+    constructor(cb: IntersectionObserverCallback, o?: IntersectionObserverInit) {
+      observers.push({ cb, margin: o?.rootMargin })
     }
-  })
-  return filtered
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return []
+    }
+  } as unknown as typeof IntersectionObserver
+})
+afterAll(() => {
+  window.IntersectionObserver = realIO
+})
+
+const near = async () => {
+  await act(async () => observers.forEach((o) => o.cb([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver)))
+  await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1))
+}
+const panel = (id: string) => document.getElementById(`pv-p-${id}`)!
+const visibleText = (el: Element) => {
+  const c = el.cloneNode(true) as Element
+  c.querySelectorAll('.sr-only').forEach((s) => s.remove())
+  return c.textContent
 }
 
-// Mock framer-motion to avoid animation issues in tests
-jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <div className={className} {...filterMotionProps(props)}>{children}</div>
-    ),
-    section: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <section className={className} {...filterMotionProps(props)}>{children}</section>
-    ),
-    h2: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <h2 className={className} {...filterMotionProps(props)}>{children}</h2>
-    ),
-    h3: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <h3 className={className} {...filterMotionProps(props)}>{children}</h3>
-    ),
-    span: ({ children, className, ...props }: React.PropsWithChildren<{ className?: string }>) => (
-      <span className={className} {...filterMotionProps(props)}>{children}</span>
-    ),
-    a: ({ children, className, href, target, rel }: React.PropsWithChildren<{ className?: string; href?: string; target?: string; rel?: string }>) => (
-      <a className={className} href={href} target={target} rel={rel}>{children}</a>
-    ),
-    article: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
-      <article className={className}>{children}</article>
-    ),
-  },
-  AnimatePresence: ({ children }: React.PropsWithChildren<object>) => <>{children}</>,
-  useReducedMotion: () => false,
-}))
-
-// Mock Next.js Image component
-jest.mock('next/image', () => ({
-  __esModule: true,
-  default: (props: { alt: string; src: string }) => (
-     
-    <img alt={props.alt} src={props.src} />
-  ),
-}))
-
 describe('ProjectsSection', () => {
-  it('renders with correct ID (#projects)', () => {
+  it('is #projects, labelled by its "Projects" heading, with the header copy', () => {
     render(<ProjectsSection />)
-
-    const section = document.getElementById('projects')
-    expect(section).toBeInTheDocument()
+    const section = screen.getByRole('region', { name: 'Projects' })
+    expect(section.id).toBe('projects')
+    expect(screen.getByRole('heading', { level: 2, name: 'Projects' })).toBeInTheDocument()
+    expect(screen.getByText('The Relic Vault')).toHaveClass('neon-text-purple')
+    expect(
+      screen.getByText('Apps I built, recovered in the year 4789 and shown on what the museum believes are period-correct televisions.'),
+    ).toBeInTheDocument()
   })
 
-  it('renders the six project cards, in order, without a TimelyCare card', () => {
+  it('has six tabs and six panels in the HTML, Number Slayers’ shown', () => {
     render(<ProjectsSection />)
-
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Quadzilla',
-      'Number Slayers',
-      'Rezmancer',
-      'Jelly Resume',
-      'Pickleball 2079',
-      'Pong Multiverse Alpaca Squadron',
-    ])
-    expect((projectsData as Project[]).map((p) => p.title)).not.toContain('TimelyCare')
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((t) => t.textContent)).toEqual(['01Quadzilla', '02Number Slayers', '03Rezmancer', '04Jelly Resume', '05Pickleball 2079', '06Pong'])
+    expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false', 'false', 'false', 'false'])
+    expect(screen.getByRole('tablist', { name: 'Exhibits' })).toBeInTheDocument()
+    const panels = screen.getAllByRole('tabpanel', { hidden: true })
+    expect(panels).toHaveLength(6)
+    expect(panels.filter((p) => !p.hidden)).toEqual([panel('number-slayers')])
+    projects.forEach((p, i) => {
+      expect(tabs[i].getAttribute('aria-controls')).toBe(`pv-p-${p.id}`)
+      expect(panel(p.id).getAttribute('aria-labelledby')).toBe(tabs[i].id)
+    })
+    // the canvas only presents: the panels carry the content
+    expect(document.querySelector('#projects canvas')?.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('links Number Slayers at numberslayers.com and the Jelly Resume in the same tab', () => {
+  it('moves the selection and focus with ←, →, Home and End (wrapping), before the engine loads too', () => {
     render(<ProjectsSection />)
+    const tabs = screen.getAllByRole('tab')
+    tabs[1].focus()
+    fireEvent.keyDown(tabs[1], { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(tabs[2])
+    expect(tabs[2]).toHaveAttribute('aria-selected', 'true')
+    expect(tabs[2]).toHaveAttribute('tabindex', '0')
+    expect(tabs[1]).toHaveAttribute('tabindex', '-1')
+    expect(panel('rezmancer').hidden).toBe(false)
+    fireEvent.keyDown(tabs[2], { key: 'End' })
+    expect(document.activeElement).toBe(tabs[5])
+    fireEvent.keyDown(tabs[5], { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(tabs[0])
+    fireEvent.keyDown(tabs[0], { key: 'ArrowLeft' })
+    expect(document.activeElement).toBe(tabs[5])
+    fireEvent.keyDown(tabs[5], { key: 'Home' })
+    expect(document.activeElement).toBe(tabs[0])
+    expect(panel('quadzilla').hidden).toBe(false)
+  })
 
-    const live = screen.getAllByRole('link', { name: /live demo/i })
-    const slayers = live.find((a) => a.getAttribute('href') === 'https://numberslayers.com')
-    expect(slayers).toHaveAttribute('target', '_blank')
-    const jelly = live.find((a) => a.getAttribute('href') === '/resume')
-    expect(jelly).toBeDefined()
+  it('shows Number Slayers’ card exactly', () => {
+    render(<ProjectsSection />)
+    const p = panel('number-slayers')
+    expect(p.querySelector('p')?.textContent).toBe('Exhibit 02 · Recovered from 2025')
+    expect(within(p).getByRole('heading', { level: 3 }).textContent).toBe('Number Slayers')
+    expect(
+      within(p).getByText(
+        'Multiplayer 3D math game. Server-authoritative multiplayer with snapshot interpolation at 60fps, AI enemy bots, an adaptive Web Audio mixer, and an FBX→GLB pipeline that cut load size 88%. I wrote the soundtrack too.',
+      ),
+    ).toBeInTheDocument()
+    const stack = within(p).getByText('Built with:', { exact: false }).parentElement!
+    expect(visibleText(stack)).toBe('React Three Fiber · Colyseus · Next.js · Convex · Railway')
+    expect(within(p).getByText('Displayed on a black tube set, c. 1994.')).toBeInTheDocument()
+    expect(within(p).getByRole('button', { name: 'Watch the Number Slayers video' })).toBeInTheDocument()
+  })
+
+  it('shows Pickleball 2079’s card exactly, with no links', () => {
+    render(<ProjectsSection />)
+    const p = panel('pickleball-2079')
+    expect(p.querySelector('p')?.textContent).toBe('Exhibit 05 · Recovered from 2026')
+    expect(within(p).getByRole('heading', { level: 3, hidden: true }).textContent).toBe('Pickleball 2079')
+    expect(
+      within(p).getByText(
+        'Wacky arcade pickleball from the year 2079, in development. Two-on-two against the CPU on a deterministic 60 Hz sim that replays bit-exact, a cast of voxel critters and kitchen objects, and players who explode when the ball hits them.',
+      ),
+    ).toBeInTheDocument()
+    expect(visibleText(within(p).getByText('Built with:', { exact: false }).parentElement!)).toBe('TypeScript · three.js · Vite · Deterministic sim')
+    expect(within(p).getByText('Displayed on a portable colour set, c. 1986.')).toBeInTheDocument()
+    expect(within(p).queryAllByRole('link', { hidden: true })).toHaveLength(0)
+  })
+
+  it('links Live and Code out in a new tab, and the Jelly Resume’s Live in this one', () => {
+    render(<ProjectsSection />)
+    const slayers = panel('number-slayers')
+    const live = within(slayers).getByRole('link', { name: 'Live (opens in a new tab)' })
+    expect(live).toHaveAttribute('href', 'https://numberslayers.com')
+    expect(live).toHaveAttribute('target', '_blank')
+    expect(live).toHaveAttribute('rel', 'noopener noreferrer')
+    const code = within(slayers).getByRole('link', { name: 'Code (opens in a new tab)' })
+    expect(code).toHaveAttribute('href', 'https://github.com/phillael/number-slayers')
+    expect(code).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(visibleText(live)).toBe('Live ↗')
+    const jelly = within(panel('jelly-resume')).getByRole('link', { name: 'Live', hidden: true })
+    expect(jelly).toHaveAttribute('href', '/resume')
     expect(jelly).not.toHaveAttribute('target')
     expect(jelly).not.toHaveAttribute('rel')
   })
 
-  it('has proper accessibility attributes', () => {
+  it('names each Watch after its exhibit (Pong by its short name)', () => {
     render(<ProjectsSection />)
-
-    const section = screen.getByRole('region', { name: /projects/i })
-    expect(section).toBeInTheDocument()
-  })
-})
-
-describe('ProjectCard', () => {
-  const mockProject: ComponentProps<typeof ProjectCard>['project'] = {
-    id: 'test-project',
-    title: 'Test Project',
-    description: 'A test project description for testing purposes.',
-    techStack: ['React', 'TypeScript', 'Tailwind'],
-    imageUrl: '/images/projects/test.png',
-    liveUrl: 'https://example.com',
-    repoUrl: 'https://github.com/test/repo',
-  }
-
-  it('displays title, description, and tech stack', () => {
-    render(<ProjectCard project={mockProject} />)
-
-    expect(screen.getByText('Test Project')).toBeInTheDocument()
-    expect(screen.getByText('A test project description for testing purposes.')).toBeInTheDocument()
-
-    // Check tech stack badges
-    mockProject.techStack.forEach((tech) => {
-      expect(screen.getByText(tech)).toBeInTheDocument()
-    })
+    const names = screen.getAllByRole('button', { name: /^Watch / , hidden: true }).map((b) => b.textContent)
+    expect(names).toEqual([
+      'Watch the Quadzilla video',
+      'Watch the Number Slayers video',
+      'Watch the Rezmancer video',
+      'Watch the Jelly Resume video',
+      'Watch the Pickleball 2079 video',
+      'Watch the Pong video',
+    ])
   })
 
-  it('renders action links with correct hrefs', () => {
-    render(<ProjectCard project={mockProject} />)
-
-    const liveLink = screen.getByRole('link', { name: /live demo/i })
-    expect(liveLink).toHaveAttribute('href', 'https://example.com')
-    expect(liveLink).toHaveAttribute('target', '_blank')
-    expect(liveLink).toHaveAttribute('rel', 'noopener noreferrer')
-
-    const codeLink = screen.getByRole('link', { name: /view code/i })
-    expect(codeLink).toHaveAttribute('href', 'https://github.com/test/repo')
-    expect(codeLink).toHaveAttribute('target', '_blank')
-    expect(codeLink).toHaveAttribute('rel', 'noopener noreferrer')
+  it('flips the power button: Pause the televisions ↔ Play the televisions', () => {
+    render(<ProjectsSection />)
+    const power = screen.getByRole('button', { name: 'Pause the televisions' })
+    expect(power).toHaveTextContent('Pause')
+    fireEvent.click(power)
+    expect(power).toHaveAccessibleName('Play the televisions')
+    expect(power).toHaveTextContent('Play')
+    fireEvent.click(power)
+    expect(power).toHaveAccessibleName('Pause the televisions')
   })
 
-  it('renders image with proper alt text', () => {
-    render(<ProjectCard project={mockProject} />)
-
-    const image = screen.getByAltText('Test Project screenshot')
-    expect(image).toBeInTheDocument()
-    expect(image).toHaveAttribute('src', '/images/projects/test.png')
+  it('names the stage’s arrows', () => {
+    render(<ProjectsSection />)
+    expect(screen.getByRole('button', { name: 'Previous exhibit' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next exhibit' })).toBeInTheDocument()
   })
 
-  it('opens an internal link in the same tab', () => {
-    render(<ProjectCard project={{ ...mockProject, liveUrl: '/resume', repoUrl: undefined }} />)
-
-    const liveLink = screen.getByRole('link', { name: /live demo/i })
-    expect(liveLink).toHaveAttribute('href', '/resume')
-    expect(liveLink).not.toHaveAttribute('target')
-    expect(liveLink).not.toHaveAttribute('rel')
+  it('imports the engine only once the section is within 800 px', async () => {
+    render(<ProjectsSection />)
+    await act(async () => {})
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(observers.map((o) => o.margin)).toContain('800px 0px')
+    await near()
+    expect(mockOpts).toMatchObject({ reducedMotion: false })
+    expect(mockOpts!.projects.map((p) => p.id)).toEqual(projects.map((p) => p.id))
+    expect(mockOpts!.canvas).toBe(document.querySelector('#projects canvas'))
+    expect(mockVault.setPaused).toHaveBeenCalledWith(false)
   })
 
-  it('shows the placeholder when there is no screenshot yet', () => {
-    render(<ProjectCard project={{ ...mockProject, imageUrl: undefined }} />)
-
-    expect(screen.queryByRole('img')).not.toBeInTheDocument()
-    expect(screen.getAllByText('Test Project')).toHaveLength(2) // the placeholder and the title
+  it('hands the stage’s buttons, the tabs and Watch to the engine, and follows its nearest exhibit', async () => {
+    render(<ProjectsSection />)
+    await near()
+    fireEvent.click(screen.getByRole('button', { name: 'Next exhibit' }))
+    expect(mockVault.step).toHaveBeenCalledWith(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Previous exhibit' }))
+    expect(mockVault.step).toHaveBeenCalledWith(-1)
+    fireEvent.click(screen.getByRole('tab', { name: 'Pong' }))
+    expect(mockVault.go).toHaveBeenCalledWith(5)
+    fireEvent.click(screen.getByRole('button', { name: 'Watch the Number Slayers video' }))
+    expect(mockVault.watch).toHaveBeenCalledWith(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Pause the televisions' }))
+    expect(mockVault.setPaused).toHaveBeenLastCalledWith(true)
+    // the first click in the section armed the sound effects
+    expect(mockVault.armSound).toHaveBeenCalled()
+    act(() => mockOpts!.onNear(4))
+    expect(screen.getByRole('tab', { name: 'Pickleball 2079' })).toHaveAttribute('aria-selected', 'true')
+    expect(panel('pickleball-2079').hidden).toBe(false)
   })
 
-  it('does not render View Code button when repoUrl is not provided', () => {
-    const projectWithoutRepo: ComponentProps<typeof ProjectCard>['project'] = {
-      ...mockProject,
-      repoUrl: undefined,
+  it('announces the arrows’ and swipes’ moves in a polite live region, and the hint fades on the first touch', async () => {
+    render(<ProjectsSection />)
+    await near()
+    act(() => mockOpts!.onAnnounce!(3))
+    const region = document.querySelector('#projects [aria-live="polite"]')!
+    expect(region.textContent).toBe('Exhibit 4 of 6: Jelly Resume')
+    const hint = document.querySelector('#projects [data-gone]')!
+    expect(hint.getAttribute('data-gone')).toBe('false')
+    act(() => mockOpts!.onInteract!())
+    expect(hint.getAttribute('data-gone')).toBe('true')
+  })
+
+  it('shows the canvas once its first frame is drawn', async () => {
+    render(<ProjectsSection />)
+    await near()
+    const stage = document.querySelector('#projects canvas')!.parentElement!
+    expect(stage.getAttribute('data-ready')).toBe('false')
+    act(() => mockOpts!.onReady())
+    expect(stage.getAttribute('data-ready')).toBe('true')
+  })
+
+  it('falls back without WebGL: the exhibit’s poster in a CSS screen, Watch still to the engine', async () => {
+    render(<ProjectsSection />)
+    await near()
+    act(() => mockOpts!.onFail())
+    const screenEl = document.querySelector('[data-vault-screen]')!
+    expect(screenEl.querySelector('img')?.getAttribute('src')).toBe('/projects/number-slayers.jpg')
+    expect(screenEl.querySelector('img')?.getAttribute('alt')).toBe('')
+    act(() => mockOpts!.onNear(0))
+    expect(document.querySelector('[data-vault-screen]')?.getAttribute('data-tall')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Watch the Quadzilla video' }))
+    expect(mockVault.watch).toHaveBeenCalledWith(0)
+  })
+
+  it('starts paused with reduced motion', async () => {
+    const real = window.matchMedia
+    window.matchMedia = ((q: string) => ({ matches: q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia
+    try {
+      render(<ProjectsSection />)
+      expect(screen.getByRole('button', { name: 'Play the televisions' })).toBeInTheDocument()
+      await near()
+      expect(mockOpts).toMatchObject({ reducedMotion: true })
+      expect(mockVault.setPaused).toHaveBeenCalledWith(true)
+    } finally {
+      window.matchMedia = real
     }
-    render(<ProjectCard project={projectWithoutRepo} />)
+  })
 
-    expect(screen.queryByRole('link', { name: /view code/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /live demo/i })).toBeInTheDocument()
+  it('destroys the engine on unmount', async () => {
+    const { unmount } = render(<ProjectsSection />)
+    await near()
+    unmount()
+    expect(mockVault.destroy).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no axe violations', async () => {
+    const { container } = render(<ProjectsSection />)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

@@ -56,6 +56,8 @@ export type VaultOpts = {
 export type Vault = {
   /** bring set i to the front; announce = say it in the live region (the arrows) */
   go(i: number, announce?: boolean): void
+  /** the next (1) or previous (-1) set from where the hall is heading, announced (the arrows) */
+  step(dir: 1 | -1): void
   watch(i: number): void
   setPaused(paused: boolean): void
   setReducedMotion(rm: boolean): void
@@ -710,6 +712,9 @@ export function createVault(opts: VaultOpts): Vault {
       }
       if (goTo(S, i, hooks) && announce) opts.onAnnounce?.(S.target)
       kick()
+    },
+    step(dir) {
+      api.go(S.target + dir, true)
     },
     watch(i) {
       interacted()

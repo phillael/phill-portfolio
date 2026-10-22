@@ -12,7 +12,6 @@ import { render, screen } from '@testing-library/react'
 import NavLinks from '@/components/NavLinks'
 import SocialLinks from '@/components/SocialLinks'
 import ResumeDownloadButton from '@/components/ResumeDownloadButton'
-import ProjectCard from '@/components/ProjectCard'
 
 // Mock framer-motion to capture whileHover and whileTap props
 const mockMotionProps: Record<string, unknown>[] = []
@@ -72,26 +71,6 @@ jest.mock('framer-motion', () => ({
   ),
   useReducedMotion: () => false,
 }))
-
-// Mock next/image for ProjectCard
-jest.mock('next/image', () => ({
-  __esModule: true,
-  default: function MockImage(props: Record<string, unknown>) {
-     
-    return <img alt={props.alt as string} src={props.src as string} />
-  },
-}))
-
-const mockProject = {
-  id: 'test-project',
-  title: 'Test Project',
-  description: 'A test project description',
-  imageUrl: '/test-image.jpg',
-  techStack: ['React', 'TypeScript'],
-  liveUrl: 'https://example.com',
-  repoUrl: 'https://github.com/test/repo',
-  featured: true,
-}
 
 describe('Hover Pattern Consistency', () => {
   beforeEach(() => {
@@ -204,45 +183,6 @@ describe('Hover Pattern Consistency', () => {
 
       expect(buttonProps[0].whileTap).toMatchObject({
         scale: 0.95,
-      })
-    })
-  })
-
-  describe('ProjectCard hover states', () => {
-    it('action buttons have scale 1.05 and whileTap 0.95', () => {
-      mockMotionProps.length = 0
-      render(<ProjectCard project={mockProject} />)
-
-      // Filter for the action button motion props (Live Demo, View Code)
-      const buttonProps = mockMotionProps.filter((p) => p.type === 'a')
-
-      // Should have 2 action buttons
-      expect(buttonProps.length).toBe(2)
-
-      // Each should have scale 1.05 on hover
-      buttonProps.forEach((props) => {
-        expect(props.whileHover).toMatchObject({
-          scale: 1.05,
-        })
-      })
-
-      // Each should have whileTap 0.95
-      buttonProps.forEach((props) => {
-        expect(props.whileTap).toMatchObject({
-          scale: 0.95,
-        })
-      })
-    })
-
-    it('action buttons have smooth 150-200ms transitions', () => {
-      render(<ProjectCard project={mockProject} />)
-
-      const links = screen.getAllByRole('link')
-      links.forEach((link) => {
-        const hasTransition =
-          link.className.includes('duration-150') ||
-          link.className.includes('duration-200')
-        expect(hasTransition).toBe(true)
       })
     })
   })

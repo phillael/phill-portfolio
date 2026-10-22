@@ -265,7 +265,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
 - [x] **T7: The sound effects** (`sfx.ts`).
   - The mockup's four cues; silent until `arm(ac)` is called from a click in the section.
   - Tests with `helpers/fakeAudio.ts`: nothing is scheduled before `arm`; each cue schedules nodes after it; there's no `createMediaElementSource`.
-- [ ] **T8: The section.**
+- [x] **T8: The section.**
   - Rewrite `ProjectsSection.tsx`; add `components/projects/ProjectsVault.tsx` and `Projects.module.css` (§1, §2, §5).
   - The fallback and the lazy import (mock `@/lib/vault/vault` in tests).
   - Delete `ProjectCard.tsx`, `public/images/projects/` and the ProjectCard block of `hover-patterns.test.tsx`.

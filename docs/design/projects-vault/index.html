@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relic Vault</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../experience-refresh/round2/hud.css">
+<link rel="stylesheet" href="vault.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+
+<!-- mockup only: not part of the section -->
+<div class="mock" role="region" aria-label="Mockup controls">
+  <b>Relic Vault</b>
+  <span class="mock-g">Idle sets
+    <span class="seg" data-set="idle">
+      <button type="button" data-v="static" aria-pressed="true">Static</button>
+      <button type="button" data-v="preview" aria-pressed="false">Preview</button>
+      <button type="button" data-v="off" aria-pressed="false">Off</button>
+    </span>
+  </span>
+  <span class="mock-g">CRT
+    <span class="seg" data-set="crt">
+      <button type="button" data-v="subtle" aria-pressed="false">Subtle</button>
+      <button type="button" data-v="classic" aria-pressed="true">Classic</button>
+      <button type="button" data-v="wrecked" aria-pressed="false">Wrecked</button>
+    </span>
+  </span>
+  <button type="button" class="tog" data-tog="sfx" aria-pressed="false">Sound FX</button>
+  <button type="button" class="tog" data-tog="rm" aria-pressed="false">Reduced motion</button>
+  <span class="mock-note">Footage is placeholder: your 30 s videos replace it</span>
+</div>
+
+<div class="above" aria-hidden="true">· · · the Skills section is above · · ·</div>
+
+<section id="projects" class="pv" aria-labelledby="projects-h">
+  <header class="pv-head">
+    <h2 id="projects-h" class="pv-eyebrow">Projects</h2>
+    <p class="pv-title">The Relic Vault</p>
+    <p class="pv-lede">Apps I built, recovered in the year 4789 and shown on what the museum believes are period-correct televisions.</p>
+  </header>
+
+  <div class="pv-vault">
+    <div class="pv-stage">
+      <canvas aria-hidden="true"></canvas>
+      <button type="button" class="pv-btn pv-arrow pv-prev" aria-label="Previous exhibit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button type="button" class="pv-btn pv-arrow pv-next" aria-label="Next exhibit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      <button type="button" class="pv-btn pv-power" aria-label="Pause the televisions"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-pause" d="M9 6v12M15 6v12"/><path class="i-play" d="M8 5.5v13l11-6.5z"/></svg><span class="pv-power-l" aria-hidden="true">Pause</span></button>
+      <p class="pv-hint" aria-hidden="true">Drag to browse <span>·</span> click a screen to watch</p>
+    </div>
+    <div class="pv-cards"></div>
+  </div>
+
+  <div class="pv-index" role="tablist" aria-label="Exhibits"></div>
+  <p class="sr-only" aria-live="polite" data-live></p>
+</section>
+
+<dialog class="holo" aria-labelledby="holo-t">
+  <svg class="holo-beam" aria-hidden="true">
+    <defs><linearGradient id="beam-g" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="hsl(188 100% 80%)" stop-opacity=".55"/><stop offset="1" stop-color="hsl(190 100% 70%)" stop-opacity=".06"/></linearGradient></defs>
+    <polygon fill="url(#beam-g)"/>
+  </svg>
+  <div class="holo-panel">
+    <video class="holo-v" playsinline muted loop preload="auto"></video>
+    <div class="holo-scan" aria-hidden="true"></div>
+  </div>
+  <div class="holo-bar">
+    <h3 id="holo-t" class="holo-t"></h3>
+    <div class="holo-acts">
+      <button type="button" class="holo-b" data-h="play" aria-label="Pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-pause" d="M9 6v12M15 6v12"/><path class="i-play" d="M8 5.5v13l11-6.5z"/></svg><span class="lbl" aria-hidden="true">Pause</span></button>
+      <button type="button" class="holo-b" data-h="sound" aria-label="Sound on" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z M16 9.5a4 4 0 0 1 0 5"/></svg><span class="lbl" aria-hidden="true">Sound on</span></button>
+      <button type="button" class="holo-b" data-h="full" aria-label="Full screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span class="lbl" aria-hidden="true">Full screen</span></button>
+      <a class="holo-b" data-h="live" target="_blank" rel="noopener noreferrer" aria-label="Live (opens in a new tab)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7"/></svg><span class="lbl" aria-hidden="true">Live</span></a>
+      <button type="button" class="holo-b holo-x" data-h="close" aria-label="Close" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+  </div>
+</dialog>
+
+<section class="notes hud" aria-labelledby="notes-h">
+  <h2 id="notes-h" class="notes-h">Mockup notes</h2>
+  <div class="notes-cols">
+    <div>
+      <h3>Try</h3>
+      <ul>
+        <li>Drag the hall (or swipe on a phone), use the arrows, or pick a name under it. The set in front powers on and plays; the others idle.</li>
+        <li>Click the lit screen (or <b>Watch</b>): the picture lifts out of the glass as a hologram, crops to the full video, and the old set becomes its projector. Esc, ✕ or a click outside puts it back.</li>
+        <li>The mock bar: what the idle sets show, how much CRT, sound effects, and reduced motion.</li>
+      </ul>
+      <h3>The sets</h3>
+      <p>Each relic is on the set the museum of 4789 got wrong: Pong on a 1974 wood console, Jelly Resume in a space helmet set, Rezmancer on a beige office terminal, Number Slayers on a black tube set, Pickleball 2079 on a red portable, Quadzilla on a pocket TV (its screen is tall, for the phone video). Built in code here; production could keep them or swap in real models.</p>
+    </div>
+    <div>
+      <h3>Your videos</h3>
+      <ul>
+        <li>30 s, 16:9 (1080p master is plenty), action from the first frame. Keep the key action inside the middle 4:3: the CRT crops the sides, the hologram shows all of it.</li>
+        <li>Quadzilla: a phone screen recording, portrait.</li>
+        <li>Sound is optional. With sound, the hologram gets a Sound button (off by default) and the site music pauses while it plays.</li>
+        <li>I encode them (H.264 + AV1, about 2–3 MB each) with poster frames.</li>
+      </ul>
+      <h3>Production</h3>
+      <ul>
+        <li>Every project stays real text (tabs + panels) for search and screen readers; the 3D only presents it.</li>
+        <li>The scene loads near the section, renders only on screen, and decodes one video at a time.</li>
+        <li>Reduced motion: no camera moves, power-on or static; video plays only on request. The Pause button stops all motion (WCAG 2.2.2).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="vault.js"></script>
+</body>
+</html>

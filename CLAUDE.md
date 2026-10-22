@@ -8,8 +8,9 @@ Cyberpunk-themed developer portfolio for Phill Aelony, live at https://www.phill
 - **Version bump** `package.json` in every PR (minor for features/perf, patch for fixes).
 - **Accessibility is non-negotiable:** WCAG 2.1 AA, keyboard support on all interactive elements, 44×44px minimum touch targets (that includes `w-11 h-11` on mobile, not `w-10`), visible focus states, `prefers-reduced-motion` respected by every animation.
 - **No real Anthropic calls from tests or verification.** Jest mocks the SDK; in the browser, stub `/api/wizard/chat` (e.g. a `fetch` override via an init script).
-- **Use R3F + drei, not raw Three.js boilerplate.** Pull current Three.js / R3F / drei / Next APIs via context7 (`resolve-library-id` → `query-docs`) rather than from memory.
-  - **Exception (Phill, 2026-10-13): the Jelly Resume engine** (`src/lib/jelly/`) is plain TypeScript on one raw WebGL2 canvas, ported from its playground. The other rules still hold: it's lazy (`next/dynamic`, `ssr: false`), one canvas, no setState per frame, paused while hidden, never mounted for reduced motion.
+- **Pick the best tool for each feature; no library is mandatory** (Phill, 2026-10-22: "we should always go with the best tech stack for optimum performance and implementation, we should never be locked to any particular library or stack"). Weigh the options on performance and fit, and say why in the plan. Pull current APIs via context7 (`resolve-library-id` → `query-docs`) or the installed package's own docs and types, not from memory.
+  - Today's 3D: R3F + drei where React drives the scene (the Shroom Wizard, the testimonials); plain TypeScript engines where a design tool or mockup was ported 1:1 and the frame loop is the product: the Jelly Resume (`src/lib/jelly/`, raw WebGL2, never mounted for reduced motion) and the Projects vault (`src/lib/vault/`, plain three.js).
+  - Whatever the stack, the performance rules hold: a lazy chunk (`next/dynamic` with `ssr: false`, or a dynamic `import()`), one canvas, no setState per frame, paused while hidden.
 
 ## Commands
 

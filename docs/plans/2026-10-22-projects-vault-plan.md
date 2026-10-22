@@ -230,7 +230,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
     - for each of the six sets after plinth placement, the screen centre's world y is `SCREEN_Y` ± 0.001;
     - **no occlusion:** a ray from 5 units in front toward the screen, at its centre and at 90 % toward each corner, hits the screen mesh (or its glass) first. This is the mockup's oval bug, caught;
     - the shader material compiles to valid uniforms (the uniform list).
-- [ ] **T5: The engine** (`vault.ts`).
+- [x] **T5: The engine** (`vault.ts`).
   - `createVault` per §5:
     - the loop on `state.ts`;
     - input (pointer drag on the x axis with `touch-action: pan-y`, click and hover via a raycast on hit boxes, a horizontal wheel past 60 px);

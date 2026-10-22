@@ -24,6 +24,8 @@ export type Hall = {
   /** the lit set's light on its plinth and the floor, in its picture's colour */
   spill: THREE.PointLight
   M: Mats
+  /** the RoomEnvironment's reflections, made once (a step of its own: the engine stages the build across frames) */
+  environment(): void
   dispose(): void
 }
 
@@ -116,13 +118,7 @@ export function createHall(canvas: HTMLCanvasElement): Hall {
   const bg = new THREE.Color(BG)
   scene.background = bg
   scene.fog = new THREE.FogExp2(bg, 0.07)
-  const pmrem = new THREE.PMREMGenerator(renderer)
-  const room = new RoomEnvironment()
-  const env = pmrem.fromScene(room, 0.04).texture
-  room.dispose()
-  pmrem.dispose()
-  scene.environment = env
-  scene.environmentIntensity = 0.42
+  let env: THREE.Texture | null = null
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 80)
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
@@ -131,7 +127,7 @@ export function createHall(canvas: HTMLCanvasElement): Hall {
   composer.addPass(new OutputPass())
 
   const tex = drawTextures()
-  const M = createMaterials({ ...tex, env })
+  const M = createMaterials(tex)
 
   const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.MeshStandardMaterial({ color: 0x0c1216, roughness: 0.3, metalness: 0.4 }))
   floor.rotation.x = -Math.PI / 2
@@ -152,8 +148,21 @@ export function createHall(canvas: HTMLCanvasElement): Hall {
     bloom,
     spill,
     M,
+    environment() {
+      if (env) return
+      const pmrem = new THREE.PMREMGenerator(renderer)
+      const room = new RoomEnvironment()
+      env = pmrem.fromScene(room, 0.04).texture
+      room.dispose()
+      pmrem.dispose()
+      scene.environment = env
+      scene.environmentIntensity = 0.42
+      M.glass.envMap = env
+      M.glass.needsUpdate = true
+    },
     dispose() {
-      const textures = new Set<THREE.Texture>([env, ...Object.values(tex)])
+      const textures = new Set<THREE.Texture>(Object.values(tex))
+      if (env) textures.add(env)
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh
         if (!mesh.isMesh) return

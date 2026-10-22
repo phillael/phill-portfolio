@@ -1,0 +1,258 @@
+/*
+ * The Relic Vault's hologram (holo.ts), ported from docs/design/projects-vault/vault.css. Global: the dialog lives
+ * on <body>, outside #projects, so it carries the section's tokens itself. Write backdrop-filter unprefixed only
+ * (the build adds -webkit-; with both, the minifier keeps only the prefixed one, which Chrome ignores).
+ */
+
+.holo {
+  --cyan: hsl(var(--primary));
+  --ink: hsl(var(--foreground));
+  --ink-2: hsl(195 18% 72%);
+  --hair: hsl(190 100% 75% / 0.14);
+  --hair-strong: hsl(190 100% 75% / 0.32);
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  overflow: hidden;
+  font: 400 1rem/1.35 var(--font-body);
+}
+.holo::backdrop {
+  /* everything dims but the set doing the projecting */
+  background: radial-gradient(circle at var(--tx, 50%) var(--ty, 70%), hsl(220 35% 2% / 0) 0, hsl(220 35% 2% / 0.25) 150px, hsl(220 35% 2% / 0.7) 420px);
+  animation: holo-fade 0.35s ease both;
+}
+.holo.closing::backdrop {
+  animation: holo-fade 0.35s ease reverse both;
+}
+@keyframes holo-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.holo-beam {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  filter: blur(7px);
+  mix-blend-mode: screen;
+}
+.holo-beam.idle {
+  animation: holo-hum 3.2s ease-in-out infinite;
+}
+@keyframes holo-hum {
+  50% {
+    opacity: 0.62;
+  }
+}
+
+.holo-panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: hsl(200 60% 4%);
+  box-shadow:
+    0 0 0 1px hsl(190 100% 75% / 0.55),
+    0 0 30px hsl(190 100% 60% / 0.45),
+    0 0 90px hsl(190 100% 55% / 0.25),
+    inset 0 0 40px hsl(190 100% 60% / 0.25);
+  will-change: transform, clip-path;
+}
+.holo-v {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.holo-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    linear-gradient(to bottom, transparent 0, hsl(190 100% 80% / 0.08) 50%, transparent 100%) 0 0 / 100% 22% no-repeat,
+    repeating-linear-gradient(to bottom, hsl(190 100% 80% / 0.07) 0 1px, transparent 1px 3px);
+  animation: holo-roll 5s linear infinite;
+}
+@keyframes holo-roll {
+  from {
+    background-position:
+      0 -30%,
+      0 0;
+  }
+  to {
+    background-position:
+      0 130%,
+      0 0;
+  }
+}
+.holo-panel.flicker {
+  animation: holo-flicker 0.5s steps(6, jump-none) both;
+}
+@keyframes holo-flicker {
+  0% {
+    opacity: 0.6;
+  }
+  30% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.75;
+  }
+  60% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.holo-bar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 0 4px 0 16px;
+  border-radius: 999px;
+  background: hsl(205 45% 5% / 0.82);
+  border: 1px solid var(--hair);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.holo-bar.on {
+  opacity: 1;
+}
+.holo-t {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 1.25rem var(--font-heading);
+  color: #fff;
+  text-shadow: 0 0 16px hsl(190 100% 70% / 0.5);
+}
+.holo-acts {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.holo-b {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--hair-strong);
+  background: hsl(200 40% 8% / 0.6);
+  color: var(--ink);
+  font: 600 0.92rem var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+.holo-b[hidden] {
+  display: none;
+}
+.holo-b:hover {
+  border-color: hsl(190 100% 75% / 0.7);
+  background: hsl(190 100% 75% / 0.12);
+}
+.holo-b:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+.holo-b svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.holo-b .i-play {
+  display: none;
+  fill: currentColor;
+  stroke: none;
+}
+.holo-b.paused .i-play {
+  display: block;
+}
+.holo-b.paused .i-pause {
+  display: none;
+}
+.holo-x {
+  padding: 0;
+  width: 44px;
+}
+.holo-x svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* phones: the bar's buttons as 44 px icons (their accessible names are on the buttons) */
+@media (max-width: 760px) {
+  .holo-t {
+    font-size: 1rem;
+  }
+  .holo-b {
+    padding: 0;
+    width: 44px;
+  }
+  .holo-b .lbl {
+    display: none;
+  }
+}
+
+/* paused (the hologram's own Pause): its motion stops with its video (WCAG 2.2.2) */
+.holo-still .holo-scan,
+.holo-still .holo-beam.idle {
+  animation-play-state: paused;
+}
+
+/* reduced motion: it fades in place; nothing rolls, hums or flickers */
+.holo-rm .holo-scan,
+.holo-rm .holo-beam.idle,
+.holo-rm .holo-panel.flicker {
+  animation: none;
+}
+.holo-rm::backdrop {
+  animation-duration: 0.01s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .holo .holo-scan,
+  .holo .holo-beam.idle,
+  .holo .holo-panel.flicker {
+    animation: none;
+  }
+  .holo::backdrop {
+    animation-duration: 0.01s;
+  }
+}

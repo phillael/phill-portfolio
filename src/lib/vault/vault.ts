@@ -3,6 +3,8 @@
  * the stage's input (drag, click, hover, a sideways wheel), powers the sets on and off, and plays one project's video
  * at a time through its set's CRT. Ported from the mockup (docs/design/projects-vault/vault.js); the React island
  * (components/projects/ProjectsVault.tsx) owns the tabs, panels, buttons and the live region, and calls in.
+ * Watch opens the hologram (holo.ts) on the set's own video; without WebGL it lifts from the fallback's screen
+ * (the stage's `[data-vault-screen]`).
  *
  * Rules it keeps: no layout reads and no callbacks per frame (sizes come from the ResizeObserver; onNear fires on
  * index changes only); the loop runs only while the stage is on screen (or the hologram is up) and the tab is
@@ -14,9 +16,11 @@ import * as THREE from 'three'
 import type { Project } from '@/types/content'
 import { CRT, IDLE, blackTexture, setU, type CrtUniforms } from './crt'
 import { createHall, type Hall } from './hall'
-import { R, SCREEN_Y, START, angleOf, clamp, coverCrop, dragPer, easeOut, holoBack, lerp, scanLines } from './math'
+import { createHolo } from './holo'
+import { R, SCREEN_Y, START, angleOf, clamp, coverCrop, dragPer, easeOut, holoBack, lerp, lookUp, scanLines, type Pt, type Quad } from './math'
 import { buildExhibit, type Exhibit } from './sets'
 import { createState, dragEnd, dragMove, go as goTo, tick, watch as watchSet, type Hooks } from './state'
+import './vault.css'
 
 export type MediaEntry = {
   w: number
@@ -124,6 +128,7 @@ export function createVault(opts: VaultOpts): Vault {
     v.playsInline = true
     v.setAttribute('playsinline', '')
     v.preload = 'auto'
+    v.poster = e.m.poster // the hologram shows it while a clip that never played loads
     for (const s of e.m.sources) {
       const el = document.createElement('source')
       el.src = s.src
@@ -224,8 +229,97 @@ export function createVault(opts: VaultOpts): Vault {
     near: (i) => opts.onNear(i),
     powerOn,
     powerOff,
-    openHolo: () => {},
+    openHolo: (i) => openHolo(i),
     tweening: (i) => E[i].tween !== null,
+  }
+
+  /* ================= the hologram ================= */
+  // the page rects it maps from: read at open and on resize only (the page doesn't scroll while it's up)
+  const rects = { canvas: null as DOMRect | null, stage: null as DOMRect | null, screen: null as DOMRect | null }
+  const fallbackScreen = () => stage.querySelector<HTMLElement>('[data-vault-screen]')
+  function readRects() {
+    rects.canvas = canvas.getBoundingClientRect()
+    rects.stage = stage.getBoundingClientRect()
+    rects.screen = fallbackScreen()?.getBoundingClientRect() ?? null
+  }
+  const corner = new THREE.Vector3()
+  /** the set's glass on the viewport (TL TR BR BL), through the camera as it is now */
+  function screenQuad(e: Exh): Quad {
+    const ex = e.ex!
+    const cam = hall!.camera
+    const r = rects.canvas!
+    cam.updateMatrixWorld()
+    ex.scr.mesh.updateWorldMatrix(true, false)
+    const { w, h } = ex.scr
+    const at = ([x, y]: Pt): Pt => {
+      corner.set(x * 0.97, y * 0.97, 0.01).applyMatrix4(ex.scr.mesh.matrixWorld).project(cam)
+      return [r.left + ((corner.x + 1) / 2) * r.width, r.top + ((1 - corner.y) / 2) * r.height]
+    }
+    return [at([-w / 2, h / 2]), at([w / 2, h / 2]), at([w / 2, -h / 2]), at([-w / 2, -h / 2])]
+  }
+  /** the fallback's CSS screen (or the stage's middle) */
+  function rectQuad(): Quad {
+    const r = rects.screen ?? rects.stage!
+    const b = rects.screen ? r : new DOMRect(r.left + r.width * 0.3, r.top + r.height * 0.3, r.width * 0.4, r.height * 0.3)
+    return [
+      [b.left, b.top],
+      [b.right, b.top],
+      [b.right, b.bottom],
+      [b.left, b.bottom],
+    ]
+  }
+  const holo = createHolo({
+    reducedMotion: () => S.rm,
+    drives: () => built && !failed && !destroyed,
+    onLayout(f) {
+      readRects()
+      if (hall) view.lookUp = lookUp(f, rects.stage!, innerHeight, view.wide, view.camD, hall.camera.fov)
+    },
+    onOpen() {
+      S.hcTo = 1
+      E[S.holo].emit = 0.85
+      kick()
+    },
+    onClosing() {
+      S.hcTo = 0
+      kick()
+    },
+    onClosed() {
+      const e = E[S.holo]
+      S.holo = -1
+      e.emit = 0
+      const v = e.video
+      if (v) {
+        if (S.on === e.i && canPlay()) play(v)
+        else v.pause()
+      }
+      const u = e.u
+      if (u && !S.rm && !failed) {
+        u.uFlash.value = 0.9
+        tween(e, 0.4, (t) => {
+          u.uFlash.value = lerp(0.9, 0, t / 0.4)
+        })
+      }
+      kick()
+    },
+  })
+  function openHolo(i: number) {
+    if (S.holo >= 0 || holo.isOpen() || destroyed) return
+    const e = E[i]
+    readRects()
+    const glass = !failed && e.ex && e.u
+    const crop: Pt = glass ? [e.u!.uCrop.value.x, e.u!.uCrop.value.y] : coverCrop(e.m.w / e.m.h, rects.screen ? rects.screen.width / rects.screen.height : 4 / 3)
+    S.holo = i
+    S.pendingHolo = -1
+    holo.open({
+      project: e.p,
+      media: e.m,
+      video: videoOf(e),
+      holder: videoHolder,
+      crop,
+      quad: () => (glass && !failed ? screenQuad(e) : rectQuad()),
+      opener: document.activeElement,
+    })
   }
 
   /* ================= the scene ================= */
@@ -352,6 +446,8 @@ export function createVault(opts: VaultOpts): Vault {
     spill.color.copy(spillColor)
     const want = on?.u ? (on.emit ? 7 : 2.6 * on.u.uBright.value * on.u.uOpenY.value) : 0
     spill.intensity = lerp(spill.intensity, want, 1 - Math.exp(-dt * 8))
+
+    if (S.holo >= 0) holo.tick()
   }
 
   /* ================= the loop ================= */
@@ -603,6 +699,10 @@ export function createVault(opts: VaultOpts): Vault {
     },
     watch(i) {
       interacted()
+      if (failed) {
+        api.go(i)
+        return openHolo(((i % N) + N) % N)
+      }
       watchSet(S, i, hooks)
       kick()
     },
@@ -625,6 +725,7 @@ export function createVault(opts: VaultOpts): Vault {
       cancelAnimationFrame(raf)
       cancelAnimationFrame(buildRaf)
       raf = buildRaf = 0
+      holo.destroy()
       cleanups.forEach((fn) => fn())
       ro.disconnect()
       io.disconnect()

@@ -251,7 +251,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
     - reduced motion makes `go()` instant;
     - `destroy()` removes listeners, stops the loop and frees the videos;
     - `onFail` when the renderer throws.
-- [ ] **T6: The hologram** (`holo.ts`, `vault.css`).
+- [x] **T6: The hologram** (`holo.ts`, `vault.css`).
   - Per §1, §2 and §5–§6: the shared video moved in and out, the camera move (`lookUp`, `hcTo`), the beam, the backdrop hole, the bar (labels, icons ≤ 760 px), Pause, Sound with the site-music handoff, Full screen (`requestFullscreen` or `webkitEnterFullscreen`), Live, Close, Esc, the backdrop rule, focus return, the scroll lock, reduced motion.
   - Tests `vault-holo.test.ts` (stub `showModal`/`close` the way `skills-scoreboard.test.ts` does; a fake `SiteMusic`):
     - labelled by the title;

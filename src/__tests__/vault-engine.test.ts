@@ -312,6 +312,57 @@ describe('createVault', () => {
     expect(opts.onAnnounce).toHaveBeenCalledWith(3)
   })
 
+  describe('Watch', () => {
+    beforeAll(() => {
+      HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+        this.setAttribute('open', '')
+      }
+      HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+        if (!this.open) return
+        this.removeAttribute('open')
+        this.dispatchEvent(new Event('close'))
+      }
+    })
+    const dlg = () => document.querySelector<HTMLDialogElement>('dialog.holo')
+
+    it('on the lit set opens the hologram on that set’s own video, and closing puts it back and plays it', async () => {
+      const { vault, videoHolder } = await ready()
+      const [v] = videos(videoHolder)
+      await frames(70) // its power-on (1.1 s) is done
+      vault.watch(1)
+      expect(dlg()?.open).toBe(true)
+      expect(v.parentElement).toBe(dlg()!.querySelector('.holo-panel'))
+      await frames(80)
+      dlg()!.querySelector<HTMLButtonElement>('[data-h="close"]')!.click()
+      await frames(60)
+      expect(dlg()?.open).toBe(false)
+      expect(v.parentElement).toBe(videoHolder)
+      expect(v.paused).toBe(false)
+    })
+
+    it('on another set goes there first, then opens once it has powered on', async () => {
+      const { vault } = await ready()
+      vault.watch(3)
+      expect(dlg()?.open).toBeFalsy()
+      await frames(200)
+      expect(dlg()?.open).toBe(true)
+      expect(dlg()!.querySelector('video source')?.getAttribute('src')).toBe('/projects/jelly-resume.webm')
+    })
+
+    it('still works without WebGL: it lifts from the fallback’s screen', async () => {
+      mockWebGL.fail = true
+      const { vault, opts } = mount()
+      const screen = document.createElement('div')
+      screen.dataset.vaultScreen = ''
+      opts.stage.append(screen)
+      await frames(3)
+      vault.watch(4)
+      expect(opts.onNear).toHaveBeenCalledWith(4)
+      expect(dlg()?.open).toBe(true)
+      expect(dlg()!.querySelector('video source')?.getAttribute('src')).toBe('/projects/pickleball-2079.webm')
+    })
+  })
+
   it('calls onFail when the WebGL context is lost', async () => {
     const { opts, canvas } = await ready()
     canvas.dispatchEvent(new Event('webglcontextlost'))

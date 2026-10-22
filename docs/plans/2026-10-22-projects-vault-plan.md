@@ -224,7 +224,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
     - release snapping with velocity;
     - settle → power on after 0.06 s, only when visible;
     - a pending Watch fires once the set is on.
-- [ ] **T4: The CRT material and the sets** (`crt.ts`, `sets.ts`, `hall.ts`).
+- [x] **T4: The CRT material and the sets** (`crt.ts`, `sets.ts`, `hall.ts`).
   - Port the mockup's values.
   - Tests `vault-sets.test.ts` (node env; three builds geometry without WebGL):
     - for each of the six sets after plinth placement, the screen centre's world y is `SCREEN_Y` ± 0.001;

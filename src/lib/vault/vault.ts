@@ -15,10 +15,10 @@
 import * as THREE from 'three'
 import type { Project } from '@/types/content'
 import { CRT, IDLE, blackTexture, setU, type CrtUniforms } from './crt'
-import { createHall, type Hall } from './hall'
+import { CONTEXT, createHall, type Hall } from './hall'
 import { createHolo } from './holo'
 import { R, SCREEN_Y, START, angleOf, clamp, coverCrop, dragPer, easeOut, holoBack, lerp, lookUp, scanLines, type Pt, type Quad } from './math'
-import { buildExhibit, type Exhibit } from './sets'
+import { SETS, buildExhibit, type Exhibit, type Television } from './sets'
 import { contextFromClick, createSfx } from './sfx'
 import { createState, dragEnd, dragMove, go as goTo, tick, watch as watchSet, type Hooks } from './state'
 import './vault.css'
@@ -71,6 +71,8 @@ type Exh = {
   p: Project
   i: number
   m: MediaEntry
+  /** its television, built a frame before the rest of the exhibit */
+  tv: Television | null
   ex: Exhibit | null
   u: CrtUniforms | null
   poster: THREE.Texture | null
@@ -93,6 +95,7 @@ export function createVault(opts: VaultOpts): Vault {
     p,
     i,
     m: media[p.id],
+    tv: null,
     ex: null,
     u: null,
     poster: null,
@@ -104,6 +107,7 @@ export function createVault(opts: VaultOpts): Vault {
   }))
   const view = { w: 0, h: 0, wide: true, camD: 4.4, ox: null as number | null, lookUp: 0 }
   let hall: Hall | null = null
+  let gl: WebGL2RenderingContext | null = null
   let failed = false
   let destroyed = false
   let built = false
@@ -344,8 +348,40 @@ export function createVault(opts: VaultOpts): Vault {
   const white = new THREE.Color(1, 1, 1)
   const spillColor = new THREE.Color(0x9fdcff)
   const spillTo = new THREE.Color(0x9fdcff)
-  let sampleG: CanvasRenderingContext2D | null = null
+  let sampleG: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null = null
+  let sampling = false
   let frameN = 0
+  /** the picture's colour, for the spill: a 4×4 copy of the video frame, made off the frame and read from an
+   * OffscreenCanvas (a video's, or a bitmap's, first draw into a readable page canvas stalls ~15 ms on a readback) */
+  function sampleSpill(v: HTMLVideoElement) {
+    if (sampling || typeof createImageBitmap !== 'function') return
+    sampling = true
+    createImageBitmap(v, { resizeWidth: 4, resizeHeight: 4, resizeQuality: 'low' })
+      .then((bmp) => {
+        if (!sampleG) {
+          const c = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(4, 4) : Object.assign(document.createElement('canvas'), { width: 4, height: 4 })
+          sampleG = c.getContext('2d', { willReadFrequently: true }) as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null
+        }
+        if (sampleG && !destroyed) {
+          sampleG.drawImage(bmp, 0, 0)
+          const d = sampleG.getImageData(0, 0, 4, 4).data
+          let r = 0
+          let g = 0
+          let b = 0
+          for (let k = 0; k < d.length; k += 4) {
+            r += d[k]
+            g += d[k + 1]
+            b += d[k + 2]
+          }
+          spillTo.setRGB(r / 16 / 255, g / 16 / 255, b / 16 / 255, THREE.SRGBColorSpace).lerp(white, 0.25)
+        }
+        bmp.close()
+      })
+      .catch(() => {})
+      .finally(() => {
+        sampling = false
+      })
+  }
 
   function placeCamera(t: number) {
     const camera = hall!.camera
@@ -375,8 +411,10 @@ export function createVault(opts: VaultOpts): Vault {
     const coarse = matchMedia('(pointer: coarse)').matches
     renderer.setPixelRatio(Math.min(devicePixelRatio, coarse ? 1.5 : 1.75))
     renderer.setSize(w, h, false)
-    composer.setPixelRatio(renderer.getPixelRatio())
-    composer.setSize(w, h)
+    if (composer) {
+      composer.setPixelRatio(renderer.getPixelRatio())
+      composer.setSize(w, h)
+    }
     camera.aspect = w / h
     camera.fov = view.wide ? 30 : 34
     view.camD = view.wide ? 4.4 : 3.55
@@ -435,25 +473,7 @@ export function createVault(opts: VaultOpts): Vault {
       tmp2.set(0, 0, 0.95).applyQuaternion(on.ex.root.quaternion)
       spill.position.copy(tmp).add(tmp2)
       const v = on.video
-      if (++frameN % 8 === 0 && v && v.readyState >= 2 && !v.paused) {
-        try {
-          sampleG ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true })
-          if (sampleG) {
-            sampleG.canvas.width = sampleG.canvas.height = 4
-            sampleG.drawImage(v, 0, 0, 4, 4)
-            const d = sampleG.getImageData(0, 0, 4, 4).data
-            let r = 0
-            let g = 0
-            let b = 0
-            for (let k = 0; k < d.length; k += 4) {
-              r += d[k]
-              g += d[k + 1]
-              b += d[k + 2]
-            }
-            spillTo.setRGB(r / 16 / 255, g / 16 / 255, b / 16 / 255, THREE.SRGBColorSpace).lerp(white, 0.25)
-          }
-        } catch {}
-      }
+      if (++frameN % 8 === 0 && v && v.readyState >= 2 && !v.paused) sampleSpill(v)
     }
     spillColor.lerp(spillTo, 1 - Math.exp(-dt * 4))
     spill.color.copy(spillColor)
@@ -490,18 +510,57 @@ export function createVault(opts: VaultOpts): Vault {
   const loader = new THREE.TextureLoader()
   function buildSet(e: Exh) {
     const h = hall!
-    const ex = buildExhibit(e.p.tv, e.i, N, h.M)
+    const ex = buildExhibit(e.p.tv, e.i, N, h.M, e.tv ?? undefined)
+    e.tv = null
     e.ex = ex
     e.u = ex.scr.mat.uniforms
     e.u.uCrop.value.set(...coverCrop(e.m.w / e.m.h, ex.scr.w / ex.scr.h))
     h.scene.add(ex.root)
     loader.load(e.m.poster, (t) => {
-      if (destroyed) return t.dispose()
+      if (destroyed || !hall) return t.dispose()
       t.colorSpace = THREE.SRGBColorSpace
+      hall.renderer.initTexture(t) // its upload in this task, not the first frame's
       e.poster = t
       if (!e.video || e.video.paused || S.on !== e.i) showTex(e, t)
       kick()
     })
+  }
+  /** draw one exhibit alone into the composer's target: its buffers go up now, not all in the first frame */
+  function warm(e: Exh) {
+    const { renderer, scene, camera, composer } = hall!
+    const hidden: THREE.Object3D[] = []
+    const unculled: THREE.Object3D[] = []
+    for (const o of E) {
+      o.ex?.root.traverse((m) => {
+        if (!(m as THREE.Mesh).isMesh) return
+        if (o !== e && m.visible) {
+          m.visible = false
+          hidden.push(m)
+        } else if (o === e && m.frustumCulled) {
+          m.frustumCulled = false
+          unculled.push(m)
+        }
+      })
+    }
+    const prev = renderer.getRenderTarget()
+    renderer.setRenderTarget(composer.readBuffer)
+    renderer.render(scene, camera)
+    renderer.setRenderTarget(prev)
+    hidden.forEach((m) => (m.visible = true))
+    unculled.forEach((m) => (m.frustumCulled = true))
+  }
+  /** the first frame, even offscreen, so the canvas is ready when it scrolls in */
+  function firstFrame() {
+    buildRaf = 0
+    if (destroyed || failed) return
+    built = true
+    E.forEach((e) => setIdle(e, true))
+    last = performance.now()
+    step(0)
+    hall!.composer.render()
+    ready = true
+    opts.onReady()
+    kick()
   }
   function fail() {
     if (failed || destroyed) return
@@ -514,17 +573,33 @@ export function createVault(opts: VaultOpts): Vault {
   }
   const steps: (() => void | Promise<void>)[] = [
     () => {
-      hall = createHall(canvas)
+      // the context in a frame of its own (three takes it next); without WebGL2, the fallback, and no three errors
+      gl = canvas.getContext('webgl2', CONTEXT)
+      if (!gl) throw new Error('no WebGL2')
       listen(canvas, 'webglcontextlost', fail)
+    },
+    () => {
+      hall = createHall(canvas, gl!)
       resize(view.w, view.h)
     },
+    () => hall!.post(),
+    () => hall!.decorate(),
+    () => hall!.prepareRoom(),
+    () => hall!.preparePasses(),
+    () => hall!.warmEnvironment(),
     () => hall!.environment(),
-    ...E.map((e) => () => buildSet(e)),
+    ...E.flatMap((e) => [
+      () => {
+        e.tv = SETS[e.p.tv](hall!.M)
+      },
+      () => buildSet(e),
+    ]),
+    () => hall!.targets(),
     async () => {
-      const { renderer, scene, camera } = hall!
       placeCamera(S.time)
-      await renderer.compileAsync(scene, camera)
+      await hall!.compile()
     },
+    ...E.map((e) => () => warm(e)),
   ]
   async function build(k: number) {
     buildRaf = 0
@@ -535,19 +610,7 @@ export function createVault(opts: VaultOpts): Vault {
       return fail()
     }
     if (destroyed || failed) return
-    if (k + 1 < steps.length) {
-      buildRaf = requestAnimationFrame(() => build(k + 1))
-      return
-    }
-    built = true
-    E.forEach((e) => setIdle(e, true))
-    // the first frame, even offscreen, so the canvas is ready when it scrolls in
-    last = performance.now()
-    step(0)
-    hall!.composer.render()
-    ready = true
-    opts.onReady()
-    kick()
+    buildRaf = requestAnimationFrame(k + 1 < steps.length ? () => build(k + 1) : firstFrame)
   }
   buildRaf = requestAnimationFrame(() => build(0))
 
@@ -629,7 +692,8 @@ export function createVault(opts: VaultOpts): Vault {
     const i = pick(ev)
     if (i < 0) return kick()
     interacted()
-    if (i === S.on && !E[i].tween) hooks.openHolo(i)
+    // the set in front (or on its way there) is Watch: now if it's on, else once it is; another set comes forward
+    if (i === S.target) watchSet(S, i, hooks)
     else goTo(S, i, hooks)
     kick()
   }

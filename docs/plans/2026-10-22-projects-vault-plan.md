@@ -280,7 +280,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
     - the power button's labels flip;
     - the engine is imported only once the section nears (the IO stub);
     - the fallback renders on `onFail`.
-- [ ] **T9: Browser verification** on a production build (`npm run build && npm run start -p <free port>`). Use puppeteer-core with Chrome, in the style of the mockup's `vshot.mjs`. Stub `/api/wizard/chat`, and never click in `#skills`. Record what each check showed:
+- [x] **T9: Browser verification** on a production build (`npm run build && npm run start -p <free port>`). Use puppeteer-core with Chrome, in the style of the mockup's `vshot.mjs`. Stub `/api/wizard/chat`, and never click in `#skills`. Record what each check showed:
   - **Desktop 1280×800 and 1440×900:**
     - the hall matches the mockup at the same states (shoot each set in front, mid-move, the hologram mid-flight and landed, closed);
     - drag, the arrows, a sideways wheel, the tabs by keyboard, a click on a side set, then a click on the front set opens Watch;
@@ -292,6 +292,16 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
   - **Network:** nothing from `/projects/` before the section nears; then only the posters and the front set's video; another set's video only when it's in front.
   - **Performance:** a trace with 4× CPU throttling while scrolling the section in shows no task over 50 ms; `DrawFrame` counts while it's idle on screen and offscreen (≈ 0); Lighthouse accessibility 100 on `/`.
   - **Console:** no errors.
+  - **Results (2026-10-22, `next start` on :3101, puppeteer-core + Chrome, the placeholder clips):** 86 checks, all passing on the final build (one transient run of 500s from the local server under the harness's load passed on rerun).
+    - **Look:** each set in front, mid-move, the hologram flying, landed and closing, at 1280×800 and 1440×900, match the mockup's shots at the same states (same composition, card, rings, CRT, beam and backdrop).
+    - **Desktop (both sizes):** tabs, arrows (announced "Exhibit 3 of 6: Rezmancer"), a gentle drag (one set) and a fast flick (throws further, as the mockup), a sideways wheel (one set per swipe, announced, the page doesn't scroll), ←/Home in the tab list, a click on a side set, a click on the lit screen → Watch; the hologram plays the set's own `<video>` (one element), ✕ focused, a drag out of the panel doesn't close, Esc/✕/backdrop close, focus back on Watch, the page scroll-locked while it's up; Pause freezes the stage (two shots 1 s apart identical), Play resumes.
+    - **Phone 375×812:** a swipe (announced), a vertical swipe over the stage scrolls the page, the card under the stage, the hologram's buttons 44×44 icons with names, Full screen calls `requestFullscreen`, ✕ closes.
+    - **Reduced motion:** paused at load (posters, no autoplay), nothing moves, the arrow is instant, Play plays, the hologram fades in place.
+    - **No WebGL** (`--disable-webgl --disable-3d-apis`): the poster in a CSS screen, the arrows browse, Watch lifts the hologram from it; no console errors (the engine asks for a WebGL2 context itself, so three never logs).
+    - **Network:** nothing from `/projects/` at the top or 1100 px out; at 600 px out the six posters and no video; on screen only `number-slayers.webm`; Next adds only `rezmancer.webm`; one video playing at a time.
+    - **Draws:** ~11,000 WebGL draw calls in 3 s on screen, 0 off screen; DrawFrame in 3 s: 180 on screen, 0 off screen.
+    - **Lighthouse accessibility on `/`: 100.**
+    - **Long tasks (4× CPU):** the first trace had five vault tasks over 50 ms (the first frame 126 ms, the PMREM 78, the renderer 51, …). Fixed by staging (see hall.ts's build note): shaders compiled for the composer's target, not the canvas; the passes' and PMREM's shaders compiled in parallel and first drawn in a tiny target; the context, renderer, passes, decor and each set in frames of their own; posters uploaded as they load; a warm-up draw per set; the spill's colour sampled through an OffscreenCanvas (a page canvas's first video read stalled 63 ms). After: **a reader scrolling from the top: no vault task over 50 ms in 4 of 5 traces, one at 51.2 ms**; the vault's heaviest steps (the WebGL context, three's renderer, the first set's cold build) run 40–50 ms. Jumping straight to the section (the vault as the page's first 3D): three's own evaluation 53–107 ms (the shared chunk the About ring loads first on a normal visit) and the vault's steps 41–51 ms (up to ~60 under machine noise). See the stop conditions.
 - [ ] **T10: Docs and version.**
   - CLAUDE.md:
     - the directory tree (`components/projects/`, `lib/vault/`, `public/projects/`, `video-masters/`, `scripts/encode-projects.mjs`);
@@ -357,3 +367,4 @@ Paste the pass lines.
 - **Performance:** if the 50 ms budget can't be met while mounting on the throttled trace after staging the build, stop with the trace numbers (don't drop the bloom or sets on your own).
 - **The mockup and this plan disagree:** the mockup wins for look and motion, this plan for architecture and copy. Note it here.
 - **Servers:** `:3002` may be Phill's own `next dev` (it holds `.next/dev/lock`); `next start` doesn't need the lock. Use a free port, and stop only servers you started.
+- **Performance, for Phill (T9, 2026-10-22; not blocking):** after staging, the vault's mount is at the 50 ms line on a 4×-throttled CPU: no task over 50 ms in 4 of 5 top-to-Projects traces, one at 51.2 ms; its heaviest steps (creating the WebGL context, three's renderer setup, the first set's cold build) can't be split further without dropping work. When the vault is the page's first 3D (a jump straight to `#projects`), three's own evaluation is 53–107 ms at 4× (~15 ms at 1×), the same chunk the About ring pays on a normal visit. Your call whether that's acceptable or worth a follow-up (e.g. evaluating three at idle after load).

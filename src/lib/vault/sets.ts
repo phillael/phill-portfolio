@@ -239,13 +239,14 @@ export type Exhibit = {
   plinthH: number
 }
 
-/** set i of n on its lit plinth, on the arc, facing the hall's centre */
-export function buildExhibit(tvKind: ProjectTv, i: number, n: number, M: Mats): Exhibit {
+export type Television = Built
+
+/** set i of n on its lit plinth, on the arc, facing the hall's centre (`tv`: the set, if it's built already) */
+export function buildExhibit(tvKind: ProjectTv, i: number, n: number, M: Mats, tv: Television = SETS[tvKind](M)): Exhibit {
   const root = new THREE.Group()
   const a = angleOf(i, n)
   root.position.set(R * Math.sin(a), 0, -R * Math.cos(a))
   root.rotation.y = -a
-  const tv = SETS[tvKind](M)
   root.add(tv.g)
   root.updateMatrixWorld(true)
   const sp = new THREE.Vector3()

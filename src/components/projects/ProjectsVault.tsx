@@ -172,10 +172,10 @@ const ProjectsVault = ({ projects, media }: Props) => {
           </button>
           <p className={css.hint} aria-hidden="true" data-gone={!hint}>
             <span className={css.fine}>
-              Drag to browse<span className={css.dot}>·</span>click a screen to watch
+              Drag to browse <span className={css.dot}>·</span> click a screen to watch
             </span>
             <span className={css.coarse}>
-              Swipe to browse<span className={css.dot}>·</span>tap a screen to watch
+              Swipe to browse <span className={css.dot}>·</span> tap a screen to watch
             </span>
           </p>
           <div ref={holderRef} className={css.videos} aria-hidden="true" />

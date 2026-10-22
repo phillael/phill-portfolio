@@ -33,6 +33,16 @@ jest.mock('three', () => {
     compileAsync() {
       return Promise.resolve()
     }
+    initTexture() {}
+    initRenderTarget() {}
+    getSize(v: { set(x: number, y: number): unknown }) {
+      return v.set(this.domElement.width, this.domElement.height)
+    }
+    getRenderTarget() {
+      return null
+    }
+    setRenderTarget() {}
+    render() {}
     dispose = mockRendererDispose
     forceContextLoss() {}
   }
@@ -53,6 +63,10 @@ jest.mock('three', () => {
 })
 jest.mock('three/examples/jsm/postprocessing/EffectComposer.js', () => ({
   EffectComposer: class {
+    readBuffer = {}
+    writeBuffer = {}
+    renderTarget1 = {}
+    renderTarget2 = {}
     addPass() {}
     setPixelRatio() {}
     setSize() {}
@@ -63,8 +77,19 @@ jest.mock('three/examples/jsm/postprocessing/EffectComposer.js', () => ({
   },
 }))
 jest.mock('three/examples/jsm/postprocessing/RenderPass.js', () => ({ RenderPass: class {} }))
-jest.mock('three/examples/jsm/postprocessing/UnrealBloomPass.js', () => ({ UnrealBloomPass: class { dispose() {} } }))
-jest.mock('three/examples/jsm/postprocessing/OutputPass.js', () => ({ OutputPass: class {} }))
+jest.mock('three/examples/jsm/postprocessing/UnrealBloomPass.js', () => ({
+  UnrealBloomPass: class {
+    materialHighPassFilter = {}
+    separableBlurMaterials = [{}, {}]
+    compositeMaterial = {}
+    blendMaterial = {}
+    renderTargetBright = {}
+    renderTargetsHorizontal = [{}]
+    renderTargetsVertical = [{}]
+    dispose() {}
+  },
+}))
+jest.mock('three/examples/jsm/postprocessing/OutputPass.js', () => ({ OutputPass: class { renderToScreen = false; render() {} } }))
 
 const projects = projectsData as Project[]
 const MEDIA = media as Record<string, MediaEntry>
@@ -123,7 +148,7 @@ beforeEach(() => {
     unobserve() {}
     disconnect = roDisconnect
   } as unknown as typeof ResizeObserver
-  // a 2D context that draws nothing (the sets' wood, grille, keys and blob; the spill's 4×4 sample)
+  // a context that draws nothing (the sets' wood, grille, keys and blob; the spill's 4×4 sample; the WebGL2 probe)
   jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
     const noop = () => {}
     return {
@@ -137,6 +162,7 @@ beforeEach(() => {
       drawImage: noop,
       createRadialGradient: () => ({ addColorStop: noop }),
       getImageData: () => ({ data: new Uint8ClampedArray(64) }),
+      getExtension: () => null,
     } as unknown as CanvasRenderingContext2D
   } as unknown as typeof HTMLCanvasElement.prototype.getContext)
   // video: play() starts it and fires `playing`; pause() stops it
@@ -182,10 +208,14 @@ function mount(over: Partial<VaultOpts> = {}) {
   return { vault, opts, canvas, videoHolder }
 }
 
-/** built (renderer, reflections, six sets, shaders), on screen, and the front set powered on */
+/** the build's frames: the context and the renderer, the passes, the decor, the environment (4), each set (2), the targets, the
+ * shaders, a warm-up draw per set, then the first frame */
+const BUILD = 2 + 1 + 1 + 4 + 6 * 2 + 1 + 1 + 6 + 1
+
+/** built, on screen, and the front set powered on */
 async function ready(over: Partial<VaultOpts> = {}) {
   const m = mount(over)
-  await frames(12)
+  await frames(BUILD)
   expect(m.opts.onReady).toHaveBeenCalledTimes(1)
   onScreen(true)
   await frames(10)
@@ -198,9 +228,9 @@ const near = (opts: VaultOpts) => (opts.onNear as jest.Mock).mock.calls.map(([i]
 describe('createVault', () => {
   it('builds over several frames, draws a first frame, then waits for the stage to be on screen', async () => {
     const { opts } = mount()
-    await frames(3)
+    await frames(BUILD - 1)
     expect(opts.onReady).not.toHaveBeenCalled()
-    await frames(9)
+    await frames(1)
     expect(opts.onReady).toHaveBeenCalledTimes(1)
     const drawn = mockRender.mock.calls.length
     expect(drawn).toBe(1)
@@ -210,7 +240,7 @@ describe('createVault', () => {
 
   it('loads no video until a set is in front on screen, then only that one (webm, then mp4)', async () => {
     const m = mount()
-    await frames(12)
+    await frames(BUILD)
     expect(videos(m.videoHolder)).toHaveLength(0)
     onScreen(true)
     await frames(10)
@@ -315,6 +345,15 @@ describe('createVault', () => {
     expect((window as { __vault?: unknown }).__vault).toBeUndefined()
   })
 
+  it.each([1, 2, 3, 5, 9, 20])('destroy() after %i build frames is safe, and stops the build', async (n) => {
+    const { vault, opts } = mount()
+    await frames(n)
+    expect(() => vault.destroy()).not.toThrow()
+    await frames(BUILD)
+    expect(opts.onReady).not.toHaveBeenCalled()
+    expect(rafQueue.size).toBe(0)
+  })
+
   it('calls onFail (and never onReady) when the renderer throws, and still moves the selection', async () => {
     mockWebGL.fail = true
     const { vault, opts } = mount()
@@ -361,6 +400,31 @@ describe('createVault', () => {
       await frames(200)
       expect(dlg()?.open).toBe(true)
       expect(dlg()!.querySelector('video source')?.getAttribute('src')).toBe('/projects/jelly-resume.webm')
+    })
+
+    /** a click on the stage at (fx, fy) of its size (the engine reads offsetX/Y) */
+    const clickAt = (canvas: HTMLCanvasElement, fx: number, fy: number) => {
+      for (const type of ['pointerdown', 'pointerup']) {
+        const ev = new MouseEvent(type, { button: 0, clientX: fx * 1280, clientY: fy * 700, bubbles: true })
+        Object.defineProperties(ev, { offsetX: { value: fx * 1280 }, offsetY: { value: fy * 700 }, pointerId: { value: 1 }, pointerType: { value: 'mouse' } })
+        canvas.dispatchEvent(ev)
+      }
+    }
+
+    it('a click on the front set’s screen is Watch, even while it is still powering on', async () => {
+      const { canvas } = await ready()
+      clickAt(canvas, 0.63, 0.47)
+      expect(dlg()?.open).toBeFalsy()
+      await frames(80)
+      expect(dlg()?.open).toBe(true)
+    })
+
+    it('a click beside the sets does nothing', async () => {
+      const { canvas, opts } = await ready()
+      clickAt(canvas, 0.4, 0.08)
+      await frames(80)
+      expect(dlg()?.open).toBeFalsy()
+      expect(opts.onNear).not.toHaveBeenCalled()
     })
 
     it('still works without WebGL: it lifts from the fallback’s screen', async () => {
@@ -413,6 +477,17 @@ describe('createVault', () => {
       await frames(30)
       expect(oscs()).toBe(before)
     })
+  })
+
+  it('falls back without three when the browser has no WebGL2 (no three errors in the console)', async () => {
+    const real = HTMLCanvasElement.prototype.getContext
+    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
+      return type === 'webgl2' ? null : (real as (...a: unknown[]) => unknown).call(this, type, ...rest)
+    } as unknown as typeof HTMLCanvasElement.prototype.getContext)
+    const { opts } = mount()
+    await frames(3)
+    expect(opts.onFail).toHaveBeenCalledTimes(1)
+    expect(mockRendererDispose).not.toHaveBeenCalled()
   })
 
   it('calls onFail when the WebGL context is lost', async () => {

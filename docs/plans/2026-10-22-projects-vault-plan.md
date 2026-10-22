@@ -380,6 +380,7 @@ Paste the pass lines.
 ## Stop conditions / open questions (for Phill)
 
 - **T11:** any placeholder left: stop and list the ids that need a master in `video-masters/`. Before any push, stop: Phill tries it locally and gives the go.
+  - **Status 2026-10-22 (T1–T10 done, 773a0fe): STOPPED at T11.** All six are placeholders: `quadzilla`, `number-slayers`, `rezmancer`, `jelly-resume`, `pickleball-2079`, `pong` need a master as `video-masters/<id>.(mp4|mov|m4v|webm)` (about 30 s, 16:9 at 720p or more with the key action in the middle 4:3; Quadzilla a portrait phone recording). Then `node scripts/encode-projects.mjs`, check the warnings (40 s, 4 MB, 720 px), T9's desktop and phone checks with the real clips, commit, and wait for Phill's go to push.
 - **New copy:** anything beyond §2 (stop and ask).
 - **A master that can't meet the bounds** (longer than 40 s, a file over 4 MB at the binding settings, under 720 px): stop and show Phill the numbers rather than re-cutting his edit.
 - **Performance:** if the 50 ms budget can't be met while mounting on the throttled trace after staging the build, stop with the trace numbers (don't drop the bloom or sets on your own).

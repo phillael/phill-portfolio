@@ -123,13 +123,15 @@ Port its values exactly, unless this plan says otherwise:
 ### 4. The media
 
 - **Phill's masters** go in `video-masters/<id>.(mp4|mov|m4v|webm)` at the repo root. The folder is gitignored (T2 adds it) and isn't watched; the script reads it.
-- **Encoding:** `node scripts/encode-projects.mjs [--id <id>]` (ffmpeg at `/opt/homebrew/bin/ffmpeg`, or `ffmpeg` on the PATH). For each project it reads the master, or, when there's none, `docs/design/projects-vault/media/<id>.mp4` as a **placeholder**, and writes:
-  - **`public/projects/<id>.webm`:** AV1 (`libsvtav1`, `-crf 34 -preset 6`), Opus 96k when the master has audio, else no audio track.
-  - **`public/projects/<id>.mp4`:** H.264 High (`-crf 23 -preset slow -maxrate 3M -bufsize 6M -pix_fmt yuv420p -movflags +faststart`), AAC 128k when the master has audio, else `-an`.
+- **Encoding:** `node scripts/encode-projects.mjs [--id <id>]` (ffmpeg at `/opt/homebrew/bin/ffmpeg`, or `ffmpeg` on the PATH). For each project it reads the master, or, when there's none, `docs/design/projects-vault/media/<id>.mp4` as a **placeholder**, and encodes into the gitignored `video-masters/encoded/`:
+  - **`<id>.webm`:** AV1 (`libsvtav1`, `-crf 34 -preset 6`), Opus 96k when the master has audio, else no audio track.
+  - **`<id>.mp4`:** H.264 High (`-crf 23 -preset slow -maxrate 3M -bufsize 6M -pix_fmt yuv420p -movflags +faststart`), AAC 128k when the master has audio, else `-an`.
   - **The size:** the long side at 1280 (so 1280×720 for 16:9, 720×1280 for Quadzilla's portrait), 30 fps, never upscaled.
-  - **`public/projects/<id>.jpg`:** the poster, the frame at `posterAt` (a per-id table at the top of the script, default 1.5 s), 960 px on the long side, about 80 KB.
-  - **`src/data/projects-media.json`** (GENERATED, never hand-edit): `{ "<id>": { "w", "h", "duration", "audio": bool, "placeholder": bool, "poster": "/projects/<id>.jpg", "sources": [{ "src": "/projects/<id>.webm", "type": "video/webm; codecs=av01.0.05M.08" }, { "src": "/projects/<id>.mp4", "type": "video/mp4" }] } }`.
-  - **It warns** past 40 s, past 4 MB for one file, or on a master under 720 px tall (16:9).
+  - **`<id>.jpg`:** the poster, the frame at `POSTER_AT[id]` (a per-id table at the top of the script, default 0: each brag master's frame 0 is its designed poster), 960 px on the long side, about 80 KB.
+  - **Hosting: Vercel Blob, not `public/` (Phill, 2026-10-22),** so the clips never enter git history (they'll be re-cut). The script uploads the three files with `@vercel/blob`'s `put` (public) to the store `phill-portfolio-media` (connected to the Vercel project) as `projects/<id>-<sha256, 12 hex>.<ext>` with a year's `cacheControlMaxAge`. A re-cut gets a new name, so the cache never serves a stale clip, and a name already in the store (`head`) isn't sent again. The token is `BLOB_READ_WRITE_TOKEN` from `.env.local` (`vercel env pull .env.local`); only the script uses it. Old files stay in the store, since a live deploy may still point at them: prune them by hand once none does.
+  - **`src/data/projects-media.json`** (GENERATED, never hand-edit): `{ "<id>": { "w", "h", "duration", "audio": bool, "placeholder": bool, "poster": "https://<store>.public.blob.vercel-storage.com/projects/<id>-<hash>.jpg", "sources": [{ "src": "…/projects/<id>-<hash>.webm", "type": "video/webm; codecs=av01.0.05M.08" }, { "src": "…/projects/<id>-<hash>.mp4", "type": "video/mp4" }] } }`.
+  - **CORS:** the CRTs draw the video into WebGL (`THREE.VideoTexture`) and read its colour for the spill, so each `<video>` is `crossOrigin = 'anonymous'` (Blob answers `Access-Control-Allow-Origin: *`); three's `TextureLoader` loads the posters anonymous by default. There's no CSP; one would need `*.public.blob.vercel-storage.com` in `media-src` and `img-src`.
+  - **It warns** past 40 s, past 15 MB for one file (Phill, 2026-10-22: one clip loads at a time, when its set powers on, so the size only sets that clip's start and a phone's data; the CRFs stay), or on a master under 720 px tall (16:9).
 - **The CRT texture and the hologram use the same files.** The CRT crops the middle to its screen's aspect (cover); the hologram shows the whole frame at the video's own aspect.
 - **The old screenshots go:** `public/images/projects/` is deleted with `ProjectCard` (T8), once nothing references them.
 
@@ -289,7 +291,7 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
   - **Phone 375×812 touch:** a swipe, a vertical scroll over the stage still scrolls the page, the card under the stage, the hologram with icon buttons, and Full screen called.
   - **Reduced motion:** posters, instant moves, Play plays, and the hologram fades.
   - **No WebGL:** Chrome with `--disable-webgl --disable-3d-apis` shows the fallback, and Watch still works.
-  - **Network:** nothing from `/projects/` before the section nears; then only the posters and the front set's video; another set's video only when it's in front.
+  - **Network:** nothing from the Blob store's `projects/` before the section nears; then only the posters and the front set's video; another set's video only when it's in front.
   - **Performance:** a trace with 4× CPU throttling while scrolling the section in shows no task over 50 ms; `DrawFrame` counts while it's idle on screen and offscreen (≈ 0); Lighthouse accessibility 100 on `/`.
   - **Console:** no errors.
   - **Results (2026-10-22, `next start` on :3101, puppeteer-core + Chrome, the placeholder clips):** 86 checks, all passing on the final build (one transient run of 500s from the local server under the harness's load passed on rerun).
@@ -310,9 +312,21 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
   - `package.json` 1.10.0.
   - The PR text below, filled in.
   - **Gates (2026-10-22):** `tsc` 0; lint 0 (no warnings); Jest 75 suites, 1034 tests, all passing; `npm run build` 0. (Next 16.4.0's CLI stops the first build after compiling with a "SecurityFatalError: your version of Next.js is affected by a known security vulnerability … retry" notice; the retry builds. Upgrading Next is outside this PR: Phill's call.)
-- [ ] **T11: Phill's videos and the PR.**
+- [x] **T11: Phill's videos and the PR.**
   - If `src/data/projects-media.json` still has any `placeholder: true`: **STOP** and tell Phill which ids still need a master in `video-masters/`. After he drops them in, run `node scripts/encode-projects.mjs`, check them on the build (each plays on its set and in the hologram, the posters are good frames, sizes are in the warnings' bounds), and commit.
   - **Then stop before pushing:** Phill tries it locally and gives the go to push and open the PR.
+  - **Done 2026-10-22.** Phill's six brag masters are in `video-masters/` (all 1920×1080 at 30 s except Quadzilla, 1080×1920 at 34 s; all with a music track). His calls: the clips on Vercel Blob instead of `public/projects/` (§4), the poster at frame 0, the size warning at 15 MB, and the go to push and open the PR.
+    - **Encode:** no placeholder, no warning (59 s on this Mac). Quadzilla 720×1280, 34.01 s, webm 3.6 MB / mp4 3.7 MB; Number Slayers 6.7 / 7.6 MB; Rezmancer 3.1 / 4.4 MB; Jelly Resume 12.6 / 9.2 MB; Pickleball 2079 5.2 / 5.9 MB; Pong 7.1 / 6.9 MB; posters 32–84 KB. ffprobe: av1 1280×720, h264 720×1280. The posters reused the earlier upload (same hash); the clips were new uploads (the AV1 and H.264 encodes aren't byte-identical between runs).
+    - **Blob:** `Access-Control-Allow-Origin: *`, `cache-control: public, max-age=31536000`, byte ranges (206), and the right content types.
+    - **Gates:** `tsc` 0; lint 0; Jest 75 suites, 1035 tests; `npm run build` 0.
+    - **T9 again, real clips (`next start` on :3101):** 87/87, the 86 checks plus "every clip and poster comes from the Blob store".
+    - **The real clips (a T11 script, 76 checks, all passing):**
+      - Each of the six plays its Blob clip on its set, `crossOrigin` anonymous, with a picture on the screen (not black: CORS works) and no console errors.
+      - Each opens in the hologram at its own aspect (Quadzilla 0.563, the rest 1.778) inside the viewport, muted, with Sound on offered, at 1280×800 and 375×812.
+      - With the clips held back 7 s, the sets show their posters, and the hologram has its poster attribute.
+      - Sound: Sound on unmutes the clip (it decodes audio) and pauses a playing site song; Sound off hands the song back; closing with Sound on hands it back and the set's clip is muted again.
+      - Quadzilla's portrait fills the pocket TV on desktop and phone.
+    - **A visual note for Phill:** on a portrait hologram (Quadzilla, 214 px wide on desktop), the bar's four buttons fill its width, so the title ellipsizes to nothing (the mockup's CSS; the dialog's accessible name is still "Quadzilla").
 
 ## PR text (T10 fills it; it waits for Phill's go before any push)
 
@@ -324,19 +338,20 @@ The Projects section is rebuilt as **the Relic Vault**: it's the year 4789, and 
 - **The engine** (`src/lib/vault/`, plain three.js, one lazy chunk): the hall, six procedural sets on plinths (`sets.ts`), the CRT shader (`crt.ts`), the bloom composer and a staged build (`hall.ts`), the pure spring/state/homography (`state.ts`, `math.ts`), drag/click/hover/sideways-wheel input, power on/off, one video at a time, posters until `playing`, the spill light in the picture's colour, paused offscreen and in hidden tabs.
 - **The hologram** (`holo.ts`, `vault.css`): a modal `<dialog>` on `<body>` mapped from the screen's projected corners by a homography, the set's own `<video>` moved in and back, the camera pulled back so the set lands below, Pause, Sound (with the site song's handoff), Full screen, Live, Esc/✕/backdrop, focus return, the scroll lock, reduced motion.
 - **Sound** (`sfx.ts`): the mockup's synthesized power-on/off and hologram cues through the site player's AudioContext, silent until a click in the section.
-- **Media** (`scripts/encode-projects.mjs`): masters in the gitignored `video-masters/` → AV1 webm + H.264 mp4 + posters in `public/projects/`, and the generated `src/data/projects-media.json`.
+- **Media** (`scripts/encode-projects.mjs`): Phill's six brag-video masters in the gitignored `video-masters/` → AV1 webm + H.264 mp4 + posters, uploaded to Vercel Blob (the public store `phill-portfolio-media`) under content-hashed names with a year's cache, and the generated `src/data/projects-media.json` with their URLs. No video in git; the `<video>` is `crossOrigin="anonymous"` because WebGL draws it.
 - **Data**: six exhibits (Pickleball 2079 added, with the Wizard's details), each with its year, television and caption; the `Project` type follows.
 - **Removed**: `ProjectCard.tsx`, `public/images/projects/`, the ProjectCard tests.
 - **Docs**: CLAUDE.md (the tree, Key Files, the vault's gotchas); v1.10.0.
 
 ### Decisions
 - The Relic Vault over a channel surfer and a TV wall; an arc the camera stands inside, not a second ring of cards (About has one).
-- Plain three.js ported 1:1 from the mockup (the frame loop is the product); no new dependencies.
+- Plain three.js ported 1:1 from the mockup (the frame loop is the product); no new runtime dependencies (`@vercel/blob` is a devDependency, for the encode script).
+- The clips on Vercel Blob, not in `public/`: re-cuts never grow the repo. The size warning is 15 MB (one clip loads at a time, when its set powers on); the CRFs stay.
 - The mockup's look is fixed: idle sets Static, CRT Classic; its mock bar doesn't ship.
 - Sound effects only after a click in the section; the videos' own sound is off until Sound on, which pauses the site song and hands it back.
 - One `<video>` per project, shared by the CRT and the hologram; only the front set plays.
 - Reduced motion keeps the hall, without camera moves, power-on, static motion or autoplay.
-- Placeholders never ship: this waits for the six clips.
+- Placeholders never ship: all six clips are Phill's masters, and `projects-media.test.ts` fails on a placeholder.
 
 ### Test plan for Phill
 - [ ] Desktop: scroll to Projects (Number Slayers powers on), drag the hall, the arrows, a sideways trackpad swipe, the names under it; click a side set, then the lit screen (Watch). Close with Esc, ✕ and a click outside.
@@ -377,12 +392,22 @@ Paste the pass lines.
 7. **The network** on a fresh load (no project bytes until near) and the performance trace (no task over 50 ms).
 8. `git status` shows only intended files; `video-masters/` is ignored.
 
+**Acceptance run (2026-10-22, after T11, the real clips on Blob, `next start` on :3101):**
+1. `tsc` 0; lint 0 (no warnings); Jest 75 suites, 1035 tests; build 0; `next-env.d.ts` restored.
+2. 1280×800: all six browsed and watched (T11's script: each plays on its set and in the hologram); closed by Esc, ✕ and the backdrop (T9's desk checks). The look matched the mockup's shots at T9; the screens now carry Phill's clips.
+3. Phone 375×812: T9's phone checks (swipe, page scroll over the stage, the hologram, Full screen) and all six holograms in the viewport.
+4. Keyboard: T9's (the tabs' ←/→/Home/End, Enter on Watch, Esc and ✕ by keyboard, focus back on Watch).
+5. Reduced motion and Pause: T9's rm checks.
+6. Sound: T9's effects after a click; T11's video sound with the site song's handoff (on pauses it, off and closing hand it back).
+7. Network: nothing from the Blob store before 800 px, then the six posters, then only the front set's clip, all from `*.public.blob.vercel-storage.com`. Performance, 4× CPU: a reader's scroll from the top, 3 traces, no vault task over 50 ms (the long tasks are About's, before 1 s; three loads for its ring at +270 ms). The jump trace (`perf.mjs`: the page loads at the top, jumps to 3000 px above the stage, then scrolls in, so About's ring never loads three first) still pays three's evaluation in one task, 57–66 ms, and the vault's heaviest step is 46–52 ms (one 52.0 and one 50.9 of 4 traces): the numbers flagged at T9, unchanged by the clips. Draws: 0 off screen; DrawFrame 181 on, 0 off.
+8. `git status`: only this work, plus `AGENTS.md` (committed on its own, Phill's go) and the round-1 `docs/design/experience-refresh/` mockups (left untracked: Phill decides; `career.js` names employer-internal vendors). `video-masters/` (with `encoded/`) is ignored.
+
 ## Stop conditions / open questions (for Phill)
 
 - **T11:** any placeholder left: stop and list the ids that need a master in `video-masters/`. Before any push, stop: Phill tries it locally and gives the go.
-  - **Status 2026-10-22 (T1–T10 done, 773a0fe): STOPPED at T11.** All six are placeholders: `quadzilla`, `number-slayers`, `rezmancer`, `jelly-resume`, `pickleball-2079`, `pong` need a master as `video-masters/<id>.(mp4|mov|m4v|webm)` (about 30 s, 16:9 at 720p or more with the key action in the middle 4:3; Quadzilla a portrait phone recording). Then `node scripts/encode-projects.mjs`, check the warnings (40 s, 4 MB, 720 px), T9's desktop and phone checks with the real clips, commit, and wait for Phill's go to push.
+  - **Status 2026-10-22: resolved (T11 done).** Was: STOPPED at T11 (T1–T10 done, 773a0fe). All six are placeholders: `quadzilla`, `number-slayers`, `rezmancer`, `jelly-resume`, `pickleball-2079`, `pong` need a master as `video-masters/<id>.(mp4|mov|m4v|webm)` (about 30 s, 16:9 at 720p or more with the key action in the middle 4:3; Quadzilla a portrait phone recording). Then `node scripts/encode-projects.mjs`, check the warnings (40 s, 4 MB, 720 px), T9's desktop and phone checks with the real clips, commit, and wait for Phill's go to push.
 - **New copy:** anything beyond §2 (stop and ask).
-- **A master that can't meet the bounds** (longer than 40 s, a file over 4 MB at the binding settings, under 720 px): stop and show Phill the numbers rather than re-cutting his edit.
+- **A master that can't meet the bounds** (longer than 40 s, a file over 15 MB at the binding settings, under 720 px): stop and show Phill the numbers rather than re-cutting his edit.
 - **Performance:** if the 50 ms budget can't be met while mounting on the throttled trace after staging the build, stop with the trace numbers (don't drop the bloom or sets on your own).
 - **The mockup and this plan disagree:** the mockup wins for look and motion, this plan for architecture and copy. Note it here.
 - **Servers:** `:3002` may be Phill's own `next dev` (it holds `.next/dev/lock`); `next start` doesn't need the lock. Use a free port, and stop only servers you started.

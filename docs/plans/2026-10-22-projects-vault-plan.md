@@ -302,13 +302,14 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
     - **Draws:** ~11,000 WebGL draw calls in 3 s on screen, 0 off screen; DrawFrame in 3 s: 180 on screen, 0 off screen.
     - **Lighthouse accessibility on `/`: 100.**
     - **Long tasks (4× CPU):** the first trace had five vault tasks over 50 ms (the first frame 126 ms, the PMREM 78, the renderer 51, …). Fixed by staging (see hall.ts's build note): shaders compiled for the composer's target, not the canvas; the passes' and PMREM's shaders compiled in parallel and first drawn in a tiny target; the context, renderer, passes, decor and each set in frames of their own; posters uploaded as they load; a warm-up draw per set; the spill's colour sampled through an OffscreenCanvas (a page canvas's first video read stalled 63 ms). After: **a reader scrolling from the top: no vault task over 50 ms in 4 of 5 traces, one at 51.2 ms**; the vault's heaviest steps (the WebGL context, three's renderer, the first set's cold build) run 40–50 ms. Jumping straight to the section (the vault as the page's first 3D): three's own evaluation 53–107 ms (the shared chunk the About ring loads first on a normal visit) and the vault's steps 41–51 ms (up to ~60 under machine noise). See the stop conditions.
-- [ ] **T10: Docs and version.**
+- [x] **T10: Docs and version.**
   - CLAUDE.md:
     - the directory tree (`components/projects/`, `lib/vault/`, `public/projects/`, `video-masters/`, `scripts/encode-projects.mjs`);
     - a Key Files entry for the vault;
     - gotchas: the poster-until-`playing` rule, the shared video element, `projects-media.json` is generated, the screen units sit on the cabinet face.
   - `package.json` 1.10.0.
   - The PR text below, filled in.
+  - **Gates (2026-10-22):** `tsc` 0; lint 0 (no warnings); Jest 75 suites, 1034 tests, all passing; `npm run build` 0. (Next 16.4.0's CLI stops the first build after compiling with a "SecurityFatalError: your version of Next.js is affected by a known security vulnerability … retry" notice; the retry builds. Upgrading Next is outside this PR: Phill's call.)
 - [ ] **T11: Phill's videos and the PR.**
   - If `src/data/projects-media.json` still has any `placeholder: true`: **STOP** and tell Phill which ids still need a master in `video-masters/`. After he drops them in, run `node scripts/encode-projects.mjs`, check them on the build (each plays on its set and in the hologram, the posters are good frames, sizes are in the warnings' bounds), and commit.
   - **Then stop before pushing:** Phill tries it locally and gives the go to push and open the PR.
@@ -316,16 +317,33 @@ Order matters: T1–T2 are data and media; T3–T7 build the engine bottom-up (p
 ## PR text (T10 fills it; it waits for Phill's go before any push)
 
 ### Summary
-(fill: the Relic Vault in two sentences)
+The Projects section is rebuilt as **the Relic Vault**: it's the year 4789, and a museum shows the apps on the CRT televisions it believes are period-correct. The set in front powers on and plays its project's brag video through a CRT shader, and Watch lifts the picture out of the glass as a hologram, with the old set beaming it up from below.
 
 ### What's in it
-(fill: the section, the engine, the hologram, the media pipeline, the data, the removals)
+- **The section** (`ProjectsSection.tsx`, `components/projects/ProjectsVault.tsx`, `Projects.module.css`): the header in the Skills section's pattern, the stage (arrows, Pause/Play, the hint), the museum card (all six exhibits' tab panels in the HTML: exhibit, year, description, stack, Watch, Live ↗, Code ↗, the set), the APG tab list of names, a polite live region. The engine is imported within 800 px; without WebGL the poster sits in a CSS screen and Watch still works.
+- **The engine** (`src/lib/vault/`, plain three.js, one lazy chunk): the hall, six procedural sets on plinths (`sets.ts`), the CRT shader (`crt.ts`), the bloom composer and a staged build (`hall.ts`), the pure spring/state/homography (`state.ts`, `math.ts`), drag/click/hover/sideways-wheel input, power on/off, one video at a time, posters until `playing`, the spill light in the picture's colour, paused offscreen and in hidden tabs.
+- **The hologram** (`holo.ts`, `vault.css`): a modal `<dialog>` on `<body>` mapped from the screen's projected corners by a homography, the set's own `<video>` moved in and back, the camera pulled back so the set lands below, Pause, Sound (with the site song's handoff), Full screen, Live, Esc/✕/backdrop, focus return, the scroll lock, reduced motion.
+- **Sound** (`sfx.ts`): the mockup's synthesized power-on/off and hologram cues through the site player's AudioContext, silent until a click in the section.
+- **Media** (`scripts/encode-projects.mjs`): masters in the gitignored `video-masters/` → AV1 webm + H.264 mp4 + posters in `public/projects/`, and the generated `src/data/projects-media.json`.
+- **Data**: six exhibits (Pickleball 2079 added, with the Wizard's details), each with its year, television and caption; the `Project` type follows.
+- **Removed**: `ProjectCard.tsx`, `public/images/projects/`, the ProjectCard tests.
+- **Docs**: CLAUDE.md (the tree, Key Files, the vault's gotchas); v1.10.0.
 
 ### Decisions
-(fill: from this plan's Decisions, briefly)
+- The Relic Vault over a channel surfer and a TV wall; an arc the camera stands inside, not a second ring of cards (About has one).
+- Plain three.js ported 1:1 from the mockup (the frame loop is the product); no new dependencies.
+- The mockup's look is fixed: idle sets Static, CRT Classic; its mock bar doesn't ship.
+- Sound effects only after a click in the section; the videos' own sound is off until Sound on, which pauses the site song and hands it back.
+- One `<video>` per project, shared by the CRT and the hologram; only the front set plays.
+- Reduced motion keeps the hall, without camera moves, power-on, static motion or autoplay.
+- Placeholders never ship: this waits for the six clips.
 
 ### Test plan for Phill
-(fill: desktop drag/arrows/Watch, the phone swipe and the hologram, reduced motion, sound after a click, video sound + the site song)
+- [ ] Desktop: scroll to Projects (Number Slayers powers on), drag the hall, the arrows, a sideways trackpad swipe, the names under it; click a side set, then the lit screen (Watch). Close with Esc, ✕ and a click outside.
+- [ ] Phone: swipe through all six, scroll the page over the stage, Watch (icon buttons), Full screen.
+- [ ] Reduced motion (System Settings → Accessibility → Display): posters at rest, Play plays, the hologram fades in place; Pause stops everything.
+- [ ] Sound: silent while scrolling; after one click in the section, the power-on thunk and the hologram whoosh. With a clip that has audio: Sound on pauses a playing song, closing gives it back.
+- [ ] Your six clips: each plays on its set and in the hologram, the posters are good frames.
 
 ## Per-task verification
 

@@ -155,6 +155,13 @@ describe('ProjectsSection', () => {
     expect(code).toHaveAttribute('href', 'https://github.com/phillael/number-slayers')
     expect(code).toHaveAttribute('rel', 'noopener noreferrer')
     expect(visibleText(live)).toBe('Live ↗')
+    // Quadzilla's and Rezmancer's apps are live (both open on their sign-in page); no Code (private repos)
+    for (const [id, url] of [['quadzilla', 'https://quadzilla.app'], ['rezmancer', 'https://rezmancer.com']]) {
+      const l = within(panel(id)).getByRole('link', { name: 'Live (opens in a new tab)', hidden: true })
+      expect(l).toHaveAttribute('href', url)
+      expect(l).toHaveAttribute('target', '_blank')
+      expect(within(panel(id)).queryByRole('link', { name: /^Code/, hidden: true })).toBeNull()
+    }
     const jelly = within(panel('jelly-resume')).getByRole('link', { name: 'Live', hidden: true })
     expect(jelly).toHaveAttribute('href', '/resume')
     expect(jelly).not.toHaveAttribute('target')

@@ -6,6 +6,7 @@
     "tv": "pocket",
     "set": "a pocket television, c. 1982",
     "description": "AI strength coach for iOS and web. A coach agent holds your whole training history and changes your program through typed tools, with an auditable decision log. Voice logging, Apple Health sync, offline replay. On TestFlight.",
+    "liveUrl": "https://quadzilla.app",
     "techStack": [
       "Expo",
       "Next.js",
@@ -39,6 +40,7 @@
     "tv": "terminal",
     "set": "a beige office terminal, c. 1984",
     "description": "AI resume builder, in development. Resume as code, a pixel-exact PDF and a Claude builder that keeps a career bank of sourced facts: every number it writes must trace back to one. Tailors a resume per posting and flags any line nothing backs.",
+    "liveUrl": "https://rezmancer.com",
     "techStack": [
       "Next.js 16",
       "Neon Postgres",

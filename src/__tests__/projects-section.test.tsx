@@ -155,6 +155,13 @@ describe('ProjectsSection', () => {
     expect(code).toHaveAttribute('href', 'https://github.com/phillael/number-slayers')
     expect(code).toHaveAttribute('rel', 'noopener noreferrer')
     expect(visibleText(live)).toBe('Live ↗')
+    // Quadzilla's and Rezmancer's apps are live (both open on their sign-in page); no Code (private repos)
+    for (const [id, url] of [['quadzilla', 'https://quadzilla.app'], ['rezmancer', 'https://rezmancer.com']]) {
+      const l = within(panel(id)).getByRole('link', { name: 'Live (opens in a new tab)', hidden: true })
+      expect(l).toHaveAttribute('href', url)
+      expect(l).toHaveAttribute('target', '_blank')
+      expect(within(panel(id)).queryByRole('link', { name: /^Code/, hidden: true })).toBeNull()
+    }
     const jelly = within(panel('jelly-resume')).getByRole('link', { name: 'Live', hidden: true })
     expect(jelly).toHaveAttribute('href', '/resume')
     expect(jelly).not.toHaveAttribute('target')
@@ -191,9 +198,17 @@ describe('ProjectsSection', () => {
     expect(screen.getByRole('button', { name: 'Next exhibit' })).toBeInTheDocument()
   })
 
-  it('imports the engine only once the section is within 800 px', async () => {
+  it('warms the engine’s code once the page is idle, but makes the engine only once the section is within 800 px', async () => {
+    const ric = jest.fn((cb: IdleRequestCallback) => {
+      cb({} as IdleDeadline)
+      return 1
+    })
+    const realRIC = window.requestIdleCallback
+    window.requestIdleCallback = ric
     render(<ProjectsSection />)
     await act(async () => {})
+    window.requestIdleCallback = realRIC
+    expect(ric).toHaveBeenCalledTimes(1)
     expect(mockCreate).not.toHaveBeenCalled()
     expect(observers.map((o) => o.margin)).toContain('800px 0px')
     await near()

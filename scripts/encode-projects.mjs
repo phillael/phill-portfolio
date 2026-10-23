@@ -12,7 +12,7 @@
  *   <id>.jpg    the poster: the frame at POSTER_AT[id] (default 0: a brag master's frame 0 is its designed poster),
  *               960 px on the long side, ~80 KB
  * Video: the long side at 1280 (never upscaled), 30 fps. Then it uploads the three to Vercel Blob (the public store
- * phill-portfolio-media: no binaries in git history, and the clips get re-cut) as projects/<id>-<sha256, 12 hex>.<ext>.
+ * phill-portfolio-media: the real clips never enter git history, and they get re-cut) as projects/<id>-<sha256, 12 hex>.<ext>.
  * A re-cut gets a new name, so a year's cache never serves a stale clip; a name already in the store isn't sent again.
  * The token is BLOB_READ_WRITE_TOKEN, from the environment or .env.local (`vercel env pull .env.local`). Old files stay
  * in the store (a live deploy may still point at them): prune them by hand once a deploy no longer does.
@@ -86,8 +86,18 @@ function fit(w, h, long) {
   return [even(w), even(h)]
 }
 
+// strict: a bad argument must never fall through to a full run (every run re-uploads all the clips: new hashes)
+const USAGE = 'usage: node scripts/encode-projects.mjs [--id <id>]'
 const argv = process.argv.slice(2)
-const onlyId = argv.includes('--id') ? argv[argv.indexOf('--id') + 1] : undefined
+let onlyId
+for (let k = 0; k < argv.length; k++) {
+  const a = argv[k]
+  if (a === '--id' || a.startsWith('--id=')) {
+    if (onlyId !== undefined) die(`--id given twice\n${USAGE}`)
+    onlyId = a === '--id' ? argv[++k] : a.slice('--id='.length)
+    if (!onlyId || onlyId.startsWith('-')) die(`--id needs a project id\n${USAGE}`)
+  } else die(`unknown argument ${a}\n${USAGE}`)
+}
 const projects = JSON.parse(fs.readFileSync(at('src/data/projects.json'), 'utf8'))
 const ids = projects.map((p) => p.id)
 if (onlyId !== undefined && !ids.includes(onlyId)) die(`--id ${onlyId}: not in src/data/projects.json (${ids.join(', ')})`)

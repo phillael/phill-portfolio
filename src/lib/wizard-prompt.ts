@@ -24,6 +24,9 @@ const experienceForWizard = () => ({
 })
 
 /** The Skills section's groups, AI first; an AI skill carries its note ("name: note") */
+/** the projects without the Projects section's museum captions (`tv`, `set`): the Wizard mustn't take them as fact */
+const projectsForWizard = () => projects.map(({ tv: _tv, set: _set, ...p }) => p)
+
 const skillsForWizard = () =>
   SKILLS.groups.map((g) => ({
     group: g.name,
@@ -127,7 +130,7 @@ export function buildWizardSystemPrompt(): string {
 
   cached = PERSONA_TEMPLATE
     .replace('{{SUMMARY}}', wizardData.professionalSummary)
-    .replace('{{PROJECTS_JSON}}', JSON.stringify(projects, null, 2))
+    .replace('{{PROJECTS_JSON}}', JSON.stringify(projectsForWizard(), null, 2))
     .replace('{{PROJECT_DETAILS_JSON}}', JSON.stringify(projectDetails, null, 2))
     .replace('{{SKILLS_JSON}}', JSON.stringify(skillsForWizard(), null, 2))
     .replace('{{EXPERIENCE_JSON}}', JSON.stringify(experienceForWizard(), null, 2))

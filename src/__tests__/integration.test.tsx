@@ -306,14 +306,13 @@ describe('Integration Tests', () => {
       }
     })
 
-    it('Projects section displays all three projects', () => {
+    it('Projects section shows the six exhibits of the Relic Vault', () => {
       render(<HomePage />)
 
-      expect(screen.getByText('Number Slayers')).toBeInTheDocument()
-      expect(screen.getByText('Pong Multiverse Alpaca Squadron')).toBeInTheDocument()
-      // TimelyCare project uses title "TimelyCare" (shared with experience)
-      const timelycareMentions = screen.getAllByText('TimelyCare')
-      expect(timelycareMentions.length).toBeGreaterThanOrEqual(1)
+      const projects = screen.getByRole('region', { name: 'Projects' })
+      expect(within(projects).getAllByRole('tab')).toHaveLength(6)
+      expect(within(projects).getByRole('heading', { level: 3, name: 'Number Slayers' })).toBeInTheDocument()
+      expect(within(projects).getByText('Pong Multiverse Alpaca Squadron')).toBeInTheDocument()
     })
 
     it('Contact section displays LinkedIn CTA', () => {

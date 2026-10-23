@@ -54,3 +54,6 @@ docs/design/jelly-resume/playground-v*.html
 
 # Round 2 mockup: local-only copies (Number Slayers models, a paid sound); never commit
 docs/design/jelly-resume/play-mode/round2/_local/
+
+# The Relic Vault: Phill's brag-video masters (scripts/encode-projects.mjs reads them); never commit
+video-masters/

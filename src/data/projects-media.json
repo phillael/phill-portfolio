@@ -1,0 +1,110 @@
+{
+  "quadzilla": {
+    "w": 720,
+    "h": 1280,
+    "duration": 34.01,
+    "audio": true,
+    "placeholder": false,
+    "poster": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/quadzilla-13a81b928172.jpg",
+    "sources": [
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/quadzilla-02726981415d.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/quadzilla-978638b0dd3d.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "number-slayers": {
+    "w": 1280,
+    "h": 720,
+    "duration": 30.47,
+    "audio": true,
+    "placeholder": false,
+    "poster": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/number-slayers-8083a424da78.jpg",
+    "sources": [
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/number-slayers-2d71bacd1f67.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/number-slayers-26dcf7183183.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "rezmancer": {
+    "w": 1280,
+    "h": 720,
+    "duration": 30.02,
+    "audio": true,
+    "placeholder": false,
+    "poster": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/rezmancer-38675e0d1e73.jpg",
+    "sources": [
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/rezmancer-3ad23c020dc1.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/rezmancer-3b48cc4be202.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "jelly-resume": {
+    "w": 1280,
+    "h": 720,
+    "duration": 30.02,
+    "audio": true,
+    "placeholder": false,
+    "poster": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/jelly-resume-2851063887a7.jpg",
+    "sources": [
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/jelly-resume-ce833e8cbf46.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/jelly-resume-8a278242ee5b.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "pickleball-2079": {
+    "w": 1280,
+    "h": 720,
+    "duration": 30.02,
+    "audio": true,
+    "placeholder": false,
+    "poster": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/pickleball-2079-0a68b22b434f.jpg",
+    "sources": [
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/pickleball-2079-5075cf5f4fc2.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/pickleball-2079-225b2ff631ba.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  },
+  "pong": {
+    "w": 1280,
+    "h": 720,
+    "duration": 30.02,
+    "audio": true,
+    "placeholder": false,
+    "poster": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/pong-be57aa02754c.jpg",
+    "sources": [
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/pong-0a499e46cefe.webm",
+        "type": "video/webm; codecs=av01.0.05M.08"
+      },
+      {
+        "src": "https://smoxoehpabh7maqt.public.blob.vercel-storage.com/projects/pong-f4d3689c0b97.mp4",
+        "type": "video/mp4"
+      }
+    ]
+  }
+}

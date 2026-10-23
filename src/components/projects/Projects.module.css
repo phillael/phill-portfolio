@@ -1,0 +1,495 @@
+/*
+ * The Projects section: the Relic Vault (mockup docs/design/projects-vault/, its vault.css section rules over
+ * ../experience-refresh/round2/hud.css; plan docs/plans/2026-10-22-projects-vault-plan.md). The header follows the
+ * Skills section's; the stage is the hall's canvas (src/lib/vault/) with its round glass buttons, the lit set in the
+ * middle; the card is a tab panel of glass centred under it, a label at its plinth's foot (Phill, 2026-10-23: over the
+ * stage's lower left it sat in front of the neighbouring set). Tokens map to the site's.
+ * Write backdrop-filter and mask unprefixed only: the build adds the -webkit- copies.
+ */
+.section {
+  --cyan: hsl(var(--primary));
+  --ink: hsl(var(--foreground));
+  --ink-2: hsl(195 18% 72%);
+  --ink-3: hsl(198 14% 56%);
+  --hair: hsl(190 100% 75% / 0.14);
+  --hair-strong: hsl(190 100% 75% / 0.32);
+  --glass: hsl(200 40% 10% / 0.45);
+  --glass-hi: hsl(190 100% 75% / 0.06);
+  --radius: 22px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  position: relative;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: clamp(3.5rem, 8vw, 6rem) 16px clamp(3rem, 6vw, 5rem);
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+
+/* header (the Skills section's) */
+.eyebrow {
+  font: 700 0.78rem/1 var(--font-body);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+.title {
+  margin-top: 0.9rem;
+  font: 400 clamp(2.4rem, 6.5vw, 4.25rem) / 1.05 var(--font-heading);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.lede {
+  margin-top: 1.1rem;
+  max-width: 40rem;
+  font-size: clamp(1.1rem, 2.2vw, 1.3rem);
+  line-height: 1.5;
+  font-weight: 300;
+  color: var(--ink-2);
+}
+
+/* ---------- the hall ---------- */
+.vault {
+  position: relative;
+  margin-top: clamp(0.5rem, 2vw, 1.5rem);
+}
+.stage {
+  position: relative;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  height: clamp(480px, 66vh, 720px);
+}
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: pan-y;
+  cursor: grab;
+  outline: none;
+  opacity: 0;
+  transition: opacity 0.6s var(--ease);
+  mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 84%, transparent), linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  mask-composite: intersect;
+}
+.stage[data-ready='true'] .canvas {
+  opacity: 1;
+}
+.stage[data-failed='true'] .canvas {
+  display: none;
+}
+.canvas:global(.dragging) {
+  cursor: grabbing;
+}
+.canvas:global(.over) {
+  cursor: pointer;
+}
+
+/* the videos the sets play: in the document (iOS), never seen here */
+.videos {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+.videos video {
+  width: 1px;
+  height: 1px;
+}
+
+/* round glass buttons on the stage */
+.btn {
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--ink);
+  background: hsl(200 40% 8% / 0.55);
+  border: 1px solid var(--hair-strong);
+  backdrop-filter: blur(8px);
+  font: 400 0.9rem var(--font-body);
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.btn:hover {
+  background: hsl(190 100% 75% / 0.12);
+  border-color: hsl(190 100% 75% / 0.6);
+  box-shadow: 0 0 18px hsl(190 100% 60% / 0.25);
+}
+.btn:focus-visible,
+.watch:focus-visible,
+.acts a:focus-visible,
+.tabs button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+.btn svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.arrow {
+  top: 44%;
+}
+.prev {
+  left: max(16px, calc(50vw - 36rem));
+}
+.next {
+  right: max(16px, calc(50vw - 36rem));
+}
+.power {
+  top: 12%;
+  right: max(16px, calc(50vw - 36rem));
+  padding: 0 16px 0 13px;
+  color: var(--ink-2);
+}
+.power svg {
+  width: 18px;
+  height: 18px;
+}
+.power .iPlay {
+  display: none;
+  fill: currentColor;
+  stroke: none;
+}
+.power[data-paused='true'] .iPlay {
+  display: block;
+}
+.power[data-paused='true'] .iPause {
+  display: none;
+}
+
+.hint {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 13%;
+  margin: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+  pointer-events: none;
+  transition: opacity 0.6s;
+}
+.hint[data-gone='true'] {
+  opacity: 0;
+}
+.hint .dot {
+  margin: 0 0.4em;
+}
+.coarse {
+  display: none;
+}
+@media (pointer: coarse) {
+  .fine {
+    display: none;
+  }
+  .coarse {
+    display: inline;
+  }
+}
+
+/* no WebGL: the exhibit's poster in a screen of CSS where the set would stand */
+.fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.screen {
+  width: min(44vw, 30rem);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 18px / 22px;
+  border: 10px solid hsl(210 8% 10%);
+  background: hsl(200 60% 4%);
+  box-shadow:
+    0 0 0 1px var(--hair-strong),
+    0 0 40px hsl(190 100% 60% / 0.2),
+    inset 0 0 30px hsl(190 100% 70% / 0.15);
+}
+.screen[data-tall='true'] {
+  width: auto;
+  height: min(60%, 26rem);
+  aspect-ratio: 3 / 4;
+}
+.screen img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- the museum card (a tab panel): a label centred under the lit set, at its plinth's foot ---------- */
+.cards {
+  position: relative;
+  z-index: 2;
+  width: min(44rem, 100%);
+  margin: -56px auto 0;
+  transition: opacity 0.35s var(--ease);
+}
+/* Watch pulls the camera back and the set lands behind the card: the card steps aside while the hologram is up */
+:global(body:has(dialog.holo[open]:not(.closing))) .cards {
+  opacity: 0;
+}
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'meta set'
+    'name acts'
+    'desc desc'
+    'stack stack';
+  align-items: center;
+  column-gap: 24px;
+  padding: 22px 26px 20px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--glass-hi), transparent 40%), hsl(205 45% 5% / 0.78);
+  border: 1px solid var(--hair);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow:
+    0 30px 80px -40px hsl(190 100% 50% / 0.25),
+    inset 0 1px 0 hsl(190 100% 90% / 0.08);
+  animation: card-in 0.45s var(--ease) both;
+}
+/* two soft corner arcs */
+.card::before,
+.card::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  border-color: var(--cyan);
+  border-style: solid;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 4px hsl(190 100% 70% / 0.8));
+}
+.card::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1.5px 0 0 1.5px;
+  border-top-left-radius: var(--radius);
+}
+.card::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 1.5px 1.5px 0;
+  border-bottom-right-radius: var(--radius);
+}
+.card[hidden] {
+  display: none;
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.meta {
+  margin: 0;
+  font: 700 0.74rem/1.2 var(--font-body);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  grid-area: meta;
+}
+.name {
+  grid-area: name;
+  margin: 0.6rem 0 0;
+  font: 400 clamp(1.45rem, 2.4vw, 1.85rem) / 1.15 var(--font-heading);
+  color: #fff;
+  text-shadow: 0 0 18px hsl(190 100% 70% / 0.3);
+}
+.desc {
+  grid-area: desc;
+  margin: 0.7rem 0 0;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.stack {
+  grid-area: stack;
+  margin: 0.75rem 0 0;
+  font-size: 0.86rem;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.acts {
+  grid-area: acts;
+  justify-self: end;
+  margin-top: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+}
+.watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px 0 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 700 0.95rem var(--font-body);
+  color: hsl(220 30% 6%);
+  background: var(--cyan);
+  border: 0;
+  box-shadow: 0 0 22px hsl(190 100% 60% / 0.35);
+}
+.watch:hover {
+  background: hsl(190 100% 84%);
+}
+/* the engine couldn't be made (its chunk failed to load): no hologram to lift */
+.watch[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  background: var(--cyan);
+  box-shadow: none;
+}
+.watch svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.acts a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 700;
+  color: var(--cyan);
+  text-decoration: none;
+}
+.acts a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.set {
+  grid-area: set;
+  margin: 0;
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+/* ---------- the exhibit names under the hall (the tab list) ---------- */
+.tabs {
+  margin-top: clamp(0.5rem, 2vw, 1.25rem);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 6px;
+}
+.tabs button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 10px;
+  font: 600 0.95rem var(--font-body);
+  color: var(--ink-3);
+  transition:
+    color 0.2s,
+    text-shadow 0.2s;
+}
+.tabs button:hover {
+  color: var(--ink);
+}
+.tabs button[aria-selected='true'] {
+  color: #fff;
+  text-shadow: 0 0 14px hsl(190 100% 70% / 0.7);
+}
+.n {
+  margin-right: 0.45em;
+  font: 400 0.78rem var(--font-heading);
+  color: var(--cyan);
+  opacity: 0.75;
+}
+
+/* ---------- phones: the card under the hall, one set at a time ---------- */
+@media (max-width: 760px) {
+  .stage {
+    height: clamp(360px, 58vh, 500px);
+  }
+  .cards {
+    width: auto;
+    margin-top: -6px;
+  }
+  .card {
+    display: block;
+    padding: 18px 18px 16px;
+  }
+  .acts {
+    margin-top: 1rem;
+  }
+  .set {
+    margin-top: 0.6rem;
+    text-align: left;
+  }
+  .arrow {
+    top: auto;
+    bottom: 8%;
+  }
+  .prev {
+    left: 16px;
+  }
+  .next {
+    right: 16px;
+  }
+  .power {
+    top: 9%;
+    right: 16px;
+    width: 48px;
+    padding: 0;
+  }
+  .powerLabel {
+    display: none;
+  }
+  .hint {
+    left: 50%;
+    bottom: 3%;
+  }
+  .screen {
+    width: min(78vw, 22rem);
+  }
+  .tabs {
+    justify-content: flex-start;
+    gap: 0;
+    margin-inline: -8px;
+  }
+  .tabs button {
+    padding: 0 8px;
+    font-size: 0.88rem;
+  }
+}
+
+/* reduced motion: nothing slides */
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+  .canvas {
+    transition: none;
+  }
+}

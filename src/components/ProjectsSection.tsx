@@ -1,57 +1,32 @@
-'use client'
-
-import AnimatedSection from '@/components/AnimatedSection'
-import ProjectCard from '@/components/ProjectCard'
-import GlitchText from '@/components/GlitchText'
 import projectsData from '@/data/projects.json'
-import { Project } from '@/types/content'
+import mediaData from '@/data/projects-media.json'
+import type { Project } from '@/types/content'
+import type { MediaEntry } from '@/lib/vault/vault'
+import ProjectsVault from '@/components/projects/ProjectsVault'
+import css from '@/components/projects/Projects.module.css'
+
+const projects = projectsData as Project[]
+const media = mediaData as Record<string, MediaEntry>
 
 /**
- * ProjectsSection - Project gallery section with featured projects
- *
- * Features:
- * - Section ID for navigation anchor (#projects)
- * - Proper accessibility attributes (role, aria-label)
- * - Section heading with neon-text-purple effect
- * - Data imported from /src/data/projects.json
- * - ProjectCard for each project with staggered entrance animations
- * - AnimatedSection wrapper with scale-up variant for heading
- * - GlitchText effect on heading for hover interaction
- * - Responsive grid: single column on mobile, 3 columns on desktop (lg+)
+ * ProjectsSection - the Relic Vault (mockup docs/design/projects-vault/; plan
+ * docs/plans/2026-10-22-projects-vault-plan.md): it's the year 4789, and a museum shows the apps on the
+ * televisions it believes are period-correct. The header follows the Skills section's; ProjectsVault holds the
+ * hall (a lazy three.js engine, src/lib/vault/), the museum card (every exhibit's tab panel is in the HTML)
+ * and the exhibit names. Content: src/data/projects.json; videos and posters: projects-media.json (generated
+ * by scripts/encode-projects.mjs).
  */
-const ProjectsSection = () => {
-  const projects = projectsData as Project[]
-
-  return (
-    <section
-      id="projects"
-      aria-labelledby="projects-heading"
-      role="region"
-      className="min-h-screen py-20 md:py-32 px-4 md:px-6"
-    >
-      <div className="max-w-6xl mx-auto">
-        {/* Section Heading - scale-up animation variant with glitch effect */}
-        <AnimatedSection variant="scale-up">
-          <h2 id="projects-heading" className="text-4xl md:text-5xl lg:text-6xl font-heading text-center mb-12 md:mb-16">
-            <GlitchText as="span" className="neon-text-purple">
-              Projects
-            </GlitchText>
-          </h2>
-        </AnimatedSection>
-
-        {/* Project Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-          {projects.map((project, index) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              delay={0.1 * (index + 1)}
-            />
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
+const ProjectsSection = () => (
+  <section id="projects" aria-labelledby="projects-h" className={css.section}>
+    <header>
+      <h2 id="projects-h" className={css.eyebrow}>
+        Projects
+      </h2>
+      <p className={`${css.title} neon-text-purple`}>Some Stuff I Built</p>
+      <p className={css.lede}>Here are a few things I am working on in my free time.</p>
+    </header>
+    <ProjectsVault projects={projects} media={media} />
+  </section>
+)
 
 export default ProjectsSection

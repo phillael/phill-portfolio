@@ -20,13 +20,14 @@ describe('Data Architecture', () => {
       expect(Array.isArray(projectsData)).toBe(true)
     })
 
-    it('contains five project entries, in order', () => {
+    it('contains the six exhibits, in order', () => {
       expect(projectsData.map((p) => p.id)).toEqual([
         'quadzilla',
         'number-slayers',
         'rezmancer',
         'jelly-resume',
-        'pong-multiverse-alpaca-squadron',
+        'pickleball-2079',
+        'pong',
       ])
     })
 
@@ -37,9 +38,47 @@ describe('Data Architecture', () => {
         expect(proj.title).toBeDefined()
         expect(proj.description).toBeDefined()
         expect(Array.isArray(proj.techStack)).toBe(true)
-        // a screenshot, or none yet (the card shows a placeholder)
-        expect(proj.imageUrl === undefined || proj.imageUrl.startsWith('/images/projects/')).toBe(true)
+        // the vault's data: the first commit's year (the Wizard reads it), the television, "Displayed on {set}."
+        expect(Number.isInteger(proj.year)).toBe(true)
+        expect(proj.year).toBeGreaterThanOrEqual(2015)
+        expect(['pocket', 'tube', 'terminal', 'sphere', 'portable', 'console']).toContain(proj.tv)
+        expect(proj.set).toMatch(/^a .+, c\. \d{4}$/)
+        // the posters replace the screenshots
+        expect(project).not.toHaveProperty('imageUrl')
       })
+    })
+
+    it('stands each project on its own television', () => {
+      expect(new Set(projectsData.map((p) => p.tv)).size).toBe(projectsData.length)
+    })
+
+    it('links each project validly: https out, internal pages by path, code on GitHub', () => {
+      projectsData.forEach((project) => {
+        const proj = project as Project
+        if (proj.liveUrl !== undefined) expect(proj.liveUrl).toMatch(/^(https:\/\/|\/[a-z])/)
+        if (proj.repoUrl !== undefined) expect(proj.repoUrl).toMatch(/^https:\/\/github\.com\/phillael\//)
+      })
+      expect(projectsData.find((p) => p.id === 'jelly-resume')?.liveUrl).toBe('/resume')
+    })
+
+    it('includes Pickleball 2079 on a portable set, with no links (a private repo)', () => {
+      const pickleball = projectsData.find((p) => p.id === 'pickleball-2079') as Project | undefined
+      expect(pickleball).toMatchObject({
+        title: 'Pickleball 2079',
+        year: 2026,
+        tv: 'portable',
+        set: 'a portable colour set, c. 1986',
+        techStack: ['TypeScript', 'three.js', 'Vite', 'Deterministic sim'],
+      })
+      expect(pickleball?.liveUrl).toBeUndefined()
+      expect(pickleball?.repoUrl).toBeUndefined()
+    })
+
+    it('gives Pong a short name for its tab', () => {
+      const pong = projectsData.find((p) => p.id === 'pong') as Project | undefined
+      expect(pong?.title).toBe('Pong Multiverse Alpaca Squadron')
+      expect(pong?.short).toBe('Pong')
+      expect(projectsData.filter((p) => 'short' in p)).toHaveLength(1)
     })
 
     it('includes Number Slayers project', () => {
@@ -71,9 +110,9 @@ describe('Data Architecture', () => {
       })
     })
 
-    it('covers Quadzilla, Rezmancer and the Jelly Resume for the Wizard', () => {
+    it('covers Quadzilla, Rezmancer, the Jelly Resume and Pickleball 2079 for the Wizard', () => {
       const ids = projectDetailsData.map((entry) => entry.id)
-      expect(ids).toEqual(expect.arrayContaining(['quadzilla', 'rezmancer', 'jelly-resume']))
+      expect(ids).toEqual(expect.arrayContaining(['quadzilla', 'rezmancer', 'jelly-resume', 'pickleball-2079']))
     })
 
     it('each id is a unique non-empty string', () => {

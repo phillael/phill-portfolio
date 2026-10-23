@@ -1,0 +1,181 @@
+/* The Relic Vault: the Projects section as a museum hall of CRT sets (over ../experience-refresh/round2/hud.css). */
+
+/* ---------- mockup chrome ---------- */
+.mock {
+  position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding: 10px 16px; font-size: .84rem; color: var(--ink-2);
+  background: hsl(220 25% 4% / .86); border-bottom: 1px solid var(--hair);
+  backdrop-filter: blur(10px);
+}
+.mock b { font: 400 .95rem var(--font-display); color: #fff; letter-spacing: .02em; }
+.mock-g { display: inline-flex; align-items: center; gap: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--hair-strong); border-radius: 999px; overflow: hidden; }
+.seg button, .tog { background: transparent; border: 0; padding: 6px 12px; min-height: 32px; cursor: pointer; color: var(--ink-2); }
+.tog { border: 1px solid var(--hair-strong); border-radius: 999px; }
+.seg button[aria-pressed='true'], .tog[aria-pressed='true'] { background: hsl(190 100% 75% / .16); color: #fff; }
+.mock-note { color: var(--ink-3); }
+.above { text-align: center; padding: 3rem 16px 0; color: var(--ink-3); font-size: .85rem; letter-spacing: .2em; }
+
+/* ---------- the section ---------- */
+.pv { max-width: 68rem; margin: 0 auto; padding: clamp(3.5rem, 8vw, 6rem) 16px clamp(3rem, 6vw, 5rem); }
+.pv-eyebrow { font: 700 .78rem/1 var(--font-text); letter-spacing: .22em; text-transform: uppercase; color: var(--cyan); }
+.pv-title { margin-top: .9rem; font: 400 clamp(2.4rem, 6.5vw, 4.25rem)/1.05 var(--font-display); letter-spacing: -.01em; color: #fff; text-shadow: 0 0 28px hsl(190 100% 70% / .25); }
+.pv-lede { margin-top: 1.1rem; max-width: 40rem; font-size: clamp(1.1rem, 2.2vw, 1.3rem); line-height: 1.5; font-weight: 300; color: var(--ink-2); }
+
+.pv-vault { position: relative; margin-top: clamp(.5rem, 2vw, 1.5rem); }
+.pv-stage {
+  position: relative; width: 100vw; margin-left: calc(50% - 50vw);
+  height: clamp(520px, 76vh, 800px);
+}
+.pv-stage canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  touch-action: pan-y; cursor: grab; outline: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 84%, transparent), linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 84%, transparent), linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  mask-composite: intersect;
+}
+.pv-stage canvas.dragging { cursor: grabbing; }
+.pv-stage canvas.over { cursor: pointer; }
+
+/* round glass buttons on the stage */
+.pv-btn {
+  position: absolute; z-index: 2; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-width: 48px; height: 48px; padding: 0; border-radius: 999px; cursor: pointer; color: var(--ink);
+  background: hsl(200 40% 8% / .55); border: 1px solid var(--hair-strong);
+  backdrop-filter: blur(8px); transition: background .2s, border-color .2s, box-shadow .2s;
+}
+.pv-btn:hover { background: hsl(190 100% 75% / .12); border-color: hsl(190 100% 75% / .6); box-shadow: 0 0 18px hsl(190 100% 60% / .25); }
+.pv-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pv-arrow { top: 44%; }
+.pv-prev { left: max(16px, calc(50vw - 36rem)); }
+.pv-next { right: max(16px, calc(50vw - 36rem)); }
+.pv-power { top: 12%; right: max(16px, calc(50vw - 36rem)); padding: 0 16px 0 13px; font-size: .9rem; color: var(--ink-2); }
+.pv-power svg { width: 18px; height: 18px; }
+.pv-power .i-play { display: none; fill: currentColor; stroke: none; }
+.pv-power.paused .i-play { display: block; }
+.pv-power.paused .i-pause { display: none; }
+.pv-hint {
+  position: absolute; z-index: 1; left: 63%; bottom: 13%; transform: translateX(-50%); white-space: nowrap;
+  font-size: .85rem; color: var(--ink-3); pointer-events: none; transition: opacity .6s;
+}
+.pv-hint span { margin: 0 .4em; }
+.pv-hint.gone { opacity: 0; }
+
+/* the museum card (a tab panel) over the stage's lower left */
+.pv-cards { position: absolute; z-index: 2; left: 0; bottom: 9%; width: min(27rem, 38vw); }
+.pv-card { padding: 22px 24px 20px; background: linear-gradient(180deg, var(--glass-hi), transparent 40%), hsl(205 45% 5% / .78); }
+.pv-card.enter { animation: pv-in .45s var(--ease) both; }
+@keyframes pv-in { from { opacity: 0; transform: translateY(8px); } }
+.pv-meta { font: 700 .74rem/1.2 var(--font-text); letter-spacing: .2em; text-transform: uppercase; color: var(--ink-3); }
+.pv-name { margin-top: .6rem; font: 400 clamp(1.45rem, 2.4vw, 1.85rem)/1.15 var(--font-display); color: #fff; text-shadow: 0 0 18px hsl(190 100% 70% / .3); }
+.pv-desc { margin-top: .7rem; font-size: .98rem; line-height: 1.5; color: var(--ink-2); }
+.pv-stack { margin-top: .75rem; font-size: .86rem; color: var(--ink-3); font-weight: 600; }
+.pv-acts { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
+.pv-watch {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px 0 14px; border-radius: 999px; cursor: pointer;
+  font: 700 .95rem var(--font-text); color: hsl(220 30% 6%); background: var(--cyan); border: 0;
+  box-shadow: 0 0 22px hsl(190 100% 60% / .35);
+}
+.pv-watch:hover { background: hsl(190 100% 84%); }
+.pv-watch svg { width: 16px; height: 16px; fill: currentColor; }
+.pv-acts a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; color: var(--cyan); text-decoration: none; }
+.pv-acts a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.pv-set { margin-top: .6rem; font-size: .8rem; color: var(--ink-3); }
+
+/* the exhibit names under the hall (the tab list) */
+.pv-index { margin-top: clamp(.5rem, 2vw, 1.25rem); display: flex; flex-wrap: wrap; justify-content: center; gap: 0 6px; }
+.pv-index button {
+  min-height: 44px; padding: 0 12px; border: 0; background: none; cursor: pointer; border-radius: 10px;
+  font: 600 .95rem var(--font-text); color: var(--ink-3); transition: color .2s, text-shadow .2s;
+}
+.pv-index button:hover { color: var(--ink); }
+.pv-index button[aria-selected='true'] { color: #fff; text-shadow: 0 0 14px hsl(190 100% 70% / .7); }
+.pv-index .pv-n { margin-right: .45em; font: 400 .78rem var(--font-display); color: var(--cyan); opacity: .75; }
+
+/* ---------- the hologram ---------- */
+.holo {
+  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0;
+  border: 0; background: transparent; color: var(--ink); overflow: hidden;
+}
+.holo::backdrop {
+  /* everything dims but the set doing the projecting */
+  background: radial-gradient(circle at var(--tx, 50%) var(--ty, 70%), hsl(220 35% 2% / 0) 0, hsl(220 35% 2% / .25) 150px, hsl(220 35% 2% / .7) 420px);
+  animation: holo-fade .35s ease both;
+}
+.holo.closing::backdrop { animation: holo-fade .35s ease reverse both; }
+@keyframes holo-fade { from { opacity: 0; } }
+.holo-beam { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: blur(7px); mix-blend-mode: screen; }
+.holo-beam.idle { animation: beam-hum 3.2s ease-in-out infinite; }
+@keyframes beam-hum { 50% { opacity: .62; } }
+.holo-panel {
+  position: fixed; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; border-radius: 10px;
+  background: hsl(200 60% 4%);
+  box-shadow: 0 0 0 1px hsl(190 100% 75% / .55), 0 0 30px hsl(190 100% 60% / .45), 0 0 90px hsl(190 100% 55% / .25), inset 0 0 40px hsl(190 100% 60% / .25);
+  will-change: transform, clip-path;
+}
+.holo-v { display: block; width: 100%; height: 100%; object-fit: cover; }
+.holo-scan {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  background:
+    linear-gradient(to bottom, transparent 0, hsl(190 100% 80% / .08) 50%, transparent 100%) 0 0 / 100% 22% no-repeat,
+    repeating-linear-gradient(to bottom, hsl(190 100% 80% / .07) 0 1px, transparent 1px 3px);
+  animation: holo-roll 5s linear infinite;
+}
+@keyframes holo-roll { from { background-position: 0 -30%, 0 0; } to { background-position: 0 130%, 0 0; } }
+.holo-panel.flicker { animation: holo-flicker .5s steps(6, jump-none) both; }
+@keyframes holo-flicker { 0% { opacity: .6; } 30% { opacity: 1; } 45% { opacity: .75; } 60% { opacity: 1; } 80% { opacity: .9; } 100% { opacity: 1; } }
+.holo-bar {
+  position: fixed; left: 0; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px 16px;
+  padding: 0 4px 0 16px; border-radius: 999px; background: hsl(205 45% 5% / .82); border: 1px solid var(--hair);
+  backdrop-filter: blur(10px);
+  opacity: 0; transition: opacity .3s;
+}
+.holo-bar.on { opacity: 1; }
+.holo-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 1.25rem var(--font-display); color: #fff; text-shadow: 0 0 16px hsl(190 100% 70% / .5); }
+.holo-acts { flex: none; display: flex; align-items: center; gap: 8px; }
+.holo-b {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 0 16px;
+  border-radius: 999px; border: 1px solid var(--hair-strong); background: hsl(200 40% 8% / .6); color: var(--ink);
+  font: 600 .92rem var(--font-text); text-decoration: none; cursor: pointer;
+}
+.holo-b:hover { border-color: hsl(190 100% 75% / .7); background: hsl(190 100% 75% / .12); }
+.holo-b svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.holo-b .i-play { display: none; fill: currentColor; stroke: none; }
+.holo-b.paused .i-play { display: block; }
+.holo-b.paused .i-pause { display: none; }
+.holo-x { padding: 0; width: 44px; }
+.holo-x svg { width: 20px; height: 20px; }
+
+/* ---------- notes ---------- */
+.notes { max-width: 68rem; margin: 2rem auto 5rem; padding: 28px 30px; width: calc(100% - 32px); }
+.notes-h { font: 400 1.4rem var(--font-display); color: #fff; }
+.notes-cols { margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 40px; }
+.notes h3 { margin-top: 1.1rem; font: 700 .78rem var(--font-text); letter-spacing: .2em; text-transform: uppercase; color: var(--cyan); }
+.notes ul { margin: .5rem 0 0; padding-left: 1.1rem; }
+.notes li, .notes p { margin-top: .4rem; font-size: .95rem; line-height: 1.5; color: var(--ink-2); }
+
+/* ---------- phones: the card under the hall, one set at a time ---------- */
+@media (max-width: 760px) {
+  .mock { position: static; }
+  .pv-stage { height: clamp(360px, 58vh, 500px); }
+  .pv-cards { position: static; width: auto; margin-top: -6px; }
+  .pv-card { padding: 18px 18px 16px; }
+  .pv-arrow { top: auto; bottom: 8%; }
+  .pv-prev { left: 16px; }
+  .pv-next { right: 16px; }
+  .pv-power { top: 9%; right: 16px; width: 48px; padding: 0; }
+  .pv-power-l { display: none; }
+  .pv-hint { left: 50%; bottom: 3%; }
+  .pv-index { justify-content: flex-start; gap: 0; margin-inline: -8px; }
+  .pv-index button { padding: 0 8px; font-size: .88rem; }
+  .notes-cols { grid-template-columns: 1fr; }
+  .holo-t { font-size: 1rem; }
+  .holo-b { padding: 0; width: 44px; }
+  .holo-b .lbl { display: none; }
+  .notes { padding: 22px 20px; }
+}
+
+/* reduced motion: nothing slides or flickers */
+html.rm .pv-card.enter, html.rm .holo-scan, html.rm .holo-beam.idle, html.rm .holo-panel.flicker { animation: none; }
+html.rm .holo::backdrop { animation-duration: .01s; }

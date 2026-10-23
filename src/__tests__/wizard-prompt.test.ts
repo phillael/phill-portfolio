@@ -58,6 +58,15 @@ describe('buildWizardSystemPrompt', () => {
     expect(skills.indexOf('"group": "AI"')).toBeLessThan(skills.indexOf('"group": "Frontend & mobile"'))
   })
 
+  it('gives the Wizard the projects without the vault’s museum captions (no tv, no set)', () => {
+    const projects = section(buildWizardSystemPrompt(), 'projects')
+    expect(projects).toContain('"title": "Pickleball 2079"')
+    expect(projects).toContain('"year": 2026')
+    expect(projects).not.toContain('"tv"')
+    expect(projects).not.toContain('"set"')
+    expect(projects).not.toContain('pocket television')
+  })
+
   it('includes project architecture details in the prompt', () => {
     const prompt = buildWizardSystemPrompt()
     expect(prompt).toContain('Colyseus')

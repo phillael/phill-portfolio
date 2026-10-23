@@ -257,6 +257,45 @@ describe('ProjectsSection', () => {
     expect(mockVault.watch).toHaveBeenCalledWith(0)
   })
 
+  it('remembers a Watch pressed while the engine loads, and plays it once the engine is made', async () => {
+    render(<ProjectsSection />)
+    fireEvent.click(screen.getByRole('button', { name: 'Watch the Number Slayers video' }))
+    expect(mockVault.watch).not.toHaveBeenCalled()
+    await near()
+    expect(mockVault.watch).toHaveBeenCalledTimes(1)
+    expect(mockVault.watch).toHaveBeenCalledWith(1)
+  })
+
+  it('drops that early Watch if the visitor moved on, or if the engine took more than 4 s', async () => {
+    const { unmount } = render(<ProjectsSection />)
+    fireEvent.click(screen.getByRole('button', { name: 'Watch the Number Slayers video' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Jelly Resume' }))
+    await near()
+    expect(mockVault.watch).not.toHaveBeenCalled()
+    unmount()
+    mockCreate.mockClear()
+    const now = jest.spyOn(performance, 'now').mockReturnValue(1000)
+    render(<ProjectsSection />)
+    fireEvent.click(screen.getByRole('button', { name: 'Watch the Number Slayers video' }))
+    now.mockReturnValue(5200)
+    await near()
+    expect(mockVault.watch).not.toHaveBeenCalled()
+    now.mockRestore()
+  })
+
+  it('disables Watch if the engine can’t be made (its chunk failed to load): the poster stays, Watch says so', async () => {
+    mockCreate.mockImplementationOnce(() => {
+      throw new Error('ChunkLoadError')
+    })
+    render(<ProjectsSection />)
+    await near()
+    await waitFor(() => expect(document.querySelector('[data-vault-screen]')).not.toBeNull())
+    const watchBtn = screen.getByRole('button', { name: 'Watch the Number Slayers video' })
+    expect(watchBtn).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(watchBtn)
+    expect(mockVault.watch).not.toHaveBeenCalled()
+  })
+
   it('starts paused with reduced motion', async () => {
     const real = window.matchMedia
     window.matchMedia = ((q: string) => ({ matches: q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia

@@ -11,6 +11,8 @@ const loadVault = () => import('@/lib/vault/vault')
 
 const nn = (i: number) => String(i + 1).padStart(2, '0')
 const PLAY_ICON = 'M8 5.5v13l11-6.5z'
+/** how long a Watch pressed before the engine exists is kept: past that, opening a modal would surprise */
+const EARLY_WATCH_MS = 4000
 
 type Props = { projects: Project[]; media: Record<string, MediaEntry> }
 
@@ -20,7 +22,9 @@ type Props = { projects: Project[]; media: Record<string, MediaEntry> }
  * (src/lib/vault/vault.ts, its own chunk with three) is imported once the section is within 800 px of the viewport;
  * it tells the island which exhibit is nearest (onNear: index changes only), and the island tells it where to go.
  * Without WebGL the stage shows the exhibit's poster in a CSS screen, and Watch still lifts the hologram from it.
- * The first click in here hands the sound effects the site player's AudioContext.
+ * A Watch pressed while the engine's chunk loads plays once it's made (within 4 s, if the visitor hasn't moved on);
+ * if the engine can't be made at all (its chunk failed to load), the poster stays and Watch is disabled: the
+ * hologram lives in that chunk. The first click in here hands the sound effects the site player's AudioContext.
  */
 const ProjectsVault = ({ projects, media }: Props) => {
   const N = projects.length
@@ -29,6 +33,7 @@ const ProjectsVault = ({ projects, media }: Props) => {
   const [hint, setHint] = useState(true)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [noEngine, setNoEngine] = useState(false)
   const [live, setLive] = useState('')
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -38,6 +43,7 @@ const ProjectsVault = ({ projects, media }: Props) => {
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
   const rmRef = useRef(false)
   const pausedRef = useRef(false)
+  const earlyWatch = useRef<{ i: number; at: number } | null>(null)
 
   const announce = useCallback((i: number) => setLive(`Exhibit ${i + 1} of ${N}: ${projects[i].title}`), [N, projects])
 
@@ -80,8 +86,15 @@ const ProjectsVault = ({ projects, media }: Props) => {
             })
             vault.setPaused(pausedRef.current)
             vaultRef.current = vault
+            const w = earlyWatch.current
+            earlyWatch.current = null
+            if (w && performance.now() - w.at < EARLY_WATCH_MS) vault.watch(w.i)
           })
-          .catch(() => setFailed(true))
+          .catch(() => {
+            earlyWatch.current = null
+            setFailed(true)
+            setNoEngine(true)
+          })
       },
       { rootMargin: '800px 0px' },
     )
@@ -96,11 +109,13 @@ const ProjectsVault = ({ projects, media }: Props) => {
 
   const go = (i: number) => {
     i = ((i % N) + N) % N
+    earlyWatch.current = null
     setHint(false)
     if (vaultRef.current) vaultRef.current.go(i)
     else setSel(i)
   }
   const step = (dir: 1 | -1) => {
+    earlyWatch.current = null
     setHint(false)
     if (vaultRef.current) return vaultRef.current.step(dir)
     const i = (sel + dir + N) % N
@@ -125,6 +140,10 @@ const ProjectsVault = ({ projects, media }: Props) => {
     e.preventDefault()
     go(i)
     tabsRef.current[i]?.focus()
+  }
+  const watch = (i: number) => {
+    if (vaultRef.current) vaultRef.current.watch(i)
+    else if (!noEngine) earlyWatch.current = { i, at: performance.now() }
   }
   // sound effects only after a click in here: the context is made inside the click
   const armSound = () => vaultRef.current?.armSound()
@@ -205,7 +224,7 @@ const ProjectsVault = ({ projects, media }: Props) => {
                   ))}
                 </p>
                 <div className={css.acts}>
-                  <button type="button" className={css.watch} onClick={() => vaultRef.current?.watch(i)}>
+                  <button type="button" className={css.watch} aria-disabled={noEngine || undefined} onClick={() => watch(i)}>
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M7 4.5v15l12.5-7.5z" />
                     </svg>

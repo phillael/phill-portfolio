@@ -105,7 +105,7 @@ export function createVault(opts: VaultOpts): Vault {
     idle: true,
     emit: 0,
   }))
-  const view = { w: 0, h: 0, wide: true, camD: 4.4, ox: null as number | null, lookUp: 0 }
+  const view = { w: 0, h: 0, wide: true, camD: 4.4, lookUp: 0 }
   let hall: Hall | null = null
   let gl: WebGL2RenderingContext | null = null
   let failed = false
@@ -394,14 +394,6 @@ export function createVault(opts: VaultOpts): Vault {
     camera.position.set(r * Math.sin(a + sway), (view.wide ? 1.74 : 1.62) + (still ? 0 : Math.sin(t * 0.33) * 0.015), -r * Math.cos(a + sway))
     camLook.set(R * Math.sin(a), SCREEN_Y - (view.wide ? 0.06 : 0.12) + S.hc * view.lookUp, -R * Math.cos(a))
     camera.lookAt(camLook)
-    // the hall sits right of the card; with the hologram up, the set comes to the middle
-    const ox = view.wide ? -view.w * 0.13 * (1 - S.hc) : 0
-    if (ox !== view.ox) {
-      view.ox = ox
-      if (ox) camera.setViewOffset(view.w, view.h, ox, 0, view.w, view.h)
-      else camera.clearViewOffset()
-      camera.updateProjectionMatrix()
-    }
   }
 
   function resize(w: number, h: number) {
@@ -420,7 +412,6 @@ export function createVault(opts: VaultOpts): Vault {
     camera.aspect = w / h
     camera.fov = view.wide ? 30 : 34
     view.camD = view.wide ? 4.4 : 3.55
-    view.ox = null
     camera.updateProjectionMatrix()
     kick()
   }

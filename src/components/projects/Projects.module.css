@@ -1,8 +1,9 @@
 /*
  * The Projects section: the Relic Vault (mockup docs/design/projects-vault/, its vault.css section rules over
  * ../experience-refresh/round2/hud.css; plan docs/plans/2026-10-22-projects-vault-plan.md). The header follows the
- * Skills section's; the stage is the hall's canvas (src/lib/vault/) with its round glass buttons; the card is a tab
- * panel of glass over the stage's lower left (under the stage on phones). Tokens map to the site's.
+ * Skills section's; the stage is the hall's canvas (src/lib/vault/) with its round glass buttons, the lit set in the
+ * middle; the card is a tab panel of glass centred under it, a label at its plinth's foot (Phill, 2026-10-23: over the
+ * stage's lower left it sat in front of the neighbouring set). Tokens map to the site's.
  * Write backdrop-filter and mask unprefixed only: the build adds the -webkit- copies.
  */
 .section {
@@ -56,7 +57,7 @@
   position: relative;
   width: 100vw;
   margin-left: calc(50% - 50vw);
-  height: clamp(520px, 76vh, 800px);
+  height: clamp(480px, 66vh, 720px);
 }
 .canvas {
   position: absolute;
@@ -178,7 +179,7 @@
 .hint {
   position: absolute;
   z-index: 1;
-  left: 63%;
+  left: 50%;
   bottom: 13%;
   margin: 0;
   transform: translateX(-50%);
@@ -212,7 +213,6 @@
   inset: 0;
   display: grid;
   place-items: center;
-  padding-left: 26%;
 }
 .screen {
   width: min(44vw, 30rem);
@@ -238,17 +238,30 @@
   object-fit: cover;
 }
 
-/* ---------- the museum card (a tab panel) over the stage's lower left ---------- */
+/* ---------- the museum card (a tab panel): a label centred under the lit set, at its plinth's foot ---------- */
 .cards {
-  position: absolute;
+  position: relative;
   z-index: 2;
-  left: 0;
-  bottom: 9%;
-  width: min(27rem, 38vw);
+  width: min(44rem, 100%);
+  margin: -56px auto 0;
+  transition: opacity 0.35s var(--ease);
+}
+/* Watch pulls the camera back and the set lands behind the card: the card steps aside while the hologram is up */
+:global(body:has(dialog.holo[open]:not(.closing))) .cards {
+  opacity: 0;
 }
 .card {
   position: relative;
-  padding: 22px 24px 20px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'meta set'
+    'name acts'
+    'desc desc'
+    'stack stack';
+  align-items: center;
+  column-gap: 24px;
+  padding: 22px 26px 20px;
   border-radius: var(--radius);
   background: linear-gradient(180deg, var(--glass-hi), transparent 40%), hsl(205 45% 5% / 0.78);
   border: 1px solid var(--hair);
@@ -298,27 +311,33 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink-3);
+  grid-area: meta;
 }
 .name {
+  grid-area: name;
   margin: 0.6rem 0 0;
   font: 400 clamp(1.45rem, 2.4vw, 1.85rem) / 1.15 var(--font-heading);
   color: #fff;
   text-shadow: 0 0 18px hsl(190 100% 70% / 0.3);
 }
 .desc {
+  grid-area: desc;
   margin: 0.7rem 0 0;
   font-size: 0.98rem;
   line-height: 1.5;
   color: var(--ink-2);
 }
 .stack {
+  grid-area: stack;
   margin: 0.75rem 0 0;
   font-size: 0.86rem;
   color: var(--ink-3);
   font-weight: 600;
 }
 .acts {
-  margin-top: 1rem;
+  grid-area: acts;
+  justify-self: end;
+  margin-top: 0.6rem;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -359,7 +378,9 @@
   text-underline-offset: 4px;
 }
 .set {
-  margin: 0.6rem 0 0;
+  grid-area: set;
+  margin: 0;
+  text-align: right;
   font-size: 0.8rem;
   color: var(--ink-3);
 }
@@ -405,12 +426,19 @@
     height: clamp(360px, 58vh, 500px);
   }
   .cards {
-    position: static;
     width: auto;
     margin-top: -6px;
   }
   .card {
+    display: block;
     padding: 18px 18px 16px;
+  }
+  .acts {
+    margin-top: 1rem;
+  }
+  .set {
+    margin-top: 0.6rem;
+    text-align: left;
   }
   .arrow {
     top: auto;
@@ -434,9 +462,6 @@
   .hint {
     left: 50%;
     bottom: 3%;
-  }
-  .fallback {
-    padding-left: 0;
   }
   .screen {
     width: min(78vw, 22rem);

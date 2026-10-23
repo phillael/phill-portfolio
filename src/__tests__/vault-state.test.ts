@@ -171,6 +171,68 @@ describe('watch', () => {
     ticks(s, h, 0.5)
     expect(h.openHolo).toHaveBeenCalledTimes(1)
   })
+
+  /** set 1 on and still powering on (its tween), Watch pressed: pending */
+  const pendingOn1 = () => {
+    let busy = true
+    const s = createState(6, 1, false)
+    s.visible = true
+    const h = hooks(() => busy)
+    ticks(s, h, 0.2)
+    expect(s.on).toBe(1)
+    watch(s, 1, h)
+    expect(s.pendingHolo).toBe(1)
+    return { s, h, done: () => (busy = false) }
+  }
+
+  it('forgets a pending Watch when the visitor goes to another set (the arrows, a tab, a click on a set)', () => {
+    const { s, h, done } = pendingOn1()
+    go(s, 2, h)
+    expect(s.pendingHolo).toBe(-1)
+    done()
+    ticks(s, h, 3)
+    expect(s.on).toBe(2)
+    // back to set 1 later, without Watch: no hologram of its own accord
+    go(s, 1, h)
+    ticks(s, h, 3)
+    expect(s.on).toBe(1)
+    expect(h.openHolo).not.toHaveBeenCalled()
+  })
+
+  it('keeps a pending Watch when the set it waits for is chosen again', () => {
+    const { s, h, done } = pendingOn1()
+    go(s, 1, h)
+    expect(s.pendingHolo).toBe(1)
+    done()
+    tick(s, DT, h)
+    expect(h.openHolo).toHaveBeenCalledWith(1)
+  })
+
+  it('forgets a pending Watch once a drag leaves its set, even if the drag comes back', () => {
+    const { s, h, done } = pendingOn1()
+    s.dragging = true
+    dragMove(s, 1.1, h)
+    expect(s.pendingHolo).toBe(1) // a small wobble keeps it
+    dragMove(s, 1.6, h)
+    expect(s.pendingHolo).toBe(-1)
+    dragMove(s, 1.05, h)
+    s.dragging = false
+    dragEnd(s, 0, h)
+    done()
+    ticks(s, h, 3)
+    expect(s.on).toBe(1)
+    expect(h.openHolo).not.toHaveBeenCalled()
+  })
+
+  it('forgets a pending Watch when a drag is thrown to another set', () => {
+    const { s, h } = pendingOn1()
+    s.dragging = true
+    dragMove(s, 1.2, h)
+    s.dragging = false
+    dragEnd(s, 9, h)
+    expect(s.target).not.toBe(1)
+    expect(s.pendingHolo).toBe(-1)
+  })
 })
 
 describe('the clock and the hologram’s camera blend', () => {

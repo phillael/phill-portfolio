@@ -74,10 +74,12 @@ function powerOff(s: VaultState, i: number, h: Hooks) {
   h.powerOff(i)
 }
 
-/** bring set i to the front (wrapping); false when it's already the target */
+/** bring set i to the front (wrapping); false when it's already the target. A Watch waiting for another set is
+ * dropped: the visitor moved on, and it mustn't open by itself when they come back */
 export function go(s: VaultState, i: number, h: Hooks) {
   i = ((i % s.n) + s.n) % s.n
   if (i === s.target) return false
+  if (s.pendingHolo !== i) s.pendingHolo = -1
   if (s.on >= 0 && s.on !== i) powerOff(s, s.on, h)
   s.target = i
   if (s.rm) {
@@ -94,10 +96,12 @@ export function watch(s: VaultState, i: number, h: Hooks) {
   s.pendingHolo = i
 }
 
-/** a sideways drag: the camera follows (a little past the ends), and the lit set powers off once it's left */
+/** a sideways drag: the camera follows (a little past the ends), and the lit set powers off once it's left; a
+ * pending Watch is dropped once the drag leaves its set */
 export function dragMove(s: VaultState, pos: number, h: Hooks) {
   s.pos = clamp(pos, -0.35, s.n - 1 + 0.35)
   s.vel = 0
+  if (s.pendingHolo >= 0 && Math.abs(s.pos - s.pendingHolo) > 0.3) s.pendingHolo = -1
   if (s.on >= 0 && Math.abs(s.pos - s.on) > 0.3) powerOff(s, s.on, h)
 }
 
@@ -105,6 +109,7 @@ export function dragMove(s: VaultState, pos: number, h: Hooks) {
 export function dragEnd(s: VaultState, vel: number, h: Hooks) {
   const to = releaseTarget(s.pos, vel, s.n)
   s.vel = vel
+  if (s.pendingHolo !== to) s.pendingHolo = -1
   if (s.on >= 0 && s.on !== to) powerOff(s, s.on, h)
   s.target = to
 }

@@ -5,6 +5,7 @@ import type { Project } from '@/types/content'
 import type { MediaEntry, Vault } from '@/lib/vault/vault'
 import { START } from '@/lib/vault/math'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { afterLoadIdle } from '@/lib/after-load-idle'
 import css from './Projects.module.css'
 
 const loadVault = () => import('@/lib/vault/vault')
@@ -18,9 +19,11 @@ type Props = { projects: Project[]; media: Record<string, MediaEntry> }
 
 /**
  * The Relic Vault's island: the stage (the hall's canvas, the arrows, the power button, the hint), the museum card
- * (six tab panels, all in the HTML), the exhibit names (the tab list) and the live region. The engine
- * (src/lib/vault/vault.ts, its own chunk with three) is imported once the section is within 800 px of the viewport;
- * it tells the island which exhibit is nearest (onNear: index changes only), and the island tells it where to go.
+ * (six tab panels, all in the HTML), the exhibit names (the tab list) and the live region. The engine's code
+ * (src/lib/vault/vault.ts, its own chunk with three) is warmed once the page has loaded and is idle, so three's
+ * evaluation (~60–100 ms on a slow phone) doesn't land in a scroll; the engine is made once the section is within
+ * 800 px of the viewport. It tells the island which exhibit is nearest (onNear: index changes only), and the island
+ * tells it where to go.
  * Without WebGL the stage shows the exhibit's poster in a CSS screen, and Watch still lifts the hologram from it.
  * A Watch pressed while the engine's chunk loads plays once it's made (within 4 s, if the visitor hasn't moved on);
  * if the engine can't be made at all (its chunk failed to load), the poster stays and Watch is disabled: the
@@ -56,6 +59,9 @@ const ProjectsVault = ({ projects, media }: Props) => {
     vaultRef.current?.setReducedMotion(reduced)
     vaultRef.current?.setPaused(reduced)
   }, [reduced])
+
+  // the engine's code, warmed in an idle moment after the page loads (not with Save-Data on)
+  useEffect(() => afterLoadIdle(() => void loadVault().catch(() => {})), [])
 
   // the engine, once the section nears
   useEffect(() => {

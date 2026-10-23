@@ -198,9 +198,17 @@ describe('ProjectsSection', () => {
     expect(screen.getByRole('button', { name: 'Next exhibit' })).toBeInTheDocument()
   })
 
-  it('imports the engine only once the section is within 800 px', async () => {
+  it('warms the engine’s code once the page is idle, but makes the engine only once the section is within 800 px', async () => {
+    const ric = jest.fn((cb: IdleRequestCallback) => {
+      cb({} as IdleDeadline)
+      return 1
+    })
+    const realRIC = window.requestIdleCallback
+    window.requestIdleCallback = ric
     render(<ProjectsSection />)
     await act(async () => {})
+    window.requestIdleCallback = realRIC
+    expect(ric).toHaveBeenCalledTimes(1)
     expect(mockCreate).not.toHaveBeenCalled()
     expect(observers.map((o) => o.margin)).toContain('800px 0px')
     await near()

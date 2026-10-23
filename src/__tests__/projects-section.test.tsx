@@ -71,10 +71,8 @@ describe('ProjectsSection', () => {
     const section = screen.getByRole('region', { name: 'Projects' })
     expect(section.id).toBe('projects')
     expect(screen.getByRole('heading', { level: 2, name: 'Projects' })).toBeInTheDocument()
-    expect(screen.getByText('The Relic Vault')).toHaveClass('neon-text-purple')
-    expect(
-      screen.getByText('Apps I built, recovered in the year 4789 and shown on what the museum believes are period-correct televisions.'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Some Stuff I Built')).toHaveClass('neon-text-purple')
+    expect(screen.getByText('Here are a few things I am working on in my free time.')).toBeInTheDocument()
   })
 
   it('has six tabs and six panels in the HTML, Number Slayers’ shown', () => {

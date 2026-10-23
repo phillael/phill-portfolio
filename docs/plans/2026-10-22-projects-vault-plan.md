@@ -75,8 +75,8 @@ Port its values exactly, unless this plan says otherwise:
 
 - **Header:**
   - eyebrow: `Projects`
-  - title: `The Relic Vault`
-  - lede: `Apps I built, recovered in the year 4789 and shown on what the museum believes are period-correct televisions.`
+  - title: `Some Stuff I Built` (Phill, 2026-10-23; was `The Relic Vault`)
+  - lede: `Here are a few things I am working on in my free time.` (Phill, 2026-10-23; was the year-4789 museum line)
 - **Card:**
   - meta: `Exhibit {NN} · Recovered from {year}`
   - name: `{title}`

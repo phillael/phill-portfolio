@@ -22,8 +22,8 @@ const ProjectsSection = () => (
       <h2 id="projects-h" className={css.eyebrow}>
         Projects
       </h2>
-      <p className={`${css.title} neon-text-purple`}>The Relic Vault</p>
-      <p className={css.lede}>Apps I built, recovered in the year 4789 and shown on what the museum believes are period-correct televisions.</p>
+      <p className={`${css.title} neon-text-purple`}>Some Stuff I Built</p>
+      <p className={css.lede}>Here are a few things I am working on in my free time.</p>
     </header>
     <ProjectsVault projects={projects} media={media} />
   </section>

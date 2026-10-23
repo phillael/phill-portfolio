@@ -38,7 +38,7 @@ describe('Data Architecture', () => {
         expect(proj.title).toBeDefined()
         expect(proj.description).toBeDefined()
         expect(Array.isArray(proj.techStack)).toBe(true)
-        // the vault's card and set: "Recovered from {year}", the television, "Displayed on {set}."
+        // the vault's data: the first commit's year (the Wizard reads it), the television, "Displayed on {set}."
         expect(Number.isInteger(proj.year)).toBe(true)
         expect(proj.year).toBeGreaterThanOrEqual(2015)
         expect(['pocket', 'tube', 'terminal', 'sphere', 'portable', 'console']).toContain(proj.tv)

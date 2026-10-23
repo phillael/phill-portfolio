@@ -15,7 +15,7 @@ export interface Project {
   title: string
   /** the tab's name when the title is long */
   short?: string
-  /** the repo's first commit: "Recovered from {year}" */
+  /** the year of the repo's first commit (the Wizard reads it; the card no longer shows it) */
   year: number
   tv: ProjectTv
   /** the caption: "Displayed on {set}." */

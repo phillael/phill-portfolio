@@ -187,9 +187,7 @@ const ProjectsVault = ({ projects, media }: Props) => {
             const internal = p.liveUrl?.startsWith('/') ?? false
             return (
               <div key={p.id} id={`pv-p-${p.id}`} className={css.card} role="tabpanel" aria-labelledby={`pv-t-${p.id}`} hidden={i !== sel}>
-                <p className={css.meta}>
-                  Exhibit {nn(i)} <span aria-hidden="true">·</span> Recovered from {p.year}
-                </p>
+                <p className={css.meta}>Exhibit {nn(i)}</p>
                 <h3 className={css.name}>{p.title}</h3>
                 <p className={css.desc}>{p.description}</p>
                 <p className={css.stack}>

@@ -116,7 +116,7 @@ describe('ProjectsSection', () => {
   it('shows Number Slayers’ card exactly', () => {
     render(<ProjectsSection />)
     const p = panel('number-slayers')
-    expect(p.querySelector('p')?.textContent).toBe('Exhibit 02 · Recovered from 2025')
+    expect(p.querySelector('p')?.textContent).toBe('Exhibit 02')
     expect(within(p).getByRole('heading', { level: 3 }).textContent).toBe('Number Slayers')
     expect(
       within(p).getByText(
@@ -132,7 +132,7 @@ describe('ProjectsSection', () => {
   it('shows Pickleball 2079’s card exactly, with no links', () => {
     render(<ProjectsSection />)
     const p = panel('pickleball-2079')
-    expect(p.querySelector('p')?.textContent).toBe('Exhibit 05 · Recovered from 2026')
+    expect(p.querySelector('p')?.textContent).toBe('Exhibit 05')
     expect(within(p).getByRole('heading', { level: 3, hidden: true }).textContent).toBe('Pickleball 2079')
     expect(
       within(p).getByText(

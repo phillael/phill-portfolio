@@ -17,7 +17,7 @@ The Projects section is scrapped and rebuilt as **the Relic Vault**: it's the ye
 - **The hall:** six sets stand on lit plinths in an arc, in a dark hall the camera stands inside.
   - The set in front powers on (dot → line → picture, a degauss wobble) and plays its project's brag video through a CRT shader. The others hiss static.
   - Drag or swipe, the arrows, a sideways trackpad swipe or the names under the hall bring the next set to the front.
-- **The card:** a glass museum card (a tab panel) gives the exhibit number, the year it was "recovered from", the name, the description, the stack, Watch, Live ↗ and Code ↗, and the set it's displayed on.
+- **The card:** a glass museum card (a tab panel) gives the exhibit number, the name, the description, the stack, Watch, Live ↗ and Code ↗, and the set it's displayed on.
 - **Watch:** the picture lifts out of the glass as a hologram, from the CRT's 4:3 crop out to the full video. The camera pulls back so the old set sits below it, beaming light up into it, and the backdrop dims all but that set. Esc, ✕ or a click outside sends it back into the glass.
 - **Phill is making the videos:** about 30 s, action-packed, one per app. Until they're in, the mockup's placeholder clips stand in (see §4 and the stop conditions).
 
@@ -78,7 +78,7 @@ Port its values exactly, unless this plan says otherwise:
   - title: `Some Stuff I Built` (Phill, 2026-10-23; was `The Relic Vault`)
   - lede: `Here are a few things I am working on in my free time.` (Phill, 2026-10-23; was the year-4789 museum line)
 - **Card:**
-  - meta: `Exhibit {NN} · Recovered from {year}`
+  - meta: `Exhibit {NN}` (Phill, 2026-10-23: "Recovered from {year}" dropped with the museum framing)
   - name: `{title}`
   - description: `{description}`
   - stack: the items joined by ` · `, with a hidden `Built with: ` before them

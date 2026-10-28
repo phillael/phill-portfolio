@@ -40,7 +40,6 @@ describe('ExperienceSection', () => {
       'TimelyCare',
       'Sessions',
       'Designit for Microsoft',
-      'phillcodes.com',
       'Guitarist & Composer',
     ])
     expect(screen.getByText('Now')).toBeInTheDocument()
@@ -93,10 +92,8 @@ describe('ExperienceSection', () => {
       expect(within(stop).getByText(job.line!)).toBeInTheDocument()
       expect(stop).toHaveTextContent(job.stack.join('·'))
     }
-    // the web basics on the two front-end jobs (Phill, 2026-10-16)
-    for (const company of ['Designit for Microsoft', 'phillcodes.com']) {
-      expect(career.jobs.find((j) => j.company === company)!.stack).toEqual(expect.arrayContaining(['JavaScript', 'HTML', 'CSS']))
-    }
+    // the web basics on the front-end job (Phill, 2026-10-16)
+    expect(career.jobs.find((j) => j.company === 'Designit for Microsoft')!.stack).toEqual(expect.arrayContaining(['JavaScript', 'HTML', 'CSS']))
     const music = screen.getByRole('heading', { level: 3, name: 'Guitarist & Composer' }).closest('li')!
     expect(within(music).getByText(career.music.dates)).toBeInTheDocument()
     expect(within(music).getByText(career.music.education)).toBeInTheDocument()

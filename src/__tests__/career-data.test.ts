@@ -36,7 +36,7 @@ describe('career data', () => {
     expect(timelycare.roles.map(({ title, dates }) => ({ title, dates }))).toEqual(resume.experience[0].roles)
 
     const earlier = career.jobs.slice(1)
-    expect(earlier.map((j) => j.company)).toEqual(['Sessions', 'Designit for Microsoft', 'phillcodes.com'])
+    expect(earlier.map((j) => j.company)).toEqual(['Sessions', 'Designit for Microsoft'])
     earlier.forEach((job, i) => {
       const entry = resume.earlier[i]
       expect(job.company).toBe(entry.company)

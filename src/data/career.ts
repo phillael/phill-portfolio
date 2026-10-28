@@ -114,7 +114,7 @@ const earlier = (company: string) => {
 export const career: Career = {
   headline: resume.headline,
   intro:
-    'Eight years shipping production software across web, mobile and cloud. Today I own platforms end to end, as engineer, designer and product manager, and build AI into them.',
+    'Shipping production software across web, mobile and cloud since 2021. Today I own platforms end to end, as engineer, designer and product manager, and build AI into them.',
   jobs: [
     {
       id: 'timelycare',

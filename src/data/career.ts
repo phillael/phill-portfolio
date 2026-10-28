@@ -57,7 +57,7 @@ export interface Career {
   /** resume.headline */
   headline: string
   intro: string
-  /** TimelyCare, Sessions, Designit for Microsoft, phillcodes.com */
+  /** TimelyCare, Sessions, Designit for Microsoft */
   jobs: CareerJob[]
   music: { title: string; company: string; dates: string; line: string; education: string }
   /** the Wizard's extra facts; never rendered on the page */
@@ -114,7 +114,7 @@ const earlier = (company: string) => {
 export const career: Career = {
   headline: resume.headline,
   intro:
-    'Eight years shipping production software across web, mobile and cloud. Today I own platforms end to end, as engineer, designer and product manager, and build AI into them.',
+    'Shipping production software across web, mobile and cloud since 2021. Today I own platforms end to end, as engineer, designer and product manager, and build AI into them.',
   jobs: [
     {
       id: 'timelycare',
@@ -194,15 +194,6 @@ export const career: Career = {
       tiles: [],
       line: 'Built accessible Azure product pages through 50% year-over-year growth, and raised team velocity 25%.',
       stack: ['C#', 'ASP.NET MVC', 'JavaScript', 'HTML', 'CSS', 'Accessibility'],
-    },
-    {
-      id: 'freelance',
-      ...earlier('phillcodes.com'),
-      blurb: 'Freelance',
-      current: false,
-      tiles: [],
-      line: 'Built client web apps end to end in React, TypeScript and Next.js.',
-      stack: ['React', 'Next.js', 'JavaScript', 'HTML', 'CSS', 'AWS'],
     },
   ],
   music: {
